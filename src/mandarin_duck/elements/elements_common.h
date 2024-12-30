@@ -32,6 +32,7 @@ struct ElementDataBinding {
 
 struct ElementMouseResult {
   bool is_hovered;
+  bool is_down;
   bool is_pressed;
   bool is_clicked;
   float click_rel_x;

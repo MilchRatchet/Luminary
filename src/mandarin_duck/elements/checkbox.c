@@ -38,7 +38,7 @@ bool element_checkbox(Window* window, Display* display, ElementCheckBoxArgs args
     *(bool*) args.data_binding = data->data;
   }
 
-  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &checkbox));
+  window_push_element(window, &checkbox);
 
   return mouse_result.is_clicked;
 }

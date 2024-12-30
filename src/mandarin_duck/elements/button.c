@@ -7,7 +7,7 @@
 static void _element_button_render_func(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
 
-  uint32_t color = (data->is_pressed) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
+  uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
 
   Color256 color256        = color256_set_1(color);
   Color256 mask_low16      = color256_set_1(0x00FF00FF);
@@ -55,7 +55,7 @@ bool element_button(Window* window, Display* display, ElementButtonArgs args) {
   data->hover_color = args.hover_color;
   data->press_color = args.press_color;
   data->is_hovered  = mouse_result.is_hovered;
-  data->is_pressed  = mouse_result.is_pressed;
+  data->is_down     = mouse_result.is_down;
 
   data->shape_size_id = 0;
 
@@ -67,7 +67,7 @@ bool element_button(Window* window, Display* display, ElementButtonArgs args) {
     }
   }
 
-  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &button));
+  window_push_element(window, &button);
 
   return mouse_result.is_clicked;
 }

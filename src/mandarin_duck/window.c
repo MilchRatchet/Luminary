@@ -14,6 +14,12 @@ void window_create(Window** window) {
   LUM_FAILURE_HANDLE(array_create(&(*window)->element_queue, sizeof(Element), 128));
 }
 
+void window_create_subwindow(Window* window) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  window_create(&window->external_subwindow);
+}
+
 void window_allocate_memory(Window* window) {
   MD_CHECK_NULL_ARGUMENT(window);
 
@@ -83,6 +89,34 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 
   window->element_has_hover = false;
 
+  switch (window->state_data.state) {
+    case WINDOW_INTERACTION_STATE_NONE:
+      break;
+    case WINDOW_INTERACTION_STATE_SLIDER:
+      if (display->mouse_state->down == false) {
+        window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
+        window->state_data.element_hash     = 0;
+        window->state_data.subelement_index = 0;
+
+        display_set_mouse_visible(display, true);
+      }
+      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
+      if (display->mouse_state->down == false) {
+        window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
+        window->state_data.element_hash     = 0;
+        window->state_data.subelement_index = 0;
+      }
+      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
+      window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
+      window->state_data.element_hash     = 0;
+      window->state_data.subelement_index = 0;
+      break;
+    default:
+      break;
+  }
+
   const bool elements_received_action = window->action_func(window, display, host);
   const bool is_mouse_hover           = window_is_mouse_hover(window, display);
 
@@ -106,23 +140,16 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
     }
   }
 
-  switch (window->state_data.state) {
-    case WINDOW_INTERACTION_STATE_NONE:
-      break;
-    case WINDOW_INTERACTION_STATE_SLIDER:
-      if (display->mouse_state->down == false) {
-        window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
-        window->state_data.element_hash     = 0;
-        window->state_data.subelement_index = 0;
-
-        display_set_mouse_visible(display, true);
-      }
-      break;
-    default:
-      break;
-  }
-
   return is_mouse_hover;
+}
+
+void window_push_element(Window* window, Element* element) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(element);
+
+  WindowContext* context = window->context_stack + window->context_stack_ptr;
+
+  LUM_FAILURE_HANDLE(array_push(&window->element_queue, element));
 }
 
 void window_margin(Window* window, uint32_t margin) {
@@ -212,6 +239,10 @@ void window_render(Window* window, Display* display) {
 void window_destroy(Window** window) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(*window);
+
+  if ((*window)->external_subwindow) {
+    window_destroy(&(*window)->external_subwindow);
+  }
 
   if ((*window)->background_blur_buffer) {
     LUM_FAILURE_HANDLE(host_free(&(*window)->background_blur_buffer));

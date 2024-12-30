@@ -254,7 +254,7 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
     display_set_mouse_visible(display, false);
   }
 
-  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &slider));
+  window_push_element(window, &slider);
 
   return updated_data;
 }

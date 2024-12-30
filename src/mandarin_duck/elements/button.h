@@ -15,7 +15,7 @@ struct ElementButtonData {
   uint32_t hover_color;
   uint32_t press_color;
   bool is_hovered;
-  bool is_pressed;
+  bool is_down;
 } typedef ElementButtonData;
 static_assert(sizeof(ElementButtonData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 

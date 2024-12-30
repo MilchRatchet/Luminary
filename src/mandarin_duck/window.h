@@ -35,12 +35,18 @@ struct WindowMargins {
   int32_t margin_bottom;
 } typedef WindowMargins;
 
-enum WindowInteractionState { WINDOW_INTERACTION_STATE_NONE, WINDOW_INTERACTION_STATE_SLIDER } typedef WindowInteractionState;
+enum WindowInteractionState {
+  WINDOW_INTERACTION_STATE_NONE,
+  WINDOW_INTERACTION_STATE_SLIDER,
+  WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER,
+  WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED
+} typedef WindowInteractionState;
 
 struct WindowInteractionStateData {
   WindowInteractionState state;
   uint64_t element_hash;
   uint32_t subelement_index;
+  uint32_t dropdown_selection;
 } typedef WindowInteractionStateData;
 
 #define WINDOW_MAX_CONTEXT_DEPTH 8
@@ -75,14 +81,17 @@ struct Window {
   uint32_t background_blur_buffer_ld;
   size_t background_blur_buffer_size;
   bool element_has_hover;
+  Window* external_subwindow;
 } typedef Window;
 
 void window_create(Window** window);
+void window_create_subwindow(Window* window);
 void window_allocate_memory(Window* window);
 
 bool window_is_mouse_hover(Window* window, Display* display);
 bool window_handle_input(Window* window, Display* display, LuminaryHost* host);
 
+void window_push_element(Window* window, Element* element);
 void window_margin(Window* window, uint32_t margin);
 void window_margin_relative(Window* window, float margin);
 void window_push_section(Window* window, uint32_t size, uint32_t padding);

@@ -26,7 +26,7 @@ bool element_color(Window* window, Display* display, ElementColorArgs args) {
 
   data->color = args.color;
 
-  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &color));
+  window_push_element(window, &color);
 
   return mouse_result.is_clicked;
 }

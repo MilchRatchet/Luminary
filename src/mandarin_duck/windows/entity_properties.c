@@ -4,6 +4,7 @@
 
 #include "elements/checkbox.h"
 #include "elements/color.h"
+#include "elements/dropdown.h"
 #include "elements/slider.h"
 #include "elements/text.h"
 
@@ -92,6 +93,33 @@ static bool _window_entity_properties_add_checkbox(Window* window, Display* disp
   return update_data;
 }
 
+static bool _window_entity_properties_add_dropdown(Window* window, Display* display, const char* text, void* data_binding) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  bool update_data = false;
+
+  window_push_section(window, 32, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.4f, .rel_height = 0.75f},
+        .text     = text,
+        .center_x = false,
+        .center_y = true});
+
+    if (element_dropdown(
+          window, display, (ElementDropdownArgs){.size = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f}})) {
+      update_data = true;
+    }
+  }
+  window_pop_section(window);
+
+  return update_data;
+}
+
 static bool _window_entity_properties_action(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -157,6 +185,8 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   update_data |=
     _window_entity_properties_add_slider(window, display, "Test", &camera.color_correction, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
 
+  _window_entity_properties_add_dropdown(window, display, "Test2", (void*) 0);
+
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }
@@ -171,7 +201,7 @@ void window_entity_properties_create(Window** window) {
 
   (*window)->x             = 128;
   (*window)->y             = 128;
-  (*window)->width         = 384;
+  (*window)->width         = 512;
   (*window)->height        = 512;
   (*window)->padding       = 8;
   (*window)->is_horizontal = false;
@@ -180,6 +210,8 @@ void window_entity_properties_create(Window** window) {
   (*window)->background    = true;
   (*window)->auto_size     = true;
   (*window)->action_func   = _window_entity_properties_action;
+
+  window_create_subwindow(*window);
 
   window_allocate_memory(*window);
 }
