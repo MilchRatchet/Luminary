@@ -31,6 +31,7 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
 void ui_renderer_render_rounded_box(
   UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size,
   uint32_t border_color, uint32_t background_color, UIRendererBackgroundMode background_mode);
+void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display);
 void ui_renderer_destroy(UIRenderer** renderer);
 
 #endif /* MANDARIN_DUCK_UI_RENDERER_H */

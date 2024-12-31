@@ -72,8 +72,19 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_GetDisplayUsableBounds(displays[0], &rect);
   SDL_GetDisplayBounds(displays[0], &screen_size);
 
+  // Add some margin to the usable bounds.
+  const uint32_t margin = 5;
+
+  rect.w = rect.w - 2 * margin;
+  rect.h = rect.h - 2 * margin;
+
   rect.w = min(rect.w, (int) width);
   rect.h = min(rect.h, (int) height);
+
+  // Make sure that the aspect ratio is maintained.
+  const float aspect_ratio = ((float) width) / ((float) height);
+
+  rect.w = rect.h * aspect_ratio;
 
   info_message("Size: %d %d", rect.w, rect.h);
 

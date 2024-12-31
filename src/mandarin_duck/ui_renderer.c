@@ -165,6 +165,68 @@ void ui_renderer_render_rounded_box(
     border_color, background_color, background_mode);
 }
 
+void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display) {
+  MD_CHECK_NULL_ARGUMENT(renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  uint32_t shape_mask_size = 0;
+
+  uint32_t shape_mask_size_id = 0xFFFFFFFF;
+  for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
+    const uint32_t size = renderer->shape_mask_size[size_id];
+
+    if (size < display->width && size >= shape_mask_size) {
+      shape_mask_size_id = size_id;
+      shape_mask_size    = size;
+    }
+  }
+
+  shape_mask_size = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->shape_mask_size[shape_mask_size_id] : renderer->block_mask_size;
+
+  const uint8_t* disk_mask = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->disk_mask[shape_mask_size_id] : renderer->block_mask;
+
+  const uint32_t shape_mask_half_size = shape_mask_size >> 1;
+  const uint32_t shape_mask_ld        = shape_mask_size * sizeof(LuminaryARGB8);
+
+  uint8_t* dst = display->buffer;
+
+  for (uint32_t row = 0; row < shape_mask_half_size; row++) {
+    uint32_t shape_col = 0;
+
+    for (uint32_t col = 0; col < shape_mask_half_size; col++) {
+      dst[col * sizeof(LuminaryARGB8) + 3] = disk_mask[shape_col * sizeof(LuminaryARGB8)];
+      shape_col++;
+    }
+
+    for (uint32_t col = display->width - shape_mask_half_size; col < display->width; col++) {
+      dst[col * sizeof(LuminaryARGB8) + 3] = disk_mask[shape_col * sizeof(LuminaryARGB8)];
+      shape_col++;
+    }
+
+    dst       = dst + display->ld;
+    disk_mask = disk_mask + shape_mask_ld;
+  }
+
+  dst = dst + display->ld * (display->height - 2 * shape_mask_half_size);
+
+  for (uint32_t row = display->height - shape_mask_half_size; row < display->height; row++) {
+    uint32_t shape_col = 0;
+
+    for (uint32_t col = 0; col < shape_mask_half_size; col++) {
+      dst[col * sizeof(LuminaryARGB8) + 3] = disk_mask[shape_col * sizeof(LuminaryARGB8)];
+      shape_col++;
+    }
+
+    for (uint32_t col = display->width - shape_mask_half_size; col < display->width; col++) {
+      dst[col * sizeof(LuminaryARGB8) + 3] = disk_mask[shape_col * sizeof(LuminaryARGB8)];
+      shape_col++;
+    }
+
+    dst       = dst + display->ld;
+    disk_mask = disk_mask + shape_mask_ld;
+  }
+}
+
 void ui_renderer_destroy(UIRenderer** renderer) {
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(*renderer);
