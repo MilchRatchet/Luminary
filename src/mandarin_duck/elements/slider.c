@@ -206,7 +206,7 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
 
   float mouse_change_rate = args.change_rate;
   if (display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down) {
-    mouse_change_rate = 0.1f * mouse_change_rate;
+    mouse_change_rate = 0.01f * mouse_change_rate;
   }
 
   switch (args.type) {

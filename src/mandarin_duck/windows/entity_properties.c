@@ -93,7 +93,7 @@ static bool _window_entity_properties_add_checkbox(Window* window, Display* disp
   return update_data;
 }
 
-static bool _window_entity_properties_add_dropdown(Window* window, Display* display, const char* text, void* data_binding) {
+static bool _window_entity_properties_add_dropdown(Window* window, Display* display, const char* text, uint32_t selected_index) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
 
@@ -111,7 +111,12 @@ static bool _window_entity_properties_add_dropdown(Window* window, Display* disp
         .center_y = true});
 
     if (element_dropdown(
-          window, display, (ElementDropdownArgs){.size = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f}})) {
+          window, display,
+          (ElementDropdownArgs){
+            .size           = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
+            .selected_index = selected_index,
+            .num_strings    = LUMINARY_TONEMAP_COUNT,
+            .strings        = (char**) luminary_strings_tonemap})) {
       update_data = true;
     }
   }
@@ -185,7 +190,7 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   update_data |=
     _window_entity_properties_add_slider(window, display, "Test", &camera.color_correction, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
 
-  _window_entity_properties_add_dropdown(window, display, "Test2", (void*) 0);
+  update_data |= _window_entity_properties_add_dropdown(window, display, "Test2", (uint32_t) camera.tonemap);
 
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));

@@ -79,13 +79,14 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 
   window->context_stack_ptr = 0;
 
-  window->context_stack[0].fill          = 0;
-  window->context_stack[0].x             = window->x;
-  window->context_stack[0].y             = window->y;
-  window->context_stack[0].width         = window->width;
-  window->context_stack[0].height        = window->height;
-  window->context_stack[0].padding       = window->padding;
-  window->context_stack[0].is_horizontal = window->is_horizontal;
+  window->context_stack[0] = (WindowContext){
+    .fill          = 0,
+    .x             = window->x,
+    .y             = window->y,
+    .width         = window->width,
+    .height        = window->height,
+    .padding       = window->padding,
+    .is_horizontal = window->is_horizontal};
 
   window->element_has_hover = false;
 
@@ -101,13 +102,17 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
         display_set_mouse_visible(display, true);
       }
       break;
-    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
-      if (display->mouse_state->down == false) {
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED: {
+      const bool subwindow_received_action = window_handle_input(window->external_subwindow, display, host);
+
+      if (display->mouse_state->down == true && !subwindow_received_action) {
         window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
         window->state_data.element_hash     = 0;
         window->state_data.subelement_index = 0;
       }
-      break;
+    }
+
+    break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
       window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
       window->state_data.element_hash     = 0;
@@ -146,8 +151,6 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 void window_push_element(Window* window, Element* element) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(element);
-
-  WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, element));
 }
@@ -233,6 +236,14 @@ void window_render(Window* window, Display* display) {
     Element* element = window->element_queue + element_id;
 
     element->render_func(element, display);
+  }
+
+  const bool render_subwindow =
+    (window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED
+     || window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER);
+
+  if (render_subwindow) {
+    window_render(window->external_subwindow, display);
   }
 }
 

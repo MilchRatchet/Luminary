@@ -52,6 +52,8 @@ struct WindowInteractionStateData {
 #define WINDOW_MAX_CONTEXT_DEPTH 8
 #define WINDOW_MAX_BLUR_MIP_COUNT 5
 #define WINDOW_MARGIN_INVALID INT32_MAX
+#define WINDOW_ROUNDING_SIZE 32
+#define WINDOW_DATA_SECTION_SIZE 4096
 
 /*
  * The Window is passed to each element so an element can resize itself based on window orientation (vertical/horizontal)
@@ -74,6 +76,7 @@ struct Window {
   WindowInteractionStateData state_data;
 
   // Runtime
+  uint8_t data[WINDOW_DATA_SECTION_SIZE];
   uint32_t context_stack_ptr;
   WindowContext context_stack[WINDOW_MAX_CONTEXT_DEPTH];
   Element* element_queue;

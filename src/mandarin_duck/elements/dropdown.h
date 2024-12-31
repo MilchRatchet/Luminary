@@ -12,7 +12,11 @@ struct ElementDropdownData {
 static_assert(sizeof(ElementDropdownData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
 struct ElementDropdownArgs {
+  char* identifier;
   ElementSize size;
+  uint32_t selected_index;
+  uint32_t num_strings;
+  char** strings;
 } typedef ElementDropdownArgs;
 
 bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args);

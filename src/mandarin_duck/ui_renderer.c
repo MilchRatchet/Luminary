@@ -141,7 +141,7 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
   if (window->y >= (int32_t) display->height)
     return;
 
-  const uint32_t rounding_size = (window->height >= 64) ? 32 : 0;
+  const uint32_t rounding_size = (window->height >= 64) ? WINDOW_ROUNDING_SIZE : 0;
   const uint32_t height        = (window->y + window->height > display->height) ? display->height - window->y : window->height;
 
   _ui_renderer_render_rounded_box(
