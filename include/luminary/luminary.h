@@ -21,6 +21,7 @@
 #include <luminary/api_utils.h>
 #include <luminary/error.h>
 #include <luminary/host.h>
+#include <luminary/name_strings.h>
 #include <luminary/path.h>
 #include <luminary/structs.h>
 
