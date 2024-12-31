@@ -112,7 +112,9 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED: {
       const bool subwindow_received_action = window_handle_input(window->external_subwindow, display, host);
 
-      if (display->mouse_state->down == true && !subwindow_received_action) {
+      window->external_subwindow->propagate_parent_func(window->external_subwindow, window);
+
+      if (display->mouse_state->phase == MOUSE_PHASE_RELEASED && !subwindow_received_action) {
         window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
         window->state_data.element_hash     = 0;
         window->state_data.subelement_index = 0;

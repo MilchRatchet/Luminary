@@ -73,6 +73,7 @@ struct Window {
   bool auto_align;
   bool auto_size;
   bool (*action_func)(Window* window, Display* display, LuminaryHost* host);
+  void (*propagate_parent_func)(Window* window, Window* parent);
   WindowInteractionStateData state_data;
 
   // Runtime

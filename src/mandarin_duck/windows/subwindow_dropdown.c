@@ -21,21 +21,26 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
 
   SubwindowDropdownData* data = (SubwindowDropdownData*) window->data;
 
+  bool received_click = false;
+
   for (uint32_t string_id = 0; string_id < data->num_strings; string_id++) {
     window_margin(window, 4);
-    element_text(
-      window, display,
-      (ElementTextArgs){
-        .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-        .color        = 0xFFFFFFFF,
-        .text         = data->strings[string_id],
-        .center_x     = true,
-        .center_y     = true,
-        .highlighting = true});
+    if (element_text(
+          window, display,
+          (ElementTextArgs){
+            .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+            .color        = 0xFFFFFFFF,
+            .text         = data->strings[string_id],
+            .center_x     = true,
+            .center_y     = true,
+            .highlighting = true})) {
+      data->selected_index = string_id;
+      received_click       = true;
+    }
     window_margin(window, 4);
   }
 
-  return false;
+  return received_click;
 }
 
 void subwindow_dropdown_add_string(Window* window, const char* string) {
@@ -60,20 +65,30 @@ void subwindow_dropdown_add_string(Window* window, const char* string) {
   data->num_strings++;
 }
 
+void _subwindow_dropdown_propagate_parent(Window* window, Window* parent) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(parent);
+
+  SubwindowDropdownData* data = (SubwindowDropdownData*) window->data;
+
+  parent->state_data.dropdown_selection = data->selected_index;
+}
+
 void subwindow_dropdown_create(Window* window, uint32_t selected_index, uint32_t width, uint32_t x, uint32_t y) {
   MD_CHECK_NULL_ARGUMENT(window);
 
-  window->x             = x;
-  window->y             = y;
-  window->width         = width;
-  window->height        = WINDOW_ROUNDING_SIZE;
-  window->padding       = WINDOW_ROUNDING_SIZE >> 1;
-  window->is_horizontal = false;
-  window->is_visible    = true;
-  window->is_movable    = false;
-  window->background    = true;
-  window->auto_size     = true;
-  window->action_func   = _subwindow_dropdown_action;
+  window->x                     = x;
+  window->y                     = y;
+  window->width                 = width;
+  window->height                = WINDOW_ROUNDING_SIZE;
+  window->padding               = WINDOW_ROUNDING_SIZE >> 1;
+  window->is_horizontal         = false;
+  window->is_visible            = true;
+  window->is_movable            = false;
+  window->background            = true;
+  window->auto_size             = true;
+  window->action_func           = _subwindow_dropdown_action;
+  window->propagate_parent_func = _subwindow_dropdown_propagate_parent;
 
   SubwindowDropdownData* data = (SubwindowDropdownData*) window->data;
 

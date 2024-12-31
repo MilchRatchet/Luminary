@@ -93,7 +93,8 @@ static bool _window_entity_properties_add_checkbox(Window* window, Display* disp
   return update_data;
 }
 
-static bool _window_entity_properties_add_dropdown(Window* window, Display* display, const char* text, uint32_t selected_index) {
+static bool _window_entity_properties_add_dropdown(
+  Window* window, Display* display, const char* text, uint32_t num_strings, char** strings, uint32_t* selected_index) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
 
@@ -114,10 +115,11 @@ static bool _window_entity_properties_add_dropdown(Window* window, Display* disp
     if (element_dropdown(
           window, display,
           (ElementDropdownArgs){
+            .identifier = text,
             .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
             .selected_index = selected_index,
-            .num_strings    = LUMINARY_TONEMAP_COUNT,
-            .strings        = (char**) luminary_strings_tonemap})) {
+            .num_strings    = num_strings,
+            .strings        = strings})) {
       update_data = true;
     }
   }
@@ -134,20 +136,21 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
-  window_push_section(window, 24, 0);
-  {
-    window_margin_relative(window, 0.25f);
-    element_text(
-      window, display,
-      (ElementTextArgs){
-        .color        = 0xFFFFFFFF,
-        .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.5f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text         = "Camera",
-        .center_x     = true,
-        .center_y     = true,
-        .highlighting = false});
-  }
-  window_pop_section(window);
+  uint32_t tonemap        = (uint32_t) camera.tonemap;
+  uint32_t filter         = (uint32_t) camera.filter;
+  uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
+
+  element_text(
+    window, display,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Camera",
+      .center_x     = true,
+      .center_y     = true,
+      .highlighting = false});
+
+  window_margin(window, 16);
 
   bool update_data = false;
 
@@ -159,8 +162,17 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
     window, display, "Field of View", &camera.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   update_data |= _window_entity_properties_add_slider(
     window, display, "Aperture Size", &camera.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    window, display, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+
+  if (camera.aperture_size > 0.0f) {
+    update_data |= _window_entity_properties_add_dropdown(
+      window, display, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
+
+    if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
+      update_data |= _window_entity_properties_add_slider(
+        window, display, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+    }
+  }
+
   update_data |= _window_entity_properties_add_slider(
     window, display, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   update_data |= _window_entity_properties_add_checkbox(window, display, "Firefly Clamping", &camera.do_firefly_clamping);
@@ -169,6 +181,8 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
 
   // TODO: Add separator
 
+  update_data |=
+    _window_entity_properties_add_dropdown(window, display, "Tonemap", LUMINARY_TONEMAP_COUNT, (char**) luminary_strings_tonemap, &tonemap);
   update_data |= _window_entity_properties_add_slider(
     window, display, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
   update_data |= _window_entity_properties_add_slider(
@@ -187,14 +201,18 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       window, display, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
   }
 
+  update_data |=
+    _window_entity_properties_add_dropdown(window, display, "Filter", LUMINARY_FILTER_COUNT, (char**) luminary_strings_filter, &filter);
   update_data |= _window_entity_properties_add_checkbox(window, display, "Dithering", &camera.dithering);
 
   update_data |=
     _window_entity_properties_add_slider(window, display, "Test", &camera.color_correction, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
 
-  update_data |= _window_entity_properties_add_dropdown(window, display, "Test2", (uint32_t) camera.tonemap);
-
   if (update_data) {
+    camera.tonemap        = (LuminaryToneMap) tonemap;
+    camera.filter         = (LuminaryFilter) filter;
+    camera.aperture_shape = (LuminaryApertureShape) aperture_shape;
+
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }
 
