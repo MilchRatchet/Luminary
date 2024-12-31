@@ -41,6 +41,13 @@ void window_allocate_memory(Window* window) {
 }
 
 static bool window_is_mouse_hover(Window* window, Display* display) {
+  if (window->is_visible == false)
+    return false;
+
+  if (window->external_subwindow && window_is_mouse_hover(window->external_subwindow, display)) {
+    return true;
+  }
+
   const MouseState* mouse_state = display->mouse_state;
 
   const int32_t mouse_x = mouse_state->x;

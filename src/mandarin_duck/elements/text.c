@@ -6,6 +6,12 @@
 static void _element_text_render_func(Element* text, Display* display) {
   ElementTextData* data = (ElementTextData*) &text->data;
 
+  if (data->highlighted) {
+    ui_renderer_render_rounded_box(
+      display->ui_renderer, display, text->width + 2 * data->highlight_padding, text->height, text->x - data->highlight_padding, text->y, 0,
+      0, 0xFF998890, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
+  }
+
   SDL_Surface* surface;
   text_renderer_render(display->text_renderer, data->text, TEXT_RENDERER_FONT_REGULAR, &surface);
 
@@ -60,6 +66,9 @@ bool element_text(Window* window, Display* display, ElementTextArgs args) {
 
   ElementMouseResult mouse_result;
   element_apply_context(&text, context, &args.size, display, &mouse_result);
+
+  data->highlighted       = args.highlighting && mouse_result.is_hovered;
+  data->highlight_padding = context->padding;
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &text));
 

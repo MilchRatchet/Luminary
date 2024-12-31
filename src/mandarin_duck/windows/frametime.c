@@ -20,10 +20,11 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.35f, .rel_height = 1.0f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = "Luminary:",
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     char text[256];
 
@@ -36,10 +37,11 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.325f, .rel_height = 1.0f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * time);
 
@@ -47,10 +49,11 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.325f, .rel_height = 1.0f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
   }
   window_pop_section(window);
 
@@ -62,10 +65,11 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.35f, .rel_height = 1.0f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = "Mandarin Duck:",
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     char text[256];
 
@@ -75,10 +79,11 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.325f, .rel_height = 1.0f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * display->frametime);
 
@@ -86,10 +91,11 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.325f, .rel_height = 1.0f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
   }
   window_pop_section(window);
 

@@ -22,20 +22,22 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display,
         (ElementTextArgs){
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.is_relative = true, .rel_width = 0.2f, .rel_height = 1.0f},
-          .text     = "Host:",
-          .center_x = false,
-          .center_y = true});
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+          .text         = "Host:",
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false});
 
       element_text(
         window, display,
         (ElementTextArgs){
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.is_relative = true, .rel_width = 0.6f, .rel_height = 1.0f},
-          .text     = string,
-          .center_x = false,
-          .center_y = true});
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
+          .text         = string,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false});
 
       char text[256];
 
@@ -47,11 +49,12 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display,
         (ElementTextArgs){
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.is_relative = true, .rel_width = 0.2f, .rel_height = 1.0f},
-          .text     = text,
-          .center_x = false,
-          .center_y = true});
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+          .text         = text,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false});
     }
     window_pop_section(window);
   }
@@ -66,20 +69,22 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display,
         (ElementTextArgs){
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.is_relative = true, .rel_width = 0.2f, .rel_height = 1.0f},
-          .text     = "Device:",
-          .center_x = false,
-          .center_y = true});
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+          .text         = "Device:",
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false});
 
       element_text(
         window, display,
         (ElementTextArgs){
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.is_relative = true, .rel_width = 0.6f, .rel_height = 1.0f},
-          .text     = string,
-          .center_x = false,
-          .center_y = true});
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
+          .text         = string,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false});
 
       char text[256];
 
@@ -91,11 +96,12 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display,
         (ElementTextArgs){
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.is_relative = true, .rel_width = 0.2f, .rel_height = 1.0f},
-          .text     = text,
-          .center_x = false,
-          .center_y = true});
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+          .text         = text,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false});
     }
     window_pop_section(window);
   }

@@ -22,10 +22,11 @@ static bool _window_entity_properties_add_slider(
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.4f, .rel_height = 0.75f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
       LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
@@ -36,8 +37,7 @@ static bool _window_entity_properties_add_slider(
       color_bits |= ((uint32_t) fminf(255.0f, fmaxf(0.0f, (color.g * 255.0f)))) << 8;
       color_bits |= ((uint32_t) fminf(255.0f, fmaxf(0.0f, (color.b * 255.0f)))) << 0;
 
-      element_color(
-        window, display, (ElementColorArgs){.size = (ElementSize){.is_relative = false, .width = 24, .height = 24}, .color = color_bits});
+      element_color(window, display, (ElementColorArgs){.size = (ElementSize){.width = 24, .height = 24}, .color = color_bits});
 
       window_margin(window, 4);
     }
@@ -45,10 +45,10 @@ static bool _window_entity_properties_add_slider(
     if (element_slider(
           window, display,
           (ElementSliderArgs){
-            .identifier        = text,
-            .type              = data_type,
-            .color             = 0xFFFFFFFF,
-            .size              = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
+            .identifier = text,
+            .type       = data_type,
+            .color      = 0xFFFFFFFF,
+            .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
             .data_binding      = data_binding,
             .min               = min,
             .max               = max,
@@ -77,14 +77,14 @@ static bool _window_entity_properties_add_checkbox(Window* window, Display* disp
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.4f, .rel_height = 0.75f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     if (element_checkbox(
-          window, display,
-          (ElementCheckBoxArgs){.size = (ElementSize){.is_relative = false, .width = 24, .height = 24}, .data_binding = data_binding})) {
+          window, display, (ElementCheckBoxArgs){.size = (ElementSize){.width = 24, .height = 24}, .data_binding = data_binding})) {
       update_data = true;
     }
   }
@@ -105,15 +105,16 @@ static bool _window_entity_properties_add_dropdown(Window* window, Display* disp
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.4f, .rel_height = 0.75f},
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
         .text     = text,
         .center_x = false,
-        .center_y = true});
+        .center_y = true,
+        .highlighting = false});
 
     if (element_dropdown(
           window, display,
           (ElementDropdownArgs){
-            .size           = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
+            .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
             .selected_index = selected_index,
             .num_strings    = LUMINARY_TONEMAP_COUNT,
             .strings        = (char**) luminary_strings_tonemap})) {
@@ -139,11 +140,12 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
     element_text(
       window, display,
       (ElementTextArgs){
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
-        .text     = "Camera",
-        .center_x = true,
-        .center_y = true});
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.5f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .text         = "Camera",
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = false});
   }
   window_pop_section(window);
 

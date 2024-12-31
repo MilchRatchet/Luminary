@@ -13,7 +13,7 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display,
         (ElementButtonArgs){
-          .size        = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
           .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
           .color       = 0xFFFF5F57,
           .hover_color = 0xFFFF1411,
@@ -26,7 +26,7 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display,
         (ElementButtonArgs){
-          .size        = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
           .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
           .color       = 0xFFFFBB2F,
           .hover_color = 0xFFFFD51A,
@@ -39,7 +39,7 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display,
         (ElementButtonArgs){
-          .size        = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
           .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
           .color       = 0xFF26C942,
           .hover_color = 0xFF13FF21,

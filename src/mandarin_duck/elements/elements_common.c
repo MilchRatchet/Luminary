@@ -7,12 +7,13 @@
 
 void element_apply_context(
   Element* element, WindowContext* context, ElementSize* size, Display* display, ElementMouseResult* mouse_result) {
-  if (size->is_relative) {
-    const float rel_width  = fminf(1.0f, fmaxf(0.0f, size->rel_width));
-    const float rel_height = fminf(1.0f, fmaxf(0.0f, size->rel_height));
+  if (size->width != ELEMENT_SIZE_INVALID) {
+    element->width = size->width;
+  }
+  else {
+    const float rel_width = fminf(1.0f, fmaxf(0.0f, size->rel_width));
 
-    element->width  = (uint32_t) ((context->width - 2 * context->padding) * rel_width);
-    element->height = (uint32_t) ((context->height - 2 * context->padding) * rel_height);
+    element->width = (uint32_t) ((context->width - 2 * context->padding) * rel_width);
 
     // If the element has a relative size, we clamp it to fit into the bounds of the context.
     if (context->is_horizontal) {
@@ -20,15 +21,22 @@ void element_apply_context(
                          ? element->width
                          : context->width - context->fill - 2 * context->padding;
     }
-    else {
+  }
+
+  if (size->height != ELEMENT_SIZE_INVALID) {
+    element->height = size->height;
+  }
+  else {
+    const float rel_height = fminf(1.0f, fmaxf(0.0f, size->rel_height));
+
+    element->height = (uint32_t) ((context->height - 2 * context->padding) * rel_height);
+
+    // If the element has a relative size, we clamp it to fit into the bounds of the context.
+    if (!context->is_horizontal) {
       element->height = (context->fill + element->height + 2 * context->padding <= context->height)
                           ? element->height
                           : context->height - context->fill - 2 * context->padding;
     }
-  }
-  else {
-    element->width  = size->width;
-    element->height = size->height;
   }
 
   element->x = context->x + context->padding + ((context->is_horizontal) ? context->fill : 0);

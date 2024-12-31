@@ -22,18 +22,17 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
   SubwindowDropdownData* data = (SubwindowDropdownData*) window->data;
 
   for (uint32_t string_id = 0; string_id < data->num_strings; string_id++) {
-    window_push_section(window, 32, 0);
-    {
-      element_text(
-        window, display,
-        (ElementTextArgs){
-          .size     = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
-          .color    = 0xFFFFFFFF,
-          .text     = data->strings[string_id],
-          .center_x = false,
-          .center_y = true});
-    }
-    window_pop_section(window);
+    window_margin(window, 4);
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+        .color        = 0xFFFFFFFF,
+        .text         = data->strings[string_id],
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = true});
+    window_margin(window, 4);
   }
 
   return false;
@@ -67,11 +66,11 @@ void subwindow_dropdown_create(Window* window, uint32_t selected_index, uint32_t
   window->x             = x;
   window->y             = y;
   window->width         = width;
-  window->height        = 512;
+  window->height        = WINDOW_ROUNDING_SIZE;
   window->padding       = WINDOW_ROUNDING_SIZE >> 1;
   window->is_horizontal = false;
   window->is_visible    = true;
-  window->is_movable    = true;
+  window->is_movable    = false;
   window->background    = true;
   window->auto_size     = true;
   window->action_func   = _subwindow_dropdown_action;
