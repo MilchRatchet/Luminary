@@ -19,6 +19,6 @@ struct ElementDropdownArgs {
   char** strings;
 } typedef ElementDropdownArgs;
 
-bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args);
+bool element_dropdown(Window* window, const MouseState* mouse_state, ElementDropdownArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_DROPDOWN_H */

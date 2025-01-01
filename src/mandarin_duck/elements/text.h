@@ -28,6 +28,6 @@ struct ElementTextArgs {
   bool cache_text;
 } typedef ElementTextArgs;
 
-bool element_text(Window* window, Display* display, ElementTextArgs args);
+bool element_text(Window* window, const MouseState* mouse_state, ElementTextArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_TEXT_H */

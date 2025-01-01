@@ -5,6 +5,8 @@
 #include "display.h"
 #include "ui_renderer_blur.h"
 
+static uint64_t __window_depth_counter = 1;
+
 void window_create(Window** window) {
   MD_CHECK_NULL_ARGUMENT(window);
 
@@ -12,6 +14,9 @@ void window_create(Window** window) {
   memset(*window, 0, sizeof(Window));
 
   LUM_FAILURE_HANDLE(array_create(&(*window)->element_queue, sizeof(Element), 128));
+
+  (*window)->depth        = __window_depth_counter++;
+  (*window)->is_subwindow = false;
 }
 
 void window_create_subwindow(Window* window) {
@@ -40,15 +45,13 @@ void window_allocate_memory(Window* window) {
   window->background_blur_buffer_size = required_background_blur_buffer_size;
 }
 
-static bool window_is_mouse_hover(Window* window, Display* display) {
+bool window_is_mouse_hover(Window* window, Display* display, const MouseState* mouse_state) {
   if (window->is_visible == false)
     return false;
 
-  if (window->external_subwindow && window_is_mouse_hover(window->external_subwindow, display)) {
+  if (window->external_subwindow && window_is_mouse_hover(window->external_subwindow, display, mouse_state)) {
     return true;
   }
-
-  const MouseState* mouse_state = display->mouse_state;
 
   const int32_t mouse_x = mouse_state->x;
   const int32_t mouse_y = mouse_state->y;
@@ -64,9 +67,13 @@ static void _window_reset_state(Window* window) {
   window->state_data.element_hash       = 0;
   window->state_data.subelement_index   = 0;
   window->state_data.dropdown_selection = 0;
+
+  if (window->external_subwindow) {
+    window->external_subwindow->is_visible = false;
+  }
 }
 
-bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
+bool window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -95,11 +102,12 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 
   switch (window->state_data.state) {
     case WINDOW_INTERACTION_STATE_NONE:
+    default:
       break;
     case WINDOW_INTERACTION_STATE_DRAG:
-      if (display->mouse_state->down) {
-        window->x += display->mouse_state->x_motion;
-        window->y += display->mouse_state->y_motion;
+      if (mouse_state->down) {
+        window->x += mouse_state->x_motion;
+        window->y += mouse_state->y_motion;
 
         if (window->x < 0)
           window->x = 0;
@@ -109,25 +117,25 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 
         if (window->y < 0)
           window->y = 0;
+
+        mouse_state_reset_button(mouse_state);
       }
       else {
         _window_reset_state(window);
       }
       break;
     case WINDOW_INTERACTION_STATE_SLIDER:
-      if (display->mouse_state->down == false) {
+      if (mouse_state->down == false) {
         _window_reset_state(window);
         display_set_mouse_visible(display, true);
       }
       break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
-      window_handle_input(window->external_subwindow, display, host);
+      window_handle_input(window->external_subwindow, display, host, mouse_state);
       window->external_subwindow->propagate_parent_func(window->external_subwindow, window);
       break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
       _window_reset_state(window);
-      break;
-    default:
       break;
   }
 
@@ -142,38 +150,42 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
     .padding       = window->padding,
     .is_horizontal = window->is_horizontal};
 
-  const bool elements_received_action = window->action_func(window, display, host);
-  const bool is_mouse_hover           = window_is_mouse_hover(window, display);
+  const bool elements_received_action = window->action_func(window, display, host, mouse_state);
+  const bool is_mouse_hover           = window_is_mouse_hover(window, display, mouse_state);
 
   switch (window->state_data.state) {
     case WINDOW_INTERACTION_STATE_NONE:
-      break;
     case WINDOW_INTERACTION_STATE_DRAG:
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
+    default:
       break;
     case WINDOW_INTERACTION_STATE_SLIDER:
+      if (mouse_state->down == true) {
+        mouse_state_reset_button(mouse_state);
+      }
       break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
-      if (display->mouse_state->phase == MOUSE_PHASE_RELEASED) {
+      if (mouse_state->phase == MOUSE_PHASE_RELEASED) {
         _window_reset_state(window);
       }
       break;
-    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
-      break;
-    default:
-      break;
-  }
-
-  if (elements_received_action) {
-    return true;
   }
 
   if (is_mouse_hover && !window->element_has_hover && window->is_movable && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
-    if (display->mouse_state->down) {
+    if (mouse_state->down && !elements_received_action) {
       window->state_data.state = WINDOW_INTERACTION_STATE_DRAG;
     }
   }
 
-  return is_mouse_hover;
+  if (is_mouse_hover && mouse_state->down && !window->fixed_depth) {
+    window->depth = __window_depth_counter++;
+
+    if (window->is_subwindow == false) {
+      mouse_state_reset_button(mouse_state);
+    }
+  }
+
+  return is_mouse_hover || elements_received_action;
 }
 
 void window_push_element(Window* window, Element* element) {

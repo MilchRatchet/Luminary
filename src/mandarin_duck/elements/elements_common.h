@@ -34,7 +34,8 @@ struct ElementMouseResult {
   float click_rel_y;
 } typedef ElementMouseResult;
 
-void element_apply_context(Element* element, WindowContext* context, ElementSize* size, Display* display, ElementMouseResult* mouse_result);
+void element_apply_context(
+  Element* element, WindowContext* context, ElementSize* size, const MouseState* mouse_state, ElementMouseResult* mouse_result);
 uint64_t element_compute_hash(const char* identifier);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_COMMON_H */

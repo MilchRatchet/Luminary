@@ -6,7 +6,7 @@
 #include "display.h"
 #include "elements/text.h"
 
-static bool _window_renderer_status_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _window_renderer_status_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -20,7 +20,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       window_margin(window, 8);
 
       element_text(
-        window, display,
+        window, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -31,7 +31,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .cache_text   = true});
 
       element_text(
-        window, display,
+        window, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
@@ -49,7 +49,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       sprintf(text, "(%.2fs)", time);
 
       element_text(
-        window, display,
+        window, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -70,7 +70,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       window_margin(window, 8);
 
       element_text(
-        window, display,
+        window, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -81,7 +81,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .cache_text   = true});
 
       element_text(
-        window, display,
+        window, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
@@ -99,7 +99,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       sprintf(text, "(%.2fs)", time);
 
       element_text(
-        window, display,
+        window, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -134,6 +134,7 @@ void window_renderer_status_create(Window** window) {
   (*window)->margins =
     (WindowMargins){.margin_bottom = 32, .margin_right = 32, .margin_left = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_renderer_status_action;
+  (*window)->fixed_depth = true;
 
   window_allocate_memory(*window);
 }

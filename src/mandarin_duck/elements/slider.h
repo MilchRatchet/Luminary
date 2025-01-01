@@ -6,6 +6,8 @@
 #include "elements_common.h"
 #include "utils.h"
 
+struct KeyboardState typedef KeyboardState;
+
 enum ElementSliderDataType {
   ELEMENT_SLIDER_DATA_TYPE_FLOAT,
   ELEMENT_SLIDER_DATA_TYPE_UINT,
@@ -44,6 +46,7 @@ struct ElementSliderArgs {
   bool center_y;
 } typedef ElementSliderArgs;
 
-bool element_slider(Window* window, Display* display, ElementSliderArgs args);
+bool element_slider(
+  Window* window, Display* display, const MouseState* mouse_state, const KeyboardState* keyboard_state, ElementSliderArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_SLIDER_H */

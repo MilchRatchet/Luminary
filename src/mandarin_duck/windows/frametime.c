@@ -7,7 +7,7 @@
 #include "display.h"
 #include "elements/text.h"
 
-static bool _window_frametime_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _window_frametime_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -17,7 +17,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     window_margin(window, 8);
 
     element_text(
-      window, display,
+      window, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -35,7 +35,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     sprintf(text, "%.1f SPPS", 1.0 / time);
 
     element_text(
-      window, display,
+      window, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -48,7 +48,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     sprintf(text, "(%.2fms)", 1000.0 * time);
 
     element_text(
-      window, display,
+      window, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -65,7 +65,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     window_margin(window, 8);
 
     element_text(
-      window, display,
+      window, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -80,7 +80,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     sprintf(text, "%.1f FPS", 1.0 / display->frametime);
 
     element_text(
-      window, display,
+      window, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -93,7 +93,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     sprintf(text, "(%.2fms)", 1000.0 * display->frametime);
 
     element_text(
-      window, display,
+      window, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -127,6 +127,7 @@ void window_frametime_create(Window** window) {
   (*window)->margins =
     (WindowMargins){.margin_bottom = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_frametime_action;
+  (*window)->fixed_depth = true;
 
   window_allocate_memory(*window);
 }

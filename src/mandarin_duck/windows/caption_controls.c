@@ -5,13 +5,13 @@
 
 #define CAPTION_CONTROL_BUTTON_SIZE 16
 
-static bool _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
   if (element_button(
-        window, display,
+        window, display, mouse_state,
         (ElementButtonArgs){
           .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
           .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
@@ -24,7 +24,7 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   window_margin(window, CAPTION_CONTROL_BUTTON_SIZE);
 
   if (element_button(
-        window, display,
+        window, display, mouse_state,
         (ElementButtonArgs){
           .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
           .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
@@ -37,7 +37,7 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   window_margin(window, CAPTION_CONTROL_BUTTON_SIZE);
 
   if (element_button(
-        window, display,
+        window, display, mouse_state,
         (ElementButtonArgs){
           .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
           .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
@@ -68,6 +68,7 @@ void window_caption_controls_create(Window** window) {
   (*window)->margins =
     (WindowMargins){.margin_top = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_caption_controls_action;
+  (*window)->fixed_depth = true;
 
   window_allocate_memory(*window);
 }

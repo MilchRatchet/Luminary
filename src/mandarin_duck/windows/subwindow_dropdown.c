@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "display.h"
 #include "elements/text.h"
 
 #define SUBWINDOW_DROPDOWN_MAX_NUM_STRINGS 12
@@ -14,7 +15,7 @@ struct SubwindowDropdownData {
 } typedef SubwindowDropdownData;
 static_assert(sizeof(SubwindowDropdownData) <= WINDOW_DATA_SECTION_SIZE, "Window data exceeds allocated size.");
 
-static bool _subwindow_dropdown_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _subwindow_dropdown_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -26,7 +27,7 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
   for (uint32_t string_id = 0; string_id < data->num_strings; string_id++) {
     window_margin(window, 4);
     if (element_text(
-          window, display,
+          window, mouse_state,
           (ElementTextArgs){
             .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
             .color        = 0xFFFFFFFF,
@@ -90,6 +91,9 @@ void subwindow_dropdown_create(Window* window, uint32_t selected_index, uint32_t
   window->auto_size             = true;
   window->action_func           = _subwindow_dropdown_action;
   window->propagate_parent_func = _subwindow_dropdown_propagate_parent;
+  window->fixed_depth           = true;
+  window->depth                 = UINT64_MAX;
+  window->is_subwindow          = true;
 
   SubwindowDropdownData* data = (SubwindowDropdownData*) window->data;
 

@@ -139,7 +139,7 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
 
   keyboard_state_reset_phases(display->keyboard_state);
   mouse_state_reset_motion(display->mouse_state);
-  mouse_state_reset_button(display->mouse_state);
+  mouse_state_step_phase(display->mouse_state);
 
   SDL_Event event;
 

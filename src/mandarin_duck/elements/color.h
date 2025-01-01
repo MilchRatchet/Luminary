@@ -16,6 +16,6 @@ struct ElementColorArgs {
   uint32_t color;
 } typedef ElementColorArgs;
 
-bool element_color(Window* window, Display* display, ElementColorArgs args);
+bool element_color(Window* window, const MouseState* mouse_state, ElementColorArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_COLOR_H */

@@ -12,9 +12,8 @@ static void _element_checkbox_render_func(Element* checkbox, Display* display) {
     UI_RENDERER_BACKGROUND_MODE_OPAQUE);
 }
 
-bool element_checkbox(Window* window, Display* display, ElementCheckBoxArgs args) {
+bool element_checkbox(Window* window, const MouseState* mouse_state, ElementCheckBoxArgs args) {
   MD_CHECK_NULL_ARGUMENT(window);
-  MD_CHECK_NULL_ARGUMENT(display);
 
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
@@ -29,7 +28,7 @@ bool element_checkbox(Window* window, Display* display, ElementCheckBoxArgs args
   data->size = args.size;
 
   ElementMouseResult mouse_result;
-  element_apply_context(&checkbox, context, &args.size, display, &mouse_result);
+  element_apply_context(&checkbox, context, &args.size, mouse_state, &mouse_result);
 
   data->data = *(bool*) args.data_binding;
 

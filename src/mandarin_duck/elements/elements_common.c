@@ -6,7 +6,7 @@
 #include "window.h"
 
 void element_apply_context(
-  Element* element, WindowContext* context, ElementSize* size, Display* display, ElementMouseResult* mouse_result) {
+  Element* element, WindowContext* context, ElementSize* size, const MouseState* mouse_state, ElementMouseResult* mouse_result) {
   if (size->width != ELEMENT_SIZE_INVALID) {
     element->width = size->width;
   }
@@ -43,8 +43,6 @@ void element_apply_context(
   element->y = context->y + context->padding + ((context->is_horizontal) ? 0 : context->fill);
 
   context->fill += (context->is_horizontal) ? element->width : element->height;
-
-  const MouseState* mouse_state = display->mouse_state;
 
   const uint32_t mouse_x = mouse_state->x;
   const uint32_t mouse_y = mouse_state->y;

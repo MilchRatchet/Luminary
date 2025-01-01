@@ -27,6 +27,6 @@ struct ElementButtonArgs {
   uint32_t press_color;
 } typedef ElementButtonArgs;
 
-bool element_button(Window* window, Display* display, ElementButtonArgs args);
+bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_BUTTON_H */

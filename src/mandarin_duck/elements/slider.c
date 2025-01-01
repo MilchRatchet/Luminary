@@ -101,19 +101,19 @@ static void _element_slider_render_func(Element* slider, Display* display) {
   }
 }
 
-static uint32_t _element_slider_get_subelement_index(Window* window, Display* display, Element* slider) {
-  if ((slider->type != ELEMENT_SLIDER_DATA_TYPE_VECTOR) && (slider->type != ELEMENT_SLIDER_DATA_TYPE_RGB)) {
+static uint32_t _element_slider_get_subelement_index(Window* window, const MouseState* mouse_state, Element* slider) {
+  ElementSliderData* data = (ElementSliderData*) &slider->data;
+
+  if ((data->type != ELEMENT_SLIDER_DATA_TYPE_VECTOR) && (data->type != ELEMENT_SLIDER_DATA_TYPE_RGB)) {
     return 0;
   }
-
-  ElementSliderData* data = (ElementSliderData*) &slider->data;
 
   // Copy from the render functions
   const uint32_t component_size_padded = (slider->width - 2 * data->margins) / 3;
   const uint32_t margins               = (slider->width - component_size_padded * 3) >> 1;
 
   // We only execute this if we have pressed the element, so we know the mouse is inside the element.
-  const uint32_t x = display->mouse_state->x - slider->x;
+  const uint32_t x = mouse_state->x - slider->x;
 
   if (x < component_size_padded) {
     return 0;
@@ -126,7 +126,8 @@ static uint32_t _element_slider_get_subelement_index(Window* window, Display* di
   }
 }
 
-bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
+bool element_slider(
+  Window* window, Display* display, const MouseState* mouse_state, const KeyboardState* keyboard_state, ElementSliderArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element slider;
@@ -146,15 +147,14 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   data->center_y          = args.center_y;
 
   ElementMouseResult mouse_result;
-  element_apply_context(&slider, context, &args.size, display, &mouse_result);
+  element_apply_context(&slider, context, &args.size, mouse_state, &mouse_result);
 
   bool updated_data = false;
 
-  const bool use_slider = (window->state_data.state == WINDOW_INTERACTION_STATE_SLIDER) && (window->state_data.element_hash == slider.hash)
-                          && (display->mouse_state->down);
+  const bool use_slider = (window->state_data.state == WINDOW_INTERACTION_STATE_SLIDER) && (window->state_data.element_hash == slider.hash);
 
   float mouse_change_rate = args.change_rate;
-  if (display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down) {
+  if (keyboard_state->keys[SDL_SCANCODE_LCTRL].down) {
     mouse_change_rate = 0.01f * mouse_change_rate;
   }
 
@@ -165,7 +165,7 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
       if (use_slider) {
         mouse_change_rate *= (1.0f + sqrtf(fabsf(data->data_float)));
 
-        data->data_float += display->mouse_state->x_motion * mouse_change_rate * 0.001f;
+        data->data_float += mouse_state->x_motion * mouse_change_rate * 0.001f;
         data->data_float            = fminf(args.max, fmaxf(args.min, data->data_float));
         *(float*) args.data_binding = data->data_float;
 
@@ -184,7 +184,7 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
 
       if (use_slider) {
         float* value = ((float*) &data->data_vec3) + window->state_data.subelement_index;
-        *value += display->mouse_state->x_motion * mouse_change_rate * 0.001f;
+        *value += mouse_state->x_motion * mouse_change_rate * 0.001f;
         *value = fminf(args.max, fmaxf(args.min, *value));
 
         ((float*) args.data_binding)[window->state_data.subelement_index] = *value;
@@ -201,7 +201,7 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
     window->state_data.state            = WINDOW_INTERACTION_STATE_SLIDER;
     window->state_data.element_hash     = slider.hash;
-    window->state_data.subelement_index = _element_slider_get_subelement_index(window, display, &slider);
+    window->state_data.subelement_index = _element_slider_get_subelement_index(window, mouse_state, &slider);
 
     display_set_mouse_visible(display, false);
   }

@@ -70,7 +70,7 @@ static void _element_button_render_func(Element* button, Display* display) {
   }
 }
 
-bool element_button(Window* window, Display* display, ElementButtonArgs args) {
+bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element button;
@@ -82,7 +82,7 @@ bool element_button(Window* window, Display* display, ElementButtonArgs args) {
   ElementButtonData* data = (ElementButtonData*) &button.data;
 
   ElementMouseResult mouse_result;
-  element_apply_context(&button, context, &args.size, display, &mouse_result);
+  element_apply_context(&button, context, &args.size, mouse_state, &mouse_result);
 
   data->shape       = args.shape;
   data->color       = args.color;

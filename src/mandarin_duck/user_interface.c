@@ -47,6 +47,38 @@ static void _user_interface_setup(UserInterface* ui) {
   }
 
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_sidebar_entities));
+
+  uint32_t num_windows;
+  LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));
+
+  LUM_FAILURE_HANDLE(array_resize(&ui->window_ids_sorted, num_windows));
+}
+
+static void _user_interface_sort_windows_by_depth(UserInterface* ui) {
+  MD_CHECK_NULL_ARGUMENT(ui);
+
+  uint32_t num_windows;
+  LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));
+
+  for (uint32_t window_id = 0; window_id < num_windows; window_id++) {
+    ui->window_ids_sorted[window_id] = window_id;
+  }
+
+  uint32_t i = 1;
+
+  while (i < num_windows) {
+    uint32_t j = i;
+
+    while ((j > 0) && (ui->windows[ui->window_ids_sorted[j - 1]]->depth < ui->windows[ui->window_ids_sorted[j]]->depth)) {
+      uint32_t temp                = ui->window_ids_sorted[j - 1];
+      ui->window_ids_sorted[j - 1] = ui->window_ids_sorted[j];
+      ui->window_ids_sorted[j]     = temp;
+
+      j = j - 1;
+    }
+
+    i++;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -57,10 +89,15 @@ void user_interface_create(UserInterface** ui) {
   MD_CHECK_NULL_ARGUMENT(ui);
 
   LUM_FAILURE_HANDLE(host_malloc(ui, sizeof(UserInterface)));
+  memset(*ui, 0, sizeof(UserInterface));
+
+  mouse_state_create(&(*ui)->mouse_state);
 
   LUM_FAILURE_HANDLE(array_create(&(*ui)->windows, sizeof(Window*), 16));
+  LUM_FAILURE_HANDLE(array_create(&(*ui)->window_ids_sorted, sizeof(uint32_t), 16));
 
   _user_interface_setup(*ui);
+  _user_interface_sort_windows_by_depth(*ui);
 }
 
 void user_interface_mouse_hovers_background(UserInterface* ui, Display* display, bool* mouse_hovers_background) {
@@ -79,7 +116,7 @@ void user_interface_mouse_hovers_background(UserInterface* ui, Display* display,
     if (window->is_visible == false)
       continue;
 
-    window_handled_mouse |= window_is_mouse_hover(window, display);
+    window_handled_mouse |= window_is_mouse_hover(window, display, display->mouse_state);
   }
 
   *mouse_hovers_background = !window_handled_mouse;
@@ -93,16 +130,20 @@ void user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));
 
+  mouse_state_copy(ui->mouse_state, display->mouse_state);
+
   bool window_handled_mouse = false;
 
   for (uint32_t window_id = 0; window_id < num_windows; window_id++) {
-    Window* window = ui->windows[window_id];
+    Window* window = ui->windows[ui->window_ids_sorted[window_id]];
 
     if (window->is_visible == false)
       continue;
 
-    window_handled_mouse |= window_handle_input(window, display, host);
+    window_handled_mouse |= window_handle_input(window, display, host, ui->mouse_state);
   }
+
+  _user_interface_sort_windows_by_depth(ui);
 }
 
 void user_interface_render(UserInterface* ui, Display* display) {
@@ -112,8 +153,8 @@ void user_interface_render(UserInterface* ui, Display* display) {
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));
 
-  for (uint32_t window_id = 0; window_id < num_windows; window_id++) {
-    Window* window = ui->windows[window_id];
+  for (int32_t window_id = num_windows - 1; window_id >= 0; window_id--) {
+    Window* window = ui->windows[ui->window_ids_sorted[window_id]];
 
     if (window->is_visible == false)
       continue;
@@ -128,6 +169,8 @@ void user_interface_destroy(UserInterface** ui) {
   MD_CHECK_NULL_ARGUMENT(ui);
   MD_CHECK_NULL_ARGUMENT(*ui);
 
+  mouse_state_destroy(&(*ui)->mouse_state);
+
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements((*ui)->windows, &num_windows));
 
@@ -136,6 +179,7 @@ void user_interface_destroy(UserInterface** ui) {
   }
 
   LUM_FAILURE_HANDLE(array_destroy(&(*ui)->windows));
+  LUM_FAILURE_HANDLE(array_destroy(&(*ui)->window_ids_sorted));
 
   LUM_FAILURE_HANDLE(host_free(ui));
 }

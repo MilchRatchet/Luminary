@@ -10,7 +10,7 @@ static void _element_color_render_func(Element* color, Display* display) {
     UI_RENDERER_BACKGROUND_MODE_OPAQUE);
 }
 
-bool element_color(Window* window, Display* display, ElementColorArgs args) {
+bool element_color(Window* window, const MouseState* mouse_state, ElementColorArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element color;
@@ -22,7 +22,7 @@ bool element_color(Window* window, Display* display, ElementColorArgs args) {
   ElementColorData* data = (ElementColorData*) &color.data;
 
   ElementMouseResult mouse_result;
-  element_apply_context(&color, context, &args.size, display, &mouse_result);
+  element_apply_context(&color, context, &args.size, mouse_state, &mouse_result);
 
   data->color = args.color;
 

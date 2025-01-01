@@ -9,7 +9,7 @@ struct WindowSidebarData {
 } typedef WindowSidebarData;
 static_assert(sizeof(WindowSidebarData) <= WINDOW_DATA_SECTION_SIZE, "Window data exceeds allocated size.");
 
-static bool _window_sidebar_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _window_sidebar_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -22,7 +22,7 @@ static bool _window_sidebar_action(Window* window, Display* display, LuminaryHos
     }
 
     if (element_button(
-          window, display,
+          window, display, mouse_state,
           (ElementButtonArgs){
             .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
             .size        = (ElementSize){.width = 32, .height = 32},
@@ -57,6 +57,7 @@ void window_sidebar_create(Window** window) {
   (*window)->margins =
     (WindowMargins){.margin_top = 128, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_sidebar_action;
+  (*window)->fixed_depth = true;
 
   window_allocate_memory(*window);
 }

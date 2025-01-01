@@ -20,7 +20,7 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
     true);
 }
 
-bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args) {
+bool element_dropdown(Window* window, const MouseState* mouse_state, ElementDropdownArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element dropdown;
@@ -57,7 +57,7 @@ bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args
   }
 
   ElementMouseResult mouse_result;
-  element_apply_context(&dropdown, context, &args.size, display, &mouse_result);
+  element_apply_context(&dropdown, context, &args.size, mouse_state, &mouse_result);
 
   if (mouse_result.is_pressed && window->external_subwindow && !external_clicked_window_is_present) {
     subwindow_dropdown_create(window->external_subwindow, selected_index, dropdown.width, dropdown.x, dropdown.y + dropdown.height);

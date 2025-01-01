@@ -6,6 +6,7 @@
 
 struct Display typedef Display;
 struct Window typedef Window;
+struct MouseState typedef MouseState;
 
 enum WindowType {
   WINDOW_TYPE_CAPTION_CONTROLS  = 0,
@@ -73,9 +74,12 @@ struct Window {
   bool background;
   bool auto_align;
   bool auto_size;
-  bool (*action_func)(Window* window, Display* display, LuminaryHost* host);
+  bool fixed_depth;
+  bool is_subwindow;
+  bool (*action_func)(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state);
   void (*propagate_parent_func)(Window* window, Window* parent);
   WindowInteractionStateData state_data;
+  uint64_t depth;
 
   // Runtime
   uint8_t data[WINDOW_DATA_SECTION_SIZE];
@@ -93,8 +97,8 @@ void window_create(Window** window);
 void window_create_subwindow(Window* window);
 void window_allocate_memory(Window* window);
 
-bool window_is_mouse_hover(Window* window, Display* display);
-bool window_handle_input(Window* window, Display* display, LuminaryHost* host);
+bool window_is_mouse_hover(Window* window, Display* display, const MouseState* mouse_state);
+bool window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state);
 
 void window_push_element(Window* window, Element* element);
 void window_margin(Window* window, uint32_t margin);
