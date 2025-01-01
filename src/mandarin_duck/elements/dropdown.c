@@ -59,7 +59,7 @@ bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args
   ElementMouseResult mouse_result;
   element_apply_context(&dropdown, context, &args.size, display, &mouse_result);
 
-  if (mouse_result.is_clicked && window->external_subwindow && !external_clicked_window_is_present) {
+  if (mouse_result.is_pressed && window->external_subwindow && !external_clicked_window_is_present) {
     subwindow_dropdown_create(window->external_subwindow, selected_index, dropdown.width, dropdown.x, dropdown.y + dropdown.height);
 
     for (uint32_t string_id = 0; string_id < args.num_strings; string_id++) {

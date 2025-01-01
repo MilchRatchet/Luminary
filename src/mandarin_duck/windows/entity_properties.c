@@ -175,10 +175,11 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       update_data |= _window_entity_properties_add_slider(
         window, display, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
     }
+
+    update_data |= _window_entity_properties_add_slider(
+      window, display, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   }
 
-  update_data |= _window_entity_properties_add_slider(
-    window, display, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   update_data |= _window_entity_properties_add_checkbox(window, display, "Firefly Clamping", &camera.do_firefly_clamping);
   update_data |= _window_entity_properties_add_slider(
     window, display, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);

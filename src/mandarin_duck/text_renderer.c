@@ -87,10 +87,11 @@ void text_renderer_render(
     uint32_t entry = hash & TEXT_RENDERER_CACHE_SIZE_MASK;
 
     uint32_t offset = 0;
-    for (; text_renderer->cache.entries[entry + offset].hash != hash && offset < TEXT_RENDERER_CACHE_SIZE; offset++) {
+    for (; text_renderer->cache.entries[(entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK].hash != hash && offset < TEXT_RENDERER_CACHE_SIZE;
+         offset++) {
     }
 
-    entry += offset;
+    entry = (entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK;
 
     if (text_renderer->cache.entries[entry].hash == hash) {
       text_instance     = text_renderer->cache.entries[entry].text;
@@ -122,10 +123,12 @@ void text_renderer_render(
     uint32_t entry = hash & TEXT_RENDERER_CACHE_SIZE_MASK;
 
     uint32_t offset = 0;
-    for (; text_renderer->cache.entries[entry].text != (TTF_Text*) 0 && offset < TEXT_RENDERER_CACHE_SIZE; offset++) {
+    for (; text_renderer->cache.entries[(entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK].text != (TTF_Text*) 0
+           && offset < TEXT_RENDERER_CACHE_SIZE;
+         offset++) {
     }
 
-    entry += offset;
+    entry = (entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK;
 
     if (text_renderer->cache.entries[entry].text == (TTF_Text*) 0) {
       text_renderer->cache.num_entries++;

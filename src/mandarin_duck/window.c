@@ -59,6 +59,13 @@ static bool window_is_mouse_hover(Window* window, Display* display) {
   return in_horizontal_bounds && in_vertical_bounds;
 }
 
+static void _window_reset_state(Window* window) {
+  window->state_data.state              = WINDOW_INTERACTION_STATE_NONE;
+  window->state_data.element_hash       = 0;
+  window->state_data.subelement_index   = 0;
+  window->state_data.dropdown_selection = 0;
+}
+
 bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -84,6 +91,46 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
     }
   }
 
+  window->element_has_hover = false;
+
+  switch (window->state_data.state) {
+    case WINDOW_INTERACTION_STATE_NONE:
+      break;
+    case WINDOW_INTERACTION_STATE_DRAG:
+      if (display->mouse_state->down) {
+        window->x += display->mouse_state->x_motion;
+        window->y += display->mouse_state->y_motion;
+
+        if (window->x < 0)
+          window->x = 0;
+
+        if (window->x + window->width > display->width)
+          window->x = display->width - window->width;
+
+        if (window->y < 0)
+          window->y = 0;
+      }
+      else {
+        _window_reset_state(window);
+      }
+      break;
+    case WINDOW_INTERACTION_STATE_SLIDER:
+      if (display->mouse_state->down == false) {
+        _window_reset_state(window);
+        display_set_mouse_visible(display, true);
+      }
+      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
+      window_handle_input(window->external_subwindow, display, host);
+      window->external_subwindow->propagate_parent_func(window->external_subwindow, window);
+      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
+      _window_reset_state(window);
+      break;
+    default:
+      break;
+  }
+
   window->context_stack_ptr = 0;
 
   window->context_stack[0] = (WindowContext){
@@ -95,44 +142,26 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
     .padding       = window->padding,
     .is_horizontal = window->is_horizontal};
 
-  window->element_has_hover = false;
+  const bool elements_received_action = window->action_func(window, display, host);
+  const bool is_mouse_hover           = window_is_mouse_hover(window, display);
 
   switch (window->state_data.state) {
     case WINDOW_INTERACTION_STATE_NONE:
       break;
+    case WINDOW_INTERACTION_STATE_DRAG:
+      break;
     case WINDOW_INTERACTION_STATE_SLIDER:
-      if (display->mouse_state->down == false) {
-        window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
-        window->state_data.element_hash     = 0;
-        window->state_data.subelement_index = 0;
-
-        display_set_mouse_visible(display, true);
+      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
+      if (display->mouse_state->phase == MOUSE_PHASE_RELEASED) {
+        _window_reset_state(window);
       }
       break;
-    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED: {
-      const bool subwindow_received_action = window_handle_input(window->external_subwindow, display, host);
-
-      window->external_subwindow->propagate_parent_func(window->external_subwindow, window);
-
-      if (display->mouse_state->phase == MOUSE_PHASE_RELEASED && !subwindow_received_action) {
-        window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
-        window->state_data.element_hash     = 0;
-        window->state_data.subelement_index = 0;
-      }
-    }
-
-    break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
-      window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
-      window->state_data.element_hash     = 0;
-      window->state_data.subelement_index = 0;
       break;
     default:
       break;
   }
-
-  const bool elements_received_action = window->action_func(window, display, host);
-  const bool is_mouse_hover           = window_is_mouse_hover(window, display);
 
   if (elements_received_action) {
     return true;
@@ -140,17 +169,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 
   if (is_mouse_hover && !window->element_has_hover && window->is_movable && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
     if (display->mouse_state->down) {
-      window->x += display->mouse_state->x_motion;
-      window->y += display->mouse_state->y_motion;
-
-      if (window->x < 0)
-        window->x = 0;
-
-      if (window->x + window->width > display->width)
-        window->x = display->width - window->width;
-
-      if (window->y < 0)
-        window->y = 0;
+      window->state_data.state = WINDOW_INTERACTION_STATE_DRAG;
     }
   }
 
