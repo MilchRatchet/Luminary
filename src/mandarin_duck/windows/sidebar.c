@@ -16,62 +16,24 @@ static bool _window_sidebar_action(Window* window, Display* display, LuminaryHos
 
   WindowSidebarData* data = (WindowSidebarData*) window->data;
 
-  if (element_button(
-        window, display,
-        (ElementButtonArgs){
-          .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
-          .size        = (ElementSize){.width = 32, .height = 32},
-          .color       = 0xFF888888,
-          .hover_color = 0xFFFFFFFF,
-          .press_color = 0xFFFFFFFF})) {
-    bool is_visible;
-    user_interface_get_window_visible(display->ui, data->window_ids[WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA], &is_visible);
-    user_interface_set_window_visible(display->ui, data->window_ids[WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA], !is_visible);
+  for (uint32_t entity_properties_id = 0; entity_properties_id < WINDOW_ENTITY_PROPERTIES_TYPE_COUNT; entity_properties_id++) {
+    if (entity_properties_id != 0) {
+      window_margin(window, 4);
+    }
+
+    if (element_button(
+          window, display,
+          (ElementButtonArgs){
+            .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
+            .size        = (ElementSize){.width = 32, .height = 32},
+            .color       = 0xFF888888,
+            .hover_color = 0xFFFFFFFF,
+            .press_color = 0xFFFFFFFF})) {
+      bool is_visible;
+      user_interface_get_window_visible(display->ui, data->window_ids[entity_properties_id], &is_visible);
+      user_interface_set_window_visible(display->ui, data->window_ids[entity_properties_id], !is_visible);
+    }
   }
-
-  window_margin(window, 4);
-
-  element_button(
-    window, display,
-    (ElementButtonArgs){
-      .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
-      .size        = (ElementSize){.width = 32, .height = 32},
-      .color       = 0xFF888888,
-      .hover_color = 0xFFFFFFFF,
-      .press_color = 0xFFFFFFFF});
-
-  window_margin(window, 4);
-
-  element_button(
-    window, display,
-    (ElementButtonArgs){
-      .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
-      .size        = (ElementSize){.width = 32, .height = 32},
-      .color       = 0xFF888888,
-      .hover_color = 0xFFFFFFFF,
-      .press_color = 0xFFFFFFFF});
-
-  window_margin(window, 4);
-
-  element_button(
-    window, display,
-    (ElementButtonArgs){
-      .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
-      .size        = (ElementSize){.width = 32, .height = 32},
-      .color       = 0xFF888888,
-      .hover_color = 0xFFFFFFFF,
-      .press_color = 0xFFFFFFFF});
-
-  window_margin(window, 4);
-
-  element_button(
-    window, display,
-    (ElementButtonArgs){
-      .shape       = ELEMENT_BUTTON_SHAPE_IMAGE,
-      .size        = (ElementSize){.width = 32, .height = 32},
-      .color       = 0xFF888888,
-      .hover_color = 0xFFFFFFFF,
-      .press_color = 0xFFFFFFFF});
 
   return false;
 }

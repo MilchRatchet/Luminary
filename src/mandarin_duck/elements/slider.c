@@ -32,7 +32,13 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
   char text[256];
-  sprintf(text, "%u", data->data_uint);
+
+  if (data->type == ELEMENT_SLIDER_DATA_TYPE_UINT) {
+    sprintf(text, "%u", data->data_uint);
+  }
+  else {
+    sprintf(text, "%d", data->data_sint);
+  }
 
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
@@ -85,6 +91,7 @@ static void _element_slider_render_func(Element* slider, Display* display) {
       _element_slider_render_float(slider, display);
       break;
     case ELEMENT_SLIDER_DATA_TYPE_UINT:
+    case ELEMENT_SLIDER_DATA_TYPE_SINT:
       _element_slider_render_uint(slider, display);
       break;
     case ELEMENT_SLIDER_DATA_TYPE_VECTOR:
@@ -167,6 +174,9 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
       break;
     case ELEMENT_SLIDER_DATA_TYPE_UINT:
       data->data_uint = *(uint32_t*) args.data_binding;
+      break;
+    case ELEMENT_SLIDER_DATA_TYPE_SINT:
+      data->data_sint = *(int32_t*) args.data_binding;
       break;
     case ELEMENT_SLIDER_DATA_TYPE_VECTOR:
     case ELEMENT_SLIDER_DATA_TYPE_RGB:

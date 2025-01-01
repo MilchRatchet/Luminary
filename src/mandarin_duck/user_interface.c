@@ -14,13 +14,15 @@
 static void _user_interface_setup(UserInterface* ui) {
   MD_CHECK_NULL_ARGUMENT(ui);
 
-  Window* window_entity_properties_camera;
-  window_entity_properties_create(&window_entity_properties_camera);
+  uint32_t entity_property_window_ids[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT];
 
-  uint32_t entity_properties_camera_id;
-  LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &entity_properties_camera_id));
+  for (uint32_t entity_property_type = 0; entity_property_type < WINDOW_ENTITY_PROPERTIES_TYPE_COUNT; entity_property_type++) {
+    Window* window_entity_properties;
+    window_entity_properties_create(&window_entity_properties, (WindowEntityPropertiesType) entity_property_type);
 
-  LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_entity_properties_camera));
+    LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &entity_property_window_ids[entity_property_type]));
+    LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_entity_properties));
+  }
 
   Window* window_caption_controls;
   window_caption_controls_create(&window_caption_controls);
@@ -39,7 +41,10 @@ static void _user_interface_setup(UserInterface* ui) {
 
   Window* window_sidebar_entities;
   window_sidebar_create(&window_sidebar_entities);
-  window_sidebar_register_window_id(window_sidebar_entities, WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA, entity_properties_camera_id);
+
+  for (uint32_t entity_property_type = 0; entity_property_type < WINDOW_ENTITY_PROPERTIES_TYPE_COUNT; entity_property_type++) {
+    window_sidebar_register_window_id(window_sidebar_entities, entity_property_type, entity_property_window_ids[entity_property_type]);
+  }
 
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_sidebar_entities));
 }

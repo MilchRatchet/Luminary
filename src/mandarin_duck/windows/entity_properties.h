@@ -5,10 +5,17 @@
 #include "window.h"
 
 enum WindowEntityPropertiesType {
+  WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS,
   WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA,
+  WINDOW_ENTITY_PROPERTIES_TYPE_OCEAN,
+  WINDOW_ENTITY_PROPERTIES_TYPE_SKY,
+  WINDOW_ENTITY_PROPERTIES_TYPE_CLOUD,
+  WINDOW_ENTITY_PROPERTIES_TYPE_FOG,
+  WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES,
+  WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL,
   WINDOW_ENTITY_PROPERTIES_TYPE_COUNT
 } typedef WindowEntityPropertiesType;
 
-void window_entity_properties_create(Window** window);
+void window_entity_properties_create(Window** window, WindowEntityPropertiesType type);
 
 #endif /* MANDARIN_DUCK_WINDOWS_ENTITY_PROPERTIES_H */

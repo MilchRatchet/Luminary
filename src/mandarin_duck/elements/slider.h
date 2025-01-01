@@ -9,6 +9,7 @@
 enum ElementSliderDataType {
   ELEMENT_SLIDER_DATA_TYPE_FLOAT,
   ELEMENT_SLIDER_DATA_TYPE_UINT,
+  ELEMENT_SLIDER_DATA_TYPE_SINT,
   ELEMENT_SLIDER_DATA_TYPE_VECTOR,
   ELEMENT_SLIDER_DATA_TYPE_RGB
 } typedef ElementSliderDataType;
@@ -17,6 +18,7 @@ struct ElementSliderData {
   ElementSliderDataType type;
   float data_float;
   uint32_t data_uint;
+  int32_t data_sint;
   LuminaryVec3 data_vec3;
   ElementSize size;
   uint32_t color;
