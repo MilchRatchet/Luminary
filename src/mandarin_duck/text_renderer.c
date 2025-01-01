@@ -30,10 +30,27 @@ static TTF_Font* _text_renderer_load_font(const char* font_location) {
   return TTF_OpenFontWithProperties(sdl_properties);
 }
 
+#define FNV_PRIME (0x01000193u)
+#define FNV_OFFSET_BASIS (0x811c9dc5u)
+
+static size_t _text_renderer_text_hash(const char* string) {
+  const size_t string_length = strlen(string);
+
+  uint32_t hash = FNV_OFFSET_BASIS;
+
+  for (size_t offset = 0; offset < string_length; offset++) {
+    hash ^= (size_t) string[offset];
+    hash *= FNV_PRIME;
+  }
+
+  return hash;
+}
+
 void text_renderer_create(TextRenderer** text_renderer) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
 
   LUM_FAILURE_HANDLE(host_malloc(text_renderer, sizeof(TextRenderer)));
+  memset(*text_renderer, 0, sizeof(TextRenderer));
 
   (*text_renderer)->text_engine = TTF_CreateSurfaceTextEngine();
 
@@ -54,13 +71,36 @@ void text_renderer_create(TextRenderer** text_renderer) {
 }
 
 void text_renderer_render(
-  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y) {
+  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
+  bool use_cache) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(text);
 
-  // TODO: Cache text
-  TTF_Text* text_instance = TTF_CreateText(text_renderer->text_engine, text_renderer->fonts[font_id], text, 0);
+  TTF_Text* text_instance = (TTF_Text*) 0;
+  bool loaded_from_cache  = false;
+  size_t hash             = 0;
+
+  if (use_cache) {
+    hash = _text_renderer_text_hash(text);
+
+    uint32_t entry = hash & TEXT_RENDERER_CACHE_SIZE_MASK;
+
+    uint32_t offset = 0;
+    for (; text_renderer->cache.entries[entry + offset].hash != hash && offset < TEXT_RENDERER_CACHE_SIZE; offset++) {
+    }
+
+    entry += offset;
+
+    if (text_renderer->cache.entries[entry].hash == hash) {
+      text_instance     = text_renderer->cache.entries[entry].text;
+      loaded_from_cache = true;
+    }
+  }
+
+  if (!loaded_from_cache) {
+    text_instance = TTF_CreateText(text_renderer->text_engine, text_renderer->fonts[font_id], text, 0);
+  }
 
   int32_t width;
   int32_t height;
@@ -76,7 +116,32 @@ void text_renderer_render(
 
   TTF_DrawSurfaceText(text_instance, x, y, display->sdl_surface);
 
-  TTF_DestroyText(text_instance);
+  bool destroy_text = !loaded_from_cache;
+
+  if (!loaded_from_cache && use_cache) {
+    uint32_t entry = hash & TEXT_RENDERER_CACHE_SIZE_MASK;
+
+    uint32_t offset = 0;
+    for (; text_renderer->cache.entries[entry].text != (TTF_Text*) 0 && offset < TEXT_RENDERER_CACHE_SIZE; offset++) {
+    }
+
+    entry += offset;
+
+    if (text_renderer->cache.entries[entry].text == (TTF_Text*) 0) {
+      text_renderer->cache.num_entries++;
+      text_renderer->cache.entries[entry].hash = hash;
+      text_renderer->cache.entries[entry].text = text_instance;
+      destroy_text                             = false;
+
+      if (text_renderer->cache.num_entries > (TEXT_RENDERER_CACHE_SIZE >> 1)) {
+        warn_message("Text renderer cache is getting full, are temporary strings cached?");
+      }
+    }
+  }
+
+  if (destroy_text) {
+    TTF_DestroyText(text_instance);
+  }
 
   // For some reason, the text sometimes has 0 opacity so we need to overwrite the opacity here
   int32_t blit_width  = ((x + width) <= display->width) ? width : display->width - x;
@@ -93,6 +158,12 @@ void text_renderer_render(
 
 void text_renderer_destroy(TextRenderer** text_renderer) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
+
+  for (uint32_t entry = 0; entry < TEXT_RENDERER_CACHE_SIZE; entry++) {
+    if ((*text_renderer)->cache.entries[entry].text != (TTF_Text*) 0) {
+      TTF_DestroyText((*text_renderer)->cache.entries[entry].text);
+    }
+  }
 
   TTF_DestroySurfaceTextEngine((*text_renderer)->text_engine);
 

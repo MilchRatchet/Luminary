@@ -17,7 +17,7 @@ static void _element_text_render_func(Element* text, Display* display) {
 
   text_renderer_render(
     display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, text->x + padding_x, text->y + padding_y, data->center_x,
-    data->center_y);
+    data->center_y, data->cache_text);
 }
 
 bool element_text(Window* window, Display* display, ElementTextArgs args) {
@@ -31,10 +31,11 @@ bool element_text(Window* window, Display* display, ElementTextArgs args) {
 
   ElementTextData* data = (ElementTextData*) &text.data;
 
-  data->color    = args.color;
-  data->size     = args.size;
-  data->center_x = args.center_x;
-  data->center_y = args.center_y;
+  data->color      = args.color;
+  data->size       = args.size;
+  data->center_x   = args.center_x;
+  data->center_y   = args.center_y;
+  data->cache_text = args.cache_text;
 
   const size_t text_size = strlen(args.text);
 

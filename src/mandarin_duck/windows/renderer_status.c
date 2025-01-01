@@ -27,7 +27,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .text         = "Host:",
           .center_x     = false,
           .center_y     = true,
-          .highlighting = false});
+          .highlighting = false,
+          .cache_text   = true});
 
       element_text(
         window, display,
@@ -37,7 +38,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .text         = string,
           .center_x     = false,
           .center_y     = true,
-          .highlighting = false});
+          .highlighting = false,
+          .cache_text   = false});
 
       char text[256];
 
@@ -54,7 +56,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .text         = text,
           .center_x     = false,
           .center_y     = true,
-          .highlighting = false});
+          .highlighting = false,
+          .cache_text   = false});
     }
     window_pop_section(window);
   }
@@ -74,7 +77,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .text         = "Device:",
           .center_x     = false,
           .center_y     = true,
-          .highlighting = false});
+          .highlighting = false,
+          .cache_text   = true});
 
       element_text(
         window, display,
@@ -84,7 +88,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .text         = string,
           .center_x     = false,
           .center_y     = true,
-          .highlighting = false});
+          .highlighting = false,
+          .cache_text   = false});
 
       char text[256];
 
@@ -101,7 +106,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .text         = text,
           .center_x     = false,
           .center_y     = true,
-          .highlighting = false});
+          .highlighting = false,
+          .cache_text   = false});
     }
     window_pop_section(window);
   }

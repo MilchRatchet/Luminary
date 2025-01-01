@@ -26,7 +26,8 @@ static bool _window_entity_properties_add_slider(
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = true});
 
     if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
       LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
@@ -81,7 +82,8 @@ static bool _window_entity_properties_add_checkbox(Window* window, Display* disp
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = true});
 
     if (element_checkbox(
           window, display, (ElementCheckBoxArgs){.size = (ElementSize){.width = 24, .height = 24}, .data_binding = data_binding})) {
@@ -110,7 +112,8 @@ static bool _window_entity_properties_add_dropdown(
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = true});
 
     if (element_dropdown(
           window, display,
@@ -148,7 +151,8 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       .text         = "Camera",
       .center_x     = true,
       .center_y     = true,
-      .highlighting = false});
+      .highlighting = false,
+      .cache_text   = true});
 
   window_margin(window, 16);
 

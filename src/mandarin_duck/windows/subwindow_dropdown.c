@@ -33,7 +33,8 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
             .text         = data->strings[string_id],
             .center_x     = true,
             .center_y     = true,
-            .highlighting = true})) {
+            .highlighting = true,
+            .cache_text   = true})) {
       data->selected_index = string_id;
       received_click       = true;
     }

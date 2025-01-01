@@ -24,7 +24,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .text     = "Luminary:",
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = true});
 
     char text[256];
 
@@ -41,7 +42,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * time);
 
@@ -53,7 +55,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = false});
   }
   window_pop_section(window);
 
@@ -69,7 +72,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .text     = "Mandarin Duck:",
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = true});
 
     char text[256];
 
@@ -83,7 +87,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * display->frametime);
 
@@ -95,7 +100,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .text     = text,
         .center_x = false,
         .center_y = true,
-        .highlighting = false});
+        .highlighting = false,
+        .cache_text   = false});
   }
   window_pop_section(window);
 

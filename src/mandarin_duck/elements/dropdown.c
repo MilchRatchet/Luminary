@@ -16,7 +16,8 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
   const uint32_t padding_y = dropdown->height >> 1;
 
   text_renderer_render(
-    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, dropdown->x + padding_x, dropdown->y + padding_y, true, true);
+    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, dropdown->x + padding_x, dropdown->y + padding_y, true, true,
+    true);
 }
 
 bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args) {

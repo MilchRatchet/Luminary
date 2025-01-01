@@ -14,6 +14,7 @@ struct ElementTextData {
   bool center_y;
   bool highlighted;
   uint32_t highlight_padding;
+  bool cache_text;
 } typedef ElementTextData;
 static_assert(sizeof(ElementTextData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -24,6 +25,7 @@ struct ElementTextArgs {
   bool center_x;
   bool center_y;
   bool highlighting;
+  bool cache_text;
 } typedef ElementTextArgs;
 
 bool element_text(Window* window, Display* display, ElementTextArgs args);
