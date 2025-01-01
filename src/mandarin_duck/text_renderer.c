@@ -1,5 +1,7 @@
 #include "text_renderer.h"
 
+#include "display.h"
+
 // TODO: Let Mandarin Duck have its own embedded files.
 void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
 
@@ -33,26 +35,66 @@ void text_renderer_create(TextRenderer** text_renderer) {
 
   LUM_FAILURE_HANDLE(host_malloc(text_renderer, sizeof(TextRenderer)));
 
+  (*text_renderer)->text_engine = TTF_CreateSurfaceTextEngine();
+
+  if ((*text_renderer)->text_engine == (TTF_TextEngine*) 0) {
+    crash_message("Failed to create text engine.");
+  }
+
   for (uint32_t font_id = 0; font_id < TEXT_RENDERER_FONT_COUNT; font_id++) {
     (*text_renderer)->fonts[font_id] = _text_renderer_load_font(font_file_locations[font_id]);
 
     if ((*text_renderer)->fonts[font_id] == (TTF_Font*) 0) {
-      crash_message("Failed to font: %s.", font_file_locations[font_id]);
+      crash_message("Failed to create font: %s.", font_file_locations[font_id]);
+    }
+
+    TTF_SetFontHinting((*text_renderer)->fonts[font_id], TTF_HINTING_LIGHT_SUBPIXEL);
+    TTF_SetFontSDF((*text_renderer)->fonts[font_id], true);
+  }
+}
+
+void text_renderer_render(
+  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y) {
+  MD_CHECK_NULL_ARGUMENT(text_renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(text);
+
+  // TODO: Cache text
+  TTF_Text* text_instance = TTF_CreateText(text_renderer->text_engine, text_renderer->fonts[font_id], text, 0);
+
+  int32_t width;
+  int32_t height;
+  TTF_GetTextSize(text_instance, &width, &height);
+
+  if (center_x) {
+    x = x - (width >> 1);
+  }
+
+  if (center_y) {
+    y = y - (height >> 1);
+  }
+
+  TTF_DrawSurfaceText(text_instance, x, y, display->sdl_surface);
+
+  TTF_DestroyText(text_instance);
+
+  // For some reason, the text sometimes has 0 opacity so we need to overwrite the opacity here
+  int32_t blit_width  = ((x + width) <= display->width) ? width : display->width - x;
+  int32_t blit_height = ((y + height) <= display->height) ? height : display->height - y;
+
+  uint8_t* dst = display->buffer;
+
+  for (int32_t y_offset = 0; y_offset < blit_height; y_offset++) {
+    for (int32_t x_offset = 0; x_offset < blit_width; x_offset++) {
+      dst[(x + x_offset) * 4 + (y + y_offset) * display->ld + 3] = 0xFF;
     }
   }
 }
 
-void text_renderer_render(TextRenderer* text_renderer, const char* text, uint32_t font_id, SDL_Surface** surface) {
-  MD_CHECK_NULL_ARGUMENT(text_renderer);
-
-  SDL_Color opaque      = {0xFF, 0xFF, 0xFF, 0xFF};
-  SDL_Color transparent = {0xFF, 0, 0, 0xFF};
-
-  *surface = TTF_RenderText_Blended(text_renderer->fonts[font_id], text, 0, opaque);
-}
-
 void text_renderer_destroy(TextRenderer** text_renderer) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
+
+  TTF_DestroySurfaceTextEngine((*text_renderer)->text_engine);
 
   for (uint32_t font_id = 0; font_id < TEXT_RENDERER_FONT_COUNT; font_id++) {
     TTF_CloseFont((*text_renderer)->fonts[font_id]);

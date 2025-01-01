@@ -12,31 +12,11 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
     display->ui_renderer, display, dropdown->width, dropdown->height, dropdown->x, dropdown->y, 0, 0xFF111111, 0xFF000000,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
-  SDL_Surface* surface;
-  text_renderer_render(display->text_renderer, data->text, TEXT_RENDERER_FONT_REGULAR, &surface);
+  const uint32_t padding_x = dropdown->width >> 1;
+  const uint32_t padding_y = dropdown->height >> 1;
 
-  if (surface->h > (int32_t) dropdown->height) {
-    crash_message("Text is taller than the element.");
-  }
-
-  const uint32_t padding_x = (dropdown->width - surface->w) >> 1;
-  const uint32_t padding_y = (dropdown->height - surface->h) >> 1;
-
-  SDL_Rect src_rect;
-  src_rect.x = 0;
-  src_rect.y = 0;
-  src_rect.w = surface->w;
-  src_rect.h = surface->h;
-
-  SDL_Rect dst_rect;
-  dst_rect.x = dropdown->x + padding_x;
-  dst_rect.y = dropdown->y + padding_y;
-  dst_rect.w = surface->w;
-  dst_rect.h = surface->h;
-
-  SDL_BlitSurface(surface, &src_rect, display->sdl_surface, &dst_rect);
-
-  SDL_DestroySurface(surface);
+  text_renderer_render(
+    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, dropdown->x + padding_x, dropdown->y + padding_y, true, true);
 }
 
 bool element_dropdown(Window* window, Display* display, ElementDropdownArgs args) {

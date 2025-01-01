@@ -16,31 +16,12 @@ static void _element_slider_render_float(Element* slider, Display* display) {
   char text[256];
   sprintf(text, "%.2f", data->data_float);
 
-  SDL_Surface* surface;
-  text_renderer_render(display->text_renderer, text, TEXT_RENDERER_FONT_REGULAR, &surface);
+  const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
+  const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
-  if (surface->h > (int32_t) slider->height) {
-    crash_message("Text is taller than the element.");
-  }
-
-  const uint32_t padding_x = data->center_x ? (slider->width - surface->w) >> 1 : 0;
-  const uint32_t padding_y = data->center_y ? (slider->height - surface->h) >> 1 : 0;
-
-  SDL_Rect src_rect;
-  src_rect.x = 0;
-  src_rect.y = 0;
-  src_rect.w = surface->w;
-  src_rect.h = surface->h;
-
-  SDL_Rect dst_rect;
-  dst_rect.x = slider->x + padding_x + data->component_padding;
-  dst_rect.y = slider->y + padding_y;
-  dst_rect.w = surface->w;
-  dst_rect.h = surface->h;
-
-  SDL_BlitSurface(surface, &src_rect, display->sdl_surface, &dst_rect);
-
-  SDL_DestroySurface(surface);
+  text_renderer_render(
+    display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
+    data->center_y);
 }
 
 static void _element_slider_render_uint(Element* slider, Display* display) {
@@ -53,31 +34,12 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
   char text[256];
   sprintf(text, "%u", data->data_uint);
 
-  SDL_Surface* surface;
-  text_renderer_render(display->text_renderer, text, TEXT_RENDERER_FONT_REGULAR, &surface);
+  const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
+  const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
-  if (surface->h > (int32_t) slider->height) {
-    crash_message("Text is taller than the element.");
-  }
-
-  const uint32_t padding_x = data->center_x ? (slider->width - surface->w) >> 1 : data->component_padding;
-  const uint32_t padding_y = data->center_y ? (slider->height - surface->h) >> 1 : 0;
-
-  SDL_Rect src_rect;
-  src_rect.x = 0;
-  src_rect.y = 0;
-  src_rect.w = surface->w;
-  src_rect.h = surface->h;
-
-  SDL_Rect dst_rect;
-  dst_rect.x = slider->x + padding_x;
-  dst_rect.y = slider->y + padding_y;
-  dst_rect.w = surface->w;
-  dst_rect.h = surface->h;
-
-  SDL_BlitSurface(surface, &src_rect, display->sdl_surface, &dst_rect);
-
-  SDL_DestroySurface(surface);
+  text_renderer_render(
+    display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
+    data->center_y);
 }
 
 static void _element_slider_render_vector(Element* slider, Display* display) {
@@ -92,7 +54,6 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
   uint32_t x_offset = slider->x;
 
   const uint32_t component_size_padded = (slider->width - 2 * data->margins) / 3;
-  const uint32_t component_size        = component_size_padded - 2 * data->component_padding;
 
   // Recompute margins so that we actually fill out the whole element's width.
   const uint32_t margins = (slider->width - component_size_padded * 3) >> 1;
@@ -105,33 +66,14 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
     char text[256];
     sprintf(text, "%.2f", vec_data[component]);
 
-    SDL_Surface* surface;
-    text_renderer_render(display->text_renderer, text, TEXT_RENDERER_FONT_REGULAR, &surface);
+    const uint32_t padding_x = data->center_x ? component_size_padded >> 1 : component_size_padded;
+    const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
-    if (surface->h > (int32_t) slider->height || surface->w > (int32_t) component_size) {
-      crash_message("Text is too larger.");
-    }
-
-    const uint32_t padding_x = data->center_x ? (component_size_padded - surface->w) >> 1 : data->component_padding;
-    const uint32_t padding_y = data->center_y ? (slider->height - surface->h) >> 1 : 0;
-
-    SDL_Rect src_rect;
-    src_rect.x = 0;
-    src_rect.y = 0;
-    src_rect.w = surface->w;
-    src_rect.h = surface->h;
-
-    SDL_Rect dst_rect;
-    dst_rect.x = x_offset + padding_x;
-    dst_rect.y = slider->y + padding_y;
-    dst_rect.w = surface->w;
-    dst_rect.h = surface->h;
-
-    SDL_BlitSurface(surface, &src_rect, display->sdl_surface, &dst_rect);
+    text_renderer_render(
+      display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, x_offset + padding_x, slider->y + padding_y, data->center_x,
+      data->center_y);
 
     x_offset += component_size_padded + margins;
-
-    SDL_DestroySurface(surface);
   }
 }
 
