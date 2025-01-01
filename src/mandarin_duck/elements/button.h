@@ -6,7 +6,7 @@
 #include "elements_common.h"
 #include "utils.h"
 
-enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE = 0 } typedef ElementButtonShape;
+enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE = 0, ELEMENT_BUTTON_SHAPE_IMAGE = 1 } typedef ElementButtonShape;
 
 struct ElementButtonData {
   ElementButtonShape shape;

@@ -4,7 +4,7 @@
 #include "ui_renderer_utils.h"
 #include "window.h"
 
-static void _element_button_render_func(Element* button, Display* display) {
+static void _element_button_render_circle(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
 
   uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
@@ -36,6 +36,40 @@ static void _element_button_render_func(Element* button, Display* display) {
   }
 }
 
+static void _element_button_render_image(Element* button, Display* display) {
+  ElementButtonData* data = (ElementButtonData*) &button->data;
+
+  uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
+
+  const uint32_t cols = button->width;
+  const uint32_t rows = button->height;
+
+  uint32_t* dst = (uint32_t*) (display->buffer + sizeof(LuminaryARGB8) * button->x + button->y * display->ld);
+
+  for (uint32_t row = 0; row < rows; row++) {
+    for (uint32_t col = 0; col < cols; col++) {
+      dst[col] = color;
+    }
+
+    dst = dst + (display->ld >> 2);
+  }
+}
+
+static void _element_button_render_func(Element* button, Display* display) {
+  ElementButtonData* data = (ElementButtonData*) &button->data;
+
+  switch (data->shape) {
+    case ELEMENT_BUTTON_SHAPE_CIRCLE:
+      _element_button_render_circle(button, display);
+      break;
+    case ELEMENT_BUTTON_SHAPE_IMAGE:
+      _element_button_render_image(button, display);
+      break;
+    default:
+      break;
+  }
+}
+
 bool element_button(Window* window, Display* display, ElementButtonArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
@@ -59,11 +93,13 @@ bool element_button(Window* window, Display* display, ElementButtonArgs args) {
 
   data->shape_size_id = 0;
 
-  for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
-    const uint32_t size = display->ui_renderer->shape_mask_size[size_id];
+  if (args.shape == ELEMENT_BUTTON_SHAPE_CIRCLE) {
+    for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
+      const uint32_t size = display->ui_renderer->shape_mask_size[size_id];
 
-    if (size <= button.width && size <= button.height) {
-      data->shape_size_id = size_id;
+      if (size <= button.width && size <= button.height) {
+        data->shape_size_id = size_id;
+      }
     }
   }
 
