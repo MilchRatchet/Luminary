@@ -20,7 +20,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       window_margin(window, 8);
 
       element_text(
-        window, mouse_state,
+        window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -28,10 +28,11 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_x     = false,
           .center_y     = true,
           .highlighting = false,
-          .cache_text   = true});
+          .cache_text   = true,
+          .auto_size    = false});
 
       element_text(
-        window, mouse_state,
+        window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
@@ -39,7 +40,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_x     = false,
           .center_y     = true,
           .highlighting = false,
-          .cache_text   = false});
+          .cache_text   = false,
+          .auto_size    = false});
 
       char text[256];
 
@@ -49,7 +51,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       sprintf(text, "(%.2fs)", time);
 
       element_text(
-        window, mouse_state,
+        window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -57,7 +59,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_x     = false,
           .center_y     = true,
           .highlighting = false,
-          .cache_text   = false});
+          .cache_text   = false,
+          .auto_size    = false});
     }
     window_pop_section(window);
   }
@@ -70,7 +73,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       window_margin(window, 8);
 
       element_text(
-        window, mouse_state,
+        window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -78,10 +81,11 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_x     = false,
           .center_y     = true,
           .highlighting = false,
-          .cache_text   = true});
+          .cache_text   = true,
+          .auto_size    = false});
 
       element_text(
-        window, mouse_state,
+        window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
@@ -89,7 +93,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_x     = false,
           .center_y     = true,
           .highlighting = false,
-          .cache_text   = false});
+          .cache_text   = false,
+          .auto_size    = false});
 
       char text[256];
 
@@ -99,7 +104,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
       sprintf(text, "(%.2fs)", time);
 
       element_text(
-        window, mouse_state,
+        window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
           .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
@@ -107,7 +112,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_x     = false,
           .center_y     = true,
           .highlighting = false,
-          .cache_text   = false});
+          .cache_text   = false,
+          .auto_size    = false});
     }
     window_pop_section(window);
   }
@@ -120,6 +126,7 @@ void window_renderer_status_create(Window** window) {
 
   window_create(window);
 
+  (*window)->type          = WINDOW_TYPE_RENDERER_STATUS;
   (*window)->x             = 0;
   (*window)->y             = 0;
   (*window)->width         = 320;

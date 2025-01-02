@@ -25,6 +25,7 @@ struct ElementButtonArgs {
   uint32_t color;
   uint32_t hover_color;
   uint32_t press_color;
+  const char* tooltip_text;
 } typedef ElementButtonArgs;
 
 bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args);

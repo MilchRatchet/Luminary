@@ -20,7 +20,7 @@ static void _element_text_render_func(Element* text, Display* display) {
     data->center_y, data->cache_text, (uint32_t*) 0);
 }
 
-bool element_text(Window* window, const MouseState* mouse_state, ElementTextArgs args) {
+bool element_text(Window* window, Display* display, const MouseState* mouse_state, ElementTextArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element text;
@@ -45,6 +45,11 @@ bool element_text(Window* window, const MouseState* mouse_state, ElementTextArgs
 
   memcpy(data->text, args.text, text_size);
   memset(data->text + text_size, 0, 256 - text_size);
+
+  if (args.auto_size) {
+    text_renderer_compute_size(
+      display->text_renderer, data->text, TEXT_RENDERER_FONT_REGULAR, data->cache_text, &args.size.width, &args.size.height);
+  }
 
   ElementMouseResult mouse_result;
   element_apply_context(&text, context, &args.size, mouse_state, &mouse_result);

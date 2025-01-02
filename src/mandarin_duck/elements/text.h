@@ -26,8 +26,9 @@ struct ElementTextArgs {
   bool center_y;
   bool highlighting;
   bool cache_text;
+  bool auto_size;
 } typedef ElementTextArgs;
 
-bool element_text(Window* window, const MouseState* mouse_state, ElementTextArgs args);
+bool element_text(Window* window, Display* display, const MouseState* mouse_state, ElementTextArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_TEXT_H */

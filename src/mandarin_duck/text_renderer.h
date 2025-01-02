@@ -32,6 +32,8 @@ void text_renderer_create(TextRenderer** text_renderer);
 void text_renderer_render(
   TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
   bool use_cache, uint32_t* text_width);
+void text_renderer_compute_size(
+  TextRenderer* text_renderer, const char* text, uint32_t font_id, bool use_cache, uint32_t* text_width, uint32_t* text_height);
 void text_renderer_destroy(TextRenderer** text_renderer);
 
 #endif /* MANDARIN_DUCK_TEXT_RENDERER */

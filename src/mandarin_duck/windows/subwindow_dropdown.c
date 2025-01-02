@@ -27,7 +27,7 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
   for (uint32_t string_id = 0; string_id < data->num_strings; string_id++) {
     window_margin(window, 4);
     if (element_text(
-          window, mouse_state,
+          window, display, mouse_state,
           (ElementTextArgs){
             .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
             .color        = 0xFFFFFFFF,
@@ -35,7 +35,8 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
             .center_x     = true,
             .center_y     = true,
             .highlighting = true,
-            .cache_text   = true})) {
+            .cache_text   = true,
+            .auto_size    = false})) {
       data->selected_index = string_id;
       received_click       = true;
     }
@@ -67,7 +68,7 @@ void subwindow_dropdown_add_string(Window* window, const char* string) {
   data->num_strings++;
 }
 
-void _subwindow_dropdown_propagate_parent(Window* window, Window* parent) {
+static void _subwindow_dropdown_propagate_parent(Window* window, Window* parent) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(parent);
 
@@ -79,6 +80,7 @@ void _subwindow_dropdown_propagate_parent(Window* window, Window* parent) {
 void subwindow_dropdown_create(Window* window, uint32_t selected_index, uint32_t width, uint32_t x, uint32_t y) {
   MD_CHECK_NULL_ARGUMENT(window);
 
+  window->type                  = WINDOW_TYPE_SUBWINDOW_DROPDOWN;
   window->x                     = x;
   window->y                     = y;
   window->width                 = width;

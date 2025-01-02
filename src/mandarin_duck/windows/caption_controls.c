@@ -13,11 +13,12 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display, mouse_state,
         (ElementButtonArgs){
-          .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color       = 0xFFFF5F57,
-          .hover_color = 0xFFFF1411,
-          .press_color = 0xFF720000})) {
+          .size         = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
+          .color        = 0xFFFF5F57,
+          .hover_color  = 0xFFFF1411,
+          .press_color  = 0xFF720000,
+          .tooltip_text = (const char*) 0})) {
     display->exit_requested = true;
   }
 
@@ -26,11 +27,12 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display, mouse_state,
         (ElementButtonArgs){
-          .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color       = 0xFFFFBB2F,
-          .hover_color = 0xFFFFD51A,
-          .press_color = 0xFF975600})) {
+          .size         = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
+          .color        = 0xFFFFBB2F,
+          .hover_color  = 0xFFFFD51A,
+          .press_color  = 0xFF975600,
+          .tooltip_text = (const char*) 0})) {
     SDL_MinimizeWindow(display->sdl_window);
   }
 
@@ -39,11 +41,12 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display, mouse_state,
         (ElementButtonArgs){
-          .size        = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color       = 0xFF26C942,
-          .hover_color = 0xFF13FF21,
-          .press_color = 0xFF026200})) {
+          .size         = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
+          .color        = 0xFF26C942,
+          .hover_color  = 0xFF13FF21,
+          .press_color  = 0xFF026200,
+          .tooltip_text = (const char*) 0})) {
   }
 
   return false;
@@ -54,6 +57,7 @@ void window_caption_controls_create(Window** window) {
 
   window_create(window);
 
+  (*window)->type          = WINDOW_TYPE_CAPTION_CONTROLS;
   (*window)->x             = CAPTION_CONTROL_BUTTON_SIZE * 2;
   (*window)->y             = CAPTION_CONTROL_BUTTON_SIZE * 2;
   (*window)->width         = CAPTION_CONTROL_BUTTON_SIZE * 5;

@@ -164,7 +164,6 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
   switch (window->state_data.state) {
     case WINDOW_INTERACTION_STATE_NONE:
     case WINDOW_INTERACTION_STATE_DRAG:
-    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
     default:
       break;
     case WINDOW_INTERACTION_STATE_SLIDER:
@@ -181,6 +180,9 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
       if (window->state_data.force_string_mode_exit) {
         _window_reset_state(window);
       }
+      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
+      window_handle_input(window->external_subwindow, display, host, mouse_state);
       break;
   }
 
@@ -265,6 +267,15 @@ void window_render(Window* window, Display* display) {
 
     if (window->is_horizontal) {
       window->width = main_context->fill + 2 * window->padding;
+
+      if (window->width >= display->width) {
+        crash_message("The window width is too large.");
+      }
+
+      // If the window has become too wide, adjust its position.
+      if (window->x + window->width >= display->width) {
+        window->x = (window->type == WINDOW_TYPE_SUBWINDOW_TOOLTIP) ? window->x - window->width : display->width - window->width;
+      }
     }
     else {
       window->height = main_context->fill + 2 * window->padding;

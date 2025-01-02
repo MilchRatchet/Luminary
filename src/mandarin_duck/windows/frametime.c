@@ -17,7 +17,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     window_margin(window, 8);
 
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -25,7 +25,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = true});
+        .cache_text   = true,
+        .auto_size    = false});
 
     char text[256];
 
@@ -35,7 +36,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     sprintf(text, "%.1f SPPS", 1.0 / time);
 
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -43,12 +44,13 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = false});
+        .cache_text   = false,
+        .auto_size    = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * time);
 
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -56,7 +58,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = false});
+        .cache_text   = false,
+        .auto_size    = false});
   }
   window_pop_section(window);
 
@@ -65,7 +68,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     window_margin(window, 8);
 
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -73,14 +76,15 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = true});
+        .cache_text   = true,
+        .auto_size    = false});
 
     char text[256];
 
     sprintf(text, "%.1f FPS", 1.0 / display->frametime);
 
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -88,12 +92,13 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = false});
+        .cache_text   = false,
+        .auto_size    = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * display->frametime);
 
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
@@ -101,7 +106,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = false});
+        .cache_text   = false,
+        .auto_size    = false});
   }
   window_pop_section(window);
 
@@ -113,6 +119,7 @@ void window_frametime_create(Window** window) {
 
   window_create(window);
 
+  (*window)->type          = WINDOW_TYPE_FRAMETIME;
   (*window)->x             = 0;
   (*window)->y             = 0;
   (*window)->width         = 320;

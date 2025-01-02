@@ -3,6 +3,7 @@
 #include "display.h"
 #include "ui_renderer_utils.h"
 #include "window.h"
+#include "windows/subwindow_tooltip.h"
 
 static void _element_button_render_circle(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
@@ -107,6 +108,15 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
     window->element_has_hover = true;
 
     display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+
+    const bool external_clicked_window_is_present = (window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED);
+
+    if (args.tooltip_text && window->external_subwindow && !external_clicked_window_is_present) {
+      subwindow_tooltip_create(window->external_subwindow, args.tooltip_text, mouse_state->x + 16.0f, mouse_state->y + 16.0f);
+
+      window->state_data =
+        (WindowInteractionStateData){.state = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER, .element_hash = button.hash};
+    }
   }
 
   window_push_element(window, &button);

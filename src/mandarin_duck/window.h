@@ -16,11 +16,14 @@ struct MouseState typedef MouseState;
 #define WINDOW_STATE_STRING_SIZE 256
 
 enum WindowType {
-  WINDOW_TYPE_CAPTION_CONTROLS  = 0,
-  WINDOW_TYPE_RENDERER_STATUS   = 1,
-  WINDOW_TYPE_ABOUT             = 2,
-  WINDOW_TYPE_ENTITY_PROPERTIES = 3,
-  WINDOW_TYPE_FRAMETIME         = 4,
+  WINDOW_TYPE_CAPTION_CONTROLS,
+  WINDOW_TYPE_RENDERER_STATUS,
+  WINDOW_TYPE_ABOUT,
+  WINDOW_TYPE_ENTITY_PROPERTIES,
+  WINDOW_TYPE_FRAMETIME,
+  WINDOW_TYPE_SIDEBAR,
+  WINDOW_TYPE_SUBWINDOW_DROPDOWN,
+  WINDOW_TYPE_SUBWINDOW_TOOLTIP,
   WINDOW_TYPE_COUNT
 } typedef WindowType;
 
@@ -67,6 +70,7 @@ struct WindowInteractionStateData {
  * and its dimensions.
  */
 struct Window {
+  WindowType type;
   int32_t x;
   int32_t y;
   uint32_t width;

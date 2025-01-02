@@ -70,13 +70,8 @@ void text_renderer_create(TextRenderer** text_renderer) {
   }
 }
 
-void text_renderer_render(
-  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
-  bool use_cache, uint32_t* text_width) {
-  MD_CHECK_NULL_ARGUMENT(text_renderer);
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(text);
-
+static TTF_Text* _text_renderer_acquire_text_instance(
+  TextRenderer* text_renderer, const char* text, uint32_t font_id, const bool use_cache, bool* loaded_from_cache_ptr, size_t* hash_ptr) {
   TTF_Text* text_instance = (TTF_Text*) 0;
   bool loaded_from_cache  = false;
   size_t hash             = 0;
@@ -103,24 +98,14 @@ void text_renderer_render(
     text_instance = TTF_CreateText(text_renderer->text_engine, text_renderer->fonts[font_id], text, 0);
   }
 
-  int32_t width;
-  int32_t height;
-  TTF_GetTextSize(text_instance, &width, &height);
+  *loaded_from_cache_ptr = loaded_from_cache;
+  *hash_ptr              = hash;
 
-  if (center_x) {
-    x = x - (width >> 1);
-  }
+  return text_instance;
+}
 
-  if (center_y) {
-    y = y - (height >> 1);
-  }
-
-  if (text_width) {
-    *text_width = (uint32_t) width;
-  }
-
-  TTF_DrawSurfaceText(text_instance, x, y, display->sdl_surface);
-
+static void _text_renderer_release_text_instance(
+  TextRenderer* text_renderer, TTF_Text* text_instance, size_t hash, bool use_cache, bool loaded_from_cache) {
   bool destroy_text = !loaded_from_cache;
 
   if (!loaded_from_cache && use_cache) {
@@ -149,6 +134,39 @@ void text_renderer_render(
   if (destroy_text) {
     TTF_DestroyText(text_instance);
   }
+}
+
+void text_renderer_render(
+  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
+  bool use_cache, uint32_t* text_width) {
+  MD_CHECK_NULL_ARGUMENT(text_renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(text);
+
+  bool loaded_from_cache = false;
+  size_t hash            = 0;
+
+  TTF_Text* text_instance = _text_renderer_acquire_text_instance(text_renderer, text, font_id, use_cache, &loaded_from_cache, &hash);
+
+  int32_t width;
+  int32_t height;
+  TTF_GetTextSize(text_instance, &width, &height);
+
+  if (center_x) {
+    x = x - (width >> 1);
+  }
+
+  if (center_y) {
+    y = y - (height >> 1);
+  }
+
+  if (text_width) {
+    *text_width = (uint32_t) width;
+  }
+
+  TTF_DrawSurfaceText(text_instance, x, y, display->sdl_surface);
+
+  _text_renderer_release_text_instance(text_renderer, text_instance, hash, use_cache, loaded_from_cache);
 
   // For some reason, the text sometimes has 0 opacity so we need to overwrite the opacity here
   int32_t blit_width  = ((x + width) <= display->width) ? width : display->width - x;
@@ -161,6 +179,31 @@ void text_renderer_render(
       dst[(x + x_offset) * 4 + (y + y_offset) * display->ld + 3] = 0xFF;
     }
   }
+}
+
+void text_renderer_compute_size(
+  TextRenderer* text_renderer, const char* text, uint32_t font_id, bool use_cache, uint32_t* text_width, uint32_t* text_height) {
+  MD_CHECK_NULL_ARGUMENT(text_renderer);
+  MD_CHECK_NULL_ARGUMENT(text);
+
+  bool loaded_from_cache = false;
+  size_t hash            = 0;
+
+  TTF_Text* text_instance = _text_renderer_acquire_text_instance(text_renderer, text, font_id, use_cache, &loaded_from_cache, &hash);
+
+  int32_t width;
+  int32_t height;
+  TTF_GetTextSize(text_instance, &width, &height);
+
+  if (text_width) {
+    *text_width = (uint32_t) width;
+  }
+
+  if (text_height) {
+    *text_height = (uint32_t) height;
+  }
+
+  _text_renderer_release_text_instance(text_renderer, text_instance, hash, use_cache, loaded_from_cache);
 }
 
 void text_renderer_destroy(TextRenderer** text_renderer) {

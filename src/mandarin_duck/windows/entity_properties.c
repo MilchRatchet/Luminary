@@ -25,7 +25,7 @@ static bool _window_entity_properties_add_slider(
   window_push_section(data.window, 32, 0);
   {
     element_text(
-      data.window, data.mouse_state,
+      data.window, data.display, data.mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
@@ -33,7 +33,8 @@ static bool _window_entity_properties_add_slider(
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = true});
+        .cache_text   = true,
+        .auto_size    = false});
 
     if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
       LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
@@ -79,7 +80,7 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
   window_push_section(data.window, 32, 0);
   {
     element_text(
-      data.window, data.mouse_state,
+      data.window, data.display, data.mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
@@ -87,7 +88,8 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = true});
+        .cache_text   = true,
+        .auto_size    = false});
 
     if (element_checkbox(
           data.window, data.display, data.mouse_state,
@@ -107,7 +109,7 @@ static bool _window_entity_properties_add_dropdown(
   window_push_section(data.window, 32, 0);
   {
     element_text(
-      data.window, data.mouse_state,
+      data.window, data.display, data.mouse_state,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
@@ -115,7 +117,8 @@ static bool _window_entity_properties_add_dropdown(
         .center_x = false,
         .center_y = true,
         .highlighting = false,
-        .cache_text   = true});
+        .cache_text   = true,
+        .auto_size    = false});
 
     if (element_dropdown(
           data.window, data.display, data.mouse_state,
@@ -600,7 +603,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   // TODO: If there is a selected material.
   if (true) {
     element_text(
-      window, mouse_state,
+      window, display, mouse_state,
       (ElementTextArgs){
         .color        = 0xFFFFFFFF,
         .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
@@ -608,7 +611,8 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
         .center_x     = true,
         .center_y     = true,
         .highlighting = false,
-        .cache_text   = true});
+        .cache_text   = true,
+        .auto_size    = false});
 
     return false;
   }
@@ -673,6 +677,7 @@ void window_entity_properties_create(Window** window, WindowEntityPropertiesType
 
   window_create(window);
 
+  (*window)->type          = WINDOW_TYPE_ENTITY_PROPERTIES;
   (*window)->x             = 128 + (((uint32_t) type) * 64);
   (*window)->y             = 128 + (((uint32_t) type) * 64);
   (*window)->width         = 512;
