@@ -215,5 +215,11 @@ void user_interface_get_window_visible(UserInterface* ui, uint32_t window_id, bo
 void user_interface_set_window_visible(UserInterface* ui, uint32_t window_id, bool visible) {
   MD_CHECK_NULL_ARGUMENT(ui);
 
-  ui->windows[window_id]->is_visible = visible;
+  Window* window = ui->windows[window_id];
+
+  window->is_visible = visible;
+
+  if (visible) {
+    window_set_focus(window);
+  }
 }

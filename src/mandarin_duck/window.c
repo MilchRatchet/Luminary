@@ -192,8 +192,8 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
     }
   }
 
-  if (is_mouse_hover && mouse_state->down && !window->fixed_depth) {
-    window->depth = __window_depth_counter++;
+  if (is_mouse_hover && mouse_state->down) {
+    window_set_focus(window);
   }
 
   if (is_mouse_hover && !window->is_subwindow) {
@@ -201,6 +201,14 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
   }
 
   return is_mouse_hover || elements_received_action;
+}
+
+void window_set_focus(Window* window) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  if (!window->fixed_depth) {
+    window->depth = __window_depth_counter++;
+  }
 }
 
 void window_push_element(Window* window, Element* element) {

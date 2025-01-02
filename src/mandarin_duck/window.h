@@ -109,6 +109,8 @@ void window_allocate_memory(Window* window);
 bool window_is_mouse_hover(Window* window, Display* display, const MouseState* mouse_state);
 bool window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state);
 
+void window_set_focus(Window* window);
+
 void window_push_element(Window* window, Element* element);
 void window_margin(Window* window, uint32_t margin);
 void window_margin_relative(Window* window, float margin);
