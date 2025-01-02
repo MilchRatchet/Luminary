@@ -147,18 +147,10 @@ static bool _window_entity_properties_renderer_settings_action(
 
   uint32_t shading_mode = (uint32_t) settings.shading_mode;
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Renderer Settings",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){
+      .text = "Renderer Settings", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -203,18 +195,9 @@ static bool _window_entity_properties_camera_action(Window* window, Display* dis
   uint32_t filter         = (uint32_t) camera.filter;
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Camera",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){.text = "Camera", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -298,18 +281,9 @@ static bool _window_entity_properties_ocean_action(Window* window, Display* disp
 
   uint32_t water_type = (uint32_t) ocean.water_type;
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Ocean",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){.text = "Ocean", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -364,18 +338,9 @@ static bool _window_entity_properties_sky_action(Window* window, Display* displa
 
   uint32_t mode = (uint32_t) sky.mode;
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Sky",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){.text = "Sky", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -489,18 +454,10 @@ static bool _window_entity_properties_cloud_action(Window* window, Display* disp
   LuminaryCloud cloud;
   LUM_FAILURE_HANDLE(luminary_host_get_cloud(host, &cloud));
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Procedural Clouds",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){
+      .text = "Procedural Clouds", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -559,18 +516,9 @@ static bool _window_entity_properties_fog_action(Window* window, Display* displa
   LuminaryFog fog;
   LUM_FAILURE_HANDLE(luminary_host_get_fog(host, &fog));
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Fog",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){.text = "Fog", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -604,18 +552,10 @@ static bool _window_entity_properties_particles_action(
   LuminaryParticles particles;
   LUM_FAILURE_HANDLE(luminary_host_get_particles(host, &particles));
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Procedural Particles",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){
+      .text = "Procedural Particles", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -653,18 +593,9 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   WindowEntityPropertiesPassingData data = {
     .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
 
-  element_text(
+  element_separator(
     window, mouse_state,
-    (ElementTextArgs){
-      .color        = 0xFFFFFFFF,
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Material",
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = false,
-      .cache_text   = true});
-
-  window_margin(window, 16);
+    (ElementSeparatorArgs){.text = "Material", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   // TODO: If there is a selected material.
   if (true) {
