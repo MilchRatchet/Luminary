@@ -161,6 +161,17 @@ struct DeviceToy {
 } typedef DeviceToy;
 LUM_STATIC_SIZE_ASSERT(DeviceToy, 0x50u);
 
+union DeviceSceneEntityCover {
+  DeviceRendererSettings settings;
+  DeviceCamera camera;
+  DeviceOcean ocean;
+  DeviceSky sky;
+  DeviceCloud cloud;
+  DeviceFog fog;
+  DeviceParticles particles;
+  DeviceToy toy;
+} typedef DeviceSceneEntityCover;
+
 enum DeviceMaterialFlags {
   DEVICE_MATERIAL_FLAG_EMISSION             = 0x01,
   DEVICE_MATERIAL_FLAG_IOR_SHADOWING        = 0x02,

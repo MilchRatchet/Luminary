@@ -209,31 +209,15 @@ static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
 
-#define DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE (4096)
-
-struct DeviceManagerHandleSceneUpdatesArgs {
-  void* entity_buffer;
-  void* device_entity_buffer;
-} typedef DeviceManagerHandleSceneUpdatesArgs;
-
-static LuminaryResult _device_manager_handle_scene_updates_clear_queue_work(
-  DeviceManager* device_manager, DeviceManagerHandleSceneUpdatesArgs* args) {
+static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceManager* device_manager, void* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
-  __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs)));
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_manager_handle_scene_updates_queue_work(
-  DeviceManager* device_manager, DeviceManagerHandleSceneUpdatesArgs* args) {
-  __CHECK_NULL_ARGUMENT(device_manager);
-  __CHECK_NULL_ARGUMENT(args);
+  LUM_UNUSED(args);
 
   Scene* scene = device_manager->scene_device;
+
+  SceneEntityCover entity_buffer;
+  DeviceSceneEntityCover device_entity_buffer;
 
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock_all(scene));
@@ -262,9 +246,9 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
   while (flags && current_entity <= SCENE_ENTITY_GLOBAL_END) {
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
-      __FAILURE_HANDLE_CRITICAL(scene_get(scene, args->entity_buffer, current_entity));
-      __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
-      __FAILURE_HANDLE_CRITICAL(_device_manager_update_scene_entity_on_devices(device_manager, args->device_entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(scene_get(scene, &entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(&entity_buffer, &device_entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(_device_manager_update_scene_entity_on_devices(device_manager, &device_entity_buffer, current_entity));
     }
 
     current_entity++;
@@ -770,20 +754,12 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
 
   __FAILURE_HANDLE(scene_propagate_changes(device_manager->scene_device, device_manager->host->scene_host));
 
-  DeviceManagerHandleSceneUpdatesArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs), (void**) &args));
-
-  __FAILURE_HANDLE(
-    ringbuffer_allocate_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE, &args->entity_buffer));
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(
-    device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE, &args->device_entity_buffer));
-
   QueueEntry entry;
 
   entry.name              = "Update device scene";
   entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
-  entry.clear_func        = (QueueEntryFunction) _device_manager_handle_scene_updates_clear_queue_work;
-  entry.args              = args;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
   entry.remove_duplicates = true;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));

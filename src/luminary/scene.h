@@ -75,6 +75,17 @@ struct MeshInstanceUpdate {
   uint32_t instance_id;
 } typedef MeshInstanceUpdate;
 
+union SceneEntityCover {
+  RendererSettings settings;
+  Camera camera;
+  Ocean ocean;
+  Sky sky;
+  Cloud cloud;
+  Fog fog;
+  Particles particles;
+  Toy toy;
+} typedef SceneEntityCover;
+
 /*
  * The scene struct holds all the data that can be modified at runtime.
  * Scene data is subject to dirty checking.
