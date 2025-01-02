@@ -17,7 +17,7 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
 
   text_renderer_render(
     display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, dropdown->x + padding_x, dropdown->y + padding_y, true, true,
-    true);
+    true, (uint32_t*) 0);
 }
 
 bool element_dropdown(Window* window, const MouseState* mouse_state, ElementDropdownArgs args) {

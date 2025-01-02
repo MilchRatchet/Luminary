@@ -72,7 +72,7 @@ void text_renderer_create(TextRenderer** text_renderer) {
 
 void text_renderer_render(
   TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
-  bool use_cache) {
+  bool use_cache, uint32_t* text_width) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(text);
@@ -113,6 +113,10 @@ void text_renderer_render(
 
   if (center_y) {
     y = y - (height >> 1);
+  }
+
+  if (text_width) {
+    *text_width = (uint32_t) width;
   }
 
   TTF_DrawSurfaceText(text_instance, x, y, display->sdl_surface);

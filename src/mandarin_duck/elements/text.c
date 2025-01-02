@@ -17,7 +17,7 @@ static void _element_text_render_func(Element* text, Display* display) {
 
   text_renderer_render(
     display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, text->x + padding_x, text->y + padding_y, data->center_x,
-    data->center_y, data->cache_text);
+    data->center_y, data->cache_text, (uint32_t*) 0);
 }
 
 bool element_text(Window* window, const MouseState* mouse_state, ElementTextArgs args) {

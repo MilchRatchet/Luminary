@@ -6,6 +6,7 @@
 #include "elements/checkbox.h"
 #include "elements/color.h"
 #include "elements/dropdown.h"
+#include "elements/separator.h"
 #include "elements/slider.h"
 #include "elements/text.h"
 
@@ -243,7 +244,9 @@ static bool _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider(
     data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
-  // TODO: Add separator
+  element_separator(
+    window, mouse_state,
+    (ElementSeparatorArgs){.text = "Post Process", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
   update_data |=
     _window_entity_properties_add_dropdown(data, "Tonemap", LUMINARY_TONEMAP_COUNT, (char**) luminary_strings_tonemap, &tonemap);
@@ -521,9 +524,20 @@ static bool _window_entity_properties_cloud_action(Window* window, Display* disp
     update_data |= _window_entity_properties_add_slider(
       data, "Weather Scale", &cloud.noise_weather_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
-    // TODO: Add separator with title specifying which layer we are talking about.
+    element_separator(
+      window, mouse_state,
+      (ElementSeparatorArgs){.text = "Top Layer", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
     update_data |= _window_entity_properties_cloud_layer_action(window, display, host, &cloud.top, mouse_state);
+
+    element_separator(
+      window, mouse_state,
+      (ElementSeparatorArgs){.text = "Mid Layer", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
     update_data |= _window_entity_properties_cloud_layer_action(window, display, host, &cloud.mid, mouse_state);
+
+    element_separator(
+      window, mouse_state,
+      (ElementSeparatorArgs){
+        .text = "Bottom Layer", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
     update_data |= _window_entity_properties_cloud_layer_action(window, display, host, &cloud.low, mouse_state);
   }
 

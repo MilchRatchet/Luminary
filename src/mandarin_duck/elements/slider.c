@@ -21,7 +21,7 @@ static void _element_slider_render_float(Element* slider, Display* display) {
 
   text_renderer_render(
     display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
-    data->center_y, false);
+    data->center_y, false, (uint32_t*) 0);
 }
 
 static void _element_slider_render_uint(Element* slider, Display* display) {
@@ -45,7 +45,7 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
 
   text_renderer_render(
     display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
-    data->center_y, false);
+    data->center_y, false, (uint32_t*) 0);
 }
 
 static void _element_slider_render_vector(Element* slider, Display* display) {
@@ -77,7 +77,7 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
 
     text_renderer_render(
       display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, x_offset + padding_x, slider->y + padding_y, data->center_x,
-      data->center_y, false);
+      data->center_y, false, (uint32_t*) 0);
 
     x_offset += component_size_padded + margins;
   }
