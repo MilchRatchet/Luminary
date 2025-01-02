@@ -123,6 +123,28 @@ __device__ void triangle_handle_store(const TriangleHandle handle, const uint32_
   __stcs(data_ptr, data);
 }
 
+__device__ void triangle_handle_store_history(const TriangleHandle handle, const uint32_t offset) {
+  uint2* data_ptr = (uint2*) (device.ptrs.hit_id_history + offset);
+
+  uint2 data;
+  data.x = handle.instance_id;
+  data.y = handle.tri_id;
+
+  __stwt(data_ptr, data);
+}
+
+__device__ TriangleHandle triangle_handle_load_history(const uint32_t offset) {
+  const uint2* data_ptr = (const uint2*) (device.ptrs.hit_id_history + offset);
+
+  const uint2 data = __ldcs(data_ptr + 0);
+
+  TriangleHandle handle;
+  handle.instance_id = data.x;
+  handle.tri_id      = data.y;
+
+  return handle;
+}
+
 __device__ RGBF load_RGBF(RGBF* ptr) {
   return *ptr;
 }
@@ -197,6 +219,14 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
 
 __device__ uint32_t mesh_id_load(const uint32_t instance_id) {
   return __ldg(device.ptrs.instance_mesh_id + instance_id);
+}
+
+__device__ uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
+  const uint32_t data =
+    __ldg((uint32_t*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 3, 3, triangle_id, device.ptrs.triangle_counts[mesh_id]));
+  const uint16_t material_id = data & 0xFFFF;
+
+  return material_id;
 }
 
 __device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {

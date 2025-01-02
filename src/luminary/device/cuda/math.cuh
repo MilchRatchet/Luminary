@@ -1106,34 +1106,16 @@ __device__ float jendersie_eon_phase_sample_cos_angle(const JendersieEonParams p
   return cos_angle;
 }
 
-__device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
-  const vec3 h  = cross_product(ray, triangle.edge2);
-  const float a = dot_product(triangle.edge1, h);
+__device__ float bvh_triangle_intersection(
+  const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 origin, const vec3 ray, float2& coords) {
+  const vec3 h  = cross_product(ray, edge2);
+  const float a = dot_product(edge1, h);
 
   const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, triangle.vertex);
+  const vec3 s  = sub_vector(origin, vertex);
   const float u = f * dot_product(s, h);
 
-  const vec3 q  = cross_product(s, triangle.edge1);
-  const float v = f * dot_product(ray, q);
-
-  if (v < 0.0f || u < 0.0f || u + v > 1.0f)
-    return FLT_MAX;
-
-  const float t = f * dot_product(triangle.edge2, q);
-
-  return __fslctf(t, FLT_MAX, t);
-}
-
-__device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, const vec3 origin, const vec3 ray, float2& coords) {
-  const vec3 h  = cross_product(ray, triangle.edge2);
-  const float a = dot_product(triangle.edge1, h);
-
-  const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, triangle.vertex);
-  const float u = f * dot_product(s, h);
-
-  const vec3 q  = cross_product(s, triangle.edge1);
+  const vec3 q  = cross_product(s, edge1);
   const float v = f * dot_product(ray, q);
 
   coords = make_float2(u, v);
@@ -1142,7 +1124,7 @@ __device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, 
   if (v < 0.0f || u < 0.0f || !(u + v <= 1.0f))
     return FLT_MAX;
 
-  const float t = f * dot_product(triangle.edge2, q);
+  const float t = f * dot_product(edge2, q);
 
   return __fslctf(t, FLT_MAX, t);
 }

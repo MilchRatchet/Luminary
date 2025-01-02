@@ -332,12 +332,10 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
       DeviceTask task   = task_load(offset);
       const float depth = trace_depth_load(offset);
 
-#if 0
-    if (IS_PRIMARY_RAY) {
-      const uint32_t pixel        = get_pixel_id(task.index);
-      device.ptrs.hit_id_history[pixel] = hit_id;
-    }
-#endif
+      if (IS_PRIMARY_RAY) {
+        const uint32_t pixel = get_pixel_id(task.index);
+        triangle_handle_store_history(handle, pixel);
+      }
 
       // TODO: This is wasteful, either move this to the next kernel or keep it if the hit_id history trick is worth it still.
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));

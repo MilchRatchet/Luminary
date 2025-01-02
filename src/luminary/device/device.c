@@ -561,9 +561,9 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * (internal_pixel_count >> 2));
   __DEVICE_BUFFER_ALLOCATE(frame_gbuffer_meta, sizeof(GBufferMetaData) * (internal_pixel_count >> 2));
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(uint32_t) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
 
-  __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(uint32_t) * internal_pixel_count, device->stream_main));
+  __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(TriangleHandle) * internal_pixel_count, device->stream_main));
   __FAILURE_HANDLE(
     device_memset(device->buffers.frame_gbuffer_meta, 0, 0, sizeof(GBufferMetaData) * (internal_pixel_count >> 2), device->stream_main));
 

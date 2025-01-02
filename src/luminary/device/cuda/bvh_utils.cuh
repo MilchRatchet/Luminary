@@ -4,6 +4,7 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+#if 0
 enum BVHAlphaResult { BVH_ALPHA_RESULT_OPAQUE = 0, BVH_ALPHA_RESULT_SEMI = 1, BVH_ALPHA_RESULT_TRANSPARENT = 2 } typedef BVHAlphaResult;
 
 /*
@@ -30,5 +31,6 @@ __device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle
 
   return BVH_ALPHA_RESULT_OPAQUE;
 }
+#endif
 
 #endif /* CU_BVH_UTILS_H */

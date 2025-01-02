@@ -1,66 +1,55 @@
 #ifndef CU_TRACE_H
 #define CU_TRACE_H
 
+#include "memory.cuh"
 #include "ocean_utils.cuh"
 #include "toy_utils.cuh"
 #include "utils.cuh"
 
-__device__ float trace_preprocess(const DeviceTask task, uint32_t& instance_id) {
+__device__ float trace_preprocess(const DeviceTask task, TriangleHandle& handle_result) {
   const uint32_t pixel = get_pixel_id(task.index);
 
-  float depth = FLT_MAX;
-  instance_id = HIT_TYPE_SKY;
+  float depth   = FLT_MAX;
+  handle_result = triangle_handle_get(HIT_TYPE_SKY, 0);
 
   // Intersect against the triangle we hit in primary visible in the last frame.
   // This is a heuristic to speed up the BVH traversal.
-  // TODO: Reenable this.
-#if 0
+  // TODO: Implement texture opacity lookup if that will be used in the BVH traversal aswell.
   if (IS_PRIMARY_RAY) {
-    uint32_t t_id;
-    TraversalTriangle tt;
-    uint32_t material_id;
+    const uint32_t pixel        = get_pixel_id(task.index);
+    const TriangleHandle handle = triangle_handle_load_history(pixel);
 
-    t_id = device.ptrs.hit_id_history[get_pixel_id(task.index)];
-    if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-      material_id = load_triangle_material_id(t_id);
+    if (handle.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+      const uint32_t mesh_id      = mesh_id_load(handle.instance_id);
+      const DeviceTransform trans = load_transform(handle.instance_id);
 
-      const float4 data0 = __ldg((float4*) triangle_get_entry_address(0, 0, t_id));
-      const float4 data1 = __ldg((float4*) triangle_get_entry_address(1, 0, t_id));
-      const float data2  = __ldg((float*) triangle_get_entry_address(2, 0, t_id));
+      const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
+      const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
 
-      tt.vertex = get_vector(data0.x, data0.y, data0.z);
-      tt.edge1  = get_vector(data0.w, data1.x, data1.y);
-      tt.edge2  = get_vector(data1.z, data1.w, data2);
-      tt.id     = t_id;
+      const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
+      const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
+      const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
 
-      const DeviceMaterial mat = load_material(device.ptrs.materials, material_id);
+      const vec3 vertex = transform_apply(trans, get_vector(t0.x, t0.y, t0.z));
+      const vec3 edge1  = transform_apply(trans, get_vector(t0.w, t1.x, t1.y));
+      const vec3 edge2  = transform_apply(trans, get_vector(t1.z, t1.w, t2.x));
 
-      tt.albedo_tex = mat.albedo_tex;
+      float2 coords;
+      const float tri_dist = bvh_triangle_intersection(vertex, edge1, edge2, task.origin, task.ray, coords);
 
-      // This optimization does not work with displacement.
-      if (mat.normal_tex == TEXTURE_NONE) {
-        float2 coords;
-        const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
-
-        if (dist < depth) {
-          const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
-
-          if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
-            depth  = dist;
-            hit_id = t_id;
-          }
-        }
+      if (tri_dist < depth) {
+        depth         = tri_dist;
+        handle_result = handle;
       }
     }
   }
-#endif
 
   if (device.toy.active) {
     const float toy_dist = get_toy_distance(task.origin, task.ray);
 
     if (toy_dist < depth) {
-      depth       = toy_dist;
-      instance_id = HIT_TYPE_TOY;
+      depth                     = toy_dist;
+      handle_result.instance_id = HIT_TYPE_TOY;
     }
   }
 
@@ -69,8 +58,8 @@ __device__ float trace_preprocess(const DeviceTask task, uint32_t& instance_id) 
       const float far_distance = ocean_far_distance(task.origin, task.ray);
 
       if (far_distance < depth) {
-        depth       = far_distance;
-        instance_id = HIT_TYPE_REJECT;
+        depth                     = far_distance;
+        handle_result.instance_id = HIT_TYPE_REJECT;
       }
     }
   }

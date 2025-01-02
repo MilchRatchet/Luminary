@@ -55,9 +55,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const uint32_t data = __ldg(
-    (uint32_t*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 3, 3, handle.tri_id, device.ptrs.triangle_counts[mesh_id]));
-  const uint16_t material_id = data & 0xFFFF;
+  const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
 
   const bool material_has_ior_shadowing = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_IOR_SHADOWING) != 0;
 
