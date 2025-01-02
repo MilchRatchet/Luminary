@@ -4,6 +4,9 @@
 #include "elements/button.h"
 #include "user_interface.h"
 
+#define SIDEBAR_COLOR_ON 0xFFA08090
+#define SIDEBAR_COLOR_OFF 0xFF808080
+
 struct WindowSidebarData {
   uint32_t window_ids[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT];
 } typedef WindowSidebarData;
@@ -32,17 +35,18 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
       window_margin(window, 4);
     }
 
+    bool is_visible;
+    user_interface_get_window_visible(display->ui, data->window_ids[entity_properties_id], &is_visible);
+
     if (element_button(
           window, display, mouse_state,
           (ElementButtonArgs){
             .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
             .size         = (ElementSize){.width = 32, .height = 32},
-            .color        = 0xFF888888,
+            .color        = (is_visible) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
             .hover_color  = 0xFFFFFFFF,
             .press_color  = 0xFFFFFFFF,
             .tooltip_text = _window_entity_properties_type_tooltip_string[entity_properties_id]})) {
-      bool is_visible;
-      user_interface_get_window_visible(display->ui, data->window_ids[entity_properties_id], &is_visible);
       user_interface_set_window_visible(display->ui, data->window_ids[entity_properties_id], !is_visible);
     }
   }
@@ -60,7 +64,7 @@ static bool _window_sidebar_mouse_modes_action(Window* window, Display* display,
         (ElementButtonArgs){
           .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
           .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = 0xFF888888,
+          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
           .hover_color  = 0xFFFFFFFF,
           .press_color  = 0xFFFFFFFF,
           .tooltip_text = "Move"})) {
@@ -74,7 +78,7 @@ static bool _window_sidebar_mouse_modes_action(Window* window, Display* display,
         (ElementButtonArgs){
           .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
           .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = 0xFF888888,
+          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_SELECT_MATERIAL) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
           .hover_color  = 0xFFFFFFFF,
           .press_color  = 0xFFFFFFFF,
           .tooltip_text = "Select Material"})) {
@@ -88,7 +92,7 @@ static bool _window_sidebar_mouse_modes_action(Window* window, Display* display,
         (ElementButtonArgs){
           .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
           .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = 0xFF888888,
+          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_SELECT_INSTANCE) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
           .hover_color  = 0xFFFFFFFF,
           .press_color  = 0xFFFFFFFF,
           .tooltip_text = "Select Instance"})) {
@@ -102,7 +106,7 @@ static bool _window_sidebar_mouse_modes_action(Window* window, Display* display,
         (ElementButtonArgs){
           .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
           .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = 0xFF888888,
+          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_SELECT_FOCAL_LENGTH) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
           .hover_color  = 0xFFFFFFFF,
           .press_color  = 0xFFFFFFFF,
           .tooltip_text = "Select Focal Length"})) {
