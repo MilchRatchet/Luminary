@@ -270,7 +270,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     current_entity++;
   }
 
-  if (flags & SCENE_ENTITY_SKY) {
+  if (flags & SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_SKY)) {
     Sky sky;
     __FAILURE_HANDLE_CRITICAL(scene_get(scene, &sky, SCENE_ENTITY_SKY));
 
