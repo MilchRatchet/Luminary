@@ -47,13 +47,18 @@ static void _user_interface_setup(UserInterface* ui) {
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_renderer_status));
 
   Window* window_sidebar_entities;
-  window_sidebar_create(&window_sidebar_entities);
+  window_sidebar_create(&window_sidebar_entities, WINDOW_SIDEBAR_TYPE_ENTITY_PROPERTIES);
 
   for (uint32_t entity_property_type = 0; entity_property_type < WINDOW_ENTITY_PROPERTIES_TYPE_COUNT; entity_property_type++) {
     window_sidebar_register_window_id(window_sidebar_entities, entity_property_type, entity_property_window_ids[entity_property_type]);
   }
 
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_sidebar_entities));
+
+  Window* window_sidebar_mouse_modes;
+  window_sidebar_create(&window_sidebar_mouse_modes, WINDOW_SIDEBAR_TYPE_MOUSE_MODES);
+
+  LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_sidebar_mouse_modes));
 
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));

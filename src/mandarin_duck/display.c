@@ -121,6 +121,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
     display->sdl_cursors[cursor_id] = SDL_CreateSystemCursor(cursor_id);
   }
 
+  display->mouse_mode = DISPLAY_MOUSE_MODE_DEFAULT;
+
   display_set_mouse_visible(display, display->show_ui);
 
   *_display = display;
@@ -130,13 +132,21 @@ void display_set_mouse_visible(Display* display, bool enable) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
-  _display_set_hittest(display, enable);
+  _display_set_hittest(display, enable && (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
 }
 
 void display_set_cursor(Display* display, SDL_SystemCursor cursor) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   display->selected_cursor = cursor;
+}
+
+void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  display->mouse_mode = mouse_mode;
+
+  _display_set_hittest(display, (mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
 }
 
 void display_query_events(Display* display, bool* exit_requested, bool* dirty) {

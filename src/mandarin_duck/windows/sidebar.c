@@ -17,9 +17,10 @@ static const char* _window_entity_properties_type_tooltip_string[WINDOW_ENTITY_P
   [WINDOW_ENTITY_PROPERTIES_TYPE_CLOUD]     = "Cloud",
   [WINDOW_ENTITY_PROPERTIES_TYPE_FOG]       = "Fog",
   [WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES] = "Particles",
-  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = "Material"};
+  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = "Material",
+  [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]  = "Instance"};
 
-static bool _window_sidebar_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static bool _window_sidebar_entity_properties_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -49,7 +50,69 @@ static bool _window_sidebar_action(Window* window, Display* display, LuminaryHos
   return false;
 }
 
-void window_sidebar_create(Window** window) {
+static bool _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  if (element_button(
+        window, display, mouse_state,
+        (ElementButtonArgs){
+          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+          .size         = (ElementSize){.width = 32, .height = 32},
+          .color        = 0xFF888888,
+          .hover_color  = 0xFFFFFFFF,
+          .press_color  = 0xFFFFFFFF,
+          .tooltip_text = "Move"})) {
+    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
+  }
+
+  window_margin(window, 4);
+
+  if (element_button(
+        window, display, mouse_state,
+        (ElementButtonArgs){
+          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+          .size         = (ElementSize){.width = 32, .height = 32},
+          .color        = 0xFF888888,
+          .hover_color  = 0xFFFFFFFF,
+          .press_color  = 0xFFFFFFFF,
+          .tooltip_text = "Select Material"})) {
+    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_MATERIAL);
+  }
+
+  window_margin(window, 4);
+
+  if (element_button(
+        window, display, mouse_state,
+        (ElementButtonArgs){
+          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+          .size         = (ElementSize){.width = 32, .height = 32},
+          .color        = 0xFF888888,
+          .hover_color  = 0xFFFFFFFF,
+          .press_color  = 0xFFFFFFFF,
+          .tooltip_text = "Select Instance"})) {
+    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_INSTANCE);
+  }
+
+  window_margin(window, 4);
+
+  if (element_button(
+        window, display, mouse_state,
+        (ElementButtonArgs){
+          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+          .size         = (ElementSize){.width = 32, .height = 32},
+          .color        = 0xFF888888,
+          .hover_color  = 0xFFFFFFFF,
+          .press_color  = 0xFFFFFFFF,
+          .tooltip_text = "Select Focal Length"})) {
+    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_FOCAL_LENGTH);
+  }
+
+  return false;
+}
+
+void window_sidebar_create(Window** window, WindowSidebarType type) {
   MD_CHECK_NULL_ARGUMENT(window);
 
   window_create(window);
@@ -66,10 +129,23 @@ void window_sidebar_create(Window** window) {
   (*window)->background    = true;
   (*window)->auto_size     = true;
   (*window)->auto_align    = true;
-  (*window)->margins =
-    (WindowMargins){.margin_top = 128, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
-  (*window)->action_func = _window_sidebar_action;
+
   (*window)->fixed_depth = true;
+
+  switch (type) {
+    case WINDOW_SIDEBAR_TYPE_ENTITY_PROPERTIES:
+      (*window)->margins = (WindowMargins){
+        .margin_top = 128, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
+      (*window)->action_func = _window_sidebar_entity_properties_action;
+      break;
+    case WINDOW_SIDEBAR_TYPE_MOUSE_MODES:
+      (*window)->margins = (WindowMargins){
+        .margin_top = 128, .margin_right = 32, .margin_left = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
+      (*window)->action_func = _window_sidebar_mouse_modes_action;
+      break;
+    default:
+      break;
+  }
 
   window_create_subwindow(*window);
 

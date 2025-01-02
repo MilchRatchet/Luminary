@@ -657,6 +657,51 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   return update_data;
 }
 
+static bool _window_entity_properties_instance_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  WindowEntityPropertiesPassingData data = {
+    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+
+  element_separator(
+    window, mouse_state,
+    (ElementSeparatorArgs){.text = "Instance", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
+  // TODO: If there is a selected instance.
+  if (true) {
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs){
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+        .text         = "No instance is selected.",
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false});
+
+    return false;
+  }
+
+  LuminaryInstance instance;
+
+  bool update_data = false;
+
+  update_data |=
+    _window_entity_properties_add_slider(data, "Position", &instance.position, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+  update_data |=
+    _window_entity_properties_add_slider(data, "Rotation", &instance.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(data, "Scale", &instance.scale, ELEMENT_SLIDER_DATA_TYPE_VECTOR, 0.0f, FLT_MAX, 1.0f);
+
+  if (update_data) {
+  }
+
+  return update_data;
+}
+
 static bool (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) = {
   [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]  = _window_entity_properties_renderer_settings_action,
@@ -666,7 +711,8 @@ static bool (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
   [WINDOW_ENTITY_PROPERTIES_TYPE_CLOUD]     = _window_entity_properties_cloud_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_FOG]       = _window_entity_properties_fog_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES] = _window_entity_properties_particles_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = _window_entity_properties_material_action};
+  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = _window_entity_properties_material_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]  = _window_entity_properties_instance_action};
 
 void window_entity_properties_create(Window** window, WindowEntityPropertiesType type) {
   MD_CHECK_NULL_ARGUMENT(window);

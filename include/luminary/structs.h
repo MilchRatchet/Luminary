@@ -341,4 +341,14 @@ LUMINARY_API struct LuminaryMaterial {
   LuminaryMaterialFlags flags;
 } typedef LuminaryMaterial;
 
+////////////////////////////////////////////////////////////////////
+// LuminaryInstance
+////////////////////////////////////////////////////////////////////
+
+LUMINARY_API struct LuminaryInstance {
+  LuminaryVec3 position;
+  LuminaryVec3 rotation;
+  LuminaryVec3 scale;
+} typedef LuminaryInstance;
+
 #endif /* LUMINARY_STRUCTS_H */

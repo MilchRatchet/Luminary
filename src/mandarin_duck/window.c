@@ -262,6 +262,11 @@ void window_render(Window* window, Display* display) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
 
+  // We may move the window during rendering, we need to keep track so that the elements can be moved accordingly aswell.
+  // These may underflow but since we only perform additions, this is equivalent to signed arithmetic.
+  uint32_t window_shift_x = 0;
+  uint32_t window_shift_y = 0;
+
   if (window->auto_size) {
     WindowContext* main_context = window->context_stack;
 
@@ -274,7 +279,11 @@ void window_render(Window* window, Display* display) {
 
       // If the window has become too wide, adjust its position.
       if (window->x + window->width >= display->width) {
+        const uint32_t old_x = window->x;
+
         window->x = (window->type == WINDOW_TYPE_SUBWINDOW_TOOLTIP) ? window->x - window->width : display->width - window->width;
+
+        window_shift_x = window->x - old_x;
       }
     }
     else {
@@ -298,6 +307,10 @@ void window_render(Window* window, Display* display) {
 
   for (uint32_t element_id = 0; element_id < num_elements; element_id++) {
     Element* element = window->element_queue + element_id;
+
+    // Apply the window shift
+    element->x += window_shift_x;
+    element->y += window_shift_y;
 
     element->render_func(element, display);
   }
