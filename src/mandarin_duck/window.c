@@ -118,7 +118,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
         if (window->y < 0)
           window->y = 0;
 
-        mouse_state_reset_button(mouse_state);
+        mouse_state_invalidate(mouse_state);
       }
       else {
         _window_reset_state(window);
@@ -161,7 +161,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
       break;
     case WINDOW_INTERACTION_STATE_SLIDER:
       if (mouse_state->down == true) {
-        mouse_state_reset_button(mouse_state);
+        mouse_state_invalidate(mouse_state);
       }
       break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
@@ -181,7 +181,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
     window->depth = __window_depth_counter++;
 
     if (window->is_subwindow == false) {
-      mouse_state_reset_button(mouse_state);
+      mouse_state_invalidate(mouse_state);
     }
   }
 

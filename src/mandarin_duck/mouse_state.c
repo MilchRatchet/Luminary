@@ -23,13 +23,6 @@ void mouse_state_reset_motion(MouseState* mouse_state) {
   mouse_state->y_motion = 0.0f;
 }
 
-void mouse_state_reset_button(MouseState* mouse_state) {
-  MD_CHECK_NULL_ARGUMENT(mouse_state);
-
-  mouse_state->down  = false;
-  mouse_state->phase = MOUSE_PHASE_STABLE;
-}
-
 void mouse_state_step_phase(MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
@@ -41,6 +34,7 @@ void mouse_state_invalidate(MouseState* mouse_state) {
 
   mouse_state->x     = FLT_MAX;
   mouse_state->y     = FLT_MAX;
+  mouse_state->down  = false;
   mouse_state->phase = MOUSE_PHASE_STABLE;
 }
 
