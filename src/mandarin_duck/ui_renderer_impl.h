@@ -5,22 +5,6 @@
 #include "ui_renderer_utils.h"
 #include "utils.h"
 
-enum UIRendererWorkSize {
-  UI_RENDERER_WORK_SIZE_32BIT,
-  UI_RENDERER_WORK_SIZE_128BIT,
-  UI_RENDERER_WORK_SIZE_256BIT,
-  UI_RENDERER_WORK_SIZE_COUNT
-} typedef UIRendererWorkSize;
-
-static const uint32_t UIRendererWorkSizeStrideLog[UI_RENDERER_WORK_SIZE_COUNT] =
-  {[UI_RENDERER_WORK_SIZE_32BIT] = 0, [UI_RENDERER_WORK_SIZE_128BIT] = 2, [UI_RENDERER_WORK_SIZE_256BIT] = 3};
-
-static const uint32_t UIRendererWorkSizeStride[UI_RENDERER_WORK_SIZE_COUNT] =
-  {[UI_RENDERER_WORK_SIZE_32BIT] = 1 << 0, [UI_RENDERER_WORK_SIZE_128BIT] = 1 << 2, [UI_RENDERER_WORK_SIZE_256BIT] = 1 << 3};
-
-static const uint32_t UIRendererWorkSizeStrideBytes[UI_RENDERER_WORK_SIZE_COUNT] =
-  {[UI_RENDERER_WORK_SIZE_32BIT] = 4 << 0, [UI_RENDERER_WORK_SIZE_128BIT] = 4 << 2, [UI_RENDERER_WORK_SIZE_256BIT] = 4 << 3};
-
 inline Color256 color256_load_generic(const uint8_t* ptr, const UIRendererWorkSize work_size) {
   switch (work_size) {
     case UI_RENDERER_WORK_SIZE_32BIT:
@@ -290,10 +274,12 @@ static void _ui_renderer_render_rounded_box(
     }
   }
 
-  shape_mask_size = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->shape_mask_size[shape_mask_size_id] : renderer->block_mask_size;
+  shape_mask_size =
+    (shape_mask_size_id != 0xFFFFFFFF) ? renderer->shape_mask_size[shape_mask_size_id] : renderer->block_mask_size[work_size];
 
-  const uint8_t* disk_mask   = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->disk_mask[shape_mask_size_id] : renderer->block_mask;
-  const uint8_t* circle_mask = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->circle_mask[shape_mask_size_id] : renderer->block_mask_border;
+  const uint8_t* disk_mask = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->disk_mask[shape_mask_size_id] : renderer->block_mask[work_size];
+  const uint8_t* circle_mask =
+    (shape_mask_size_id != 0xFFFFFFFF) ? renderer->circle_mask[shape_mask_size_id] : renderer->block_mask_border[work_size];
 
   const uint32_t shape_mask_half_size = shape_mask_size >> 1;
   const uint32_t shape_mask_ld        = shape_mask_size * sizeof(LuminaryARGB8);

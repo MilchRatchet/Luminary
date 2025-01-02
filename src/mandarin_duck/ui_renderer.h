@@ -8,6 +8,22 @@
 #define UI_RENDERER_STRIDE_LOG 3
 #define UI_RENDERER_STRIDE_BYTES (UI_RENDERER_STRIDE * 4)
 
+enum UIRendererWorkSize {
+  UI_RENDERER_WORK_SIZE_32BIT,
+  UI_RENDERER_WORK_SIZE_128BIT,
+  UI_RENDERER_WORK_SIZE_256BIT,
+  UI_RENDERER_WORK_SIZE_COUNT
+} typedef UIRendererWorkSize;
+
+static const uint32_t UIRendererWorkSizeStrideLog[UI_RENDERER_WORK_SIZE_COUNT] =
+  {[UI_RENDERER_WORK_SIZE_32BIT] = 0, [UI_RENDERER_WORK_SIZE_128BIT] = 2, [UI_RENDERER_WORK_SIZE_256BIT] = 3};
+
+static const uint32_t UIRendererWorkSizeStride[UI_RENDERER_WORK_SIZE_COUNT] =
+  {[UI_RENDERER_WORK_SIZE_32BIT] = 1 << 0, [UI_RENDERER_WORK_SIZE_128BIT] = 1 << 2, [UI_RENDERER_WORK_SIZE_256BIT] = 1 << 3};
+
+static const uint32_t UIRendererWorkSizeStrideBytes[UI_RENDERER_WORK_SIZE_COUNT] =
+  {[UI_RENDERER_WORK_SIZE_32BIT] = 4 << 0, [UI_RENDERER_WORK_SIZE_128BIT] = 4 << 2, [UI_RENDERER_WORK_SIZE_256BIT] = 4 << 3};
+
 enum UIRendererBackgroundMode {
   UI_RENDERER_BACKGROUND_MODE_OPAQUE          = 0,
   UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT = 1,
@@ -17,9 +33,9 @@ enum UIRendererBackgroundMode {
 #define SHAPE_MASK_COUNT 3
 
 struct UIRenderer {
-  uint8_t* block_mask;
-  uint8_t* block_mask_border;
-  uint32_t block_mask_size;
+  uint8_t* block_mask[UI_RENDERER_WORK_SIZE_COUNT];
+  uint8_t* block_mask_border[UI_RENDERER_WORK_SIZE_COUNT];
+  uint32_t block_mask_size[UI_RENDERER_WORK_SIZE_COUNT];
   uint8_t* disk_mask[SHAPE_MASK_COUNT];
   uint8_t* circle_mask[SHAPE_MASK_COUNT];
   uint32_t shape_mask_size[SHAPE_MASK_COUNT];

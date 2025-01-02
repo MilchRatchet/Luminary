@@ -106,11 +106,16 @@ void ui_renderer_create(UIRenderer** renderer) {
 
   LUM_FAILURE_HANDLE(host_malloc(renderer, sizeof(UIRenderer)));
 
-  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->block_mask, sizeof(uint32_t) * 2 * UI_RENDERER_STRIDE * 2 * UI_RENDERER_STRIDE));
-  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->block_mask_border, sizeof(uint32_t) * 2 * UI_RENDERER_STRIDE * 2 * UI_RENDERER_STRIDE));
-  (*renderer)->block_mask_size = 2 * UI_RENDERER_STRIDE;
+  for (uint32_t work_size_id = 0; work_size_id < UI_RENDERER_WORK_SIZE_COUNT; work_size_id++) {
+    const uint32_t stride = UIRendererWorkSizeStride[work_size_id];
 
-  _ui_renderer_create_block_mask((*renderer)->block_mask, (*renderer)->block_mask_border, (*renderer)->block_mask_size);
+    LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->block_mask[work_size_id], sizeof(uint32_t) * 2 * stride * 2 * stride));
+    LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->block_mask_border[work_size_id], sizeof(uint32_t) * 2 * stride * 2 * stride));
+    (*renderer)->block_mask_size[work_size_id] = 2 * stride;
+
+    _ui_renderer_create_block_mask(
+      (*renderer)->block_mask[work_size_id], (*renderer)->block_mask_border[work_size_id], (*renderer)->block_mask_size[work_size_id]);
+  }
 
   for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
     const uint32_t size = 16 << size_id;
@@ -186,9 +191,11 @@ void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display) 
     }
   }
 
-  shape_mask_size = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->shape_mask_size[shape_mask_size_id] : renderer->block_mask_size;
+  shape_mask_size = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->shape_mask_size[shape_mask_size_id]
+                                                       : renderer->block_mask_size[UI_RENDERER_WORK_SIZE_32BIT];
 
-  const uint8_t* disk_mask = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->disk_mask[shape_mask_size_id] : renderer->block_mask;
+  const uint8_t* disk_mask =
+    (shape_mask_size_id != 0xFFFFFFFF) ? renderer->disk_mask[shape_mask_size_id] : renderer->block_mask[UI_RENDERER_WORK_SIZE_32BIT];
 
   const uint32_t shape_mask_half_size = shape_mask_size >> 1;
   const uint32_t shape_mask_ld        = shape_mask_size * sizeof(LuminaryARGB8);
@@ -236,8 +243,10 @@ void ui_renderer_destroy(UIRenderer** renderer) {
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(*renderer);
 
-  LUM_FAILURE_HANDLE(host_free(&(*renderer)->block_mask));
-  LUM_FAILURE_HANDLE(host_free(&(*renderer)->block_mask_border));
+  for (uint32_t work_size_id = 0; work_size_id < UI_RENDERER_WORK_SIZE_COUNT; work_size_id++) {
+    LUM_FAILURE_HANDLE(host_free(&(*renderer)->block_mask[work_size_id]));
+    LUM_FAILURE_HANDLE(host_free(&(*renderer)->block_mask_border[work_size_id]));
+  }
 
   for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
     LUM_FAILURE_HANDLE(host_free(&(*renderer)->disk_mask[size_id]));
