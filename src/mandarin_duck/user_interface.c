@@ -1,6 +1,7 @@
 #include "user_interface.h"
 
 #include "display.h"
+#include "windows/about.h"
 #include "windows/caption_controls.h"
 #include "windows/entity_properties.h"
 #include "windows/frametime.h"
@@ -28,6 +29,12 @@ static void _user_interface_setup(UserInterface* ui) {
   window_caption_controls_create(&window_caption_controls);
 
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_caption_controls));
+
+  Window* window_about;
+  window_about_create(&window_about);
+
+  LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &ui->about_window_id));
+  LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_about));
 
   Window* window_frametime;
   window_frametime_create(&window_frametime);
@@ -128,6 +135,13 @@ void user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   MD_CHECK_NULL_ARGUMENT(host);
 
   display_set_cursor(display, SDL_SYSTEM_CURSOR_DEFAULT);
+
+  // Toggle the "About" window with F1.
+  if (display->keyboard_state->keys[SDL_SCANCODE_F1].phase == KEY_PHASE_PRESSED) {
+    bool visible;
+    user_interface_get_window_visible(ui, ui->about_window_id, &visible);
+    user_interface_set_window_visible(ui, ui->about_window_id, !visible);
+  }
 
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));

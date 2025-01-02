@@ -1,0 +1,271 @@
+#include "about.h"
+
+#include <stdio.h>
+
+#include "elements/checkbox.h"
+#include "elements/separator.h"
+#include "elements/text.h"
+
+static bool _window_about_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  element_separator(
+    window, mouse_state,
+    (ElementSeparatorArgs){.text = "About", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Mandarin Duck - CPU Graphical User Interface for Luminary",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 2021 - 2025 Max Jenke",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the GNU Affero General Public Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  window_margin(window, 24);
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Luminary - Path Tracing Renderer",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 2024 - 2025 Max Jenke",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the GNU Affero General Public Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_separator(
+    window, mouse_state,
+    (ElementSeparatorArgs){.text = "Devices", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
+  uint32_t device_count;
+  LUM_FAILURE_HANDLE(luminary_host_get_device_count(host, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    LuminaryDeviceInfo device_info;
+    LUM_FAILURE_HANDLE(luminary_host_get_device_info(host, device_id, &device_info));
+
+    // TODO: Allow for toggling of devices
+    bool device_active = true;
+
+    window_push_section(window, 32, 4);
+    {
+      element_checkbox(
+        window, display, mouse_state,
+        (ElementCheckBoxArgs){.size = (ElementSize){.width = 24, .height = 24}, .data_binding = &device_active});
+
+      element_text(
+        window, display, mouse_state,
+        (ElementTextArgs){
+          .color    = 0xFFFFFFFF,
+          .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.8f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+          .text     = device_info.name,
+          .center_x = false,
+          .center_y = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false});
+
+      char memory_string[64];
+      sprintf(memory_string, "%.1f GB", device_info.memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)));
+
+      element_text(
+        window, display, mouse_state,
+        (ElementTextArgs){
+          .color    = 0xFFFFFFFF,
+          .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+          .text     = memory_string,
+          .center_x = false,
+          .center_y = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false});
+    }
+    window_pop_section(window);
+  }
+
+  element_separator(
+    window, mouse_state,
+    (ElementSeparatorArgs){
+      .text = "Third Party Licences", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Simple DirectMedia Layer (SDL) Version 3.0",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Zlib Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  window_margin(window, 24);
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "SDL_ttf Version 3.0",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Zlib Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  window_margin(window, 24);
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Freetype",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Freetype Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false});
+
+  return false;
+}
+
+void window_about_create(Window** window) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  window_create(window);
+
+  (*window)->type          = WINDOW_TYPE_ABOUT;
+  (*window)->x             = 128;
+  (*window)->y             = 128;
+  (*window)->width         = 512;
+  (*window)->height        = 48;
+  (*window)->padding       = 8;
+  (*window)->is_horizontal = false;
+  (*window)->is_visible    = false;
+  (*window)->is_movable    = true;
+  (*window)->background    = true;
+  (*window)->auto_size     = true;
+  (*window)->auto_align    = false;
+  (*window)->action_func   = _window_about_action;
+  (*window)->fixed_depth   = false;
+
+  window_allocate_memory(*window);
+}

@@ -50,6 +50,11 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t max_sample_count;
 } typedef LuminaryRendererSettings;
 
+LUMINARY_API struct LuminaryDeviceInfo {
+  char name[256];
+  size_t memory_size;
+} typedef LuminaryDeviceInfo;
+
 LUMINARY_API struct LuminaryOutputProperties {
   bool enabled;
   uint32_t width;

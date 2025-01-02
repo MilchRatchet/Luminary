@@ -7,6 +7,7 @@
 struct UserInterface {
   Window** windows;
   uint32_t* window_ids_sorted;
+  uint32_t about_window_id;
   MouseState* mouse_state;
 } typedef UserInterface;
 

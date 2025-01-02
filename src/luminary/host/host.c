@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <luminary/host.h>
 #include <stdlib.h>
 #include <string.h>
@@ -309,6 +310,36 @@ LuminaryResult luminary_host_destroy(Host** host) {
   __FAILURE_HANDLE(output_handler_destroy(&(*host)->output_handler));
 
   __FAILURE_HANDLE(host_free(host));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_device_count(LuminaryHost* host, uint32_t* device_count) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(device_count);
+
+  __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, device_count));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device_id, LuminaryDeviceInfo* info) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(info);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, &num_devices));
+
+  if (device_id >= num_devices) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device ID exceeds number of devices.");
+  }
+
+  Device* device = host->device_manager->devices[device_id];
+
+  static_assert(sizeof(info->name) >= 256 && sizeof(device->properties.name) >= 256, "Name buffers are too small.");
+  memcpy(info->name, device->properties.name, 256);
+
+  info->memory_size = device->properties.memory_size;
 
   return LUMINARY_SUCCESS;
 }
