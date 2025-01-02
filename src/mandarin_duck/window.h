@@ -8,6 +8,13 @@ struct Display typedef Display;
 struct Window typedef Window;
 struct MouseState typedef MouseState;
 
+#define WINDOW_MAX_CONTEXT_DEPTH 8
+#define WINDOW_MAX_BLUR_MIP_COUNT 5
+#define WINDOW_MARGIN_INVALID INT32_MAX
+#define WINDOW_ROUNDING_SIZE 32
+#define WINDOW_DATA_SECTION_SIZE 4096
+#define WINDOW_STATE_STRING_SIZE 256
+
 enum WindowType {
   WINDOW_TYPE_CAPTION_CONTROLS  = 0,
   WINDOW_TYPE_RENDERER_STATUS   = 1,
@@ -41,7 +48,8 @@ enum WindowInteractionState {
   WINDOW_INTERACTION_STATE_DRAG,
   WINDOW_INTERACTION_STATE_SLIDER,
   WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER,
-  WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED
+  WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED,
+  WINDOW_INTERACTION_STATE_STRING
 } typedef WindowInteractionState;
 
 struct WindowInteractionStateData {
@@ -49,13 +57,10 @@ struct WindowInteractionStateData {
   uint64_t element_hash;
   uint32_t subelement_index;
   uint32_t dropdown_selection;
+  uint32_t num_characters;
+  char string[WINDOW_STATE_STRING_SIZE];
+  bool force_string_mode_exit;
 } typedef WindowInteractionStateData;
-
-#define WINDOW_MAX_CONTEXT_DEPTH 8
-#define WINDOW_MAX_BLUR_MIP_COUNT 5
-#define WINDOW_MARGIN_INVALID INT32_MAX
-#define WINDOW_ROUNDING_SIZE 32
-#define WINDOW_DATA_SECTION_SIZE 4096
 
 /*
  * The Window is passed to each element so an element can resize itself based on window orientation (vertical/horizontal)

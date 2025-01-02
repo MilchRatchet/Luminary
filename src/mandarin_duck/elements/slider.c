@@ -9,43 +9,58 @@
 static void _element_slider_render_float(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
+  uint32_t background_color = (data->string_edit_mode) ? 0xFF443399 : 0xFF000000;
+
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, 0xFF111111, 0xFF000000,
+    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, 0xFF111111, background_color,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
   char text[256];
-  sprintf(text, "%.2f", data->data_float);
+  if (data->string_edit_mode) {
+    sprintf(text, "%s", data->string);
+  }
+  else {
+    sprintf(text, "%.2f", data->data_float);
+  }
 
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
+  uint32_t text_width;
   text_renderer_render(
     display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
-    data->center_y, false, (uint32_t*) 0);
+    data->center_y, false, &text_width);
 }
 
 static void _element_slider_render_uint(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
+  uint32_t background_color = (data->string_edit_mode) ? 0xFF443399 : 0xFF000000;
+
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, 0xFF111111, 0xFF000000,
+    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, 0xFF111111, background_color,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
   char text[256];
-
-  if (data->type == ELEMENT_SLIDER_DATA_TYPE_UINT) {
-    sprintf(text, "%u", data->data_uint);
+  if (data->string_edit_mode) {
+    sprintf(text, "%s", data->string);
   }
   else {
-    sprintf(text, "%d", data->data_sint);
+    if (data->type == ELEMENT_SLIDER_DATA_TYPE_UINT) {
+      sprintf(text, "%u", data->data_uint);
+    }
+    else {
+      sprintf(text, "%d", data->data_sint);
+    }
   }
 
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
+  uint32_t text_width;
   text_renderer_render(
     display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
-    data->center_y, false, (uint32_t*) 0);
+    data->center_y, false, &text_width);
 }
 
 static void _element_slider_render_vector(Element* slider, Display* display) {
@@ -65,12 +80,19 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
   const uint32_t margins = (slider->width - component_size_padded * 3) >> 1;
 
   for (uint32_t component = 0; component < 3; component++) {
+    uint32_t background_color = (data->string_edit_mode && data->string_component_index == component) ? 0xFF443399 : 0xFF000000;
+
     ui_renderer_render_rounded_box(
-      display->ui_renderer, display, component_size_padded, slider->height, x_offset, slider->y, 0, 0xFF111111, 0xFF000000,
+      display->ui_renderer, display, component_size_padded, slider->height, x_offset, slider->y, 0, 0xFF111111, background_color,
       UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
     char text[256];
-    sprintf(text, "%.2f", vec_data[component]);
+    if (data->string_edit_mode && data->string_component_index == component) {
+      sprintf(text, "%s", data->string);
+    }
+    else {
+      sprintf(text, "%.2f", vec_data[component]);
+    }
 
     const uint32_t padding_x = data->center_x ? component_size_padded >> 1 : component_size_padded;
     const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
@@ -126,6 +148,26 @@ static uint32_t _element_slider_get_subelement_index(Window* window, const Mouse
   }
 }
 
+static void _element_slider_update_data(Element* slider, void* dst, uint32_t subelement_index) {
+  ElementSliderData* data = (ElementSliderData*) &slider->data;
+
+  switch (data->type) {
+    case ELEMENT_SLIDER_DATA_TYPE_FLOAT:
+      *(float*) dst = data->data_float;
+      break;
+    case ELEMENT_SLIDER_DATA_TYPE_UINT:
+      *(uint32_t*) dst = data->data_uint;
+      break;
+    case ELEMENT_SLIDER_DATA_TYPE_SINT:
+      *(int32_t*) dst = data->data_sint;
+      break;
+    case ELEMENT_SLIDER_DATA_TYPE_VECTOR:
+    case ELEMENT_SLIDER_DATA_TYPE_RGB:
+      ((float*) dst)[subelement_index] = ((float*) &data->data_vec3)[subelement_index];
+      break;
+  }
+}
+
 bool element_slider(
   Window* window, Display* display, const MouseState* mouse_state, const KeyboardState* keyboard_state, ElementSliderArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
@@ -145,6 +187,9 @@ bool element_slider(
   data->margins           = args.margins;
   data->center_x          = args.center_x;
   data->center_y          = args.center_y;
+  data->string_edit_mode  = false;
+
+  const bool is_integer_type = (args.type == ELEMENT_SLIDER_DATA_TYPE_UINT || args.type == ELEMENT_SLIDER_DATA_TYPE_SINT);
 
   ElementMouseResult mouse_result;
   element_apply_context(&slider, context, &args.size, mouse_state, &mouse_result);
@@ -152,6 +197,7 @@ bool element_slider(
   bool updated_data = false;
 
   const bool use_slider = (window->state_data.state == WINDOW_INTERACTION_STATE_SLIDER) && (window->state_data.element_hash == slider.hash);
+  const bool use_string = (window->state_data.state == WINDOW_INTERACTION_STATE_STRING) && (window->state_data.element_hash == slider.hash);
 
   float mouse_change_rate = args.change_rate;
   if (keyboard_state->keys[SDL_SCANCODE_LCTRL].down) {
@@ -166,8 +212,7 @@ bool element_slider(
         mouse_change_rate *= (1.0f + sqrtf(fabsf(data->data_float)));
 
         data->data_float += mouse_state->x_motion * mouse_change_rate * 0.001f;
-        data->data_float            = fminf(args.max, fmaxf(args.min, data->data_float));
-        *(float*) args.data_binding = data->data_float;
+        data->data_float = fminf(args.max, fmaxf(args.min, data->data_float));
 
         updated_data = true;
       }
@@ -187,11 +232,113 @@ bool element_slider(
         *value += mouse_state->x_motion * mouse_change_rate * 0.001f;
         *value = fminf(args.max, fmaxf(args.min, *value));
 
-        ((float*) args.data_binding)[window->state_data.subelement_index] = *value;
-
         updated_data = true;
       }
       break;
+  }
+
+  if (use_string) {
+    data->string_edit_mode = true;
+
+    if (keyboard_state->keys[SDL_SCANCODE_RETURN].down || window->state_data.force_string_mode_exit) {
+      switch (args.type) {
+        case ELEMENT_SLIDER_DATA_TYPE_FLOAT:
+          data->data_float = SDL_strtod(window->state_data.string, NULL);
+          data->data_float = fminf(args.max, fmaxf(args.min, data->data_float));
+          break;
+        case ELEMENT_SLIDER_DATA_TYPE_UINT:
+          data->data_uint = (uint32_t) SDL_strtoul(window->state_data.string, NULL, 10);
+          data->data_uint = fmin(args.max, fmax(args.min, data->data_uint));
+          break;
+        case ELEMENT_SLIDER_DATA_TYPE_SINT:
+          data->data_sint = (int32_t) SDL_strtol(window->state_data.string, NULL, 10);
+          data->data_sint = fmin(args.max, fmax(args.min, data->data_sint));
+          break;
+        case ELEMENT_SLIDER_DATA_TYPE_VECTOR:
+        case ELEMENT_SLIDER_DATA_TYPE_RGB:
+          ((float*) &data->data_vec3)[window->state_data.subelement_index] = SDL_strtod(window->state_data.string, NULL);
+          ((float*) &data->data_vec3)[window->state_data.subelement_index] =
+            fminf(args.max, fmaxf(args.min, ((float*) &data->data_vec3)[window->state_data.subelement_index]));
+          break;
+      }
+
+      updated_data = true;
+
+      window->state_data.force_string_mode_exit = true;
+    }
+    else if (keyboard_state->keys[SDL_SCANCODE_ESCAPE].down) {
+      // Abort and don't update the data
+      window->state_data.force_string_mode_exit = true;
+    }
+    else {
+      if (keyboard_state->keys[SDL_SCANCODE_1].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '1';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_2].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '2';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_3].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '3';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_4].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '4';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_5].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '5';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_6].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '6';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_7].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '7';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_8].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '8';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_9].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '9';
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_0].phase == KEY_PHASE_PRESSED) {
+        window->state_data.string[window->state_data.num_characters++] = '0';
+      }
+
+      if (args.type != ELEMENT_SLIDER_DATA_TYPE_UINT) {
+        if (keyboard_state->keys[SDL_SCANCODE_MINUS].phase == KEY_PHASE_PRESSED) {
+          window->state_data.string[window->state_data.num_characters++] = '-';
+        }
+
+        // German Layout
+        if (keyboard_state->keys[SDL_SCANCODE_SLASH].phase == KEY_PHASE_PRESSED) {
+          window->state_data.string[window->state_data.num_characters++] = '-';
+        }
+      }
+
+      if (is_integer_type == false) {
+        if (keyboard_state->keys[SDL_SCANCODE_PERIOD].phase == KEY_PHASE_PRESSED) {
+          window->state_data.string[window->state_data.num_characters++] = '.';
+        }
+
+        if (keyboard_state->keys[SDL_SCANCODE_COMMA].phase == KEY_PHASE_PRESSED) {
+          window->state_data.string[window->state_data.num_characters++] = '.';
+        }
+      }
+
+      if (keyboard_state->keys[SDL_SCANCODE_BACKSPACE].phase == KEY_PHASE_PRESSED) {
+        if (window->state_data.num_characters > 0) {
+          window->state_data.string[window->state_data.num_characters - 1] = '\0';
+          window->state_data.num_characters--;
+        }
+      }
+    }
   }
 
   if (mouse_result.is_hovered) {
@@ -199,11 +346,45 @@ bool element_slider(
   }
 
   if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
-    window->state_data.state            = WINDOW_INTERACTION_STATE_SLIDER;
     window->state_data.element_hash     = slider.hash;
     window->state_data.subelement_index = _element_slider_get_subelement_index(window, mouse_state, &slider);
 
-    display_set_mouse_visible(display, false);
+    if (keyboard_state->keys[SDL_SCANCODE_LALT].down || is_integer_type) {
+      window->state_data.state = WINDOW_INTERACTION_STATE_STRING;
+
+      switch (args.type) {
+        case ELEMENT_SLIDER_DATA_TYPE_FLOAT:
+          window->state_data.num_characters = sprintf(window->state_data.string, "%.2f", data->data_float);
+          break;
+        case ELEMENT_SLIDER_DATA_TYPE_UINT:
+          window->state_data.num_characters = sprintf(window->state_data.string, "%u", data->data_uint);
+          break;
+        case ELEMENT_SLIDER_DATA_TYPE_SINT:
+          window->state_data.num_characters = sprintf(window->state_data.string, "%d", data->data_sint);
+          break;
+        case ELEMENT_SLIDER_DATA_TYPE_VECTOR:
+        case ELEMENT_SLIDER_DATA_TYPE_RGB: {
+          const float value                 = ((float*) &data->data_vec3)[window->state_data.subelement_index];
+          window->state_data.num_characters = sprintf(window->state_data.string, "%.2f", value);
+        } break;
+      }
+
+      data->string_edit_mode = true;
+    }
+    else {
+      window->state_data.state = WINDOW_INTERACTION_STATE_SLIDER;
+
+      display_set_mouse_visible(display, false);
+    }
+  }
+
+  if (data->string_edit_mode) {
+    memcpy(data->string, window->state_data.string, WINDOW_STATE_STRING_SIZE);
+    data->string_component_index = window->state_data.subelement_index;
+  }
+
+  if (updated_data) {
+    _element_slider_update_data(&slider, args.data_binding, window->state_data.subelement_index);
   }
 
   window_push_element(window, &slider);

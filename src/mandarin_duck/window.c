@@ -67,6 +67,9 @@ static void _window_reset_state(Window* window) {
   window->state_data.element_hash       = 0;
   window->state_data.subelement_index   = 0;
   window->state_data.dropdown_selection = 0;
+  window->state_data.num_characters     = 0;
+  memset(window->state_data.string, 0, WINDOW_STATE_STRING_SIZE);
+  window->state_data.force_string_mode_exit = false;
 
   if (window->external_subwindow) {
     window->external_subwindow->is_visible = false;
@@ -137,6 +140,11 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
       _window_reset_state(window);
       break;
+    case WINDOW_INTERACTION_STATE_STRING:
+      if (mouse_state->phase == MOUSE_PHASE_PRESSED) {
+        window->state_data.force_string_mode_exit = true;
+      }
+      break;
   }
 
   window->context_stack_ptr = 0;
@@ -166,6 +174,11 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
       break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
       if (mouse_state->phase == MOUSE_PHASE_RELEASED) {
+        _window_reset_state(window);
+      }
+      break;
+    case WINDOW_INTERACTION_STATE_STRING:
+      if (window->state_data.force_string_mode_exit) {
         _window_reset_state(window);
       }
       break;

@@ -28,6 +28,9 @@ struct ElementSliderData {
   uint32_t margins;
   bool center_x;
   bool center_y;
+  bool string_edit_mode;
+  char string[WINDOW_STATE_STRING_SIZE];
+  uint32_t string_component_index;
 } typedef ElementSliderData;
 static_assert(sizeof(ElementSliderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
