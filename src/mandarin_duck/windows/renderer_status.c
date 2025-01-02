@@ -23,7 +23,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
         window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
           .text         = "Host:",
           .center_x     = false,
           .center_y     = true,
@@ -35,7 +35,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
         window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
           .text         = string,
           .center_x     = false,
           .center_y     = true,
@@ -76,7 +76,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
         window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
           .text         = "Device:",
           .center_x     = false,
           .center_y     = true,
@@ -88,7 +88,7 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
         window, display, mouse_state,
         (ElementTextArgs){
           .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.6f, .height = 24},
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
           .text         = string,
           .center_x     = false,
           .center_y     = true,
@@ -129,7 +129,7 @@ void window_renderer_status_create(Window** window) {
   (*window)->type          = WINDOW_TYPE_RENDERER_STATUS;
   (*window)->x             = 0;
   (*window)->y             = 0;
-  (*window)->width         = 320;
+  (*window)->width         = 384;
   (*window)->height        = 48;
   (*window)->padding       = 0;
   (*window)->is_horizontal = false;
