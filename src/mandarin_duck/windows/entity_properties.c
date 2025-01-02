@@ -90,7 +90,7 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
         .cache_text   = true});
 
     if (element_checkbox(
-          data.window, data.mouse_state,
+          data.window, data.display, data.mouse_state,
           (ElementCheckBoxArgs){.size = (ElementSize){.width = 24, .height = 24}, .data_binding = data_binding})) {
       update_data = true;
     }
@@ -118,7 +118,7 @@ static bool _window_entity_properties_add_dropdown(
         .cache_text   = true});
 
     if (element_dropdown(
-          data.window, data.mouse_state,
+          data.window, data.display, data.mouse_state,
           (ElementDropdownArgs){
             .identifier = text,
             .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},

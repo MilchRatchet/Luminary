@@ -17,6 +17,6 @@ struct ElementCheckBoxArgs {
   ElementSize size;
 } typedef ElementCheckBoxArgs;
 
-bool element_checkbox(Window* window, const MouseState* mouse_state, ElementCheckBoxArgs args);
+bool element_checkbox(Window* window, Display* display, const MouseState* mouse_state, ElementCheckBoxArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_CHECKBOX_H */

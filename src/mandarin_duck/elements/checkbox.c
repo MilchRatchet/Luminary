@@ -12,7 +12,7 @@ static void _element_checkbox_render_func(Element* checkbox, Display* display) {
     UI_RENDERER_BACKGROUND_MODE_OPAQUE);
 }
 
-bool element_checkbox(Window* window, const MouseState* mouse_state, ElementCheckBoxArgs args) {
+bool element_checkbox(Window* window, Display* display, const MouseState* mouse_state, ElementCheckBoxArgs args) {
   MD_CHECK_NULL_ARGUMENT(window);
 
   WindowContext* context = window->context_stack + window->context_stack_ptr;
@@ -35,6 +35,12 @@ bool element_checkbox(Window* window, const MouseState* mouse_state, ElementChec
   if (mouse_result.is_clicked) {
     data->data                 = !data->data;
     *(bool*) args.data_binding = data->data;
+  }
+
+  if (mouse_result.is_hovered) {
+    window->element_has_hover = true;
+
+    display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
   }
 
   window_push_element(window, &checkbox);

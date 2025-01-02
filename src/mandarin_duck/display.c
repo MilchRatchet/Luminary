@@ -116,6 +116,11 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   ui_renderer_create(&display->ui_renderer);
   text_renderer_create(&display->text_renderer);
 
+  display->selected_cursor = SDL_SYSTEM_CURSOR_DEFAULT;
+  for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
+    display->sdl_cursors[cursor_id] = SDL_CreateSystemCursor(cursor_id);
+  }
+
   display_set_mouse_visible(display, display->show_ui);
 
   *_display = display;
@@ -126,6 +131,12 @@ void display_set_mouse_visible(Display* display, bool enable) {
 
   SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
   _display_set_hittest(display, enable);
+}
+
+void display_set_cursor(Display* display, SDL_SystemCursor cursor) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  display->selected_cursor = cursor;
 }
 
 void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
@@ -269,11 +280,20 @@ void display_render(Display* display, LuminaryHost* host) {
 void display_update(Display* display) {
   MD_CHECK_NULL_ARGUMENT(display);
 
+  SDL_SetCursor(display->sdl_cursors[display->selected_cursor]);
+
   SDL_UpdateWindowSurface(display->sdl_window);
 }
 
 void display_destroy(Display** display) {
   MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(*display);
+
+  SDL_SetCursor((SDL_Cursor*) 0);
+
+  for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
+    SDL_DestroyCursor((*display)->sdl_cursors[cursor_id]);
+  }
 
   SDL_DestroyWindow((*display)->sdl_window);
 

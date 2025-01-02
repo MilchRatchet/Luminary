@@ -343,6 +343,13 @@ bool element_slider(
 
   if (mouse_result.is_hovered) {
     window->element_has_hover = true;
+
+    if (keyboard_state->keys[SDL_SCANCODE_LALT].down || is_integer_type) {
+      display_set_cursor(display, SDL_SYSTEM_CURSOR_TEXT);
+    }
+    else {
+      display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+    }
   }
 
   if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {

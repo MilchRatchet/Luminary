@@ -20,7 +20,7 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
     true, (uint32_t*) 0);
 }
 
-bool element_dropdown(Window* window, const MouseState* mouse_state, ElementDropdownArgs args) {
+bool element_dropdown(Window* window, Display* display, const MouseState* mouse_state, ElementDropdownArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element dropdown;
@@ -71,6 +71,12 @@ bool element_dropdown(Window* window, const MouseState* mouse_state, ElementDrop
       .element_hash       = dropdown.hash,
       .subelement_index   = 0,
       .dropdown_selection = selected_index};
+  }
+
+  if (mouse_result.is_hovered) {
+    window->element_has_hover = true;
+
+    display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
   }
 
   window_push_element(window, &dropdown);

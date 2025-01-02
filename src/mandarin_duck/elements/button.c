@@ -103,6 +103,12 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
     }
   }
 
+  if (mouse_result.is_hovered) {
+    window->element_has_hover = true;
+
+    display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+  }
+
   window_push_element(window, &button);
 
   return mouse_result.is_clicked;

@@ -192,10 +192,10 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
 
   if (is_mouse_hover && mouse_state->down && !window->fixed_depth) {
     window->depth = __window_depth_counter++;
+  }
 
-    if (window->is_subwindow == false) {
-      mouse_state_invalidate(mouse_state);
-    }
+  if (is_mouse_hover && !window->is_subwindow) {
+    mouse_state_invalidate(mouse_state);
   }
 
   return is_mouse_hover || elements_received_action;

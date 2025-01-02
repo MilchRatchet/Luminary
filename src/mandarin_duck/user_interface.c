@@ -127,6 +127,8 @@ void user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
+  display_set_cursor(display, SDL_SYSTEM_CURSOR_DEFAULT);
+
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));
 
