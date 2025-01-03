@@ -26,7 +26,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_y = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     char text[256];
 
@@ -45,7 +46,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_y = true,
         .highlighting = false,
         .cache_text   = false,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * time);
 
@@ -59,7 +61,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_y = true,
         .highlighting = false,
         .cache_text   = false,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
   }
   window_pop_section(window);
 
@@ -77,7 +80,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_y = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     char text[256];
 
@@ -93,7 +97,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_y = true,
         .highlighting = false,
         .cache_text   = false,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * display->frametime);
 
@@ -107,7 +112,8 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .center_y = true,
         .highlighting = false,
         .cache_text   = false,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
   }
   window_pop_section(window);
 

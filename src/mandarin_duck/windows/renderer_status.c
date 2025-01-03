@@ -29,7 +29,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_y     = true,
           .highlighting = false,
           .cache_text   = true,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
 
       element_text(
         window, display, mouse_state,
@@ -41,7 +42,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_y     = true,
           .highlighting = false,
           .cache_text   = false,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
 
       char text[256];
 
@@ -60,7 +62,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_y     = true,
           .highlighting = false,
           .cache_text   = false,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
     }
     window_pop_section(window);
   }
@@ -82,7 +85,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_y     = true,
           .highlighting = false,
           .cache_text   = true,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
 
       element_text(
         window, display, mouse_state,
@@ -94,7 +98,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_y     = true,
           .highlighting = false,
           .cache_text   = false,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
 
       char text[256];
 
@@ -113,7 +118,8 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
           .center_y     = true,
           .highlighting = false,
           .cache_text   = false,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
     }
     window_pop_section(window);
   }

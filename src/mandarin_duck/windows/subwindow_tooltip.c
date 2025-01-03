@@ -28,7 +28,8 @@ static bool _subwindow_tooltip_action(Window* window, Display* display, Luminary
       .center_y     = true,
       .highlighting = true,
       .cache_text   = true,
-      .auto_size    = true});
+      .auto_size    = true,
+      .is_clickable = false});
 
   return false;
 }

@@ -15,8 +15,10 @@ static void _element_text_render_func(Element* text, Display* display) {
   const uint32_t padding_x = data->center_x ? text->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? text->height >> 1 : 0;
 
+  const uint32_t text_color = (data->is_clickable) ? MD_COLOR_GRAY : MD_COLOR_WHITE;
+
   text_renderer_render(
-    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, MD_COLOR_WHITE, text->x + padding_x, text->y + padding_y,
+    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, text_color, text->x + padding_x, text->y + padding_y,
     data->center_x, data->center_y, data->cache_text, (uint32_t*) 0);
 }
 
@@ -31,11 +33,12 @@ bool element_text(Window* window, Display* display, const MouseState* mouse_stat
 
   ElementTextData* data = (ElementTextData*) &text.data;
 
-  data->color      = args.color;
-  data->size       = args.size;
-  data->center_x   = args.center_x;
-  data->center_y   = args.center_y;
-  data->cache_text = args.cache_text;
+  data->color        = args.color;
+  data->size         = args.size;
+  data->center_x     = args.center_x;
+  data->center_y     = args.center_y;
+  data->cache_text   = args.cache_text;
+  data->is_clickable = args.is_clickable;
 
   const size_t text_size = strlen(args.text);
 
@@ -56,6 +59,12 @@ bool element_text(Window* window, Display* display, const MouseState* mouse_stat
 
   data->highlighted       = args.highlighting && mouse_result.is_hovered;
   data->highlight_padding = context->padding;
+
+  if (mouse_result.is_hovered && args.is_clickable) {
+    window->element_has_hover = true;
+
+    display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+  }
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &text));
 

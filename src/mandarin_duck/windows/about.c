@@ -25,19 +25,21 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_text(
     window, display, mouse_state,
     (ElementTextArgs){
       .color        = 0xFFFFFFFF,
       .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Copyright(C) 2021 - 2025 Max Jenke",
+      .text         = "Copyright(C) 2024 - 2025 Max Jenke",
       .center_x     = false,
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_text(
     window, display, mouse_state,
@@ -49,7 +51,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   window_margin(window, 24);
 
@@ -63,19 +66,21 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_text(
     window, display, mouse_state,
     (ElementTextArgs){
       .color        = 0xFFFFFFFF,
       .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .text         = "Copyright(C) 2024 - 2025 Max Jenke",
+      .text         = "Copyright(C) 2021 - 2025 Max Jenke",
       .center_x     = false,
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_text(
     window, display, mouse_state,
@@ -87,7 +92,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_separator(
     window, mouse_state,
@@ -119,7 +125,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
           .center_y = true,
           .highlighting = false,
           .cache_text   = true,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
 
       char memory_string[64];
       sprintf(memory_string, "%.1f GB", device_info.memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)));
@@ -134,7 +141,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
           .center_y = true,
           .highlighting = false,
           .cache_text   = true,
-          .auto_size    = false});
+          .auto_size    = false,
+          .is_clickable = false});
     }
     window_pop_section(window);
   }
@@ -154,7 +162,23 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
+
+  if (element_text(
+        window, display, mouse_state,
+        (ElementTextArgs){
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+          .text         = "https://github.com/libsdl-org/SDL",
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = true})) {
+    SDL_OpenURL("https://github.com/libsdl-org/SDL");
+  }
 
   element_text(
     window, display, mouse_state,
@@ -166,7 +190,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_text(
     window, display, mouse_state,
@@ -178,7 +203,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   window_margin(window, 24);
 
@@ -192,7 +218,23 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
+
+  if (element_text(
+        window, display, mouse_state,
+        (ElementTextArgs){
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+          .text         = "https://github.com/libsdl-org/SDL_ttf",
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = true})) {
+    SDL_OpenURL("https://github.com/libsdl-org/SDL_ttf");
+  }
 
   element_text(
     window, display, mouse_state,
@@ -204,7 +246,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   element_text(
     window, display, mouse_state,
@@ -216,7 +259,8 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
 
   window_margin(window, 24);
 
@@ -230,7 +274,23 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
+
+  if (element_text(
+        window, display, mouse_state,
+        (ElementTextArgs){
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+          .text         = "https://github.com/freetype/freetype",
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = true})) {
+    SDL_OpenURL("https://github.com/freetype/freetype");
+  }
 
   element_text(
     window, display, mouse_state,
@@ -242,7 +302,51 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .center_y     = true,
       .highlighting = false,
       .cache_text   = true,
-      .auto_size    = false});
+      .auto_size    = false,
+      .is_clickable = false});
+
+  window_margin(window, 24);
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Material Symbols",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false});
+
+  if (element_text(
+        window, display, mouse_state,
+        (ElementTextArgs){
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+          .text         = "https://github.com/google/material-design-icons",
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = true})) {
+    SDL_OpenURL("https://github.com/google/material-design-icons");
+  }
+
+  element_text(
+    window, display, mouse_state,
+    (ElementTextArgs){
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Apache Version 2.0 Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false});
 
   return false;
 }

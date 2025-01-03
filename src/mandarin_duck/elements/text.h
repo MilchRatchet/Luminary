@@ -15,6 +15,7 @@ struct ElementTextData {
   bool highlighted;
   uint32_t highlight_padding;
   bool cache_text;
+  bool is_clickable;
 } typedef ElementTextData;
 static_assert(sizeof(ElementTextData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -27,6 +28,7 @@ struct ElementTextArgs {
   bool highlighting;
   bool cache_text;
   bool auto_size;
+  bool is_clickable;
 } typedef ElementTextArgs;
 
 bool element_text(Window* window, Display* display, const MouseState* mouse_state, ElementTextArgs args);

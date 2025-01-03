@@ -34,7 +34,8 @@ static bool _window_entity_properties_add_slider(
         .center_y = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
       LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
@@ -89,7 +90,8 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
         .center_y = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     if (element_checkbox(
           data.window, data.display, data.mouse_state,
@@ -118,7 +120,8 @@ static bool _window_entity_properties_add_dropdown(
         .center_y = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     if (element_dropdown(
           data.window, data.display, data.mouse_state,
@@ -612,7 +615,8 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
         .center_y     = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     return false;
   }
@@ -681,7 +685,8 @@ static bool _window_entity_properties_instance_action(Window* window, Display* d
         .center_y     = true,
         .highlighting = false,
         .cache_text   = true,
-        .auto_size    = false});
+        .auto_size    = false,
+        .is_clickable = false});
 
     return false;
   }

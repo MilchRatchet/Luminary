@@ -36,7 +36,8 @@ static bool _subwindow_dropdown_action(Window* window, Display* display, Luminar
             .center_y     = true,
             .highlighting = true,
             .cache_text   = true,
-            .auto_size    = false})) {
+            .auto_size    = false,
+            .is_clickable = false})) {
       data->selected_index = string_id;
       received_click       = true;
     }
