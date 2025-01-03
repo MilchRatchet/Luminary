@@ -5,10 +5,15 @@
 // TODO: Let Mandarin Duck have its own embedded files.
 void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
 
-static const char* font_file_locations[TEXT_RENDERER_FONT_COUNT] =
-  {[TEXT_RENDERER_FONT_REGULAR] = "LuminaryFont.ttf", [TEXT_RENDERER_FONT_BOLD] = "LuminaryFontBold.ttf"};
+static const char* font_file_locations[TEXT_RENDERER_FONT_COUNT] = {
+  [TEXT_RENDERER_FONT_REGULAR]  = "LuminaryFont.ttf",
+  [TEXT_RENDERER_FONT_BOLD]     = "LuminaryFontBold.ttf",
+  [TEXT_RENDERER_FONT_MATERIAL] = "MaterialSymbols.ttf"};
 
-static TTF_Font* _text_renderer_load_font(const char* font_location) {
+static const float font_sizes[TEXT_RENDERER_FONT_COUNT] =
+  {[TEXT_RENDERER_FONT_REGULAR] = 15.0f, [TEXT_RENDERER_FONT_BOLD] = 15.0f, [TEXT_RENDERER_FONT_MATERIAL] = 25.0f};
+
+static TTF_Font* _text_renderer_load_font(const char* font_location, const float size) {
   char* font_data;
   int64_t font_size;
   uint64_t info;
@@ -24,7 +29,7 @@ static TTF_Font* _text_renderer_load_font(const char* font_location) {
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetPointerProperty(sdl_properties, TTF_PROP_FONT_CREATE_IOSTREAM_POINTER, iostream);
   SDL_SetBooleanProperty(sdl_properties, TTF_PROP_FONT_CREATE_IOSTREAM_AUTOCLOSE_BOOLEAN, true);
-  SDL_SetFloatProperty(sdl_properties, TTF_PROP_FONT_CREATE_SIZE_FLOAT, 15.0f);
+  SDL_SetFloatProperty(sdl_properties, TTF_PROP_FONT_CREATE_SIZE_FLOAT, size);
   SDL_SetNumberProperty(sdl_properties, TTF_PROP_FONT_CREATE_VERTICAL_DPI_NUMBER, 72);
 
   return TTF_OpenFontWithProperties(sdl_properties);
@@ -59,7 +64,7 @@ void text_renderer_create(TextRenderer** text_renderer) {
   }
 
   for (uint32_t font_id = 0; font_id < TEXT_RENDERER_FONT_COUNT; font_id++) {
-    (*text_renderer)->fonts[font_id] = _text_renderer_load_font(font_file_locations[font_id]);
+    (*text_renderer)->fonts[font_id] = _text_renderer_load_font(font_file_locations[font_id], font_sizes[font_id]);
 
     if ((*text_renderer)->fonts[font_id] == (TTF_Font*) 0) {
       crash_message("Failed to create font: %s.", font_file_locations[font_id]);
@@ -137,8 +142,8 @@ static void _text_renderer_release_text_instance(
 }
 
 void text_renderer_render(
-  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
-  bool use_cache, uint32_t* text_width) {
+  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t color, uint32_t x, uint32_t y, bool center_x,
+  bool center_y, bool use_cache, uint32_t* text_width) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(text);
@@ -152,12 +157,20 @@ void text_renderer_render(
   int32_t height;
   TTF_GetTextSize(text_instance, &width, &height);
 
+  TTF_SetTextColor(text_instance, (color >> 16) & 0xFF, (color >> 8) & 0xFF, (color >> 0) & 0xFF, (color >> 24) & 0xFF);
+
   if (center_x) {
     x = x - (width >> 1);
+    if (font_id == TEXT_RENDERER_FONT_MATERIAL) {
+      x -= 1;
+    }
   }
 
   if (center_y) {
     y = y - (height >> 1);
+    if (font_id == TEXT_RENDERER_FONT_MATERIAL) {
+      y -= 3;
+    }
   }
 
   if (text_width) {

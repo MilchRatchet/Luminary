@@ -6,7 +6,7 @@ static void _element_color_render_func(Element* color, Display* display) {
   ElementColorData* data = (ElementColorData*) &color->data;
 
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, color->width, color->height, color->x, color->y, 0, 0xFF111111, data->color,
+    display->ui_renderer, display, color->width, color->height, color->x, color->y, 0, MD_COLOR_BORDER, data->color,
     UI_RENDERER_BACKGROUND_MODE_OPAQUE);
 }
 

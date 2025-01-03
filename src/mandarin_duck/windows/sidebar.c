@@ -4,9 +4,6 @@
 #include "elements/button.h"
 #include "user_interface.h"
 
-#define SIDEBAR_COLOR_ON 0xFFA08090
-#define SIDEBAR_COLOR_OFF 0xFF808080
-
 struct WindowSidebarData {
   uint32_t window_ids[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT];
 } typedef WindowSidebarData;
@@ -22,6 +19,17 @@ static const char* _window_entity_properties_type_tooltip_string[WINDOW_ENTITY_P
   [WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES] = "Particles",
   [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = "Material",
   [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]  = "Instance"};
+
+static const ElementButtonImage _window_entity_properties_type_button_images[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT] = {
+  [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]  = ELEMENT_BUTTON_IMAGE_SETTINGS,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA]    = ELEMENT_BUTTON_IMAGE_CAMERA,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_OCEAN]     = ELEMENT_BUTTON_IMAGE_WAVES,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_SKY]       = ELEMENT_BUTTON_IMAGE_SUN,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_CLOUD]     = ELEMENT_BUTTON_IMAGE_CLOUD,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_FOG]       = ELEMENT_BUTTON_IMAGE_MIST,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES] = ELEMENT_BUTTON_IMAGE_PRECIPITATION,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = ELEMENT_BUTTON_IMAGE_MATERIAL,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]  = ELEMENT_BUTTON_IMAGE_INSTANCE};
 
 static bool _window_sidebar_entity_properties_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
@@ -42,10 +50,11 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
           window, display, mouse_state,
           (ElementButtonArgs){
             .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+            .image        = _window_entity_properties_type_button_images[entity_properties_id],
             .size         = (ElementSize){.width = 32, .height = 32},
-            .color        = (is_visible) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
-            .hover_color  = 0xFFFFFFFF,
-            .press_color  = 0xFFFFFFFF,
+            .color        = (is_visible) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_GRAY,
+            .hover_color  = MD_COLOR_WHITE,
+            .press_color  = MD_COLOR_WHITE,
             .tooltip_text = _window_entity_properties_type_tooltip_string[entity_properties_id]})) {
       user_interface_set_window_visible(display->ui, data->window_ids[entity_properties_id], !is_visible);
     }
@@ -54,63 +63,40 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
   return false;
 }
 
+static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] = {
+  [DISPLAY_MOUSE_MODE_DEFAULT]         = "Move",
+  [DISPLAY_MOUSE_MODE_SELECT_MATERIAL] = "Select Material",
+  [DISPLAY_MOUSE_MODE_SELECT_INSTANCE] = "Select Instance",
+  [DISPLAY_MOUSE_MODE_FOCUS_CAMERA]    = "Focus Camera"};
+
+static const ElementButtonImage _window_mouse_modes_button_images[DISPLAY_MOUSE_MODE_COUNT] = {
+  [DISPLAY_MOUSE_MODE_DEFAULT]         = ELEMENT_BUTTON_IMAGE_MOVE,
+  [DISPLAY_MOUSE_MODE_SELECT_MATERIAL] = ELEMENT_BUTTON_IMAGE_SELECT_MATERIAL,
+  [DISPLAY_MOUSE_MODE_SELECT_INSTANCE] = ELEMENT_BUTTON_IMAGE_SELECT_INSTANCE,
+  [DISPLAY_MOUSE_MODE_FOCUS_CAMERA]    = ELEMENT_BUTTON_IMAGE_FOCUS};
+
 static bool _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  if (element_button(
-        window, display, mouse_state,
-        (ElementButtonArgs){
-          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-          .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
-          .hover_color  = 0xFFFFFFFF,
-          .press_color  = 0xFFFFFFFF,
-          .tooltip_text = "Move"})) {
-    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
-  }
+  for (uint32_t mouse_mode = 0; mouse_mode < DISPLAY_MOUSE_MODE_COUNT; mouse_mode++) {
+    if (mouse_mode != 0) {
+      window_margin(window, 4);
+    }
 
-  window_margin(window, 4);
-
-  if (element_button(
-        window, display, mouse_state,
-        (ElementButtonArgs){
-          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-          .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_SELECT_MATERIAL) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
-          .hover_color  = 0xFFFFFFFF,
-          .press_color  = 0xFFFFFFFF,
-          .tooltip_text = "Select Material"})) {
-    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_MATERIAL);
-  }
-
-  window_margin(window, 4);
-
-  if (element_button(
-        window, display, mouse_state,
-        (ElementButtonArgs){
-          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-          .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_SELECT_INSTANCE) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
-          .hover_color  = 0xFFFFFFFF,
-          .press_color  = 0xFFFFFFFF,
-          .tooltip_text = "Select Instance"})) {
-    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_INSTANCE);
-  }
-
-  window_margin(window, 4);
-
-  if (element_button(
-        window, display, mouse_state,
-        (ElementButtonArgs){
-          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-          .size         = (ElementSize){.width = 32, .height = 32},
-          .color        = (display->mouse_mode == DISPLAY_MOUSE_MODE_SELECT_FOCAL_LENGTH) ? SIDEBAR_COLOR_ON : SIDEBAR_COLOR_OFF,
-          .hover_color  = 0xFFFFFFFF,
-          .press_color  = 0xFFFFFFFF,
-          .tooltip_text = "Select Focal Length"})) {
-    display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_FOCAL_LENGTH);
+    if (element_button(
+          window, display, mouse_state,
+          (ElementButtonArgs){
+            .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+            .image        = _window_mouse_modes_button_images[mouse_mode],
+            .size         = (ElementSize){.width = 32, .height = 32},
+            .color        = (display->mouse_mode == (DisplayMouseMode) mouse_mode) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_GRAY,
+            .hover_color  = MD_COLOR_WHITE,
+            .press_color  = MD_COLOR_WHITE,
+            .tooltip_text = _window_mouse_modes_tooltip_string[mouse_mode]})) {
+      display_set_mouse_mode(display, mouse_mode);
+    }
   }
 
   return false;

@@ -9,15 +9,17 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
   ElementDropdownData* data = (ElementDropdownData*) &dropdown->data;
 
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, dropdown->width, dropdown->height, dropdown->x, dropdown->y, 0, 0xFF111111, 0xFF000000,
+    display->ui_renderer, display, dropdown->width, dropdown->height, dropdown->x, dropdown->y, 0, MD_COLOR_BORDER, MD_COLOR_BLACK,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
   const uint32_t padding_x = dropdown->width >> 1;
   const uint32_t padding_y = dropdown->height >> 1;
 
+  const uint32_t text_color = (data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+
   text_renderer_render(
-    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, dropdown->x + padding_x, dropdown->y + padding_y, true, true,
-    true, (uint32_t*) 0);
+    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, text_color, dropdown->x + padding_x, dropdown->y + padding_y,
+    true, true, true, (uint32_t*) 0);
 }
 
 bool element_dropdown(Window* window, Display* display, const MouseState* mouse_state, ElementDropdownArgs args) {
@@ -58,6 +60,8 @@ bool element_dropdown(Window* window, Display* display, const MouseState* mouse_
 
   ElementMouseResult mouse_result;
   element_apply_context(&dropdown, context, &args.size, mouse_state, &mouse_result);
+
+  data->is_hovered = mouse_result.is_hovered;
 
   if (mouse_result.is_pressed && window->external_subwindow && !external_clicked_window_is_present) {
     subwindow_dropdown_create(window->external_subwindow, selected_index, dropdown.width, dropdown.x, dropdown.y + dropdown.height);

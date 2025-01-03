@@ -7,7 +7,12 @@
 
 struct Display typedef Display;
 
-enum TextRendererFont { TEXT_RENDERER_FONT_REGULAR, TEXT_RENDERER_FONT_BOLD, TEXT_RENDERER_FONT_COUNT } typedef TextRendererFont;
+enum TextRendererFont {
+  TEXT_RENDERER_FONT_REGULAR,
+  TEXT_RENDERER_FONT_BOLD,
+  TEXT_RENDERER_FONT_MATERIAL,
+  TEXT_RENDERER_FONT_COUNT
+} typedef TextRendererFont;
 
 #define TEXT_RENDERER_CACHE_SIZE 1024
 #define TEXT_RENDERER_CACHE_SIZE_MASK (TEXT_RENDERER_CACHE_SIZE - 1)
@@ -30,8 +35,8 @@ struct TextRenderer {
 
 void text_renderer_create(TextRenderer** text_renderer);
 void text_renderer_render(
-  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t x, uint32_t y, bool center_x, bool center_y,
-  bool use_cache, uint32_t* text_width);
+  TextRenderer* text_renderer, Display* display, const char* text, uint32_t font_id, uint32_t color, uint32_t x, uint32_t y, bool center_x,
+  bool center_y, bool use_cache, uint32_t* text_width);
 void text_renderer_compute_size(
   TextRenderer* text_renderer, const char* text, uint32_t font_id, bool use_cache, uint32_t* text_width, uint32_t* text_height);
 void text_renderer_destroy(TextRenderer** text_renderer);

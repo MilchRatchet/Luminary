@@ -9,15 +9,15 @@ static void _element_text_render_func(Element* text, Display* display) {
   if (data->highlighted) {
     ui_renderer_render_rounded_box(
       display->ui_renderer, display, text->width + 2 * data->highlight_padding, text->height, text->x - data->highlight_padding, text->y, 0,
-      0, 0xFF998890, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
+      0, MD_COLOR_ACCENT_LIGHT_2, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
   }
 
   const uint32_t padding_x = data->center_x ? text->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? text->height >> 1 : 0;
 
   text_renderer_render(
-    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, text->x + padding_x, text->y + padding_y, data->center_x,
-    data->center_y, data->cache_text, (uint32_t*) 0);
+    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, MD_COLOR_WHITE, text->x + padding_x, text->y + padding_y,
+    data->center_x, data->center_y, data->cache_text, (uint32_t*) 0);
 }
 
 bool element_text(Window* window, Display* display, const MouseState* mouse_state, ElementTextArgs args) {

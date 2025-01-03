@@ -11,8 +11,8 @@ static void _element_separator_render_func(Element* separator, Display* display)
 
   uint32_t text_width;
   text_renderer_render(
-    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, separator->x + padding_x, separator->y + padding_y, true, true,
-    true, &text_width);
+    display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, MD_COLOR_WHITE, separator->x + padding_x,
+    separator->y + padding_y, true, true, true, &text_width);
 
   const uint32_t line_length = (separator->width - text_width) >> 1;
 

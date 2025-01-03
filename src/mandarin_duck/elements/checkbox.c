@@ -5,11 +5,22 @@
 static void _element_checkbox_render_func(Element* checkbox, Display* display) {
   ElementCheckBoxData* data = (ElementCheckBoxData*) &checkbox->data;
 
-  const uint32_t color = data->data ? 0xFFD4AF37 : 0xFF000000;
+  const uint32_t background_color = (data->data) ? MD_COLOR_ACCENT_2 : MD_COLOR_BLACK;
+  const UIRendererBackgroundMode background_mode =
+    (data->data) ? UI_RENDERER_BACKGROUND_MODE_OPAQUE : UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT;
 
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, checkbox->width, checkbox->height, checkbox->x, checkbox->y, 0, 0xFF111111, color,
-    UI_RENDERER_BACKGROUND_MODE_OPAQUE);
+    display->ui_renderer, display, checkbox->width, checkbox->height, checkbox->x, checkbox->y, 0, MD_COLOR_BORDER, background_color,
+    background_mode);
+
+  if (data->data) {
+    const uint32_t padding_x = (checkbox->width >> 1) - 2;
+    const uint32_t padding_y = (checkbox->width >> 1) - 1;
+
+    text_renderer_render(
+      display->text_renderer, display, "\ue5ca", TEXT_RENDERER_FONT_MATERIAL, MD_COLOR_WHITE, checkbox->x + padding_x,
+      checkbox->y + padding_y, true, true, true, (uint32_t*) 0);
+  }
 }
 
 bool element_checkbox(Window* window, Display* display, const MouseState* mouse_state, ElementCheckBoxArgs args) {

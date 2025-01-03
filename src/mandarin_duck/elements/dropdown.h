@@ -7,7 +7,8 @@
 #include "utils.h"
 
 struct ElementDropdownData {
-  char text[512];
+  char text[256];
+  bool is_hovered;
 } typedef ElementDropdownData;
 static_assert(sizeof(ElementDropdownData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 

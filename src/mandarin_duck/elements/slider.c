@@ -9,10 +9,10 @@
 static void _element_slider_render_float(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
-  uint32_t background_color = (data->string_edit_mode) ? 0xFF443399 : 0xFF000000;
+  uint32_t background_color = (data->string_edit_mode) ? MD_COLOR_ACCENT_2 : MD_COLOR_BLACK;
 
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, 0xFF111111, background_color,
+    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, MD_COLOR_BORDER, background_color,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
   char text[256];
@@ -26,19 +26,21 @@ static void _element_slider_render_float(Element* slider, Display* display) {
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
+  const uint32_t text_color = (data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+
   uint32_t text_width;
   text_renderer_render(
-    display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
-    data->center_y, false, &text_width);
+    display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, text_color, slider->x + padding_x, slider->y + padding_y,
+    data->center_x, data->center_y, false, &text_width);
 }
 
 static void _element_slider_render_uint(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
-  uint32_t background_color = (data->string_edit_mode) ? 0xFF443399 : 0xFF000000;
+  uint32_t background_color = (data->string_edit_mode) ? MD_COLOR_ACCENT_2 : MD_COLOR_BLACK;
 
   ui_renderer_render_rounded_box(
-    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, 0xFF111111, background_color,
+    display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0, MD_COLOR_BORDER, background_color,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
   char text[256];
@@ -57,10 +59,12 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
+  const uint32_t text_color = (data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+
   uint32_t text_width;
   text_renderer_render(
-    display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, slider->x + padding_x, slider->y + padding_y, data->center_x,
-    data->center_y, false, &text_width);
+    display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, text_color, slider->x + padding_x, slider->y + padding_y,
+    data->center_x, data->center_y, false, &text_width);
 }
 
 static void _element_slider_render_vector(Element* slider, Display* display) {
@@ -80,10 +84,10 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
   const uint32_t margins = (slider->width - component_size_padded * 3) >> 1;
 
   for (uint32_t component = 0; component < 3; component++) {
-    uint32_t background_color = (data->string_edit_mode && data->string_component_index == component) ? 0xFF443399 : 0xFF000000;
+    uint32_t background_color = (data->string_edit_mode && data->string_component_index == component) ? MD_COLOR_ACCENT_2 : MD_COLOR_BLACK;
 
     ui_renderer_render_rounded_box(
-      display->ui_renderer, display, component_size_padded, slider->height, x_offset, slider->y, 0, 0xFF111111, background_color,
+      display->ui_renderer, display, component_size_padded, slider->height, x_offset, slider->y, 0, MD_COLOR_BORDER, background_color,
       UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 
     char text[256];
@@ -97,9 +101,11 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
     const uint32_t padding_x = data->center_x ? component_size_padded >> 1 : component_size_padded;
     const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
+    const uint32_t text_color = (data->is_hovered && data->hover_component_index == component) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+
     text_renderer_render(
-      display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, x_offset + padding_x, slider->y + padding_y, data->center_x,
-      data->center_y, false, (uint32_t*) 0);
+      display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, text_color, x_offset + padding_x, slider->y + padding_y,
+      data->center_x, data->center_y, false, (uint32_t*) 0);
 
     x_offset += component_size_padded + margins;
   }
@@ -193,6 +199,8 @@ bool element_slider(
 
   ElementMouseResult mouse_result;
   element_apply_context(&slider, context, &args.size, mouse_state, &mouse_result);
+
+  data->is_hovered = mouse_result.is_hovered;
 
   bool updated_data = false;
 
@@ -352,9 +360,13 @@ bool element_slider(
     }
   }
 
+  if (mouse_result.is_hovered) {
+    data->hover_component_index = _element_slider_get_subelement_index(window, mouse_state, &slider);
+  }
+
   if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
     window->state_data.element_hash     = slider.hash;
-    window->state_data.subelement_index = _element_slider_get_subelement_index(window, mouse_state, &slider);
+    window->state_data.subelement_index = data->hover_component_index;
 
     if (keyboard_state->keys[SDL_SCANCODE_LALT].down || is_integer_type) {
       window->state_data.state = WINDOW_INTERACTION_STATE_STRING;

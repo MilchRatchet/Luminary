@@ -37,23 +37,33 @@ static void _element_button_render_circle(Element* button, Display* display) {
   }
 }
 
+static const char* _button_image_string[ELEMENT_BUTTON_IMAGE_COUNT] = {
+  [ELEMENT_BUTTON_IMAGE_CHECK]           = "\ue5ca",
+  [ELEMENT_BUTTON_IMAGE_SETTINGS]        = "\ue8b8",
+  [ELEMENT_BUTTON_IMAGE_CAMERA]          = "\ue412",
+  [ELEMENT_BUTTON_IMAGE_WAVES]           = "\ue176",
+  [ELEMENT_BUTTON_IMAGE_SUN]             = "\uf157",
+  [ELEMENT_BUTTON_IMAGE_CLOUD]           = "\ue2bd",
+  [ELEMENT_BUTTON_IMAGE_MIST]            = "\ue188",
+  [ELEMENT_BUTTON_IMAGE_PRECIPITATION]   = "\ue810",
+  [ELEMENT_BUTTON_IMAGE_MATERIAL]        = "\uef8f",
+  [ELEMENT_BUTTON_IMAGE_INSTANCE]        = "\uead3",
+  [ELEMENT_BUTTON_IMAGE_MOVE]            = "\ue89f",
+  [ELEMENT_BUTTON_IMAGE_SELECT_MATERIAL] = "\uf706",
+  [ELEMENT_BUTTON_IMAGE_SELECT_INSTANCE] = "\uf719",
+  [ELEMENT_BUTTON_IMAGE_FOCUS]           = "\ue3b4"};
+
 static void _element_button_render_image(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
 
   uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
 
-  const uint32_t cols = button->width;
-  const uint32_t rows = button->height;
+  const uint32_t padding_x = button->width >> 1;
+  const uint32_t padding_y = button->height >> 1;
 
-  uint32_t* dst = (uint32_t*) (display->buffer + sizeof(LuminaryARGB8) * button->x + button->y * display->ld);
-
-  for (uint32_t row = 0; row < rows; row++) {
-    for (uint32_t col = 0; col < cols; col++) {
-      dst[col] = color;
-    }
-
-    dst = dst + (display->ld >> 2);
-  }
+  text_renderer_render(
+    display->text_renderer, display, _button_image_string[data->image], TEXT_RENDERER_FONT_MATERIAL, color, button->x + padding_x,
+    button->y + padding_y, true, true, true, (uint32_t*) 0);
 }
 
 static void _element_button_render_func(Element* button, Display* display) {
@@ -86,6 +96,7 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
   element_apply_context(&button, context, &args.size, mouse_state, &mouse_result);
 
   data->shape       = args.shape;
+  data->image       = args.image;
   data->color       = args.color;
   data->hover_color = args.hover_color;
   data->press_color = args.press_color;

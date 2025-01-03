@@ -31,6 +31,8 @@ struct ElementSliderData {
   bool string_edit_mode;
   char string[WINDOW_STATE_STRING_SIZE];
   uint32_t string_component_index;
+  bool is_hovered;
+  uint32_t hover_component_index;
 } typedef ElementSliderData;
 static_assert(sizeof(ElementSliderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
