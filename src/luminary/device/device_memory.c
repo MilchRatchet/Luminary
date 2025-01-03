@@ -327,6 +327,17 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_memory_get_total_allocation_size(CUdevice device, size_t* size) {
+  __CHECK_NULL_ARGUMENT(size);
+
+  int current_device_id;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
+
+  *size = total_memory_allocation[current_device_id];
+
+  return LUMINARY_SUCCESS;
+}
+
 struct DeviceStagingMemoryHeader {
   uint64_t magic;
   uint64_t size;

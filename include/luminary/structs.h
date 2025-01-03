@@ -53,6 +53,7 @@ LUMINARY_API struct LuminaryRendererSettings {
 LUMINARY_API struct LuminaryDeviceInfo {
   char name[256];
   size_t memory_size;
+  size_t allocated_memory_size;
 } typedef LuminaryDeviceInfo;
 
 LUMINARY_API struct LuminaryOutputProperties {

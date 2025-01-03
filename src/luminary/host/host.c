@@ -339,6 +339,8 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
   static_assert(sizeof(info->name) >= 256 && sizeof(device->properties.name) >= 256, "Name buffers are too small.");
   memcpy(info->name, device->properties.name, 256);
 
+  __FAILURE_HANDLE(device_memory_get_total_allocation_size(device->cuda_device, &info->allocated_memory_size));
+
   info->memory_size = device->properties.memory_size;
 
   return LUMINARY_SUCCESS;

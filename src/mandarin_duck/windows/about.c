@@ -119,7 +119,7 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
         window, display, mouse_state,
         (ElementTextArgs){
           .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.8f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+          .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.7f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
           .text     = device_info.name,
           .center_x = false,
           .center_y = true,
@@ -129,13 +129,15 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
           .is_clickable = false});
 
       char memory_string[64];
-      sprintf(memory_string, "%.1f GB", device_info.memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)));
+      sprintf(
+        memory_string, "%.1f GB / %.1f GB", device_info.allocated_memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)),
+        device_info.memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)));
 
       element_text(
         window, display, mouse_state,
         (ElementTextArgs){
           .color    = 0xFFFFFFFF,
-          .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+          .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.25f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
           .text     = memory_string,
           .center_x = false,
           .center_y = true,
