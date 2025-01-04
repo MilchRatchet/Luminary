@@ -107,7 +107,7 @@ LuminaryResult device_unregister_as_main(Device* device);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
-LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id);
+LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y);
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
 LuminaryResult device_sync_constant_memory(Device* device);
 LuminaryResult device_allocate_work_buffers(Device* device);
@@ -135,7 +135,10 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
-LuminaryResult device_get_gbuffer_meta_data(Device* device, uint32_t x, uint32_t y, GBufferMetaData* data);
+LuminaryResult device_invalidate_gbuffer_meta(Device* device);
+LuminaryResult device_request_gbuffer_meta(Device* device, uint16_t x, uint16_t y);
+LuminaryResult device_query_gbuffer_meta(Device* device);
+LuminaryResult device_get_gbuffer_meta(Device* device, GBufferMetaData* data);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

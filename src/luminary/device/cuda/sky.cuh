@@ -613,6 +613,8 @@ LUMINARY_KERNEL void sky_process_tasks() {
     const DeviceTask task = task_load(offset);
     const uint32_t pixel  = get_pixel_id(task.index);
 
+    HandleGBufferMetaDataRequest(task.index, FLT_MAX, HIT_TYPE_INVALID, MATERIAL_ID_INVALID);
+
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     RGBF sky = sky_color_main(task.origin, task.ray, task.state, pixel, task.index);

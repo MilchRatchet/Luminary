@@ -321,6 +321,8 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     __FAILURE_HANDLE_CRITICAL(
       device_update_sample_count(device_manager->devices[device_manager->main_device_index], &device_manager->sample_count));
 
+    __FAILURE_HANDLE_CRITICAL(device_invalidate_gbuffer_meta(device_manager->devices[device_manager->main_device_index]));
+
     DeviceRendererQueueArgs render_args;
     render_args.max_depth           = scene->settings.max_ray_depth;
     render_args.render_clouds       = scene->cloud.active && scene->sky.mode == LUMINARY_SKY_MODE_DEFAULT;
@@ -460,6 +462,33 @@ static LuminaryResult _device_manager_add_textures(DeviceManager* device_manager
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_add_textures(device_manager->devices[device_id], args->textures, args->num_textures));
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+struct DeviceManagerRequestGBufferMetaArgs {
+  uint16_t x;
+  uint16_t y;
+} typedef DeviceManagerRequestGBufferMetaArgs;
+
+static LuminaryResult _device_manager_request_gbuffer_meta_clear_work(
+  DeviceManager* device_manager, DeviceManagerRequestGBufferMetaArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerRequestGBufferMetaArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_request_gbuffer_meta_queue_work(
+  DeviceManager* device_manager, DeviceManagerRequestGBufferMetaArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  Device* device = device_manager->devices[device_manager->main_device_index];
+
+  __FAILURE_HANDLE(device_request_gbuffer_meta(device, args->x, args->y));
 
   return LUMINARY_SUCCESS;
 }
@@ -858,6 +887,28 @@ LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const 
   entry.name              = "Add textures";
   entry.function          = (QueueEntryFunction) _device_manager_add_textures;
   entry.clear_func        = (QueueEntryFunction) _device_manager_add_textures_clear;
+  entry.args              = (void*) args;
+  entry.remove_duplicates = false;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_queue_pixel_query(DeviceManager* device_manager, uint16_t x, uint16_t y) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerRequestGBufferMetaArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerRequestGBufferMetaArgs), (void**) &args));
+
+  args->x = x;
+  args->y = y;
+
+  QueueEntry entry;
+
+  entry.name              = "Request GBuffer Meta Data";
+  entry.function          = (QueueEntryFunction) _device_manager_request_gbuffer_meta_queue_work;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_request_gbuffer_meta_clear_work;
   entry.args              = (void*) args;
   entry.remove_duplicates = false;
 

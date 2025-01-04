@@ -248,7 +248,6 @@ struct DevicePointers {
   DEVICE RGBF* frame_indirect_accumulate;
   DEVICE RGBF* frame_post;
   DEVICE RGBF* frame_final;
-  DEVICE GBufferMetaData* frame_gbuffer_meta;
   DEVICE RGBF* records;
   DEVICE TriangleHandle* hit_id_history;
   DEVICE ARGB8* buffer_8bit;
@@ -268,6 +267,7 @@ struct DevicePointers {
   DEVICE const Quad* particle_quads;
   DEVICE const Star* stars;
   DEVICE const uint32_t* stars_offsets;
+  DEVICE GBufferMetaData* gbuffer_meta;
   DEVICE uint32_t* abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 

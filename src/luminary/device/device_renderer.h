@@ -44,6 +44,9 @@ struct DeviceRenderer {
   CUevent time_start[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   CUevent time_end[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float last_time;
+  bool query_gbuffer_meta;
+  uint16_t query_gbuffer_meta_x;
+  uint16_t query_gbuffer_meta_y;
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {
@@ -56,6 +59,7 @@ struct DeviceRendererQueueArgs {
 
 DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer);
 LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceRenderCallbackData* data, bool* is_valid);
+LuminaryResult device_renderer_query_gbuffer_meta(DeviceRenderer* renderer, uint16_t x, uint16_t y);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args);
 DEVICE_CTX_FUNC LuminaryResult
   device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, DeviceCommonCallbackData callback_data);

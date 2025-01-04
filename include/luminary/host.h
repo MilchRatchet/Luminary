@@ -76,9 +76,6 @@ LUMINARY_API LuminaryResult
 LUMINARY_API LuminaryResult
   luminary_host_try_await_output(LuminaryHost* host, LuminaryOutputPromiseHandle handle, LuminaryOutputHandle* output_handle);
 
-LUMINARY_API LuminaryResult luminary_host_set_enable_pixel_query(LuminaryHost* host, bool enable);
-LUMINARY_API LuminaryResult luminary_host_pixel_query(LuminaryHost* host, uint32_t x, uint32_t y, LuminaryPixelQueryResult* result);
-
 /*
  * Returns handle to an output. Every handle acquired must be released by calling luminary_host_release_output. Consecutive calls to
  * luminary_host_acquire_output are not guaranteed to return unique handles.
@@ -88,6 +85,9 @@ LUMINARY_API LuminaryResult luminary_host_pixel_query(LuminaryHost* host, uint32
 LUMINARY_API LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHandle* output_handle);
 LUMINARY_API LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void** output_buffer);
 LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle output_handle);
+
+LUMINARY_API LuminaryResult luminary_host_queue_pixel_query(LuminaryHost* host, uint16_t x, uint16_t y);
+LUMINARY_API LuminaryResult luminary_host_get_pixel_info(LuminaryHost* host, LuminaryPixelQueryResult* result);
 
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
@@ -112,5 +112,8 @@ LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, Lumi
 
 LUMINARY_API LuminaryResult luminary_host_get_toy(LuminaryHost* host, LuminaryToy* toy);
 LUMINARY_API LuminaryResult luminary_host_set_toy(LuminaryHost* host, LuminaryToy* toy);
+
+LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
+LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
 
 #endif /* LUMINARY_HOST_H */

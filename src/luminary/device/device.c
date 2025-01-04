@@ -559,13 +559,10 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_post, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * (internal_pixel_count >> 2));
-  __DEVICE_BUFFER_ALLOCATE(frame_gbuffer_meta, sizeof(GBufferMetaData) * (internal_pixel_count >> 2));
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
 
   __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(TriangleHandle) * internal_pixel_count, device->stream_main));
-  __FAILURE_HANDLE(
-    device_memset(device->buffers.frame_gbuffer_meta, 0, 0, sizeof(GBufferMetaData) * (internal_pixel_count >> 2), device->stream_main));
 
   DEVICE_UPDATE_CONSTANT_MEMORY(max_task_count, max_task_count);
   DEVICE_UPDATE_CONSTANT_MEMORY(pixels_per_thread, pixels_per_thread);
@@ -591,7 +588,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(frame_indirect_accumulate);
   __DEVICE_BUFFER_FREE(frame_post);
   __DEVICE_BUFFER_FREE(frame_final);
-  __DEVICE_BUFFER_FREE(frame_gbuffer_meta);
   __DEVICE_BUFFER_FREE(records);
   __DEVICE_BUFFER_FREE(buffer_8bit);
   __DEVICE_BUFFER_FREE(hit_id_history);
@@ -611,6 +607,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
+  __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(abort_flag);
 
   return LUMINARY_SUCCESS;
@@ -714,6 +711,16 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_post_create(&device->post));
 
   ////////////////////////////////////////////////////////////////////
+  // Initialize GBuffer readback buffers
+  ////////////////////////////////////////////////////////////////////
+
+  __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData));
+  __FAILURE_HANDLE(device_memset(device->buffers.gbuffer_meta, 0, 0, sizeof(GBufferMetaData), device->stream_main));
+
+  __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData), false));
+  memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData));
+
+  ////////////////////////////////////////////////////////////////////
   // Initialize abort flag
   ////////////////////////////////////////////////////////////////////
 
@@ -722,12 +729,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   *device->abort_flags = 0;
   __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
-
-  ////////////////////////////////////////////////////////////////////
-  // Initialize screen selection related data
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData), false));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -814,7 +815,7 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id) {
+LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
@@ -827,8 +828,10 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_id), sample_id, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(
     cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), 0, 1, device->stream_main));
-  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.user_selected_x), 0xFFFFFFFF, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD16Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.user_selected_x), x, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD16Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.user_selected_y), y, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.undersampling), device->undersampling_state, 1,
     device->stream_main));
@@ -1384,16 +1387,39 @@ LuminaryResult device_unset_abort(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_get_gbuffer_meta_data(Device* device, uint32_t x, uint32_t y, GBufferMetaData* data) {
+LuminaryResult device_invalidate_gbuffer_meta(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(data);
 
-  __FAILURE_HANDLE(device_download(
-    device->gbuffer_meta_dst, device->buffers.frame_gbuffer_meta,
-    sizeof(GBufferMetaData) * (x + y * device->constant_memory->settings.width), sizeof(GBufferMetaData), device->stream_secondary));
+  device->gbuffer_meta_dst->depth       = DEPTH_INVALID;
+  device->gbuffer_meta_dst->instance_id = 0xFFFFFFFF;
+  device->gbuffer_meta_dst->material_id = MATERIAL_ID_INVALID;
 
-  // This will stall. However, interactivity is not necessarily a problem with this.
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_secondary));
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_request_gbuffer_meta(Device* device, uint16_t x, uint16_t y) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(device_renderer_query_gbuffer_meta(device->renderer, x, y));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_query_gbuffer_meta(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(
+    device_download(device->gbuffer_meta_dst, device->buffers.gbuffer_meta, 0, sizeof(GBufferMetaData), device->stream_main));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_get_gbuffer_meta(Device* device, GBufferMetaData* data) {
+  __CHECK_NULL_ARGUMENT(device);
 
   memcpy(data, device->gbuffer_meta_dst, sizeof(GBufferMetaData));
 

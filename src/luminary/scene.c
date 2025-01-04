@@ -261,7 +261,7 @@ LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity) {
       memcpy(object, &scene->instances, sizeof(ARRAY MeshInstance*));
       break;
     default:
-      __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_get yet.");
+      __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_get.");
   }
 
   return LUMINARY_SUCCESS;
@@ -278,6 +278,24 @@ LuminaryResult scene_get_locking(Scene* scene, void* object, SceneEntity entity)
   __FAILURE_HANDLE(scene_unlock(scene, scene_entity_to_mutex[entity]));
 
   __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_get_entry(Scene* scene, void* object, SceneEntity entity, uint32_t index) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(object);
+
+  switch (entity) {
+    case SCENE_ENTITY_MATERIALS:
+      memcpy(object, &scene->materials[index], sizeof(Material));
+      break;
+    case SCENE_ENTITY_INSTANCES:
+      memcpy(object, &scene->instances[index], sizeof(MeshInstance));
+      break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_get_entry.");
+  }
 
   return LUMINARY_SUCCESS;
 }

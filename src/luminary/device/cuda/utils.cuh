@@ -25,6 +25,7 @@
 #define BSDF_ROUGHNESS_CLAMP (0.025f)
 
 enum HitType : uint32_t {
+  HIT_TYPE_INVALID           = 0xFFFFFFFFu,  // TODO: Shift all values so that invalid is all bits set
   HIT_TYPE_SKY               = 0xffffffffu,
   HIT_TYPE_OCEAN             = 0xfffffffeu,
   HIT_TYPE_TOY               = 0xfffffffdu,
@@ -99,6 +100,9 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #define OUTPUT_DIM(dim) (dim >> 1)
 
 __device__ bool is_selected_pixel(const ushort2 index) {
+  if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
+    return false;
+
   // Only the top left subpixel of a pixel can be selected.
   return (index.x == (device.state.user_selected_x << 1) && index.y == (device.state.user_selected_y << 1));
 }
@@ -206,6 +210,30 @@ __device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const 
 
 __device__ bool triangle_handle_equal(const TriangleHandle handle1, const TriangleHandle handle2) {
   return (handle1.instance_id == handle2.instance_id) && (handle1.tri_id == handle2.tri_id);
+}
+
+//===========================================================================================
+// GBuffer Meta Data
+//===========================================================================================
+
+__device__ void HandleGBufferMetaDataRequest(
+  const ushort2 index, const float depth, const uint32_t instance_id, const uint16_t material_id) {
+  if (!is_selected_pixel(index) || !IS_PRIMARY_RAY)
+    return;
+
+  GBufferMetaData meta_data;
+
+  meta_data.depth       = depth;
+  meta_data.instance_id = instance_id;
+  meta_data.material_id = material_id;
+
+  uint4 data;
+  data.x = meta_data.instance_id;
+  data.y = __float_as_uint(meta_data.depth);
+  data.z = 0xFFFFFFFF;
+  data.w = (0xFFFF << 16) | (meta_data.material_id);
+
+  __stwt((uint4*) device.ptrs.gbuffer_meta, data);
 }
 
 #endif /* CU_UTILS_H */

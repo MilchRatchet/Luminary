@@ -1,5 +1,7 @@
 #include "display.h"
 
+#include <float.h>
+
 static uint32_t __num_displays = 0;
 
 static void _display_handle_resize(Display* display) {
@@ -235,6 +237,14 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
+  if (display->pixel_query_in_progress) {
+    LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, &display->pixel_query_result));
+
+    if (display->pixel_query_result.pixel_query_is_valid) {
+      display->pixel_query_in_progress = false;
+    }
+  }
+
   display->frametime = time_step;
 
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
@@ -243,7 +253,45 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   }
 
   if (display->show_ui) {
-    user_interface_handle_inputs(display->ui, display, host);
+    const bool ui_handled_mouse = user_interface_handle_inputs(display->ui, display, host);
+
+    if (!ui_handled_mouse) {
+      switch (display->mouse_mode) {
+        case DISPLAY_MOUSE_MODE_DEFAULT:
+        default:
+          if (display->keyboard_state->keys[SDL_SCANCODE_LALT].down) {
+          }
+          break;
+        case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
+        case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
+        case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
+          if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
+            const float rel_x = display->mouse_state->x / display->width;
+            const float rel_y = display->mouse_state->y / display->height;
+
+            LuminaryRendererSettings settings;
+            LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+            LUM_FAILURE_HANDLE(luminary_host_queue_pixel_query(host, rel_x * settings.width, rel_y * settings.height));
+            display->pixel_query_in_progress = true;
+          }
+          break;
+      }
+    }
+
+    if (display->mouse_mode == DISPLAY_MOUSE_MODE_FOCUS_CAMERA && display->pixel_query_result.pixel_query_is_valid) {
+      if (display->pixel_query_result.depth != FLT_MAX && display->pixel_query_result.depth > 0) {
+        LuminaryCamera camera;
+        LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
+
+        camera.focal_length = display->pixel_query_result.depth;
+
+        LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
+
+        // Invalidate the pixel query so that it does not keep overriding the focal length now.
+        display->pixel_query_result.pixel_query_is_valid = false;
+      }
+    }
   }
   else {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);

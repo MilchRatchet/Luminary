@@ -39,6 +39,8 @@ struct Display {
   SDL_Cursor* sdl_cursors[SDL_SYSTEM_CURSOR_COUNT];
   SDL_SystemCursor selected_cursor;
   DisplayMouseMode mouse_mode;
+  bool pixel_query_in_progress;
+  LuminaryPixelQueryResult pixel_query_result;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);

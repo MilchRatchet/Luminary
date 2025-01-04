@@ -134,7 +134,7 @@ void user_interface_mouse_hovers_background(UserInterface* ui, Display* display,
   *mouse_hovers_background = !window_handled_mouse;
 }
 
-void user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host) {
+bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(ui);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -165,6 +165,8 @@ void user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   }
 
   _user_interface_sort_windows_by_depth(ui);
+
+  return window_handled_mouse;
 }
 
 void user_interface_render(UserInterface* ui, Display* display) {

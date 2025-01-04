@@ -295,6 +295,8 @@ __device__ GBufferData
   data.ior_in    = ray_ior;
   data.ior_out   = ray_ior;
 
+  HandleGBufferMetaDataRequest(task.index, DEPTH_INVALID, 0xFFFFFFFF, MATERIAL_ID_INVALID);
+
   return data;
 }
 #endif /* VOLUME_KERNEL */

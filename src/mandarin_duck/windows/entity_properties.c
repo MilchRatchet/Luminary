@@ -603,8 +603,10 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
     window, mouse_state,
     (ElementSeparatorArgs){.text = "Material", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
+  const bool material_is_selected = display->pixel_query_result.pixel_query_is_valid && display->pixel_query_result.material_id != 0xFFFF;
+
   // TODO: If there is a selected material.
-  if (true) {
+  if (!material_is_selected) {
     element_text(
       window, display, mouse_state,
       (ElementTextArgs){
@@ -622,6 +624,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   }
 
   LuminaryMaterial material;
+  LUM_FAILURE_HANDLE(luminary_host_get_material(host, display->pixel_query_result.material_id, &material));
 
   bool emission_active = material.flags.emission_active != 0;
 

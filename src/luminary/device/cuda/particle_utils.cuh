@@ -40,6 +40,8 @@ __device__ GBufferData particle_generate_g_buffer(const DeviceTask task, const u
   data.ior_in      = ray_ior;
   data.ior_out     = ray_ior;
 
+  HandleGBufferMetaDataRequest(task.index, get_length(sub_vector(task.origin, device.camera.pos)), 0xFFFFFFFF, MATERIAL_ID_INVALID);
+
   return data;
 }
 

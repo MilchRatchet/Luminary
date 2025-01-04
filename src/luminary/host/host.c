@@ -176,6 +176,29 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor*
   return LUMINARY_SUCCESS;
 }
 
+struct HostRequestPixelQueryArgs {
+  uint16_t x;
+  uint16_t y;
+} typedef HostRequestPixelQueryArgs;
+
+static LuminaryResult _host_request_pixel_query_clear_work(Host* host, HostRequestPixelQueryArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostRequestPixelQueryArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _host_request_pixel_query_queue_work(Host* host, HostRequestPixelQueryArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(device_manager_queue_pixel_query(host->device_manager, args->x, args->y));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _host_start_render_queue_work(Host* host, void* args) {
   __CHECK_NULL_ARGUMENT(host);
 
@@ -641,7 +664,23 @@ LuminaryResult luminary_host_set_toy(Host* host, Toy* toy) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties) {
+LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(material);
+
+  __FAILURE_HANDLE(scene_get_entry(host->scene_caller, material, SCENE_ENTITY_MATERIALS, id));
+
+  return LUMINARY_SUCCESS;
+}
+
+LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(material);
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_output_properties(Host* host, LuminaryOutputProperties properties) {
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_set_properties(host->output_handler, properties));
@@ -650,8 +689,7 @@ LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryO
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_request_output(
-  LuminaryHost* host, LuminaryOutputRequestProperties properties, LuminaryOutputPromiseHandle* handle) {
+LuminaryResult luminary_host_request_output(Host* host, LuminaryOutputRequestProperties properties, LuminaryOutputPromiseHandle* handle) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(handle);
 
@@ -660,7 +698,7 @@ LuminaryResult luminary_host_request_output(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_try_await_output(LuminaryHost* host, LuminaryOutputPromiseHandle handle, LuminaryOutputHandle* output_handle) {
+LuminaryResult luminary_host_try_await_output(Host* host, LuminaryOutputPromiseHandle handle, LuminaryOutputHandle* output_handle) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(output_handle);
 
@@ -669,7 +707,7 @@ LuminaryResult luminary_host_try_await_output(LuminaryHost* host, LuminaryOutput
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHandle* output_handle) {
+LuminaryResult luminary_host_acquire_output(Host* host, LuminaryOutputHandle* output_handle) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(output_handle);
 
@@ -678,7 +716,7 @@ LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHa
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void** output_buffer) {
+LuminaryResult luminary_host_get_output_buffer(Host* host, LuminaryOutputHandle output_handle, void** output_buffer) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(output_buffer);
 
@@ -687,10 +725,50 @@ LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutpu
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle output_handle) {
+LuminaryResult luminary_host_release_output(Host* host, LuminaryOutputHandle output_handle) {
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_release(host->output_handler, output_handle));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_queue_pixel_query(Host* host, uint16_t x, uint16_t y) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  HostRequestPixelQueryArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostRequestPixelQueryArgs), (void**) &args));
+
+  args->x = x;
+  args->y = y;
+
+  QueueEntry entry;
+
+  entry.name              = "Request Pixel Query";
+  entry.function          = (QueueEntryFunction) _host_request_pixel_query_queue_work;
+  entry.clear_func        = (QueueEntryFunction) _host_request_pixel_query_clear_work;
+  entry.args              = (void*) args;
+  entry.remove_duplicates = false;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_pixel_info(Host* host, LuminaryPixelQueryResult* result) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(result);
+
+  Device* device = host->device_manager->devices[host->device_manager->main_device_index];
+
+  GBufferMetaData meta_data;
+  __FAILURE_HANDLE(device_get_gbuffer_meta(device, &meta_data));
+
+  result->pixel_query_is_valid =
+    (meta_data.depth != DEPTH_INVALID) || (meta_data.instance_id != 0xFFFFFFFF) || (meta_data.material_id != MATERIAL_ID_INVALID);
+  result->depth       = meta_data.depth;
+  result->instance_id = meta_data.instance_id;
+  result->material_id = meta_data.material_id;
 
   return LUMINARY_SUCCESS;
 }

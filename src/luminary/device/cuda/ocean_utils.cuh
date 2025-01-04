@@ -473,6 +473,8 @@ __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
   data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
 
+  HandleGBufferMetaDataRequest(task.index, get_length(sub_vector(task.origin, device.camera.pos)), HIT_TYPE_INVALID, MATERIAL_ID_INVALID);
+
   return data;
 }
 
