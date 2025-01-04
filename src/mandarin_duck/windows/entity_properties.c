@@ -633,9 +633,11 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
 
   bool update_data = false;
 
-  update_data |= _window_entity_properties_add_slider(data, "Albedo", &material.albedo, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Opacity", &material.albedo.a, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  if (material.albedo_tex == 0xFFFF) {
+    update_data |= _window_entity_properties_add_slider(data, "Albedo", &material.albedo, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
+    update_data |=
+      _window_entity_properties_add_slider(data, "Opacity", &material.albedo.a, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Emission Active", &emission_active);
 
@@ -650,18 +652,22 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
     }
   }
 
-  update_data |=
-    _window_entity_properties_add_slider(data, "Metallic", &material.metallic, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Roughness", &material.roughness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  if (material.material_tex) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "Metallic", &material.metallic, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+    update_data |=
+      _window_entity_properties_add_slider(data, "Roughness", &material.roughness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  }
+
   update_data |= _window_entity_properties_add_slider(
     data, "Roughness Clamp", &material.roughness_clamp, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   update_data |=
-    _window_entity_properties_add_slider(data, "IOR", &material.refraction_index, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+    _window_entity_properties_add_slider(data, "IOR", &material.refraction_index, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
 
   material.flags.emission_active = (emission_active) ? 1 : 0;
 
   if (update_data) {
+    LUM_FAILURE_HANDLE(luminary_host_set_material(host, display->pixel_query_result.material_id, &material));
   }
 
   return update_data;

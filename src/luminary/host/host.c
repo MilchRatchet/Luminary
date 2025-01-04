@@ -244,6 +244,21 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _host_set_scene_entity_entry(Host* host, void* object, SceneEntity entity, uint32_t id) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(object);
+
+  bool scene_changed = false;
+  __FAILURE_HANDLE(scene_update_entry(host->scene_caller, object, entity, id, &scene_changed));
+
+  // If there are no changes, skip the propagation to avoid hammering the queue.
+  if (scene_changed) {
+    __FAILURE_HANDLE(_host_update_scene(host));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
@@ -533,7 +548,7 @@ LuminaryResult luminary_host_set_settings(Host* host, RendererSettings* settings
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
-  _host_set_scene_entity(host, (void*) settings, SCENE_ENTITY_SETTINGS);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) settings, SCENE_ENTITY_SETTINGS));
 
   return LUMINARY_SUCCESS;
 }
@@ -551,7 +566,7 @@ LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
-  _host_set_scene_entity(host, (void*) camera, SCENE_ENTITY_CAMERA);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) camera, SCENE_ENTITY_CAMERA));
 
   return LUMINARY_SUCCESS;
 }
@@ -569,7 +584,7 @@ LuminaryResult luminary_host_set_ocean(Host* host, Ocean* ocean) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
-  _host_set_scene_entity(host, (void*) ocean, SCENE_ENTITY_OCEAN);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) ocean, SCENE_ENTITY_OCEAN));
 
   return LUMINARY_SUCCESS;
 }
@@ -587,7 +602,7 @@ LuminaryResult luminary_host_set_sky(Host* host, Sky* sky) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
-  _host_set_scene_entity(host, (void*) sky, SCENE_ENTITY_SKY);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) sky, SCENE_ENTITY_SKY));
 
   return LUMINARY_SUCCESS;
 }
@@ -605,7 +620,7 @@ LuminaryResult luminary_host_set_cloud(Host* host, Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
-  _host_set_scene_entity(host, (void*) cloud, SCENE_ENTITY_CLOUD);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) cloud, SCENE_ENTITY_CLOUD));
 
   return LUMINARY_SUCCESS;
 }
@@ -623,7 +638,7 @@ LuminaryResult luminary_host_set_fog(Host* host, Fog* fog) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
-  _host_set_scene_entity(host, (void*) fog, SCENE_ENTITY_FOG);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) fog, SCENE_ENTITY_FOG));
 
   return LUMINARY_SUCCESS;
 }
@@ -641,7 +656,7 @@ LuminaryResult luminary_host_set_particles(Host* host, Particles* particles) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
-  _host_set_scene_entity(host, (void*) particles, SCENE_ENTITY_PARTICLES);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) particles, SCENE_ENTITY_PARTICLES));
 
   return LUMINARY_SUCCESS;
 }
@@ -659,7 +674,7 @@ LuminaryResult luminary_host_set_toy(Host* host, Toy* toy) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(toy);
 
-  _host_set_scene_entity(host, (void*) toy, SCENE_ENTITY_TOY);
+  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) toy, SCENE_ENTITY_TOY));
 
   return LUMINARY_SUCCESS;
 }
@@ -676,6 +691,8 @@ LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint1
 LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(material);
+
+  __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) material, SCENE_ENTITY_MATERIALS, id));
 
   return LUMINARY_SUCCESS;
 }

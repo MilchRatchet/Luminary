@@ -6,6 +6,7 @@
 #include "cloud.h"
 #include "fog.h"
 #include "internal_error.h"
+#include "material.h"
 #include "ocean.h"
 #include "particles.h"
 #include "settings.h"
@@ -128,7 +129,8 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   __CHECK_NULL_ARGUMENT(object);
   __CHECK_NULL_ARGUMENT(scene_changed);
 
-  __FAILURE_HANDLE(scene_lock(scene, scene_entity_to_mutex[entity]))
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(scene, scene_entity_to_mutex[entity]))
 
   bool output_dirty      = false;
   bool integration_dirty = false;
@@ -138,35 +140,35 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 
   switch (entity) {
     case SCENE_ENTITY_SETTINGS:
-      __FAILURE_HANDLE(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &integration_dirty, &buffers_dirty));
+      __FAILURE_HANDLE_CRITICAL(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &integration_dirty, &buffers_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty || buffers_dirty) ? SCENE_DIRTY_FLAG_SETTINGS : 0;
       break;
     case SCENE_ENTITY_CAMERA:
-      __FAILURE_HANDLE(camera_check_for_dirty((Camera*) object, &scene->camera, &output_dirty, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(camera_check_for_dirty((Camera*) object, &scene->camera, &output_dirty, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_CAMERA : 0;
       break;
     case SCENE_ENTITY_OCEAN:
-      __FAILURE_HANDLE(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_OCEAN : 0;
       break;
     case SCENE_ENTITY_SKY:
-      __FAILURE_HANDLE(sky_check_for_dirty((Sky*) object, &scene->sky, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_SKY : 0;
       break;
     case SCENE_ENTITY_CLOUD:
-      __FAILURE_HANDLE(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_CLOUD : 0;
       break;
     case SCENE_ENTITY_FOG:
-      __FAILURE_HANDLE(fog_check_for_dirty((Fog*) object, &scene->fog, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(fog_check_for_dirty((Fog*) object, &scene->fog, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_FOG : 0;
       break;
     case SCENE_ENTITY_PARTICLES:
-      __FAILURE_HANDLE(particles_check_for_dirty((Particles*) object, &scene->particles, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(particles_check_for_dirty((Particles*) object, &scene->particles, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_PARTICLES : 0;
       break;
     case SCENE_ENTITY_TOY:
-      __FAILURE_HANDLE(toy_check_for_dirty((Toy*) object, &scene->toy, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(toy_check_for_dirty((Toy*) object, &scene->toy, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_TOY : 0;
       break;
     default:
@@ -177,14 +179,17 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (buffers_dirty) ? SCENE_DIRTY_FLAG_BUFFERS : 0;
 
-  // We need to always update the scene because we certain changes might not cause anything to be dirty.
-  __FAILURE_HANDLE(scene_update_force(scene, object, entity));
+  // We need to always update the scene because certain changes might not cause anything to be dirty.
+  __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, object, entity));
 
   if (output_dirty || integration_dirty || buffers_dirty) {
     *scene_changed = true;
   }
 
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(scene, scene_entity_to_mutex[entity]));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -221,6 +226,63 @@ LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity 
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_update yet.");
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t index, bool* scene_changed) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(object);
+  __CHECK_NULL_ARGUMENT(scene_changed);
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(scene, scene_entity_to_mutex[entity]));
+
+  bool is_dirty = false;
+
+  switch (entity) {
+    case SCENE_ENTITY_MATERIALS: {
+      // Get canonical new material ID.
+      uint32_t num_materials;
+      __FAILURE_HANDLE(array_get_num_elements(scene->materials, &num_materials));
+
+      if (index >= num_materials) {
+        __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Invalid material ID.");
+      }
+
+      Material material = scene->materials[index];
+
+      __FAILURE_HANDLE_CRITICAL(material_check_for_dirty((Material*) object, &material, &is_dirty));
+
+      if (is_dirty) {
+        MaterialUpdate update;
+        update.material_id = index;
+
+        memcpy(&update.material, object, sizeof(Material));
+
+        __FAILURE_HANDLE(array_push(&scene->material_updates, &update));
+
+        scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_MATERIALS;
+      }
+    } break;
+    case SCENE_ENTITY_INSTANCES: {
+      __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Not implemented :(");
+    } break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+  }
+
+  scene->flags[SCENE_ENTITY_TYPE_LIST] |= (is_dirty) ? SCENE_DIRTY_FLAG_OUTPUT : 0;
+  scene->flags[SCENE_ENTITY_TYPE_LIST] |= (is_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
+
+  if (is_dirty) {
+    *scene_changed = true;
+  }
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock(scene, scene_entity_to_mutex[entity]));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -571,7 +633,7 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
   }
 
-  scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_BUFFERS;
+  scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT;
 
   return LUMINARY_SUCCESS;
 }
