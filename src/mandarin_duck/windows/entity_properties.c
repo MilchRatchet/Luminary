@@ -160,20 +160,23 @@ static bool _window_entity_properties_renderer_settings_action(
 
   bool update_data = false;
 
-  update_data |= _window_entity_properties_add_slider(data, "Width", &settings.width, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(data, "Height", &settings.height, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(data, "Width", &settings.width, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 16535.0f, 1.0f);
   update_data |=
-    _window_entity_properties_add_slider(data, "Max Depth", &settings.max_ray_depth, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+    _window_entity_properties_add_slider(data, "Height", &settings.height, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 16535.0f, 1.0f);
+  update_data |=
+    _window_entity_properties_add_slider(data, "Max Depth", &settings.max_ray_depth, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Num Light RIS Samples", &settings.light_num_ris_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+    data, "Num Light RIS Samples", &settings.light_num_ris_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Num Light Rays", &settings.light_num_rays, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+    data, "Num Light Rays", &settings.light_num_rays, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 31.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+    data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 15.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Bridges Num RIS Samples", &settings.bridge_num_ris_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+    data, "Bridges Num RIS Samples", &settings.bridge_num_ris_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
+  update_data |=
+    _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
+  update_data |=
+    _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 

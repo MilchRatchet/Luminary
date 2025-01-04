@@ -65,8 +65,8 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       undersampling_x *= undersampling_scale;
       undersampling_y *= undersampling_scale;
 
-      undersampling_x += (undersampling_scale >> 1) * ((undersampling_iteration & 0b01) ? 1 : 0);
-      undersampling_y += (undersampling_scale >> 1) * ((undersampling_iteration & 0b10) ? 1 : 0);
+      undersampling_x += (undersampling_scale >> 1) * ((undersampling_iteration & 0b01) ? 0 : 1);
+      undersampling_y += (undersampling_scale >> 1) * ((undersampling_iteration & 0b10) ? 0 : 1);
     }
 
     if (undersampling_x >= device.settings.width || undersampling_y >= device.settings.height)
@@ -355,85 +355,75 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
+__device__ RGBF load_pair_of_pixels_and_sum(const KernelArgsGenerateFinalImage args, const uint32_t x, const uint32_t y) {
+  const float2* src_ptr0 = (const float2*) (args.src + x + y * device.settings.width);
+
+  const float2 data0 = __ldg(src_ptr0 + 0);
+  const float2 data1 = __ldg(src_ptr0 + 1);
+  const float2 data2 = __ldg(src_ptr0 + 2);
+
+  RGBF pixel0 = get_color(data0.x, data0.y, data1.x);
+  pixel0      = tonemap_apply(pixel0, x + 0, y, args.color_correction, args.agx_params);
+
+  RGBF pixel1 = get_color(data1.y, data2.x, data2.y);
+  pixel1      = tonemap_apply(pixel1, x + 1, y, args.color_correction, args.agx_params);
+
+  return add_color(pixel0, pixel1);
+}
+
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t undersampling_stage         = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
-  const uint32_t undersampling_stage_clamped = max(undersampling_stage, 1);
-  const uint32_t undersampling_iteration     = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
+  const uint32_t undersampling_stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  const uint32_t undersampling_iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
 
-  const uint32_t undersampling_scale    = 1 << undersampling_stage_clamped;
-  const uint32_t undersampling_subscale = 1 << undersampling_stage;
+  const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
 
-  const uint32_t undersampling_width  = (device.settings.width + undersampling_scale - 1) >> undersampling_stage_clamped;
-  const uint32_t undersampling_height = (device.settings.height + undersampling_scale - 1) >> undersampling_stage_clamped;
+  const uint32_t output_scale = 1 << undersampling_output;
 
-  const uint32_t amount = undersampling_width * undersampling_height;
+  const uint32_t output_width  = device.settings.width >> undersampling_output;
+  const uint32_t output_height = device.settings.height >> undersampling_output;
 
-  const float color_scale = (undersampling_stage) ? 1.0f / (4.0f - undersampling_iteration) : 1.0f;
+  const uint32_t supersampling_scale = max(device.settings.supersampling, undersampling_stage) - undersampling_stage;
 
-  for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
-    const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
-    const uint16_t x = (uint16_t) (undersampling_pixel - y * undersampling_width);
+  const uint32_t output_amount = output_width * output_height;
 
-    const uint16_t source_x = x * undersampling_scale;
-    const uint16_t source_y = y * undersampling_scale;
+  float color_scale = (undersampling_stage) ? 1.0f / (4.0f - undersampling_iteration) : 1.0f;
+  color_scale       = color_scale / (1 << (2 * supersampling_scale));
+
+  for (uint32_t output_pixel = THREAD_ID; output_pixel < output_amount; output_pixel += blockDim.x * gridDim.x) {
+    const uint16_t y = (uint16_t) (output_pixel / output_width);
+    const uint16_t x = (uint16_t) (output_pixel - y * output_width);
+
+    const uint16_t source_x = x * output_scale;
+    const uint16_t source_y = y * output_scale;
 
     RGBF color = get_color(0.0f, 0.0f, 0.0f);
 
-    if (undersampling_stage) {
-      for (uint32_t yi = 0; yi < 2; yi++) {
-        for (uint32_t xi = 0; xi < 2; xi++) {
-          RGBF accumulated_sub_color = get_color(0.0f, 0.0f, 0.0f);
+    for (uint32_t yi = 0; yi < output_scale; yi++) {
+      for (uint32_t xi = 0; xi < output_scale; xi++) {
+        const uint32_t pixel_x = min(source_x + xi, device.settings.width - 1);
+        const uint32_t pixel_y = min(source_y + yi, device.settings.height - 1);
 
-          const uint32_t subpixel_x = source_x + xi * undersampling_subscale;
-          const uint32_t subpixel_y = source_y + yi * undersampling_subscale;
+        const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
-          for (uint32_t yj = 0; yj < undersampling_subscale; yj++) {
-            for (uint32_t xj = 0; xj < undersampling_subscale; xj++) {
-              const uint32_t pixel_x = min(subpixel_x + xj, device.settings.width - 1);
-              const uint32_t pixel_y = min(subpixel_y + yj, device.settings.height - 1);
+        RGBF pixel = load_RGBF(args.src + index);
 
-              const uint32_t index = pixel_x + pixel_y * device.settings.width;
-
-              RGBF pixel            = load_RGBF(args.src + index);
-              accumulated_sub_color = add_color(accumulated_sub_color, pixel);
-            }
-          }
-
-          accumulated_sub_color = scale_color(accumulated_sub_color, color_scale);
-          accumulated_sub_color = tonemap_apply(accumulated_sub_color, subpixel_x, subpixel_y, args.color_correction, args.agx_params);
-
-          color = add_color(color, accumulated_sub_color);
+        if (undersampling_stage == 0) {
+          pixel = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
         }
+
+        color = add_color(color, pixel);
       }
     }
-    else {
-      const float2* src_ptr0 = (const float2*) (args.src + source_x + source_y * device.settings.width);
-      const float2* src_ptr1 = (const float2*) (args.src + source_x + (source_y + 1) * device.settings.width);
-      const float2 data00    = __ldg(src_ptr0 + 0);
-      const float2 data01    = __ldg(src_ptr0 + 1);
-      const float2 data02    = __ldg(src_ptr0 + 2);
-      const float2 data10    = __ldg(src_ptr1 + 0);
-      const float2 data11    = __ldg(src_ptr1 + 1);
-      const float2 data12    = __ldg(src_ptr1 + 2);
 
-      const RGBF pixel00 = get_color(data00.x, data00.y, data01.x);
-      color              = add_color(color, tonemap_apply(pixel00, source_x + 0, source_y + 0, args.color_correction, args.agx_params));
+    color = scale_color(color, color_scale);
 
-      const RGBF pixel01 = get_color(data01.y, data02.x, data02.y);
-      color              = add_color(color, tonemap_apply(pixel01, source_x + 0, source_y + 1, args.color_correction, args.agx_params));
-
-      const RGBF pixel10 = get_color(data10.x, data10.y, data11.x);
-      color              = add_color(color, tonemap_apply(pixel10, source_x + 1, source_y + 0, args.color_correction, args.agx_params));
-
-      const RGBF pixel11 = get_color(data11.y, data12.x, data12.y);
-      color              = add_color(color, tonemap_apply(pixel11, source_x + 1, source_y + 1, args.color_correction, args.agx_params));
+    if (undersampling_stage != 0) {
+      color = tonemap_apply(color, x, y, args.color_correction, args.agx_params);
     }
 
-    color = scale_color(color, 0.25f);
-
-    const uint32_t dst_index = x + y * undersampling_width;
+    const uint32_t dst_index = x + y * output_width;
     store_RGBF(device.ptrs.frame_final + dst_index, color);
   }
 }
@@ -447,12 +437,19 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
   const float scale_x   = 1.0f / (args.width - 1);
   const float scale_y   = 1.0f / (args.height - 1);
 
-  const uint32_t undersampling_stage = max((device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT, 1);
-  const uint32_t undersampling_width = (device.settings.width + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t undersampling_stage = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
-  const float mem_scale = (undersampling_stage > 1) ? 1.0f / (1 << (undersampling_stage - 1)) : 1.0f;
+  const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
 
-  const bool scaled_output = (args.width != OUTPUT_DIM(device.settings.width)) || (args.height != OUTPUT_DIM(device.settings.height));
+  const uint32_t final_image_width  = device.settings.width >> device.settings.supersampling;
+  const uint32_t final_image_height = device.settings.height >> device.settings.supersampling;
+
+  const uint32_t output_width = device.settings.width >> undersampling_output;
+
+  const uint32_t undersampling_mem = undersampling_output - device.settings.supersampling;
+
+  const float mem_scale    = 1.0f / (1 << undersampling_mem);
+  const bool scaled_output = (args.width != final_image_width) || (args.height != final_image_height);
 
   while (id < amount) {
     const uint32_t y = id / args.width;
@@ -463,13 +460,13 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
       const float sx = x * scale_x;
       const float sy = y * scale_y;
 
-      pixel = sample_pixel_clamp(
-        device.ptrs.frame_final, sx, sy, OUTPUT_DIM(device.settings.width), OUTPUT_DIM(device.settings.height), mem_scale);
+      pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, final_image_width, final_image_height, mem_scale);
     }
     else {
-      const uint32_t src_x = x >> (undersampling_stage - 1);
-      const uint32_t src_y = y >> (undersampling_stage - 1);
-      pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
+      const uint32_t src_x = x >> undersampling_mem;
+      const uint32_t src_y = y >> undersampling_mem;
+
+      pixel = load_RGBF(device.ptrs.frame_final + src_x + src_y * output_width);
     }
 
     switch (args.filter) {

@@ -46,6 +46,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   LUMINARY_DEPRECATED bool use_opacity_micromaps;
   LUMINARY_DEPRECATED bool use_displacement_micromaps;
   uint32_t undersampling;
+  uint32_t supersampling;
   LuminaryShadingMode shading_mode;
   uint32_t max_sample_count;
 } typedef LuminaryRendererSettings;

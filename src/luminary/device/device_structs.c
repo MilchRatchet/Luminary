@@ -16,9 +16,10 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->bridge_num_ris_samples  = settings->bridge_num_ris_samples;
   device_settings->light_num_rays          = settings->light_num_rays;
   device_settings->light_num_ris_samples   = settings->light_num_ris_samples;
+  device_settings->supersampling           = settings->supersampling;
 
-  device_settings->width  = settings->width;
-  device_settings->height = settings->height;
+  device_settings->width  = settings->width << settings->supersampling;
+  device_settings->height = settings->height << settings->supersampling;
 
   return LUMINARY_SUCCESS;
 }

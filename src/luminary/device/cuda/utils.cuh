@@ -97,14 +97,12 @@ extern "C" static __constant__ DeviceConstantMemory device;
 
 #define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
 
-#define OUTPUT_DIM(dim) (dim >> 1)
-
 __device__ bool is_selected_pixel(const ushort2 index) {
   if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
     return false;
 
   // Only the top left subpixel of a pixel can be selected.
-  return (index.x == (device.state.user_selected_x << 1) && index.y == (device.state.user_selected_y << 1));
+  return (index.x == device.state.user_selected_x && index.y == device.state.user_selected_y);
 }
 
 __device__ bool is_selected_pixel_lenient(const ushort2 index) {

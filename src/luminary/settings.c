@@ -14,7 +14,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->light_num_rays             = 1;
   settings->use_opacity_micromaps      = false;
   settings->use_displacement_micromaps = false;
-  settings->undersampling              = 3;
+  settings->supersampling              = 1;
   settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
   settings->max_sample_count           = 0xFFFFFFFF;
 
@@ -49,6 +49,7 @@ LuminaryResult settings_check_for_dirty(
 
   __SETTINGS_STANDARD_DIRTY(width);
   __SETTINGS_STANDARD_DIRTY(height);
+  __SETTINGS_STANDARD_DIRTY(supersampling);
   __SETTINGS_INTEGRATION_DIRTY(bridge_max_num_vertices);
   __SETTINGS_INTEGRATION_DIRTY(bridge_num_ris_samples);
   __SETTINGS_INTEGRATION_DIRTY(light_num_ris_samples);

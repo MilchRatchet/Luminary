@@ -558,7 +558,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_post, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * (internal_pixel_count >> 2));
+  __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2)));
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
 

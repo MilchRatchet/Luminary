@@ -488,7 +488,10 @@ static LuminaryResult _device_manager_request_gbuffer_meta_queue_work(
 
   Device* device = device_manager->devices[device_manager->main_device_index];
 
-  __FAILURE_HANDLE(device_request_gbuffer_meta(device, args->x, args->y));
+  RendererSettings settings;
+  __FAILURE_HANDLE(scene_get(device_manager->scene_device, &settings, SCENE_ENTITY_SETTINGS));
+
+  __FAILURE_HANDLE(device_request_gbuffer_meta(device, args->x << settings.supersampling, args->y << settings.supersampling));
 
   return LUMINARY_SUCCESS;
 }
