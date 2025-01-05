@@ -153,6 +153,10 @@ bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
 
   mouse_state_copy(ui->mouse_state, display->mouse_state);
 
+  if (display->mouse_visible == false) {
+    mouse_state_invalidate_position(ui->mouse_state);
+  }
+
   bool window_handled_mouse = false;
 
   for (uint32_t window_id = 0; window_id < num_windows; window_id++) {

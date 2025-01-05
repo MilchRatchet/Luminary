@@ -21,6 +21,7 @@ void mouse_state_copy(MouseState* dst, MouseState* src);
 void mouse_state_reset_motion(MouseState* mouse_state);
 void mouse_state_step_phase(MouseState* mouse_state);
 void mouse_state_invalidate(MouseState* mouse_state);
+void mouse_state_invalidate_position(MouseState* mouse_state);
 void mouse_state_update_motion(MouseState* mouse_state, SDL_MouseMotionEvent sdl_event);
 void mouse_state_update_button(MouseState* mouse_state, SDL_MouseButtonEvent sdl_event);
 void mouse_state_update_wheel(MouseState* mouse_state, SDL_MouseWheelEvent sdl_event);

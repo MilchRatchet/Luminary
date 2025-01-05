@@ -200,12 +200,12 @@ bool element_slider(
   ElementMouseResult mouse_result;
   element_apply_context(&slider, context, &args.size, mouse_state, &mouse_result);
 
-  data->is_hovered = mouse_result.is_hovered;
-
   bool updated_data = false;
 
   const bool use_slider = (window->state_data.state == WINDOW_INTERACTION_STATE_SLIDER) && (window->state_data.element_hash == slider.hash);
   const bool use_string = (window->state_data.state == WINDOW_INTERACTION_STATE_STRING) && (window->state_data.element_hash == slider.hash);
+
+  data->is_hovered = mouse_result.is_hovered || use_slider;
 
   float mouse_change_rate = args.change_rate;
   if (keyboard_state->keys[SDL_SCANCODE_LCTRL].down) {
@@ -243,6 +243,10 @@ bool element_slider(
         updated_data = true;
       }
       break;
+  }
+
+  if (use_slider) {
+    data->hover_component_index = window->state_data.subelement_index;
   }
 
   if (use_string) {
@@ -358,9 +362,7 @@ bool element_slider(
     else {
       display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
     }
-  }
 
-  if (mouse_result.is_hovered) {
     data->hover_component_index = _element_slider_get_subelement_index(window, mouse_state, &slider);
   }
 

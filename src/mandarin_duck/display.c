@@ -133,6 +133,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 void display_set_mouse_visible(Display* display, bool enable) {
   MD_CHECK_NULL_ARGUMENT(display);
 
+  display->mouse_visible = enable;
   SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
   _display_set_hittest(display, enable && (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
 }

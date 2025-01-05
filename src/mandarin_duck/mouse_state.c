@@ -38,6 +38,13 @@ void mouse_state_invalidate(MouseState* mouse_state) {
   mouse_state->phase = MOUSE_PHASE_STABLE;
 }
 
+void mouse_state_invalidate_position(MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
+  mouse_state->x = FLT_MAX;
+  mouse_state->y = FLT_MAX;
+}
+
 void mouse_state_update_motion(MouseState* mouse_state, SDL_MouseMotionEvent sdl_event) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
