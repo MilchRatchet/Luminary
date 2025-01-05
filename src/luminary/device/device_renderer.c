@@ -176,6 +176,20 @@ LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_renderer_query_gbuffer_meta(DeviceRenderer* renderer, Device* device) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(device);
+
+  if (renderer->query_gbuffer_meta) {
+    __FAILURE_HANDLE(device_query_gbuffer_meta(device));
+    renderer->query_gbuffer_meta   = false;
+    renderer->query_gbuffer_meta_x = 0xFFFF;
+    renderer->query_gbuffer_meta_y = 0xFFFF;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
@@ -215,6 +229,10 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
         __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
+
+        if (is_full_sample) {
+          __FAILURE_HANDLE(_device_renderer_query_gbuffer_meta(renderer, device));
+        }
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
         DeviceRenderCallbackData* callback_data;
@@ -236,11 +254,8 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], device->stream_main));
         renderer->event_id++;
 
-        if (renderer->query_gbuffer_meta && is_full_sample) {
-          __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-          renderer->query_gbuffer_meta   = false;
-          renderer->query_gbuffer_meta_x = 0xFFFF;
-          renderer->query_gbuffer_meta_y = 0xFFFF;
+        if (is_full_sample) {
+          __FAILURE_HANDLE(_device_renderer_query_gbuffer_meta(renderer, device));
         }
 
         return LUMINARY_SUCCESS;
