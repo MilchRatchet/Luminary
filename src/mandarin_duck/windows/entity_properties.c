@@ -652,7 +652,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
     }
   }
 
-  if (material.material_tex) {
+  if (material.material_tex == 0xFFFF) {
     update_data |=
       _window_entity_properties_add_slider(data, "Metallic", &material.metallic, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
     update_data |=

@@ -753,6 +753,10 @@ LuminaryResult luminary_host_release_output(Host* host, LuminaryOutputHandle out
 LuminaryResult luminary_host_queue_pixel_query(Host* host, uint16_t x, uint16_t y) {
   __CHECK_NULL_ARGUMENT(host);
 
+  Device* device = host->device_manager->devices[host->device_manager->main_device_index];
+
+  __FAILURE_HANDLE(device_invalidate_gbuffer_meta(device));
+
   HostRequestPixelQueryArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostRequestPixelQueryArgs), (void**) &args));
 

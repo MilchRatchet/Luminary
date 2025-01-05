@@ -139,8 +139,6 @@ bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  display_set_cursor(display, SDL_SYSTEM_CURSOR_DEFAULT);
-
   // Toggle the "About" window with F1.
   if (display->keyboard_state->keys[SDL_SCANCODE_F1].phase == KEY_PHASE_PRESSED) {
     bool visible;

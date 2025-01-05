@@ -230,7 +230,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
         __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
 
-        if (is_full_sample) {
+        if (is_full_sample && (action->mem_update.depth > 0)) {
           __FAILURE_HANDLE(_device_renderer_query_gbuffer_meta(renderer, device));
         }
         break;

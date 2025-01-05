@@ -234,6 +234,27 @@ static void _display_move_sun(Display* display, LuminaryHost* host, float time_s
   LUM_FAILURE_HANDLE(luminary_host_set_sky(host, &sky));
 }
 
+static void _display_set_default_cursor(Display* display) {
+  SDL_SystemCursor cursor;
+
+  bool mouse_hovers_background = false;
+  user_interface_mouse_hovers_background(display->ui, display, &mouse_hovers_background);
+
+  switch (display->mouse_mode) {
+    case DISPLAY_MOUSE_MODE_DEFAULT:
+    default:
+      cursor = SDL_SYSTEM_CURSOR_DEFAULT;
+      break;
+    case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
+    case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
+    case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
+      cursor = (mouse_hovers_background) ? SDL_SYSTEM_CURSOR_POINTER : SDL_SYSTEM_CURSOR_DEFAULT;
+      break;
+  }
+
+  display_set_cursor(display, cursor);
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -254,6 +275,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   }
 
   if (display->show_ui) {
+    _display_set_default_cursor(display);
+
     const bool ui_handled_mouse = user_interface_handle_inputs(display->ui, display, host);
 
     if (!ui_handled_mouse) {
