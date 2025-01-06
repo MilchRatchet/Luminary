@@ -54,6 +54,8 @@ struct DeviceOptixProperties {
   uint32_t shader_execution_reordering;
 } typedef DeviceOptixProperties;
 
+enum GBufferMetaState { GBUFFER_META_STATE_NOT_READY, GBUFFER_META_STATE_QUEUED, GBUFFER_META_STATE_READY } typedef GBufferMetaState;
+
 struct Device {
   uint32_t index;
   DeviceProperties properties;
@@ -75,6 +77,7 @@ struct Device {
   CUstream stream_callbacks;
   CUevent event_queue_render;
   CUevent event_queue_output;
+  CUevent event_queue_gbuffer_meta;
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
@@ -96,6 +99,7 @@ struct Device {
   DevicePost* post;
   DeviceRenderer* renderer;
   DeviceOutput* output;
+  GBufferMetaState gbuffer_meta_state;
 } typedef Device;
 
 void _device_init(void);

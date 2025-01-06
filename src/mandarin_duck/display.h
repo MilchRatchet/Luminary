@@ -42,6 +42,7 @@ struct Display {
   SDL_SystemCursor selected_cursor;
   DisplayMouseMode mouse_mode;
   LuminaryPixelQueryResult pixel_query_result;
+  bool awaiting_pixel_query_result;
   uint32_t reference_x;
   uint32_t reference_y;
 } typedef Display;

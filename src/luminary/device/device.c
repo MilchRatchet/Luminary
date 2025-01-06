@@ -686,6 +686,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_render, CU_EVENT_DISABLE_TIMING));
   CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_output, CU_EVENT_DISABLE_TIMING));
+  CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_gbuffer_meta, CU_EVENT_DISABLE_TIMING));
 
   ////////////////////////////////////////////////////////////////////
   // Constant memory initialization
@@ -1296,6 +1297,8 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
+  device->gbuffer_meta_state = GBUFFER_META_STATE_NOT_READY;
+
   __FAILURE_HANDLE(device_sync_constant_memory(device));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
@@ -1394,6 +1397,9 @@ LuminaryResult device_query_gbuffer_meta(Device* device) {
   __FAILURE_HANDLE(device_download(
     device->gbuffer_meta_dst, device->buffers.gbuffer_meta, 0, sizeof(GBufferMetaData) * width * height, device->stream_main));
 
+  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_gbuffer_meta, device->stream_main));
+  device->gbuffer_meta_state = GBUFFER_META_STATE_QUEUED;
+
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
@@ -1408,7 +1414,23 @@ LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, G
   const uint16_t width  = device->constant_memory->settings.width >> (device->constant_memory->settings.supersampling + 1);
   const uint16_t height = device->constant_memory->settings.height >> (device->constant_memory->settings.supersampling + 1);
 
-  if (x >= width || y >= height) {
+  bool data_available = x < width && y < height && device->gbuffer_meta_state != GBUFFER_META_STATE_NOT_READY;
+
+  if (data_available) {
+    if (device->gbuffer_meta_state == GBUFFER_META_STATE_QUEUED) {
+      CUresult result = cuEventQuery(device->event_queue_gbuffer_meta);
+
+      if (result == CUDA_ERROR_NOT_READY) {
+        data_available = false;
+      }
+      else {
+        CUDA_FAILURE_HANDLE(result);
+        device->gbuffer_meta_state = GBUFFER_META_STATE_READY;
+      }
+    }
+  }
+
+  if (data_available == false) {
     data->depth       = DEPTH_INVALID;
     data->instance_id = 0xFFFFFFFF;
     data->material_id = MATERIAL_ID_INVALID;
@@ -1482,6 +1504,7 @@ LuminaryResult device_destroy(Device** device) {
 
   CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_render));
   CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_output));
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_gbuffer_meta));
 
   OPTIX_FAILURE_HANDLE(optixDeviceContextDestroy((*device)->optix_ctx));
   CUDA_FAILURE_HANDLE(cuCtxDestroy((*device)->cuda_ctx));

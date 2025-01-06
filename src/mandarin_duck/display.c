@@ -260,11 +260,11 @@ static void _display_set_default_cursor(Display* display) {
   display_set_cursor(display, cursor);
 }
 
-static void _display_query_pixel_info(Display* display, LuminaryHost* host) {
+static void _display_query_pixel_info(Display* display, LuminaryHost* host, float request_x, float request_y) {
   MD_CHECK_NULL_ARGUMENT(display);
 
-  const float rel_x = display->mouse_state->x / display->width;
-  const float rel_y = display->mouse_state->y / display->height;
+  const float rel_x = request_x / display->width;
+  const float rel_y = request_y / display->height;
 
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
@@ -273,6 +273,19 @@ static void _display_query_pixel_info(Display* display, LuminaryHost* host) {
   const uint16_t y = rel_y * settings.height;
 
   LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &display->pixel_query_result));
+
+  display->reference_x = request_x;
+  display->reference_y = request_y;
+
+  display->awaiting_pixel_query_result = !display->pixel_query_result.pixel_query_is_valid;
+}
+
+static void _display_start_camera_mode(Display* display, const bool left_pressed) {
+  display->active_camera_movement = true;
+  display_set_mouse_visible(display, false);
+
+  camera_handler_set_mode(display->camera_handler, (left_pressed) ? CAMERA_MODE_ORBIT : CAMERA_MODE_ZOOM);
+  camera_handler_set_reference_pos(display->camera_handler, display->pixel_query_result.rel_hit_pos);
 }
 
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
@@ -285,6 +298,32 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     display->show_ui                = !display->show_ui;
     display->active_camera_movement = !display->show_ui;
     display_set_mouse_visible(display, display->show_ui);
+  }
+
+  if (display->awaiting_pixel_query_result) {
+    display->awaiting_pixel_query_result = false;
+
+    switch (display->mouse_mode) {
+      case DISPLAY_MOUSE_MODE_DEFAULT:
+      default: {
+        const bool left_down  = display->mouse_state->down;
+        const bool right_down = display->mouse_state->right_down;
+        const bool alt_down   = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+
+        if ((left_down || right_down) && alt_down) {
+          _display_query_pixel_info(display, host, display->reference_x, display->reference_y);
+
+          if (display->pixel_query_result.pixel_query_is_valid) {
+            _display_start_camera_mode(display, left_down);
+          }
+        }
+      } break;
+      case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
+      case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
+      case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
+        _display_query_pixel_info(display, host, display->reference_x, display->reference_y);
+        break;
+    }
   }
 
   _display_move_sun(display, host, time_step);
@@ -304,16 +343,11 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
 
             if ((left_pressed || right_pressed) && alt_down) {
-              _display_query_pixel_info(display, host);
+              _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
 
-              display->reference_x = display->mouse_state->x;
-              display->reference_y = display->mouse_state->y;
-
-              display->active_camera_movement = true;
-              display_set_mouse_visible(display, false);
-
-              camera_handler_set_mode(display->camera_handler, (left_pressed) ? CAMERA_MODE_ORBIT : CAMERA_MODE_ZOOM);
-              camera_handler_set_reference_pos(display->camera_handler, display->pixel_query_result.rel_hit_pos);
+              if (display->pixel_query_result.pixel_query_is_valid) {
+                _display_start_camera_mode(display, left_pressed);
+              }
             }
           }
           else if (display->active_camera_movement) {
@@ -336,7 +370,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
         case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
         case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
           if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
-            _display_query_pixel_info(display, host);
+            _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
           }
           break;
       }
