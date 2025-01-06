@@ -17,7 +17,7 @@ __device__ uint16_t optix_float_to_bfloat16(const float val) {
 }
 
 __device__ void optix_write_out_gbuffer_meta(const DeviceTask task, const float depth, const TriangleHandle handle) {
-  if (device.state.sample_id != 1 || device.state.depth != 0)
+  if (device.state.sample_id != 0 || device.state.depth != 0)
     return;
 
   const uint32_t shift = device.settings.supersampling + 1;

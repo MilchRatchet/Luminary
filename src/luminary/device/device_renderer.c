@@ -268,7 +268,18 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
 
-  bool is_gbuffer_meta_query = (sample_count->current_sample_count == 1);
+  // Query only during the first sample
+  bool is_gbuffer_meta_query = (sample_count->current_sample_count == 0);
+
+  if (is_gbuffer_meta_query) {
+    const uint32_t undersampling_stage     = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+    const uint32_t undersampling_iteration = (device->undersampling_state & UNDERSAMPLING_ITERATION_MASK);
+
+    // Query only if enough samples have been computed after this iteration.
+    if (undersampling_stage > (1 + device->constant_memory->settings.supersampling)) {
+      is_gbuffer_meta_query = false;
+    }
+  }
 
   for (uint32_t action_id = renderer->action_ptr; action_id < num_actions; action_id++) {
     const DeviceRendererQueueAction* action = renderer->queue + action_id;
