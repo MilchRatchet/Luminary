@@ -135,10 +135,8 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
-LuminaryResult device_invalidate_gbuffer_meta(Device* device);
-LuminaryResult device_request_gbuffer_meta(Device* device, uint16_t x, uint16_t y);
 LuminaryResult device_query_gbuffer_meta(Device* device);
-LuminaryResult device_get_gbuffer_meta(Device* device, GBufferMetaData* data);
+LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, GBufferMetaData* data);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

@@ -259,14 +259,6 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  if (display->pixel_query_in_progress) {
-    LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, &display->pixel_query_result));
-
-    if (display->pixel_query_result.pixel_query_is_valid) {
-      display->pixel_query_in_progress = false;
-    }
-  }
-
   display->frametime = time_step;
 
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
@@ -296,8 +288,10 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             LuminaryRendererSettings settings;
             LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
-            LUM_FAILURE_HANDLE(luminary_host_queue_pixel_query(host, rel_x * settings.width, rel_y * settings.height));
-            display->pixel_query_in_progress = true;
+            const uint16_t x = rel_x * settings.width;
+            const uint16_t y = rel_y * settings.height;
+
+            LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &display->pixel_query_result));
           }
           break;
       }

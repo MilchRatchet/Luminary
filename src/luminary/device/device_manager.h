@@ -55,7 +55,6 @@ LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Me
 LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const Texture** textures, uint32_t num_textures);
 LuminaryResult device_manager_start_queue(DeviceManager* device_manager);
 LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEntry* entry);
-LuminaryResult device_manager_queue_pixel_query(DeviceManager* device_manager, uint16_t x, uint16_t y);
 LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager);
 LuminaryResult device_manager_destroy(DeviceManager** device_manager);
 

@@ -86,8 +86,7 @@ LUMINARY_API LuminaryResult luminary_host_acquire_output(LuminaryHost* host, Lum
 LUMINARY_API LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void** output_buffer);
 LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle output_handle);
 
-LUMINARY_API LuminaryResult luminary_host_queue_pixel_query(LuminaryHost* host, uint16_t x, uint16_t y);
-LUMINARY_API LuminaryResult luminary_host_get_pixel_info(LuminaryHost* host, LuminaryPixelQueryResult* result);
+LUMINARY_API LuminaryResult luminary_host_get_pixel_info(LuminaryHost* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result);
 
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);

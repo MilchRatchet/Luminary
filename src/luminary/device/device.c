@@ -538,7 +538,9 @@ static LuminaryResult _device_update_undersampling(Device* device) {
 static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  const uint32_t internal_pixel_count = device->constant_memory->settings.width * device->constant_memory->settings.height;
+  const uint32_t internal_pixel_count     = device->constant_memory->settings.width * device->constant_memory->settings.height;
+  const uint32_t external_pixel_count     = (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2));
+  const uint32_t gbuffer_meta_pixel_count = external_pixel_count >> 2;
 
   const uint32_t thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
   const uint32_t pixels_per_thread = 1 + ((internal_pixel_count + thread_count - 1) / thread_count);
@@ -558,9 +560,13 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_post, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2)));
+  __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * external_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
+
+  __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
+  memset(device->gbuffer_meta_dst, 0xFF, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
 
   __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(TriangleHandle) * internal_pixel_count, device->stream_main));
 
@@ -588,6 +594,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(frame_indirect_accumulate);
   __DEVICE_BUFFER_FREE(frame_post);
   __DEVICE_BUFFER_FREE(frame_final);
+  __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(records);
   __DEVICE_BUFFER_FREE(buffer_8bit);
   __DEVICE_BUFFER_FREE(hit_id_history);
@@ -607,7 +614,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
-  __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(abort_flag);
 
   return LUMINARY_SUCCESS;
@@ -709,16 +715,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_bsdf_lut_create(&device->bsdf_lut));
 
   __FAILURE_HANDLE(device_post_create(&device->post));
-
-  ////////////////////////////////////////////////////////////////////
-  // Initialize GBuffer readback buffers
-  ////////////////////////////////////////////////////////////////////
-
-  __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData));
-  __FAILURE_HANDLE(device_memset(device->buffers.gbuffer_meta, 0, 0, sizeof(GBufferMetaData), device->stream_main));
-
-  __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData), false));
-  memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData));
 
   ////////////////////////////////////////////////////////////////////
   // Initialize abort flag
@@ -1387,41 +1383,40 @@ LuminaryResult device_unset_abort(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_invalidate_gbuffer_meta(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  device->gbuffer_meta_dst->depth       = DEPTH_INVALID;
-  device->gbuffer_meta_dst->instance_id = 0xFFFFFFFF;
-  device->gbuffer_meta_dst->material_id = MATERIAL_ID_INVALID;
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult device_request_gbuffer_meta(Device* device, uint16_t x, uint16_t y) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  __FAILURE_HANDLE(device_renderer_query_gbuffer_meta(device->renderer, x, y));
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_query_gbuffer_meta(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(
-    device_download(device->gbuffer_meta_dst, device->buffers.gbuffer_meta, 0, sizeof(GBufferMetaData), device->stream_main));
+  const uint16_t width  = device->constant_memory->settings.width >> (device->constant_memory->settings.supersampling + 1);
+  const uint16_t height = device->constant_memory->settings.height >> (device->constant_memory->settings.supersampling + 1);
+
+  __FAILURE_HANDLE(device_download(
+    device->gbuffer_meta_dst, device->buffers.gbuffer_meta, 0, sizeof(GBufferMetaData) * width * height, device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_get_gbuffer_meta(Device* device, GBufferMetaData* data) {
+LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, GBufferMetaData* data) {
   __CHECK_NULL_ARGUMENT(device);
 
-  memcpy(data, device->gbuffer_meta_dst, sizeof(GBufferMetaData));
+  x = x >> 1;
+  y = y >> 1;
+
+  const uint16_t width  = device->constant_memory->settings.width >> (device->constant_memory->settings.supersampling + 1);
+  const uint16_t height = device->constant_memory->settings.height >> (device->constant_memory->settings.supersampling + 1);
+
+  if (x >= width || y >= height) {
+    data->depth       = DEPTH_INVALID;
+    data->instance_id = 0xFFFFFFFF;
+    data->material_id = MATERIAL_ID_INVALID;
+
+    return LUMINARY_SUCCESS;
+  }
+
+  memcpy(data, device->gbuffer_meta_dst + x + y * width, sizeof(GBufferMetaData));
 
   return LUMINARY_SUCCESS;
 }

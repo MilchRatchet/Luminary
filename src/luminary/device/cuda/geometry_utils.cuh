@@ -156,9 +156,6 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
   data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
 
-  HandleGBufferMetaDataRequest(
-    task.index, get_length(sub_vector(task.origin, device.camera.pos)), triangle_handle.instance_id, material_id);
-
   return data;
 }
 

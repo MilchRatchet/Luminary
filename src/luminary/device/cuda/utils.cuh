@@ -210,28 +210,4 @@ __device__ bool triangle_handle_equal(const TriangleHandle handle1, const Triang
   return (handle1.instance_id == handle2.instance_id) && (handle1.tri_id == handle2.tri_id);
 }
 
-//===========================================================================================
-// GBuffer Meta Data
-//===========================================================================================
-
-__device__ void HandleGBufferMetaDataRequest(
-  const ushort2 index, const float depth, const uint32_t instance_id, const uint16_t material_id) {
-  if (!is_selected_pixel(index) || !IS_PRIMARY_RAY)
-    return;
-
-  GBufferMetaData meta_data;
-
-  meta_data.depth       = depth;
-  meta_data.instance_id = instance_id;
-  meta_data.material_id = material_id;
-
-  uint4 data;
-  data.x = meta_data.instance_id;
-  data.y = __float_as_uint(meta_data.depth);
-  data.z = 0xFFFFFFFF;
-  data.w = (0xFFFF << 16) | (meta_data.material_id);
-
-  __stwt((uint4*) device.ptrs.gbuffer_meta, data);
-}
-
 #endif /* CU_UTILS_H */

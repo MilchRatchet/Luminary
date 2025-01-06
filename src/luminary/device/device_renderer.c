@@ -18,10 +18,6 @@ LuminaryResult device_renderer_create(DeviceRenderer** renderer) {
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_end[event_id], 0));
   }
 
-  (*renderer)->query_gbuffer_meta   = false;
-  (*renderer)->query_gbuffer_meta_x = 0xFFFF;
-  (*renderer)->query_gbuffer_meta_y = 0xFFFF;
-
   return LUMINARY_SUCCESS;
 }
 
@@ -31,16 +27,6 @@ LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceR
   __CHECK_NULL_ARGUMENT(is_valid);
 
   *is_valid = renderer->render_id == data->render_id;
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult device_renderer_query_gbuffer_meta(DeviceRenderer* renderer, uint16_t x, uint16_t y) {
-  __CHECK_NULL_ARGUMENT(renderer);
-
-  renderer->query_gbuffer_meta   = true;
-  renderer->query_gbuffer_meta_x = x;
-  renderer->query_gbuffer_meta_y = y;
 
   return LUMINARY_SUCCESS;
 }
@@ -176,20 +162,6 @@ LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_query_gbuffer_meta(DeviceRenderer* renderer, Device* device) {
-  __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(device);
-
-  if (renderer->query_gbuffer_meta) {
-    __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-    renderer->query_gbuffer_meta   = false;
-    renderer->query_gbuffer_meta_x = 0xFFFF;
-    renderer->query_gbuffer_meta_y = 0xFFFF;
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
@@ -211,7 +183,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
 
-  const bool is_full_sample = (sample_count->current_sample_count > 0);
+  bool is_gbuffer_meta_query = (sample_count->current_sample_count == 1);
 
   for (uint32_t action_id = renderer->action_ptr; action_id < num_actions; action_id++) {
     const DeviceRendererQueueAction* action = renderer->queue + action_id;
@@ -224,14 +196,14 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         __FAILURE_HANDLE(optix_kernel_execute(device->optix_kernels[action->optix_type], device));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
-        __FAILURE_HANDLE(device_update_dynamic_const_mem(
-          device, sample_count->current_sample_count, renderer->query_gbuffer_meta_x, renderer->query_gbuffer_meta_y));
+        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_count->current_sample_count, 0xFFFF, 0xFFFF));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
         __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
 
-        if (is_full_sample && (action->mem_update.depth > 0)) {
-          __FAILURE_HANDLE(_device_renderer_query_gbuffer_meta(renderer, device));
+        if (is_gbuffer_meta_query && (action->mem_update.depth > 0)) {
+          __FAILURE_HANDLE(device_query_gbuffer_meta(device));
+          is_gbuffer_meta_query = false;
         }
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
@@ -254,8 +226,8 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], device->stream_main));
         renderer->event_id++;
 
-        if (is_full_sample) {
-          __FAILURE_HANDLE(_device_renderer_query_gbuffer_meta(renderer, device));
+        if (is_gbuffer_meta_query) {
+          __FAILURE_HANDLE(device_query_gbuffer_meta(device));
         }
 
         return LUMINARY_SUCCESS;

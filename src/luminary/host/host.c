@@ -176,29 +176,6 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor*
   return LUMINARY_SUCCESS;
 }
 
-struct HostRequestPixelQueryArgs {
-  uint16_t x;
-  uint16_t y;
-} typedef HostRequestPixelQueryArgs;
-
-static LuminaryResult _host_request_pixel_query_clear_work(Host* host, HostRequestPixelQueryArgs* args) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(args);
-
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostRequestPixelQueryArgs)));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _host_request_pixel_query_queue_work(Host* host, HostRequestPixelQueryArgs* args) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(args);
-
-  __FAILURE_HANDLE(device_manager_queue_pixel_query(host->device_manager, args->x, args->y));
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _host_start_render_queue_work(Host* host, void* args) {
   __CHECK_NULL_ARGUMENT(host);
 
@@ -750,40 +727,14 @@ LuminaryResult luminary_host_release_output(Host* host, LuminaryOutputHandle out
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_queue_pixel_query(Host* host, uint16_t x, uint16_t y) {
-  __CHECK_NULL_ARGUMENT(host);
-
-  Device* device = host->device_manager->devices[host->device_manager->main_device_index];
-
-  __FAILURE_HANDLE(device_invalidate_gbuffer_meta(device));
-
-  HostRequestPixelQueryArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostRequestPixelQueryArgs), (void**) &args));
-
-  args->x = x;
-  args->y = y;
-
-  QueueEntry entry;
-
-  entry.name              = "Request Pixel Query";
-  entry.function          = (QueueEntryFunction) _host_request_pixel_query_queue_work;
-  entry.clear_func        = (QueueEntryFunction) _host_request_pixel_query_clear_work;
-  entry.args              = (void*) args;
-  entry.remove_duplicates = false;
-
-  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult luminary_host_get_pixel_info(Host* host, LuminaryPixelQueryResult* result) {
+LuminaryResult luminary_host_get_pixel_info(Host* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(result);
 
   Device* device = host->device_manager->devices[host->device_manager->main_device_index];
 
   GBufferMetaData meta_data;
-  __FAILURE_HANDLE(device_get_gbuffer_meta(device, &meta_data));
+  __FAILURE_HANDLE(device_get_gbuffer_meta(device, x, y, &meta_data));
 
   result->pixel_query_is_valid =
     (meta_data.depth != DEPTH_INVALID) || (meta_data.instance_id != 0xFFFFFFFF) || (meta_data.material_id != MATERIAL_ID_INVALID);
