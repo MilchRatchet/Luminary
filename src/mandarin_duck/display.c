@@ -342,6 +342,22 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   const bool ui_handled_mouse          = user_interface_handle_inputs(display->ui, display, host, visibility_mask);
 
   if (display->show_ui) {
+    if (display->keyboard_state->keys[SDL_SCANCODE_1].down) {
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
+    }
+
+    if (display->keyboard_state->keys[SDL_SCANCODE_2].down) {
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_MATERIAL);
+    }
+
+    if (display->keyboard_state->keys[SDL_SCANCODE_3].down) {
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_INSTANCE);
+    }
+
+    if (display->keyboard_state->keys[SDL_SCANCODE_4].down) {
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS_CAMERA);
+    }
+
     if (!ui_handled_mouse) {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
