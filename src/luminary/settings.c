@@ -57,6 +57,7 @@ LuminaryResult settings_check_for_dirty(
   __SETTINGS_INTEGRATION_DIRTY(use_opacity_micromaps);
   __SETTINGS_INTEGRATION_DIRTY(use_displacement_micromaps);
   __SETTINGS_INTEGRATION_DIRTY(undersampling);
+  __SETTINGS_INTEGRATION_DIRTY(shading_mode);
 
   if (input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
     __SETTINGS_INTEGRATION_DIRTY(max_ray_depth);

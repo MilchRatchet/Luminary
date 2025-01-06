@@ -52,6 +52,8 @@ struct DeviceRendererQueueArgs {
   bool render_volumes;
   bool render_clouds;
   bool render_inscattering;
+  bool render_lights;
+  ShadingMode shading_mode;
 } typedef DeviceRendererQueueArgs;
 
 DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer);

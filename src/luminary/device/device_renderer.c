@@ -31,16 +31,11 @@ LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceR
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(array_set_num_elements(&renderer->queue, 0));
-
   DeviceRendererQueueAction action;
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   for (uint32_t depth = 0; depth <= args->max_depth; depth++) {
     action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
@@ -79,9 +74,11 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
       // We want to sample over the whole unoccluded ray path so sampling scattering events before
       // that would shorten the path.
 
-      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+      if (args->render_lights) {
+        action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+        action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES;
+        __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+      }
 
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
       action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS;
@@ -123,6 +120,94 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
     action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
     action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(args);
+
+  DeviceRendererQueueAction action;
+
+  action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
+  action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = 0};
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+  action.cuda_type = CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+  action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  if (args->render_particles) {
+    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+    action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+  }
+
+  if (args->render_clouds) {
+    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+    action.cuda_type = CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+  }
+
+  if (args->render_inscattering) {
+    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+    action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+  }
+
+  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+  action.cuda_type = CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+  action.cuda_type = CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  if (args->render_particles) {
+    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+    action.cuda_type = CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+  }
+
+  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+  action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(array_set_num_elements(&renderer->queue, 0));
+
+  DeviceRendererQueueAction action;
+
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  switch (args->shading_mode) {
+    case LUMINARY_SHADING_MODE_DEFAULT:
+    default:
+      __FAILURE_HANDLE(_device_renderer_build_main_kernel_queue(renderer, args));
+      break;
+    case LUMINARY_SHADING_MODE_ALBEDO:
+    case LUMINARY_SHADING_MODE_DEPTH:
+    case LUMINARY_SHADING_MODE_NORMAL:
+    case LUMINARY_SHADING_MODE_IDENTIFICATION:
+    case LUMINARY_SHADING_MODE_LIGHTS:
+      __FAILURE_HANDLE(_device_renderer_build_debug_kernel_queue(renderer, args));
+      break;
   }
 
   action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
