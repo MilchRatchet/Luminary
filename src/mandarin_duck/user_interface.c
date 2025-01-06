@@ -134,7 +134,7 @@ void user_interface_mouse_hovers_background(UserInterface* ui, Display* display,
   *mouse_hovers_background = !window_handled_mouse;
 }
 
-bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host) {
+bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host, WindowVisibilityMask visibility_mask) {
   MD_CHECK_NULL_ARGUMENT(ui);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -160,7 +160,7 @@ bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   for (uint32_t window_id = 0; window_id < num_windows; window_id++) {
     Window* window = ui->windows[ui->window_ids_sorted[window_id]];
 
-    if (window->is_visible == false)
+    if (window->is_visible == false || ((window->visibility_mask & visibility_mask) == 0))
       continue;
 
     window_handled_mouse |= window_handle_input(window, display, host, ui->mouse_state);
@@ -171,7 +171,7 @@ bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
   return window_handled_mouse;
 }
 
-void user_interface_render(UserInterface* ui, Display* display) {
+void user_interface_render(UserInterface* ui, Display* display, WindowVisibilityMask visibility_mask) {
   MD_CHECK_NULL_ARGUMENT(ui);
   MD_CHECK_NULL_ARGUMENT(display);
 
@@ -185,7 +185,7 @@ void user_interface_render(UserInterface* ui, Display* display) {
   for (int32_t window_id = num_windows - 1; window_id >= 0; window_id--) {
     Window* window = ui->windows[ui->window_ids_sorted[window_id]];
 
-    if (window->is_visible == false)
+    if (window->is_visible == false || ((window->visibility_mask & visibility_mask) == 0))
       continue;
 
     window_render(window, display);

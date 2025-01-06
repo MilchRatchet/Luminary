@@ -43,6 +43,7 @@ void subwindow_tooltip_create(Window* window, const char* text, uint32_t x, uint
   MD_CHECK_NULL_ARGUMENT(window);
 
   window->type                  = WINDOW_TYPE_SUBWINDOW_TOOLTIP;
+  window->visibility_mask       = WINDOW_VISIBILITY_UTILITIES;
   window->x                     = x;
   window->y                     = y;
   window->width                 = 8;

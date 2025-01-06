@@ -288,6 +288,14 @@ static void _display_start_camera_mode(Display* display, const bool left_pressed
   camera_handler_set_reference_pos(display->camera_handler, display->pixel_query_result.rel_hit_pos);
 }
 
+static WindowVisibilityMask _display_get_window_visibility_mask(Display* display) {
+  if (display->show_ui) {
+    return (display->active_camera_movement) ? WINDOW_VISIBILITY_MASK_MOVEMENT : WINDOW_VISIBILITY_MASK_ALL;
+  }
+
+  return WINDOW_VISIBILITY_NONE;
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -328,11 +336,12 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
 
   _display_move_sun(display, host, time_step);
 
+  _display_set_default_cursor(display);
+
+  WindowVisibilityMask visibility_mask = _display_get_window_visibility_mask(display);
+  const bool ui_handled_mouse          = user_interface_handle_inputs(display->ui, display, host, visibility_mask);
+
   if (display->show_ui) {
-    _display_set_default_cursor(display);
-
-    const bool ui_handled_mouse = user_interface_handle_inputs(display->ui, display, host);
-
     if (!ui_handled_mouse) {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
@@ -427,9 +436,8 @@ void display_render(Display* display, LuminaryHost* host) {
 
   _display_render_output(display, host);
 
-  if (display->show_ui) {
-    user_interface_render(display->ui, display);
-  }
+  WindowVisibilityMask visibility_mask = _display_get_window_visibility_mask(display);
+  user_interface_render(display->ui, display, visibility_mask);
 }
 
 void display_update(Display* display) {

@@ -358,20 +358,21 @@ void window_about_create(Window** window) {
 
   window_create(window);
 
-  (*window)->type          = WINDOW_TYPE_ABOUT;
-  (*window)->x             = 128;
-  (*window)->y             = 128;
-  (*window)->width         = 512;
-  (*window)->height        = 48;
-  (*window)->padding       = 8;
-  (*window)->is_horizontal = false;
-  (*window)->is_visible    = false;
-  (*window)->is_movable    = true;
-  (*window)->background    = true;
-  (*window)->auto_size     = true;
-  (*window)->auto_align    = false;
-  (*window)->action_func   = _window_about_action;
-  (*window)->fixed_depth   = false;
+  (*window)->type            = WINDOW_TYPE_ABOUT;
+  (*window)->visibility_mask = WINDOW_VISIBILITY_UTILITIES;
+  (*window)->x               = 128;
+  (*window)->y               = 128;
+  (*window)->width           = 512;
+  (*window)->height          = 48;
+  (*window)->padding         = 8;
+  (*window)->is_horizontal   = false;
+  (*window)->is_visible      = false;
+  (*window)->is_movable      = true;
+  (*window)->background      = true;
+  (*window)->auto_size       = true;
+  (*window)->auto_align      = false;
+  (*window)->action_func     = _window_about_action;
+  (*window)->fixed_depth     = false;
 
   window_allocate_memory(*window);
 }

@@ -13,8 +13,8 @@ struct UserInterface {
 
 void user_interface_create(UserInterface** ui);
 void user_interface_mouse_hovers_background(UserInterface* ui, Display* display, bool* mouse_hovers_background);
-bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host);
-void user_interface_render(UserInterface* ui, Display* display);
+bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host, WindowVisibilityMask visibility_mask);
+void user_interface_render(UserInterface* ui, Display* display, WindowVisibilityMask visibility_mask);
 void user_interface_destroy(UserInterface** ui);
 
 void user_interface_get_window_visible(UserInterface* ui, uint32_t window_id, bool* visible);

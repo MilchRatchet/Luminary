@@ -57,18 +57,19 @@ void window_caption_controls_create(Window** window) {
 
   window_create(window);
 
-  (*window)->type          = WINDOW_TYPE_CAPTION_CONTROLS;
-  (*window)->x             = CAPTION_CONTROL_BUTTON_SIZE * 2;
-  (*window)->y             = CAPTION_CONTROL_BUTTON_SIZE * 2;
-  (*window)->width         = CAPTION_CONTROL_BUTTON_SIZE * 5;
-  (*window)->height        = CAPTION_CONTROL_BUTTON_SIZE;
-  (*window)->padding       = 0;
-  (*window)->is_horizontal = true;
-  (*window)->is_visible    = true;
-  (*window)->is_movable    = false;
-  (*window)->background    = false;
-  (*window)->auto_size     = false;
-  (*window)->auto_align    = true;
+  (*window)->type            = WINDOW_TYPE_CAPTION_CONTROLS;
+  (*window)->visibility_mask = WINDOW_VISIBILITY_CAPTION_CONTROLS;
+  (*window)->x               = CAPTION_CONTROL_BUTTON_SIZE * 2;
+  (*window)->y               = CAPTION_CONTROL_BUTTON_SIZE * 2;
+  (*window)->width           = CAPTION_CONTROL_BUTTON_SIZE * 5;
+  (*window)->height          = CAPTION_CONTROL_BUTTON_SIZE;
+  (*window)->padding         = 0;
+  (*window)->is_horizontal   = true;
+  (*window)->is_visible      = true;
+  (*window)->is_movable      = false;
+  (*window)->background      = false;
+  (*window)->auto_size       = false;
+  (*window)->auto_align      = true;
   (*window)->margins =
     (WindowMargins){.margin_top = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_caption_controls_action;

@@ -740,19 +740,20 @@ void window_entity_properties_create(Window** window, WindowEntityPropertiesType
 
   window_create(window);
 
-  (*window)->type          = WINDOW_TYPE_ENTITY_PROPERTIES;
-  (*window)->x             = 128 + (((uint32_t) type) * 64);
-  (*window)->y             = 128 + (((uint32_t) type) * 64);
-  (*window)->width         = 512;
-  (*window)->height        = 512;
-  (*window)->padding       = 8;
-  (*window)->is_horizontal = false;
-  (*window)->is_visible    = false;
-  (*window)->is_movable    = true;
-  (*window)->background    = true;
-  (*window)->auto_size     = true;
-  (*window)->action_func   = action_funcs[type];
-  (*window)->fixed_depth   = false;
+  (*window)->type            = WINDOW_TYPE_ENTITY_PROPERTIES;
+  (*window)->visibility_mask = WINDOW_VISIBILITY_UTILITIES;
+  (*window)->x               = 128 + (((uint32_t) type) * 64);
+  (*window)->y               = 128 + (((uint32_t) type) * 64);
+  (*window)->width           = 512;
+  (*window)->height          = 512;
+  (*window)->padding         = 8;
+  (*window)->is_horizontal   = false;
+  (*window)->is_visible      = false;
+  (*window)->is_movable      = true;
+  (*window)->background      = true;
+  (*window)->auto_size       = true;
+  (*window)->action_func     = action_funcs[type];
+  (*window)->fixed_depth     = false;
 
   window_create_subwindow(*window);
 

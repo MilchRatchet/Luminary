@@ -107,18 +107,19 @@ void window_sidebar_create(Window** window, WindowSidebarType type) {
 
   window_create(window);
 
-  (*window)->type          = WINDOW_TYPE_SIDEBAR;
-  (*window)->x             = 0;
-  (*window)->y             = 0;
-  (*window)->width         = 48;
-  (*window)->height        = 128;
-  (*window)->padding       = 8;
-  (*window)->is_horizontal = false;
-  (*window)->is_visible    = true;
-  (*window)->is_movable    = false;
-  (*window)->background    = true;
-  (*window)->auto_size     = true;
-  (*window)->auto_align    = true;
+  (*window)->type            = WINDOW_TYPE_SIDEBAR;
+  (*window)->visibility_mask = WINDOW_VISIBILITY_UTILITIES;
+  (*window)->x               = 0;
+  (*window)->y               = 0;
+  (*window)->width           = 48;
+  (*window)->height          = 128;
+  (*window)->padding         = 8;
+  (*window)->is_horizontal   = false;
+  (*window)->is_visible      = true;
+  (*window)->is_movable      = false;
+  (*window)->background      = true;
+  (*window)->auto_size       = true;
+  (*window)->auto_align      = true;
 
   (*window)->fixed_depth = true;
 

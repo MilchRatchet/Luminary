@@ -82,6 +82,7 @@ void subwindow_dropdown_create(Window* window, uint32_t selected_index, uint32_t
   MD_CHECK_NULL_ARGUMENT(window);
 
   window->type                  = WINDOW_TYPE_SUBWINDOW_DROPDOWN;
+  window->visibility_mask       = WINDOW_VISIBILITY_UTILITIES;
   window->x                     = x;
   window->y                     = y;
   window->width                 = width;
