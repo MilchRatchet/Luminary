@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "display.h"
+#include "text_renderer.h"
 #include "ui_renderer_blur.h"
 #include "ui_renderer_impl.h"
 #include "ui_renderer_utils.h"
@@ -237,6 +238,14 @@ void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display) 
     dst       = dst + display->ld;
     disk_mask = disk_mask + shape_mask_ld;
   }
+}
+
+void ui_renderer_render_crosshair(UIRenderer* renderer, Display* display, uint32_t x, uint32_t y) {
+  MD_CHECK_NULL_ARGUMENT(renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  text_renderer_render(
+    display->text_renderer, display, "\ue5d0", TEXT_RENDERER_FONT_MATERIAL, MD_COLOR_GRAY, x, y, true, true, true, (uint32_t*) 0);
 }
 
 void ui_renderer_destroy(UIRenderer** renderer) {

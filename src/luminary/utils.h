@@ -14,6 +14,11 @@
 #define PI 3.141592653589f
 #endif
 
+// https://stackoverflow.com/a/9283155
+#define LITTLE_ENDIAN 0x41424344UL
+#define BIG_ENDIAN 0x44434241UL
+#define ENDIAN_ORDER ('ABCD')
+
 #define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size")
 
 // Flags variables as unused so that no warning is emitted

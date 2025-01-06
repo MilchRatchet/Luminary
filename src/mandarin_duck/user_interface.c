@@ -175,6 +175,10 @@ void user_interface_render(UserInterface* ui, Display* display) {
   MD_CHECK_NULL_ARGUMENT(ui);
   MD_CHECK_NULL_ARGUMENT(display);
 
+  if (display->camera_handler->mode == CAMERA_MODE_ORBIT || display->camera_handler->mode == CAMERA_MODE_ZOOM) {
+    ui_renderer_render_crosshair(display->ui_renderer, display, display->reference_x, display->reference_y);
+  }
+
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));
 

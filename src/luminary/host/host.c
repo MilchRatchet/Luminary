@@ -727,6 +727,20 @@ LuminaryResult luminary_host_release_output(Host* host, LuminaryOutputHandle out
   return LUMINARY_SUCCESS;
 }
 
+static float _host_bfloat16_to_float32(uint16_t val) {
+  float float32;
+
+  memset(&float32, 0, sizeof(float));
+
+#if ENDIAN_ORDER == BIG_ENDIAN
+  memcpy(&float32, &val, sizeof(uint16_t));
+#else
+  memcpy(((uint8_t*) (&float32)) + sizeof(float) - sizeof(uint16_t), &val, sizeof(uint16_t));
+#endif
+
+  return float32;
+}
+
 LuminaryResult luminary_host_get_pixel_info(Host* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(result);
@@ -738,9 +752,12 @@ LuminaryResult luminary_host_get_pixel_info(Host* host, uint16_t x, uint16_t y, 
 
   result->pixel_query_is_valid =
     (meta_data.depth != DEPTH_INVALID) || (meta_data.instance_id != 0xFFFFFFFF) || (meta_data.material_id != MATERIAL_ID_INVALID);
-  result->depth       = meta_data.depth;
-  result->instance_id = meta_data.instance_id;
-  result->material_id = meta_data.material_id;
+  result->depth         = meta_data.depth;
+  result->instance_id   = meta_data.instance_id;
+  result->material_id   = meta_data.material_id;
+  result->rel_hit_pos.x = _host_bfloat16_to_float32(meta_data.rel_hit_x_bfloat16);
+  result->rel_hit_pos.y = _host_bfloat16_to_float32(meta_data.rel_hit_y_bfloat16);
+  result->rel_hit_pos.z = _host_bfloat16_to_float32(meta_data.rel_hit_z_bfloat16);
 
   return LUMINARY_SUCCESS;
 }

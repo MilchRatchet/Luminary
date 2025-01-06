@@ -78,6 +78,7 @@ LUMINARY_API struct LuminaryPixelQueryResult {
   uint32_t instance_id;
   uint16_t material_id;
   float depth;
+  LuminaryVec3 rel_hit_pos;
 } typedef LuminaryPixelQueryResult;
 
 ////////////////////////////////////////////////////////////////////

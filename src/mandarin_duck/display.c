@@ -38,7 +38,9 @@ static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const 
   display->mouse_state->x = prev_mouse_x;
   display->mouse_state->y = prev_mouse_y;
 
-  return (mouse_hovers_background) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+  const bool alt_down = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+
+  return (mouse_hovers_background && !alt_down) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
 }
 
 static void _display_set_hittest(Display* display, bool enable) {
@@ -135,7 +137,7 @@ void display_set_mouse_visible(Display* display, bool enable) {
 
   display->mouse_visible = enable;
   SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
-  _display_set_hittest(display, enable && (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
+  _display_set_hittest(display, enable && (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT) && !display->active_camera_movement);
 }
 
 void display_set_cursor(Display* display, SDL_SystemCursor cursor) {
@@ -148,6 +150,9 @@ void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   display->mouse_mode = mouse_mode;
+
+  // Invalidate the result
+  display->pixel_query_result.pixel_query_is_valid = false;
 
   _display_set_hittest(display, (mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
 }
@@ -255,6 +260,21 @@ static void _display_set_default_cursor(Display* display) {
   display_set_cursor(display, cursor);
 }
 
+static void _display_query_pixel_info(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  const float rel_x = display->mouse_state->x / display->width;
+  const float rel_y = display->mouse_state->y / display->height;
+
+  LuminaryRendererSettings settings;
+  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+  const uint16_t x = rel_x * settings.width;
+  const uint16_t y = rel_y * settings.height;
+
+  LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &display->pixel_query_result));
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -262,9 +282,12 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   display->frametime = time_step;
 
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
-    display->show_ui = !display->show_ui;
+    display->show_ui                = !display->show_ui;
+    display->active_camera_movement = !display->show_ui;
     display_set_mouse_visible(display, display->show_ui);
   }
+
+  _display_move_sun(display, host, time_step);
 
   if (display->show_ui) {
     _display_set_default_cursor(display);
@@ -275,23 +298,45 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
         default:
-          if (display->keyboard_state->keys[SDL_SCANCODE_LALT].down) {
+          if (display->mouse_visible) {
+            const bool left_pressed  = display->mouse_state->phase == MOUSE_PHASE_PRESSED;
+            const bool right_pressed = display->mouse_state->right_phase == MOUSE_PHASE_PRESSED;
+            const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+
+            if ((left_pressed || right_pressed) && alt_down) {
+              _display_query_pixel_info(display, host);
+
+              display->reference_x = display->mouse_state->x;
+              display->reference_y = display->mouse_state->y;
+
+              display->active_camera_movement = true;
+              display_set_mouse_visible(display, false);
+
+              camera_handler_set_mode(display->camera_handler, (left_pressed) ? CAMERA_MODE_ORBIT : CAMERA_MODE_ZOOM);
+              camera_handler_set_reference_pos(display->camera_handler, display->pixel_query_result.rel_hit_pos);
+            }
+          }
+          else if (display->active_camera_movement) {
+            const bool left_pressed  = display->mouse_state->down;
+            const bool right_pressed = display->mouse_state->right_down;
+            const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+
+            const bool cond0 = (display->camera_handler->mode == CAMERA_MODE_ORBIT && !left_pressed);
+            const bool cond1 = (display->camera_handler->mode == CAMERA_MODE_ZOOM && !right_pressed);
+
+            if (cond0 || cond1 || !alt_down) {
+              display->active_camera_movement = !display->show_ui;
+              display_set_mouse_visible(display, true);
+
+              camera_handler_set_mode(display->camera_handler, CAMERA_MODE_FLY);
+            }
           }
           break;
         case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
         case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
         case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
           if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
-            const float rel_x = display->mouse_state->x / display->width;
-            const float rel_y = display->mouse_state->y / display->height;
-
-            LuminaryRendererSettings settings;
-            LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-            const uint16_t x = rel_x * settings.width;
-            const uint16_t y = rel_y * settings.height;
-
-            LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &display->pixel_query_result));
+            _display_query_pixel_info(display, host);
           }
           break;
       }
@@ -311,9 +356,9 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       }
     }
   }
-  else {
+
+  if (display->active_camera_movement) {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
-    _display_move_sun(display, host, time_step);
   }
 }
 

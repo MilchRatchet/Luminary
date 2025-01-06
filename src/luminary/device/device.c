@@ -566,7 +566,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
-  memset(device->gbuffer_meta_dst, 0xFF, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
+  memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
 
   __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(TriangleHandle) * internal_pixel_count, device->stream_main));
 

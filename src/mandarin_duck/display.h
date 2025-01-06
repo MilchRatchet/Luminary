@@ -30,6 +30,7 @@ struct Display {
   bool exit_requested;
   bool show_ui;
   bool mouse_visible;
+  bool active_camera_movement;
   double frametime;
   KeyboardState* keyboard_state;
   MouseState* mouse_state;
@@ -41,6 +42,8 @@ struct Display {
   SDL_SystemCursor selected_cursor;
   DisplayMouseMode mouse_mode;
   LuminaryPixelQueryResult pixel_query_result;
+  uint32_t reference_x;
+  uint32_t reference_y;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);

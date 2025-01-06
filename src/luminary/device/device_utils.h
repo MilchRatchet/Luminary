@@ -191,9 +191,10 @@ struct GBufferData {
 struct GBufferMetaData {
   uint32_t instance_id;
   float depth;
-  uint32_t padding32;
+  uint16_t rel_hit_x_bfloat16;
+  uint16_t rel_hit_y_bfloat16;
+  uint16_t rel_hit_z_bfloat16;
   uint16_t material_id;
-  uint16_t padding16;
 } typedef GBufferMetaData;
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
 
