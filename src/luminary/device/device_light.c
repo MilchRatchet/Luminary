@@ -1574,12 +1574,36 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _light_tree_free_data(LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  if (tree->nodes_data) {
+    __FAILURE_HANDLE(host_free(&tree->nodes_data));
+  }
+
+  if (tree->paths_data) {
+    __FAILURE_HANDLE(host_free(&tree->paths_data));
+  }
+
+  if (tree->tri_handle_map_data) {
+    __FAILURE_HANDLE(host_free(&tree->tri_handle_map_data));
+  }
+
+  if (tree->bvh_vertex_buffer_data) {
+    __FAILURE_HANDLE(host_free(&tree->bvh_vertex_buffer_data));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult light_tree_build(LightTree* tree, Device* device) {
   __CHECK_NULL_ARGUMENT(tree);
 
   // Only build if the cache is dirty.
   if (!tree->cache.is_dirty)
     return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(_light_tree_free_data(tree));
 
   __FAILURE_HANDLE(_light_tree_handle_dirty_states(tree));
 
@@ -1650,10 +1674,7 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.instances));
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.materials));
 
-  __FAILURE_HANDLE(host_free(&(*tree)->nodes_data));
-  __FAILURE_HANDLE(host_free(&(*tree)->paths_data));
-  __FAILURE_HANDLE(host_free(&(*tree)->tri_handle_map_data));
-  __FAILURE_HANDLE(host_free(&(*tree)->bvh_vertex_buffer_data));
+  __FAILURE_HANDLE(_light_tree_free_data(*tree));
 
   __FAILURE_HANDLE(host_free(tree));
 
