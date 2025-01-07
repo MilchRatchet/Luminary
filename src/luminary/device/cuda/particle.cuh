@@ -56,29 +56,24 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
   }
 }
 
-LUMINARY_KERNEL void particle_generate(
-  const uint32_t count, const uint32_t seed, const float size, const float size_variation, float4* vertex_buffer, uint32_t* index_buffer,
-  Quad* quads) {
+LUMINARY_KERNEL void particle_generate(const KernelArgsParticleGenerate args) {
   uint32_t id = THREAD_ID;
 
-  // TODO: Make sure to do this multiplication when passing this arg to the kernel.
-  // size *= 0.001f;
-
-  while (id < count) {
-    const float x = white_noise_offset(seed + id * 6 + 0);
-    const float y = white_noise_offset(seed + id * 6 + 1);
-    const float z = white_noise_offset(seed + id * 6 + 2);
+  while (id < args.count) {
+    const float x = white_noise_offset(args.seed + id * 6 + 0);
+    const float y = white_noise_offset(args.seed + id * 6 + 1);
+    const float z = white_noise_offset(args.seed + id * 6 + 2);
 
     const vec3 p = get_vector(x, y, z);
 
-    const float r1 = 2.0f * white_noise_offset(seed + id * 6 + 3) - 1.0f;
-    const float r2 = white_noise_offset(seed + id * 6 + 4);
+    const float r1 = 2.0f * white_noise_offset(args.seed + id * 6 + 3) - 1.0f;
+    const float r2 = white_noise_offset(args.seed + id * 6 + 4);
 
     const vec3 normal      = sample_ray_sphere(r1, r2);
     const Mat3x3 transform = create_basis(normal);
 
-    const float random_size = 2.0f * white_noise_offset(seed + id * 6 + 5) - 1.0f;
-    const float s           = size * (1.0f + random_size * size_variation);
+    const float random_size = 2.0f * white_noise_offset(args.seed + id * 6 + 5) - 1.0f;
+    const float s           = args.size * (1.0f + random_size * args.size_variation);
 
     const vec3 a00 = add_vector(p, transform_vec3(transform, get_vector(s, s, 0.0f)));
     const vec3 a01 = add_vector(p, transform_vec3(transform, get_vector(s, -s, 0.0f)));
@@ -96,19 +91,19 @@ LUMINARY_KERNEL void particle_generate(
     quad.edge2  = sub_vector(a10, a00);
     quad.normal = normalize_vector(cross_product(quad.edge1, quad.edge2));
 
-    quads[id] = quad;
+    args.quads[id] = quad;
 
-    __stcs(vertex_buffer + 4 * id + 0, f00);
-    __stcs(vertex_buffer + 4 * id + 1, f01);
-    __stcs(vertex_buffer + 4 * id + 2, f10);
-    __stcs(vertex_buffer + 4 * id + 3, f11);
+    __stcs(args.vertex_buffer + 4 * id + 0, f00);
+    __stcs(args.vertex_buffer + 4 * id + 1, f01);
+    __stcs(args.vertex_buffer + 4 * id + 2, f10);
+    __stcs(args.vertex_buffer + 4 * id + 3, f11);
 
-    index_buffer[id * 6 + 0] = id * 4 + 0;
-    index_buffer[id * 6 + 1] = id * 4 + 1;
-    index_buffer[id * 6 + 2] = id * 4 + 2;
-    index_buffer[id * 6 + 3] = id * 4 + 3;
-    index_buffer[id * 6 + 4] = id * 4 + 2;
-    index_buffer[id * 6 + 5] = id * 4 + 1;
+    args.index_buffer[id * 6 + 0] = id * 4 + 0;
+    args.index_buffer[id * 6 + 1] = id * 4 + 1;
+    args.index_buffer[id * 6 + 2] = id * 4 + 2;
+    args.index_buffer[id * 6 + 3] = id * 4 + 3;
+    args.index_buffer[id * 6 + 4] = id * 4 + 2;
+    args.index_buffer[id * 6 + 5] = id * 4 + 1;
 
     id += blockDim.x * gridDim.x;
   }

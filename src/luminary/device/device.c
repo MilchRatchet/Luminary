@@ -721,6 +721,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
   __FAILURE_HANDLE(device_bsdf_lut_create(&device->bsdf_lut));
   __FAILURE_HANDLE(device_cloud_noise_create(&device->cloud_noise, device));
+  __FAILURE_HANDLE(device_particles_handle_create(&device->particles_handle));
 
   ////////////////////////////////////////////////////////////////////
   // Initialize abort flag
@@ -1230,6 +1231,24 @@ LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_particles(Device* device, const Particles* particles) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(particles);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_particles_handle_generate(device->particles_handle, particles, device));
+
+  if (particles->active) {
+    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, device->particles_handle->bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, DEVICE_PTR(device->particles_handle->quad_buffer));
+  }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_clear_lighting_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -1494,6 +1513,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));
   __FAILURE_HANDLE(device_bsdf_lut_destroy(&(*device)->bsdf_lut));
   __FAILURE_HANDLE(device_cloud_noise_destroy(&(*device)->cloud_noise));
+  __FAILURE_HANDLE(device_particles_handle_destroy(&(*device)->particles_handle));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));

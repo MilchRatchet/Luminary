@@ -46,6 +46,16 @@ struct KernelArgsSkyComputeMultiscatteringLUT {
   float4* dst_high;
 } typedef KernelArgsSkyComputeMultiscatteringLUT;
 
+struct KernelArgsParticleGenerate {
+  uint32_t count;
+  uint32_t seed;
+  float size;
+  float size_variation;
+  float4* vertex_buffer;
+  uint32_t* index_buffer;
+  Quad* quads;
+} typedef KernelArgsParticleGenerate;
+
 struct KernelArgsGenerateFinalImage {
   RGBF* src;
   RGBF color_correction;

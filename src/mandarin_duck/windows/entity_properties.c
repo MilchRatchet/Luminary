@@ -571,6 +571,9 @@ static bool _window_entity_properties_particles_action(
   update_data |= _window_entity_properties_add_checkbox(data, "Active", &particles.active);
 
   if (particles.active) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "Count", &particles.count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 32767.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(data, "Seed", &particles.seed, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_slider(data, "Albedo", &particles.albedo, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
     update_data |=
       _window_entity_properties_add_slider(data, "Speed", &particles.speed, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
