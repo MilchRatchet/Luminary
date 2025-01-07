@@ -11,7 +11,6 @@
 #include "particles.h"
 #include "settings.h"
 #include "sky.h"
-#include "toy.h"
 
 size_t scene_entity_size[] = {
   sizeof(RendererSettings),  // SCENE_ENTITY_SETTINGS     = 0,
@@ -21,7 +20,6 @@ size_t scene_entity_size[] = {
   sizeof(Cloud),             // SCENE_ENTITY_CLOUD        = 4,
   sizeof(Fog),               // SCENE_ENTITY_FOG          = 5,
   sizeof(Particles),         // SCENE_ENTITY_PARTICLES    = 6,
-  sizeof(Toy)                // SCENE_ENTITY_TOY          = 7,
 };
 LUM_STATIC_SIZE_ASSERT(scene_entity_size, sizeof(size_t) * SCENE_ENTITY_GLOBAL_COUNT);
 
@@ -33,7 +31,6 @@ SceneEntityType scene_entity_to_mutex[] = {
   SCENE_ENTITY_TYPE_GLOBAL,  // SCENE_ENTITY_CLOUD
   SCENE_ENTITY_TYPE_GLOBAL,  // SCENE_ENTITY_FOG
   SCENE_ENTITY_TYPE_GLOBAL,  // SCENE_ENTITY_PARTICLES
-  SCENE_ENTITY_TYPE_GLOBAL,  // SCENE_ENTITY_TOY
 
   SCENE_ENTITY_TYPE_LIST,  // SCENE_ENTITY_MATERIALS
   SCENE_ENTITY_TYPE_LIST   // SCENE_ENTITY_INSTANCES
@@ -58,7 +55,6 @@ LuminaryResult scene_create(Scene** _scene) {
   __FAILURE_HANDLE(cloud_get_default(&scene->cloud));
   __FAILURE_HANDLE(fog_get_default(&scene->fog));
   __FAILURE_HANDLE(particles_get_default(&scene->particles));
-  __FAILURE_HANDLE(toy_get_default(&scene->toy));
 
   __FAILURE_HANDLE(array_create(&scene->materials, sizeof(Material), 16));
   __FAILURE_HANDLE(array_create(&scene->instances, sizeof(MeshInstance), 16));
@@ -167,10 +163,6 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
       __FAILURE_HANDLE_CRITICAL(particles_check_for_dirty((Particles*) object, &scene->particles, &integration_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_PARTICLES : 0;
       break;
-    case SCENE_ENTITY_TOY:
-      __FAILURE_HANDLE_CRITICAL(toy_check_for_dirty((Toy*) object, &scene->toy, &integration_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_TOY : 0;
-      break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_update yet.");
   }
@@ -219,9 +211,6 @@ LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity 
       break;
     case SCENE_ENTITY_PARTICLES:
       memcpy(&scene->particles, object, sizeof(Particles));
-      break;
-    case SCENE_ENTITY_TOY:
-      memcpy(&scene->toy, object, sizeof(Toy));
       break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_update yet.");
@@ -312,9 +301,6 @@ LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity) {
       break;
     case SCENE_ENTITY_PARTICLES:
       memcpy(object, &scene->particles, sizeof(Particles));
-      break;
-    case SCENE_ENTITY_TOY:
-      memcpy(object, &scene->toy, sizeof(Toy));
       break;
     case SCENE_ENTITY_MATERIALS:
       memcpy(object, &scene->materials, sizeof(ARRAY Material*));

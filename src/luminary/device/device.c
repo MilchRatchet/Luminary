@@ -14,7 +14,6 @@
 #include "internal_error.h"
 #include "particles.h"
 #include "sky.h"
-#include "toy.h"
 
 #ifdef CUDA_STALL_VALIDATION
 WallTime* __cuda_stall_validation_macro_walltime;
@@ -28,7 +27,6 @@ static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_memb
   DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD,      // SCENE_ENTITY_CLOUD
   DEVICE_CONSTANT_MEMORY_MEMBER_FOG,        // SCENE_ENTITY_FOG
   DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES,  // SCENE_ENTITY_PARTICLES
-  DEVICE_CONSTANT_MEMORY_MEMBER_TOY         // SCENE_ENTITY_TOY
 };
 LUM_STATIC_SIZE_ASSERT(device_scene_entity_to_const_memory_member, sizeof(DeviceConstantMemoryMember) * SCENE_ENTITY_GLOBAL_COUNT);
 
@@ -41,7 +39,6 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, cloud),                         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   offsetof(DeviceConstantMemory, fog),                           // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   offsetof(DeviceConstantMemory, particles),                     // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  offsetof(DeviceConstantMemory, toy),                           // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
   offsetof(DeviceConstantMemory, pixels_per_thread),             // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   offsetof(DeviceConstantMemory, optix_bvh),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
@@ -62,7 +59,6 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(DeviceCloud),                 // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   sizeof(DeviceFog),                   // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   sizeof(DeviceParticles),             // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  sizeof(DeviceToy),                   // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
   sizeof(uint32_t) * 2,                // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   sizeof(OptixTraversableHandle) * 4,  // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX

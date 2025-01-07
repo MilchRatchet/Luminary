@@ -242,24 +242,6 @@ LuminaryResult device_struct_particles_convert(const Particles* particles, Devic
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_struct_toy_convert(const Toy* toy, DeviceToy* device_toy) {
-  __CHECK_NULL_ARGUMENT(toy);
-  __CHECK_NULL_ARGUMENT(device_toy);
-
-  device_toy->active   = toy->active;
-  device_toy->emissive = toy->emissive;
-
-  device_toy->position         = toy->position;
-  device_toy->rotation         = toy->rotation;
-  device_toy->scale            = toy->scale;
-  device_toy->refractive_index = toy->refractive_index;
-  device_toy->albedo           = toy->albedo;
-  device_toy->material         = toy->material;
-  device_toy->emission         = toy->emission;
-
-  return LUMINARY_SUCCESS;
-}
-
 static uint16_t _device_struct_convert_float01_to_uint16(const float f) {
   return (uint16_t) (f * 0xFFFFu + 0.5f);
 }
@@ -334,9 +316,6 @@ LuminaryResult device_struct_scene_entity_convert(const void* restrict source, v
       break;
     case SCENE_ENTITY_PARTICLES:
       __FAILURE_HANDLE(device_struct_particles_convert(source, dst));
-      break;
-    case SCENE_ENTITY_TOY:
-      __FAILURE_HANDLE(device_struct_toy_convert(source, dst));
       break;
     case SCENE_ENTITY_MATERIALS:
       __FAILURE_HANDLE(device_struct_material_convert(source, dst));

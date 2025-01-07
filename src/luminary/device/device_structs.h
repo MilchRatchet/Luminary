@@ -148,20 +148,6 @@ struct DeviceParticles {
 } typedef DeviceParticles;
 LUM_STATIC_SIZE_ASSERT(DeviceParticles, 0x2Cu);
 
-struct DeviceToy {
-  uint32_t active : 1;
-  uint32_t emissive : 1;
-
-  vec3 position;
-  vec3 rotation;
-  float scale;
-  float refractive_index;
-  RGBAF albedo;
-  RGBAF material;
-  RGBF emission;
-} typedef DeviceToy;
-LUM_STATIC_SIZE_ASSERT(DeviceToy, 0x50u);
-
 union DeviceSceneEntityCover {
   DeviceRendererSettings settings;
   DeviceCamera camera;
@@ -170,7 +156,6 @@ union DeviceSceneEntityCover {
   DeviceCloud cloud;
   DeviceFog fog;
   DeviceParticles particles;
-  DeviceToy toy;
 } typedef DeviceSceneEntityCover;
 
 enum DeviceMaterialFlags {
@@ -263,7 +248,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky);
 LuminaryResult device_struct_cloud_convert(const Cloud* cloud, DeviceCloud* device_cloud);
 LuminaryResult device_struct_fog_convert(const Fog* fog, DeviceFog* device_fog);
 LuminaryResult device_struct_particles_convert(const Particles* particles, DeviceParticles* device_particles);
-LuminaryResult device_struct_toy_convert(const Toy* toy, DeviceToy* device_toy);
 LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterialCompressed* device_material);
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
 LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);

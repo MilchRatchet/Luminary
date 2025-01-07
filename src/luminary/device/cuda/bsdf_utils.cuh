@@ -2,7 +2,6 @@
 #define CU_BSDF_UTILS_H
 
 #include "math.cuh"
-#include "toy_utils.cuh"
 #include "utils.cuh"
 
 struct BSDFRayContext {
@@ -108,9 +107,6 @@ __device__ float bsdf_shadowed_F90(const RGBF specular_f0) {
 ///////////////////////////////////////////////////
 
 __device__ float bsdf_refraction_index_ambient(const vec3 position, const vec3 ray) {
-  if (device.toy.active && toy_is_inside(position, ray))
-    return device.toy.refractive_index;
-
   if (device.ocean.active && position.y < device.ocean.height)
     return device.ocean.refractive_index;
 

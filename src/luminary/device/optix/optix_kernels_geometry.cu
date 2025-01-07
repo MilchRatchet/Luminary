@@ -15,7 +15,6 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "shading_kernel.cuh"
-#include "toy_utils.cuh"
 #include "utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
@@ -32,10 +31,7 @@ extern "C" __global__ void __raygen__optix() {
     const uint32_t pixel                 = get_pixel_id(task.index);
 
     GBufferData data;
-    if (triangle_handle.instance_id == HIT_TYPE_TOY) {
-      data = toy_generate_g_buffer(task, pixel);
-    }
-    else if (triangle_handle.instance_id == HIT_TYPE_OCEAN) {
+    if (triangle_handle.instance_id == HIT_TYPE_OCEAN) {
       data = ocean_generate_g_buffer(task, pixel);
     }
     else {

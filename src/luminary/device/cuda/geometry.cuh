@@ -5,7 +5,6 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
-#include "toy_utils.cuh"
 
 LUMINARY_KERNEL void geometry_process_tasks_debug() {
   HANDLE_DEVICE_ABORT();
@@ -19,47 +18,6 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
     const uint32_t pixel           = get_pixel_id(task.index);
 
     switch (triangle_handle.instance_id) {
-      case HIT_TYPE_TOY: {
-        switch (device.settings.shading_mode) {
-          case LUMINARY_SHADING_MODE_ALBEDO: {
-            write_beauty_buffer_forced(opaque_color(device.toy.albedo), pixel);
-          } break;
-          case LUMINARY_SHADING_MODE_DEPTH: {
-            const float dist  = get_length(sub_vector(device.camera.pos, task.origin));
-            const float value = __saturatef((1.0f / dist) * 2.0f);
-            write_beauty_buffer_forced(get_color(value, value, value), pixel);
-          } break;
-          case LUMINARY_SHADING_MODE_NORMAL: {
-            vec3 normal = get_toy_normal(task.origin);
-
-            if (dot_product(normal, task.ray) > 0.0f) {
-              normal = scale_vector(normal, -1.0f);
-            }
-
-            normal.x = 0.5f * normal.x + 0.5f;
-            normal.y = 0.5f * normal.y + 0.5f;
-            normal.z = 0.5f * normal.z + 0.5f;
-
-            write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
-          } break;
-          case LUMINARY_SHADING_MODE_IDENTIFICATION: {
-            write_beauty_buffer_forced(get_color(1.0f, 0.63f, 0.0f), pixel);
-          } break;
-          case LUMINARY_SHADING_MODE_LIGHTS: {
-            RGBF color;
-            if (device.toy.emissive) {
-              color = get_color(100.0f, 100.0f, 100.0f);
-            }
-            else {
-              color = scale_color(opaque_color(device.toy.albedo), 0.1f);
-            }
-
-            write_beauty_buffer_forced(color, pixel);
-          } break;
-          default:
-            break;
-        }
-      } break;
       case HIT_TYPE_OCEAN: {
         switch (device.settings.shading_mode) {
           case LUMINARY_SHADING_MODE_DEPTH: {

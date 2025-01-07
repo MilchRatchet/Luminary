@@ -38,8 +38,6 @@ typedef LuminaryFog Fog;
 
 typedef LuminaryParticles Particles;
 
-typedef LuminaryToy Toy;
-
 typedef LuminaryMaterial Material;
 typedef LuminaryMaterialFlags MaterialFlags;
 

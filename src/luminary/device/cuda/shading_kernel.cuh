@@ -120,7 +120,6 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
-  visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
@@ -246,9 +245,7 @@ __device__ RGBF
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
-  visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, handle, index, compressed_ior));
-  visibility      = mul_color(visibility, optix_toy_shadowing(connection_point, sun_dir, sun_dist, compressed_ior));
   visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, sun_dist));
 
   if (is_underwater) {
@@ -296,119 +293,6 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   }
 
   return sun_light;
-}
-
-////////////////////////////////////////////////////////////////////
-// Lighting from Toy
-////////////////////////////////////////////////////////////////////
-
-__device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 index) {
-  const bool toy_visible = (device.toy.active && device.toy.emissive);
-
-  if (!toy_visible)
-    return get_color(0.0f, 0.0f, 0.0f);
-
-  const RGBF toy_emission = scale_color(device.toy.emission, device.toy.material.b);
-
-  if (color_importance(toy_emission) == 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
-
-  // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
-
-  ////////////////////////////////////////////////////////////////////
-  // Sample a direction using BSDF importance sampling
-  ////////////////////////////////////////////////////////////////////
-
-  bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
-  const vec3 dir_bsdf =
-    bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_TOY_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
-  RGBF light_bsdf = toy_emission;
-
-  bool is_refraction_bsdf;
-  const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
-  light_bsdf            = mul_color(light_bsdf, value_bsdf);
-
-  if (get_toy_distance(data.position, dir_bsdf) == FLT_MAX) {
-    light_bsdf = get_color(0.0f, 0.0f, 0.0f);
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Sample a direction in the sun's solid angle
-  ////////////////////////////////////////////////////////////////////
-
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_TOY_RAY, index);
-
-  const vec3 dir_solid_angle = toy_sample_ray(data.position, random);
-  RGBF light_solid_angle     = toy_emission;
-
-  bool is_refraction_solid_angle;
-  const RGBF value_solid_angle = bsdf_evaluate(data, dir_solid_angle, BSDF_SAMPLING_GENERAL, is_refraction_solid_angle, 1.0f);
-  light_solid_angle            = mul_color(light_solid_angle, value_solid_angle);
-
-  ////////////////////////////////////////////////////////////////////
-  // Resampled Importance Sampling
-  ////////////////////////////////////////////////////////////////////
-
-  const float solid_angle = toy_get_solid_angle(data.position);
-
-  const float target_pdf_bsdf        = color_importance(light_bsdf);
-  const float target_pdf_solid_angle = color_importance(light_solid_angle);
-
-  // MIS weight multiplied with PDF
-  const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
-  const float mis_weight_solid_angle = solid_angle / (bsdf_sample_for_light_pdf(data, dir_solid_angle) * solid_angle + 1.0f);
-
-  const float weight_bsdf        = target_pdf_bsdf * mis_weight_bsdf;
-  const float weight_solid_angle = target_pdf_solid_angle * mis_weight_solid_angle;
-
-  const float sum_weights = weight_bsdf + weight_solid_angle;
-
-  float target_pdf;
-  vec3 dir;
-  RGBF light_color;
-  bool is_refraction;
-  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_SUN_RIS_RESAMPLING, index) * sum_weights < weight_bsdf) {
-    dir           = dir_bsdf;
-    target_pdf    = target_pdf_bsdf;
-    light_color   = light_bsdf;
-    is_refraction = is_refraction_bsdf;
-  }
-  else {
-    dir           = dir_solid_angle;
-    target_pdf    = target_pdf_solid_angle;
-    light_color   = light_solid_angle;
-    is_refraction = is_refraction_solid_angle;
-  }
-
-  light_color = scale_color(light_color, sum_weights / target_pdf);
-
-  ////////////////////////////////////////////////////////////////////
-  // Compute Visibility
-  ////////////////////////////////////////////////////////////////////
-
-  const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
-
-  float dist = get_toy_distance(position, dir);
-
-  if (target_pdf == 0.0f) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-  }
-
-  // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-  }
-
-  const TriangleHandle handle = triangle_handle_get(LIGHT_ID_TOY, 0);
-  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
-
-  return mul_color(light_color, visibility);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -480,7 +364,6 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, light_handle, index, compressed_ior);
-  visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   light_color = mul_color(light_color, visibility);
@@ -525,7 +408,6 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
   sky_light = mul_color(sky_light, optix_geometry_shadowing(position, ray, FLT_MAX, handle, index, compressed_ior));
-  sky_light = mul_color(sky_light, optix_toy_shadowing(position, ray, FLT_MAX, compressed_ior));
   sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
   sky_light = mul_color(sky_light, sample_weight);
 

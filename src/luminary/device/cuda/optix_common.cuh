@@ -1,9 +1,9 @@
 #ifndef CU_LUMINARY_OPTIX_COMMON_H
 #define CU_LUMINARY_OPTIX_COMMON_H
 
+#include "ior_stack.cuh"
 #include "memory.cuh"
 #include "optix_utils.cuh"
-#include "toy_utils.cuh"
 #include "utils.cuh"
 
 enum OptixAlphaResult {
@@ -94,40 +94,6 @@ __device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort
   }
 
   return false;
-}
-
-__device__ RGBF optix_toy_shadowing(const vec3 position, const vec3 dir, const float dist, unsigned int& compressed_ior) {
-  if (device.toy.active) {
-    const float toy_dist = get_toy_distance(position, dir);
-
-    if (toy_dist < dist) {
-      RGBF toy_transparency = scale_color(opaque_color(device.toy.albedo), 1.0f - device.toy.albedo.a);
-
-      if (color_importance(toy_transparency) == 0.0f)
-        return get_color(0.0f, 0.0f, 0.0f);
-
-      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
-      toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
-
-      const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
-
-      bool two_hits = false;
-      if (toy_dist2 < dist) {
-        toy_transparency = mul_color(toy_transparency, toy_transparency);
-        two_hits         = true;
-      }
-
-      if (!two_hits) {
-        // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
-        compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
-      }
-
-      return toy_transparency;
-    }
-  }
-
-  return get_color(1.0f, 1.0f, 1.0f);
 }
 
 __device__ RGBAF optix_get_albedo_with_ior_check(const TriangleHandle handle, const uint32_t material_id, const unsigned int ray_ior) {

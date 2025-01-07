@@ -28,8 +28,7 @@ enum HitType : uint32_t {
   HIT_TYPE_INVALID           = 0xFFFFFFFFu,  // TODO: Shift all values so that invalid is all bits set
   HIT_TYPE_SKY               = 0xffffffffu,
   HIT_TYPE_OCEAN             = 0xfffffffeu,
-  HIT_TYPE_TOY               = 0xfffffffdu,
-  HIT_TYPE_PARTICLE          = 0xfffffffcu,
+  HIT_TYPE_PARTICLE          = 0xfffffffdu,
   HIT_TYPE_VOLUME_OCEAN      = 0xfffffff3u,
   HIT_TYPE_VOLUME_FOG        = 0xfffffff2u,
   HIT_TYPE_REJECT            = 0xfffffff0u,

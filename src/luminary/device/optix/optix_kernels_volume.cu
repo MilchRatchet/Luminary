@@ -60,7 +60,6 @@ extern "C" __global__ void __raygen__optix() {
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
     accumulated_light = add_color(
       accumulated_light,
       optix_compute_light_ray_ambient_sky(data, bounce_ray, bounce_info.weight, bounce_info.is_transparent_pass, task.index));

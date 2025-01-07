@@ -3,7 +3,6 @@
 
 #include "memory.cuh"
 #include "ocean_utils.cuh"
-#include "toy_utils.cuh"
 #include "utils.cuh"
 
 __device__ float trace_preprocess(const DeviceTask task, TriangleHandle& handle_result) {
@@ -41,15 +40,6 @@ __device__ float trace_preprocess(const DeviceTask task, TriangleHandle& handle_
         depth         = tri_dist;
         handle_result = handle;
       }
-    }
-  }
-
-  if (device.toy.active) {
-    const float toy_dist = get_toy_distance(task.origin, task.ray);
-
-    if (toy_dist < depth) {
-      depth                     = toy_dist;
-      handle_result.instance_id = HIT_TYPE_TOY;
     }
   }
 

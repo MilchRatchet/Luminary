@@ -16,7 +16,6 @@ struct LumFileContent {
   Cloud cloud;
   Fog fog;
   Particles particles;
-  Toy toy;
   ARRAY MeshInstance* instances;
 } typedef LumFileContent;
 

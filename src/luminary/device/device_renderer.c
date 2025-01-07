@@ -272,8 +272,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   bool is_gbuffer_meta_query = (sample_count->current_sample_count == 0);
 
   if (is_gbuffer_meta_query) {
-    const uint32_t undersampling_stage     = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
-    const uint32_t undersampling_iteration = (device->undersampling_state & UNDERSAMPLING_ITERATION_MASK);
+    const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
     // Query only if enough samples have been computed after this iteration.
     if (undersampling_stage > (1 + device->constant_memory->settings.supersampling)) {

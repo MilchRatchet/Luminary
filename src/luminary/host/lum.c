@@ -12,7 +12,6 @@
 #include "particles.h"
 #include "settings.h"
 #include "sky.h"
-#include "toy.h"
 #include "utils.h"
 
 #define LINE_SIZE 4096
@@ -34,7 +33,6 @@ LuminaryResult lum_content_create(LumFileContent** _content) {
   __FAILURE_HANDLE(cloud_get_default(&content->cloud));
   __FAILURE_HANDLE(fog_get_default(&content->fog));
   __FAILURE_HANDLE(particles_get_default(&content->particles));
-  __FAILURE_HANDLE(toy_get_default(&content->toy));
 
   __FAILURE_HANDLE(wavefront_arguments_get_default(&content->wavefront_args));
 

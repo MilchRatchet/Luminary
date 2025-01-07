@@ -109,9 +109,6 @@ LUMINARY_API LuminaryResult luminary_host_set_fog(LuminaryHost* host, LuminaryFo
 LUMINARY_API LuminaryResult luminary_host_get_particles(LuminaryHost* host, LuminaryParticles* particles);
 LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, LuminaryParticles* particles);
 
-LUMINARY_API LuminaryResult luminary_host_get_toy(LuminaryHost* host, LuminaryToy* toy);
-LUMINARY_API LuminaryResult luminary_host_set_toy(LuminaryHost* host, LuminaryToy* toy);
-
 LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
 LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
 

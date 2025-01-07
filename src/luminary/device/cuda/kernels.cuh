@@ -206,7 +206,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   uint16_t particle_task_count = 0;
   uint16_t sky_task_count      = 0;
   uint16_t ocean_task_count    = 0;
-  uint16_t toy_task_count      = 0;
   uint16_t volume_task_count   = 0;
 
   // count data
@@ -220,9 +219,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     else if (instance_id == HIT_TYPE_OCEAN) {
       ocean_task_count++;
     }
-    else if (instance_id == HIT_TYPE_TOY) {
-      toy_task_count++;
-    }
     else if (VOLUME_HIT_CHECK(instance_id)) {
       volume_task_count++;
     }
@@ -235,8 +231,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   }
 
   uint32_t geometry_offset = 0;
-  uint32_t toy_offset      = geometry_offset + geometry_task_count;
-  uint32_t ocean_offset    = toy_offset + toy_task_count;
+  uint32_t ocean_offset    = geometry_offset + geometry_task_count;
   uint32_t volume_offset   = ocean_offset + ocean_task_count;
   uint32_t particle_offset = volume_offset + volume_task_count;
   uint32_t sky_offset      = particle_offset + particle_task_count;
@@ -250,8 +245,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   const uint32_t num_tasks               = rejects_offset;
   const uint32_t initial_geometry_offset = 0;
-  const uint32_t initial_toy_offset      = initial_geometry_offset + geometry_task_count;
-  const uint32_t initial_ocean_offset    = initial_toy_offset + toy_task_count;
+  const uint32_t initial_ocean_offset    = initial_geometry_offset + geometry_task_count;
   const uint32_t initial_volume_offset   = initial_ocean_offset + ocean_task_count;
   const uint32_t initial_particle_offset = initial_volume_offset + volume_task_count;
   const uint32_t initial_sky_offset      = initial_particle_offset + particle_task_count;
@@ -270,13 +264,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
       needs_swapping = k >= geometry_task_count + initial_geometry_offset;
       if (needs_swapping || k >= geometry_offset) {
         geometry_offset++;
-      }
-    }
-    else if (instance_id == HIT_TYPE_TOY) {
-      index          = toy_offset;
-      needs_swapping = (k < initial_toy_offset) || (k >= toy_task_count + initial_toy_offset);
-      if (needs_swapping || k >= toy_offset) {
-        toy_offset++;
       }
     }
     else if (instance_id == HIT_TYPE_OCEAN) {
@@ -344,7 +331,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     }
   }
 
-  const uint16_t geometry_kernel_task_count = geometry_task_count + toy_task_count + ocean_task_count;
+  const uint16_t geometry_kernel_task_count = geometry_task_count + ocean_task_count;
 
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY]   = geometry_kernel_task_count;
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]     = volume_task_count;

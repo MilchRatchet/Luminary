@@ -461,7 +461,6 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   __FAILURE_HANDLE(luminary_host_set_cloud(host, &content->cloud));
   __FAILURE_HANDLE(luminary_host_set_fog(host, &content->fog));
   __FAILURE_HANDLE(luminary_host_set_particles(host, &content->particles));
-  __FAILURE_HANDLE(luminary_host_set_toy(host, &content->toy));
 
   __FAILURE_HANDLE(lum_content_destroy(&content));
 
@@ -634,24 +633,6 @@ LuminaryResult luminary_host_set_particles(Host* host, Particles* particles) {
   __CHECK_NULL_ARGUMENT(particles);
 
   __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) particles, SCENE_ENTITY_PARTICLES));
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult luminary_host_get_toy(Host* host, Toy* toy) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(toy);
-
-  __FAILURE_HANDLE(scene_get(host->scene_caller, toy, SCENE_ENTITY_TOY));
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult luminary_host_set_toy(Host* host, Toy* toy) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(toy);
-
-  __FAILURE_HANDLE(_host_set_scene_entity(host, (void*) toy, SCENE_ENTITY_TOY));
 
   return LUMINARY_SUCCESS;
 }

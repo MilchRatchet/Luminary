@@ -35,7 +35,6 @@
 #define DEPTH_INVALID -1.0f
 
 #define LIGHT_ID_SUN (0xffffffffu)
-#define LIGHT_ID_TOY (0xfffffffeu)
 #define LIGHT_ID_NONE (0xfffffff1u)
 #define LIGHT_ID_ANY (0xfffffff0u)
 #define LIGHT_ID_TRIANGLE_ID_LIMIT (0x7fffffffu)

@@ -450,7 +450,7 @@ __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint
 
   const IORStackMethod ior_stack_method =
     (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(device.toy.refractive_index, pixel, ior_stack_method);
+  const float ray_ior = ior_stack_interact(device.ocean.refractive_index, pixel, ior_stack_method);
 
   // We clamp the roughness to avoid caustics which would never clean up.
   float roughness = 0.045f;

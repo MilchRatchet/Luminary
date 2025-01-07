@@ -668,58 +668,6 @@ static LuminaryResult parse_particle_settings(Particles* particle, char* line) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult parse_toy_settings(Toy* toy, char* line) {
-  const uint64_t key = *((uint64_t*) line);
-  char* value        = line + 9;
-  uint32_t bool_uint = 0;
-
-  switch (key) {
-    /* ACTIVE__ */
-    case 6872287793290429249u:
-      sscanf(value, "%u\n", &bool_uint);
-      toy->active = bool_uint;
-      break;
-    /* POSITION */
-    case 5642809484474797904u:
-      sscanf(value, "%f %f %f\n", &toy->position.x, &toy->position.y, &toy->position.z);
-      break;
-    /* ROTATION */
-    case 5642809484340645714u:
-      sscanf(value, "%f %f %f\n", &toy->rotation.x, &toy->rotation.y, &toy->rotation.z);
-      break;
-    /* SCALE__ */
-    case 6872316307627393875u:
-      sscanf(value, "%f\n", &toy->scale);
-      break;
-    /* COLOR___ */
-    case 6872316363513024323u:
-      sscanf(value, "%f %f %f %f\n", &toy->albedo.r, &toy->albedo.g, &toy->albedo.b, &toy->albedo.a);
-      break;
-    /* MATERIAL */
-    case 5494753638068011341u:
-      sscanf(value, "%f %f %f\n", &toy->material.r, &toy->material.g, &toy->material.b);
-      break;
-    /* EMISSION */
-    case 5642809480346946885u:
-      sscanf(value, "%f %f %f\n", &toy->emission.r, &toy->emission.g, &toy->emission.b);
-      break;
-    /* EMISSIVE */
-    case 4996261458842570053u:
-      sscanf(value, "%u\n", &bool_uint);
-      toy->emissive = bool_uint;
-      break;
-    /* REFRACT_ */
-    case 6869189279479121234u:
-      sscanf(value, "%f\n", &toy->refractive_index);
-      break;
-    default:
-      warn_message("%8.8s (%zu) is not a valid TOY setting.", line, key);
-      break;
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
   char* line;
 
@@ -755,7 +703,7 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
       __FAILURE_HANDLE(parse_particle_settings(&content->particles, line + 8 + 1));
     }
     else if (line[0] == 'T') {
-      __FAILURE_HANDLE(parse_toy_settings(&content->toy, line + 3 + 1));
+      // Legacy toy settings
     }
     else if (line[0] == '#' || line[0] == 10) {
       // Comment

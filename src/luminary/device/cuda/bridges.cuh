@@ -307,7 +307,6 @@ __device__ RGBF bridges_evaluate_bridge(
 
   light_color =
     mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel, compressed_ior));
-  light_color = mul_color(light_color, optix_toy_shadowing(current_vertex, current_direction, dist, compressed_ior));
 
   sum_dist += dist;
 
@@ -324,7 +323,6 @@ __device__ RGBF bridges_evaluate_bridge(
 
     light_color =
       mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel, compressed_ior));
-    light_color = mul_color(light_color, optix_toy_shadowing(current_vertex, current_direction, dist, compressed_ior));
 
     sum_dist += dist;
   }
