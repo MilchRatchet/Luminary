@@ -359,4 +359,18 @@ __device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
   return node;
 }
 
+__device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
+  const float4* ptr = (float4*) (device.ptrs.textures + offset);
+  const float4 v0   = __ldg(ptr + 0);
+
+  union {
+    float4 data;
+    DeviceTextureObject tex;
+  } float4_to_tex_converter;
+
+  float4_to_tex_converter.data = v0;
+
+  return float4_to_tex_converter.tex;
+}
+
 #endif /* CU_MEMORY_H */

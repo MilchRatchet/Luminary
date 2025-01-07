@@ -113,7 +113,7 @@ __device__ RGBAF optix_get_albedo_with_ior_check(const TriangleHandle handle, co
   if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
-    const float4 tex_value = tex2D<float4>(device.ptrs.textures[tex].handle, uv.u, 1.0f - uv.v);
+    const float4 tex_value = tex2D<float4>(load_texture_object(tex).handle, uv.u, 1.0f - uv.v);
 
     RGBAF albedo;
     albedo.r = tex_value.x;

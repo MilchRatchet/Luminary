@@ -15,7 +15,7 @@ __device__ vec3 geometry_compute_normal(
   is_inside        = dot_product(face_normal, ray) > 0.0f;
 
   if (normal_tex != TEXTURE_NONE) {
-    const float4 normal_f = texture_load(device.ptrs.textures[normal_tex], tex_coords);
+    const float4 normal_f = texture_load(load_texture_object(normal_tex), tex_coords);
 
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
@@ -96,7 +96,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
 
   RGBAF albedo = mat.albedo;
   if (mat.albedo_tex != TEXTURE_NONE) {
-    const float4 albedo_f = texture_load(device.ptrs.textures[mat.albedo_tex], tex_coords);
+    const float4 albedo_f = texture_load(load_texture_object(mat.albedo_tex), tex_coords);
     albedo.r              = albedo_f.x;
     albedo.g              = albedo_f.y;
     albedo.b              = albedo_f.z;
@@ -107,7 +107,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
 
   RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
   if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
-    const float4 luminance_f = texture_load(device.ptrs.textures[mat.luminance_tex], tex_coords);
+    const float4 luminance_f = texture_load(load_texture_object(mat.luminance_tex), tex_coords);
 
     emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
     emission = scale_color(emission, luminance_f.w * albedo.a);
@@ -116,7 +116,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   float roughness = mat.roughness;
   float metallic  = mat.metallic;
   if (mat.material_tex != TEXTURE_NONE) {
-    const float4 material_f = texture_load(device.ptrs.textures[mat.material_tex], tex_coords);
+    const float4 material_f = texture_load(load_texture_object(mat.material_tex), tex_coords);
 
     roughness = material_f.x;
     metallic  = material_f.y;

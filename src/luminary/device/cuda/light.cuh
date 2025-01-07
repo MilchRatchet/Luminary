@@ -160,7 +160,7 @@ __device__ RGBF light_get_color(const TriangleLight triangle) {
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
   if (mat.luminance_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(device.ptrs.textures[mat.luminance_tex], triangle.tex_coords);
+    const float4 emission = texture_load(load_texture_object(mat.luminance_tex), triangle.tex_coords);
 
     color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
   }
@@ -171,7 +171,7 @@ __device__ RGBF light_get_color(const TriangleLight triangle) {
   if (color_importance(color) > 0.0f) {
     float alpha;
     if (mat.albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(device.ptrs.textures[mat.albedo_tex], triangle.tex_coords).w;
+      alpha = texture_load(load_texture_object(mat.albedo_tex), triangle.tex_coords).w;
     }
     else {
       alpha = mat.albedo.a;
@@ -539,7 +539,7 @@ __device__ float light_tree_query_pdf(const GBufferData data, const uint32_t lig
 ////////////////////////////////////////////////////////////////////
 
 __device__ float lights_integrate_emission(const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2) {
-  const DeviceTextureObject tex = device.ptrs.textures[material.luminance_tex];
+  const DeviceTextureObject tex = load_texture_object(material.luminance_tex);
 
   // Super crude way of determining the number of texel fetches I will need. If performance of this becomes an issue
   // then I will have to rethink this here.
