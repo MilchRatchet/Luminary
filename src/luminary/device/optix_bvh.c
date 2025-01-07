@@ -504,8 +504,6 @@ LuminaryResult optix_bvh_particles_build(OptixBVH* bvh, Device* device, const De
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(particles_handle);
 
-  // TODO: Particles crash if they are on at startup, this is caught here because the download of the compaction size is synchronized.
-
   __FAILURE_HANDLE(_optix_bvh_free(bvh));
 
   ////////////////////////////////////////////////////////////////////
@@ -523,7 +521,7 @@ LuminaryResult optix_bvh_particles_build(OptixBVH* bvh, Device* device, const De
   memset(&build_input, 0, sizeof(OptixBuildInput));
   build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-  const uint32_t vertex_count = particles_handle->count * 4;
+  const uint32_t vertex_count = particles_handle->count * 6;
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(particles_handle->vertex_buffer);
 
@@ -532,10 +530,10 @@ LuminaryResult optix_bvh_particles_build(OptixBVH* bvh, Device* device, const De
   build_input.triangleArray.numVertices         = vertex_count;
   build_input.triangleArray.vertexBuffers       = (vertex_count > 0) ? &device_vertex_buffer_ptr : (CUdeviceptr*) 0;
 
-  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_NONE;
   build_input.triangleArray.indexStrideInBytes = 0;
-  build_input.triangleArray.numIndexTriplets   = particles_handle->count * 2;
-  build_input.triangleArray.indexBuffer        = DEVICE_CUPTR(particles_handle->index_buffer);
+  build_input.triangleArray.numIndexTriplets   = 0;
+  build_input.triangleArray.indexBuffer        = (CUdeviceptr) 0;
 
   unsigned int inputFlags = 0;
   inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;

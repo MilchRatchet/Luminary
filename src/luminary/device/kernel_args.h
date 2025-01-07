@@ -52,7 +52,6 @@ struct KernelArgsParticleGenerate {
   float size;
   float size_variation;
   float4* vertex_buffer;
-  uint32_t* index_buffer;
   Quad* quads;
 } typedef KernelArgsParticleGenerate;
 

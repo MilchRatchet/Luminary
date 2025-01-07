@@ -10,7 +10,6 @@ struct DeviceParticlesHandle {
   uint32_t allocated_count;
   uint32_t count;
   DEVICE float* vertex_buffer;
-  DEVICE uint16_t* index_buffer;
   DEVICE Quad* quad_buffer;
   OptixBVH* bvh;
 } typedef DeviceParticlesHandle;

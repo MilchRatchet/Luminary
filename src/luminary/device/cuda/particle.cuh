@@ -93,17 +93,12 @@ LUMINARY_KERNEL void particle_generate(const KernelArgsParticleGenerate args) {
 
     args.quads[id] = quad;
 
-    __stcs(args.vertex_buffer + 4 * id + 0, f00);
-    __stcs(args.vertex_buffer + 4 * id + 1, f01);
-    __stcs(args.vertex_buffer + 4 * id + 2, f10);
-    __stcs(args.vertex_buffer + 4 * id + 3, f11);
-
-    args.index_buffer[id * 6 + 0] = id * 4 + 0;
-    args.index_buffer[id * 6 + 1] = id * 4 + 1;
-    args.index_buffer[id * 6 + 2] = id * 4 + 2;
-    args.index_buffer[id * 6 + 3] = id * 4 + 3;
-    args.index_buffer[id * 6 + 4] = id * 4 + 2;
-    args.index_buffer[id * 6 + 5] = id * 4 + 1;
+    __stcs(args.vertex_buffer + 6 * id + 0, f00);
+    __stcs(args.vertex_buffer + 6 * id + 1, f01);
+    __stcs(args.vertex_buffer + 6 * id + 2, f10);
+    __stcs(args.vertex_buffer + 6 * id + 3, f01);
+    __stcs(args.vertex_buffer + 6 * id + 4, f10);
+    __stcs(args.vertex_buffer + 6 * id + 5, f11);
 
     id += blockDim.x * gridDim.x;
   }

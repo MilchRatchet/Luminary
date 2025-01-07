@@ -29,16 +29,11 @@ LuminaryResult device_particles_handle_generate(DeviceParticlesHandle* particles
       __FAILURE_HANDLE(device_free(&particles_handle->vertex_buffer));
     }
 
-    if (particles_handle->index_buffer) {
-      __FAILURE_HANDLE(device_free(&particles_handle->index_buffer));
-    }
-
     if (particles_handle->quad_buffer) {
       __FAILURE_HANDLE(device_free(&particles_handle->quad_buffer));
     }
 
-    __FAILURE_HANDLE(device_malloc(&particles_handle->vertex_buffer, 4 * 4 * sizeof(float) * particles->count));
-    __FAILURE_HANDLE(device_malloc(&particles_handle->index_buffer, 6 * sizeof(uint16_t) * particles->count));
+    __FAILURE_HANDLE(device_malloc(&particles_handle->vertex_buffer, 6 * 4 * sizeof(float) * particles->count));
     __FAILURE_HANDLE(device_malloc(&particles_handle->quad_buffer, sizeof(Quad) * particles->count));
 
     particles_handle->allocated_count = particles->count;
@@ -53,7 +48,6 @@ LuminaryResult device_particles_handle_generate(DeviceParticlesHandle* particles
   args.size           = particles->size * 0.001f;
   args.size_variation = particles->size_variation;
   args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
-  args.index_buffer   = DEVICE_PTR(particles_handle->index_buffer);
   args.quads          = DEVICE_PTR(particles_handle->quad_buffer);
 
   __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
@@ -71,10 +65,6 @@ LuminaryResult device_particles_handle_destroy(DeviceParticlesHandle** particles
 
   if ((*particles_handle)->vertex_buffer) {
     __FAILURE_HANDLE(device_free(&(*particles_handle)->vertex_buffer));
-  }
-
-  if ((*particles_handle)->index_buffer) {
-    __FAILURE_HANDLE(device_free(&(*particles_handle)->index_buffer));
   }
 
   if ((*particles_handle)->quad_buffer) {
