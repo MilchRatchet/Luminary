@@ -2,6 +2,7 @@
 #define LUMINARY_DEVICE_H
 
 #include "device_bsdf.h"
+#include "device_cloud.h"
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
@@ -100,6 +101,7 @@ struct Device {
   DeviceRenderer* renderer;
   DeviceOutput* output;
   GBufferMetaState gbuffer_meta_state;
+  DeviceCloudNoise* cloud_noise;
 } typedef Device;
 
 void _device_init(void);
@@ -128,6 +130,7 @@ LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
 LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
+LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud);
 LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);

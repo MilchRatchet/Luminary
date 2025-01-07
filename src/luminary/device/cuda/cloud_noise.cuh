@@ -338,7 +338,7 @@ LUMINARY_KERNEL void cloud_compute_weather_noise(const KernelArgsCloudComputeWea
 
     perlin1 = remap01(2.0f * perlin1, 0.05, 1.0);
 
-    dst[x + y * args.dim] = make_uchar4(
+    dst[x + y * args.ld] = make_uchar4(
       __saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, __saturatef(perlin4) * 255.0f);
 
     id += blockDim.x * gridDim.x;

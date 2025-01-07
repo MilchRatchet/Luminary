@@ -205,14 +205,57 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension exceeds limits: %ux%u.", width, height);
   }
 
-  device_texture->memory = data_device;
-  device_texture->width  = width;
-  device_texture->height = height;
-  device_texture->gamma  = texture->gamma;
-  device_texture->is_3D  = (texture->dim == Tex3D);
-  device_texture->pitch  = pitch_gpu;
+  device_texture->memory     = data_device;
+  device_texture->width      = width;
+  device_texture->height     = height;
+  device_texture->depth      = depth;
+  device_texture->gamma      = texture->gamma;
+  device_texture->is_3D      = (texture->dim == Tex3D);
+  device_texture->pitch      = pitch_gpu;
+  device_texture->pixel_size = pixel_size;
 
   *_device_texture = device_texture;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_texture_copy_from_mem(DeviceTexture* device_texture, const DEVICE void* mem, CUstream stream) {
+  __CHECK_NULL_ARGUMENT(device_texture);
+  __CHECK_NULL_ARGUMENT(mem);
+
+  if (device_texture->is_3D) {
+    CUDA_MEMCPY3D memcpy_info;
+    memset(&memcpy_info, 0, sizeof(CUDA_MEMCPY3D));
+
+    memcpy_info.dstArray      = (CUarray) device_texture->memory;
+    memcpy_info.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+    memcpy_info.srcDevice     = DEVICE_CUPTR(mem);
+    memcpy_info.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+    memcpy_info.WidthInBytes  = device_texture->width * device_texture->pixel_size;
+    memcpy_info.Height        = device_texture->height;
+    memcpy_info.Depth         = device_texture->depth;
+
+    CUDA_FAILURE_HANDLE(cuMemcpy3DAsync(&memcpy_info, stream));
+  }
+  else {
+    CUDA_MEMCPY2D memcpy_info;
+    memset(&memcpy_info, 0, sizeof(CUDA_MEMCPY2D));
+
+    memcpy_info.dstDevice     = DEVICE_CUPTR(device_texture->memory);
+    memcpy_info.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+    memcpy_info.dstPitch      = device_texture->pitch;
+    memcpy_info.dstXInBytes   = 0;
+    memcpy_info.dstY          = 0;
+    memcpy_info.srcDevice     = DEVICE_CUPTR(mem);
+    memcpy_info.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+    memcpy_info.srcPitch      = device_texture->width * device_texture->pixel_size;
+    memcpy_info.srcXInBytes   = 0;
+    memcpy_info.srcY          = 0;
+    memcpy_info.WidthInBytes  = device_texture->width * device_texture->pixel_size;
+    memcpy_info.Height        = device_texture->height;
+
+    CUDA_FAILURE_HANDLE(cuMemcpy2DAsync(&memcpy_info, stream));
+  }
 
   return LUMINARY_SUCCESS;
 }

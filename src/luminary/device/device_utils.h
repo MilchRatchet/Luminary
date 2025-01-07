@@ -254,7 +254,6 @@ struct DevicePointers {
   DEVICE TriangleHandle* hit_id_history;
   DEVICE ARGB8* buffer_8bit;
   DEVICE const DeviceTextureObject* textures;
-  DEVICE const DeviceTextureObject* cloud_noise;
   DEVICE const uint16_t* bluenoise_1D;
   DEVICE const uint32_t* bluenoise_2D;
   DEVICE const float* bridge_lut;
@@ -296,7 +295,8 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX,
-  DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX,
+  DEVICE_CONSTANT_MEMORY_MEMBER_STATE,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 } typedef DeviceConstantMemoryMember;
@@ -342,6 +342,10 @@ struct DeviceConstantMemory {
   DeviceTextureObject bsdf_lut_glossy;
   DeviceTextureObject bsdf_lut_dielectric;
   DeviceTextureObject bsdf_lut_dielectric_inv;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  DeviceTextureObject cloud_noise_shape_tex;
+  DeviceTextureObject cloud_noise_detail_tex;
+  DeviceTextureObject cloud_noise_weather_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   DeviceExecutionState state;
 } typedef DeviceConstantMemory;

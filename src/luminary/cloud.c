@@ -10,7 +10,7 @@ LuminaryResult cloud_get_default(Cloud* cloud) {
   cloud->steps                 = 96;
   cloud->shadow_steps          = 8;
   cloud->atmosphere_scattering = true;
-  cloud->seed                  = 1;
+  cloud->seed                  = CLOUD_DEFAULT_SEED;
   cloud->offset_x              = 0.0f;
   cloud->offset_z              = 0.0f;
   cloud->noise_shape_scale     = 1.0f;

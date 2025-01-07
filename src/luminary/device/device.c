@@ -45,6 +45,7 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, sky_lut_transmission_low_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
+  offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
   offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
@@ -65,6 +66,7 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
+  sizeof(DeviceTextureObject) * 3,     // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
   sizeof(DeviceExecutionState)         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
@@ -595,7 +597,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(buffer_8bit);
   __DEVICE_BUFFER_FREE(hit_id_history);
   __DEVICE_BUFFER_FREE(textures);
-  __DEVICE_BUFFER_FREE(cloud_noise);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);
   __DEVICE_BUFFER_FREE(bridge_lut);
@@ -704,14 +705,22 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
 
+  ////////////////////////////////////////////////////////////////////
+  // Initialize processing objects
+  ////////////////////////////////////////////////////////////////////
+
   __FAILURE_HANDLE(device_renderer_create(&device->renderer));
   __FAILURE_HANDLE(device_output_create(&device->output));
+  __FAILURE_HANDLE(device_post_create(&device->post));
+
+  ////////////////////////////////////////////////////////////////////
+  // Initialize scene entity LUT objects
+  ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
   __FAILURE_HANDLE(device_bsdf_lut_create(&device->bsdf_lut));
-
-  __FAILURE_HANDLE(device_post_create(&device->post));
+  __FAILURE_HANDLE(device_cloud_noise_create(&device->cloud_noise, device));
 
   ////////////////////////////////////////////////////////////////////
   // Initialize abort flag
@@ -1201,6 +1210,26 @@ LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(cloud);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_cloud_noise_generate(device->cloud_noise, cloud, device));
+
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->cloud_noise->shape_tex, &device->constant_memory->cloud_noise_shape_tex));
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->cloud_noise->detail_tex, &device->constant_memory->cloud_noise_detail_tex));
+  __FAILURE_HANDLE(
+    device_struct_texture_object_convert(device->cloud_noise->weather_tex, &device->constant_memory->cloud_noise_weather_tex));
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_clear_lighting_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -1464,6 +1493,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));
   __FAILURE_HANDLE(device_bsdf_lut_destroy(&(*device)->bsdf_lut));
+  __FAILURE_HANDLE(device_cloud_noise_destroy(&(*device)->cloud_noise));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));

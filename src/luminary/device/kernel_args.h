@@ -31,6 +31,7 @@ struct KernelArgsCloudComputeWeatherNoise {
   uint32_t dim;
   float seed;
   uint8_t* tex;
+  uint32_t ld;
 } typedef KernelArgsCloudComputeWeatherNoise;
 
 struct KernelArgsSkyComputeTransmittanceLUT {

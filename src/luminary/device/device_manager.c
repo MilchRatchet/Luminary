@@ -272,6 +272,17 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     }
   }
 
+  if (flags & SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_CLOUD)) {
+    Cloud cloud;
+    __FAILURE_HANDLE_CRITICAL(scene_get(scene, &cloud, SCENE_ENTITY_CLOUD));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+
+      __FAILURE_HANDLE_CRITICAL(device_update_cloud_noise(device, &cloud));
+    }
+  }
+
   if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
     __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_material_updates(device_manager));
   }
