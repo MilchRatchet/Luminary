@@ -441,7 +441,6 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   ////////////////////////////////////////////////////////////////////
 
   OptixAccelBufferSizes buffer_sizes;
-
   OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, &build_input, 1, &buffer_sizes));
 
   DEVICE void* temp_buffer;
@@ -496,8 +495,6 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   __FAILURE_HANDLE(device_free(&device_vertex_buffer));
 
   bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
-
-  return LUMINARY_SUCCESS;
 
   return LUMINARY_SUCCESS;
 }

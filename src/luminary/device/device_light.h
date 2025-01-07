@@ -14,7 +14,7 @@ struct LightTreeFragment {
   uint32_t instance_id;
   uint32_t tri_id;
   float power;
-  uint32_t padding;
+  uint32_t instance_cache_tri_id;
 } typedef LightTreeFragment;
 LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x40);
 
@@ -31,7 +31,7 @@ struct LightTreeCacheMesh {
   uint32_t instance_count;
   bool has_emission;
   ARRAY uint16_t* materials;
-  ARRAY LightTreeCacheTriangle* ARRAY* triangles;
+  ARRAY LightTreeCacheTriangle* ARRAY* material_triangles;
 } typedef LightTreeCacheMesh;
 
 struct LightTreeBVHTriangle {

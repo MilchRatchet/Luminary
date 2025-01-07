@@ -152,7 +152,9 @@ void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
   display->mouse_mode = mouse_mode;
 
   // Invalidate the result
-  display->pixel_query_result.pixel_query_is_valid = false;
+  if (mouse_mode == DISPLAY_MOUSE_MODE_FOCUS_CAMERA) {
+    display->pixel_query_result.pixel_query_is_valid = false;
+  }
 
   _display_set_hittest(display, (mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
 }

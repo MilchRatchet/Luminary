@@ -168,7 +168,7 @@ static bool _window_entity_properties_renderer_settings_action(
   update_data |= _window_entity_properties_add_slider(
     data, "Num Light RIS Samples", &settings.light_num_ris_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Num Light Rays", &settings.light_num_rays, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 31.0f, 1.0f);
+    data, "Num Light Rays", &settings.light_num_rays, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 31.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
     data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 15.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
