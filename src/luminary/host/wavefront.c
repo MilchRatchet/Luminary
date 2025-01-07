@@ -361,9 +361,9 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
 
       float emission[3];
       if (read_float_line(value, 3, emission) == 3) {
-        content->materials[current_material_ptr].emission.r = emission[0];
-        content->materials[current_material_ptr].emission.g = emission[1];
-        content->materials[current_material_ptr].emission.b = emission[2];
+        content->materials[current_material_ptr].emission.r = emission[0] * content->args.emission_scale;
+        content->materials[current_material_ptr].emission.g = emission[1] * content->args.emission_scale;
+        content->materials[current_material_ptr].emission.b = emission[2] * content->args.emission_scale;
       }
       else {
         warn_message("Expected three values in emission in *.mtl file but didn't find three numbers. Line: %s.", line);
@@ -736,37 +736,6 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
   uint32_t texture_count;
   __FAILURE_HANDLE(array_get_num_elements(content->texture_instances, &texture_count));
 
-  // TODO: This is the old WavefrontMaterial -> PackedMaterial code. Port this to Material -> PackedMaterial and make a function out of
-  // that.
-#if 0
-  for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
-    RGBF emission                 = content->materials[mat_id].emission;
-    const uint16_t emission_scale = (uint16_t) fminf(fmaxf(fmaxf(emission.r, emission.g), emission.b) + 1.0f, (float) 0xFFFF);
-    emission.r /= (float) emission_scale;
-    emission.g /= (float) emission_scale;
-    emission.b /= (float) emission_scale;
-
-    PackedMaterial mat;
-    mat.refraction_index = content->materials[mat_id].refraction_index;
-    mat.albedo_r         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].diffuse_reflectivity.r);
-    mat.albedo_g         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].diffuse_reflectivity.g);
-    mat.albedo_b         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].diffuse_reflectivity.b);
-    mat.albedo_a         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].dissolve);
-    mat.emission_r       = _wavefront_convert_float01_to_uint16(emission.r);
-    mat.emission_g       = _wavefront_convert_float01_to_uint16(emission.g);
-    mat.emission_b       = _wavefront_convert_float01_to_uint16(emission.b);
-    mat.emission_scale   = emission_scale;
-    mat.metallic         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].specular_reflectivity.r);
-    mat.roughness        = _wavefront_convert_float01_to_uint16(1.0f - content->materials[mat_id].specular_exponent / 1000.0f);
-    mat.albedo_tex       = content->materials[mat_id].texture[WF_ALBEDO];
-    mat.luminance_tex    = content->materials[mat_id].texture[WF_LUMINANCE];
-    mat.material_tex     = content->materials[mat_id].texture[WF_MATERIAL];
-    mat.normal_tex       = content->materials[mat_id].texture[WF_NORMAL];
-
-    materials[mat_id] = mat;
-  }
-#endif
-
   for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
     const WavefrontTextureInstance instance = content->texture_instances[tex_id];
     const Texture* tex                      = content->textures[instance.texture_id];
@@ -790,7 +759,7 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
     mat.albedo.a                   = wavefront_mat.dissolve;
     mat.emission                   = wavefront_mat.emission;
-    mat.emission_scale             = 1.0f;
+    mat.emission_scale             = content->args.emission_scale;
     mat.refraction_index           = wavefront_mat.refraction_index;
     mat.metallic                   = wavefront_mat.specular_reflectivity.r;
     mat.roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
@@ -1068,6 +1037,7 @@ LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments) {
 
   arguments->legacy_smoothness         = false;
   arguments->force_transparency_cutout = false;
+  arguments->emission_scale            = 1.0f;
 
   return LUMINARY_SUCCESS;
 }

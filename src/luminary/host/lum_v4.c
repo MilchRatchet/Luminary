@@ -10,6 +10,7 @@ struct LegacyLumFileSettings {
   bool legacy_smoothness;
   bool force_transparency_cutout;
   bool force_thin_walled;
+  float emission_scale;
 } typedef LegacyLumFileSettings;
 
 static LuminaryResult parse_general_settings(
@@ -96,10 +97,12 @@ static void parse_material_settings(LegacyLumFileSettings* settings, char* line)
     case 4848490364238316877u:
       sscanf(value, "%f\n", &material->default_material.g);
       break;
+#endif
     /* EMISSION */
     case 5642809480346946885u:
-      sscanf(value, "%f\n", &material->default_material.b);
+      sscanf(value, "%f\n", &settings->emission_scale);
       break;
+#if 0
     /* ALPHACUT */
     case 6076837219871509569u:
       sscanf(value, "%f\n", &material->alpha_cutoff);
@@ -673,7 +676,8 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
 
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
 
-  LegacyLumFileSettings legacy_settings = {.legacy_smoothness = false, .force_transparency_cutout = false, .force_thin_walled = false};
+  LegacyLumFileSettings legacy_settings = {
+    .legacy_smoothness = false, .force_transparency_cutout = false, .force_thin_walled = false, .emission_scale = 1.0f};
 
   while (1) {
     fgets(line, LINE_SIZE, file);
@@ -718,6 +722,7 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
 
   content->wavefront_args.legacy_smoothness         = legacy_settings.legacy_smoothness;
   content->wavefront_args.force_transparency_cutout = legacy_settings.force_transparency_cutout;
+  content->wavefront_args.emission_scale            = legacy_settings.emission_scale;
 
   __FAILURE_HANDLE(host_free(&line));
 

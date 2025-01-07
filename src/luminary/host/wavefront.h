@@ -65,6 +65,7 @@ struct WavefrontTextureInstance {
 struct WavefrontArguments {
   bool legacy_smoothness;
   bool force_transparency_cutout;
+  float emission_scale;
 } typedef WavefrontArguments;
 
 enum WavefrontContentState {
