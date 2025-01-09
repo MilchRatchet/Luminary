@@ -31,7 +31,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const uint32_t pixel = get_pixel_id(task.index);
 
-    if (!(task.state & STATE_FLAG_DELTA_PATH))
+    if ((task.state & STATE_FLAG_DELTA_PATH) == 0)
       continue;
 
     float start            = FLT_MAX;

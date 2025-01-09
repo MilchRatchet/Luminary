@@ -8,8 +8,8 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->width                      = 1920;
   settings->height                     = 1080;
   settings->max_ray_depth              = 4;
-  settings->bridge_max_num_vertices    = 1;
-  settings->bridge_num_ris_samples     = 8;
+  settings->bridge_max_num_vertices    = 8;
+  settings->bridge_num_ris_samples     = 16;
   settings->light_num_ris_samples      = 16;
   settings->light_num_rays             = 1;
   settings->use_opacity_micromaps      = false;

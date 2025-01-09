@@ -155,6 +155,38 @@ __device__ void light_load_sample_finalize(
   triangle.tex_coords      = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }
 
+__device__ void light_load_sample_finalize_bridges(
+  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist, float& area) {
+  const float r1 = sqrtf(random.x);
+  const float r2 = random.y;
+
+  float2 uv;
+  uv.x = 1.0f - r1;
+  uv.y = r1 * r2;
+
+  const vec3 point_on_light =
+    add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
+
+  area = get_length(cross_product(triangle.edge1, triangle.edge2)) * 0.5f;
+
+  ray = normalize_vector(sub_vector(point_on_light, origin));
+
+  float2 coords;
+  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
+
+  // Our ray does not actually hit the light, abort.
+  if (dist == FLT_MAX) {
+    area = 0.0f;
+    dist = 1.0f;
+    return;
+  }
+
+  const UV vertex_texture  = uv_unpack(packed_light_data.x);
+  const UV vertex1_texture = uv_unpack(packed_light_data.y);
+  const UV vertex2_texture = uv_unpack(packed_light_data.z);
+  triangle.tex_coords      = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
+}
+
 __device__ RGBF light_get_color(const TriangleLight triangle) {
   RGBF color;
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);

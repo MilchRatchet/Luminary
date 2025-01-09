@@ -241,8 +241,8 @@ __device__ RGBF bridges_sample_bridge(
 
 // TODO: Check if I can maybe get rid of all these duplicate computations and just reuse what I computed in the RIS step.
 __device__ RGBF bridges_evaluate_bridge(
-  const DeviceTask task, const VolumeDescriptor volume, const vec3 initial_vertex, const TriangleHandle light_handle, const uint32_t seed,
-  const Quaternion rotation, const float scale, const RGBF initial_vertex_transmittance, const float ior, const ushort2 pixel) {
+  const DeviceTask task, const VolumeDescriptor volume, const TriangleHandle light_handle, const uint32_t seed, const Quaternion rotation,
+  const float scale, const float ior, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Get light sample
   ////////////////////////////////////////////////////////////////////
@@ -258,8 +258,8 @@ __device__ RGBF bridges_evaluate_bridge(
     const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + seed, pixel);
 
     vec3 light_dir;
-    float light_dist, solid_angle;
-    light_load_sample_finalize(light, light_packed_uv, initial_vertex, random_light_point, light_dir, light_dist, solid_angle);
+    float light_dist, area;
+    light_load_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
 
     light_color  = light_get_color(light);
     light_vector = scale_vector(light_dir, light_dist);
@@ -268,8 +268,6 @@ __device__ RGBF bridges_evaluate_bridge(
     light_color  = get_color(0.0f, 0.0f, 0.0f);
     light_vector = get_vector(0.0f, 0.0f, 1.0f);
   }
-
-  light_color = mul_color(light_color, initial_vertex_transmittance);
 
   ////////////////////////////////////////////////////////////////////
   // Get sampled vertex count
@@ -288,7 +286,7 @@ __device__ RGBF bridges_evaluate_bridge(
   // Compute visibility of path
   ////////////////////////////////////////////////////////////////////
 
-  vec3 current_vertex            = initial_vertex;
+  vec3 current_vertex            = task.origin;
   vec3 current_direction_sampled = normalize_vector(light_vector);
   vec3 current_direction         = quaternion_apply(rotation, current_direction_sampled);
 
@@ -334,153 +332,12 @@ __device__ RGBF bridges_evaluate_bridge(
   return light_color;
 }
 
-__device__ float bridges_sample_initial_vertex_target_pdf(
-  const DeviceTask task, const VolumeDescriptor volume, const TriangleLight light, const vec3 light_center, const float t) {
-  RGBF weight;
-
-  weight.r = expf(-t * (volume.scattering.r + volume.absorption.r));
-  weight.g = expf(-t * (volume.scattering.g + volume.absorption.g));
-  weight.b = expf(-t * (volume.scattering.b + volume.absorption.b));
-
-  weight = mul_color(weight, volume.scattering);
-
-  const vec3 sample_point = add_vector(task.origin, scale_vector(task.ray, t));
-
-  const float solid_angle = light_get_solid_angle(light, sample_point);
-
-  weight = scale_color(weight, solid_angle);
-
-  const float cos_angle = dot_product(task.ray, normalize_vector(sub_vector(light_center, sample_point)));
-
-  const float phase_function_weight = bridges_phase_function(cos_angle);
-
-  weight = scale_color(weight, phase_function_weight);
-
-  return color_importance(weight);
-}
-
-__device__ float bridges_initial_vertex_uniform_sample(const float uniform_min, const float uniform_max, const float random) {
-  return uniform_min + random * (uniform_max - uniform_min);
-}
-
-__device__ float bridges_initial_vertex_uniform_sample_pdf(const float uniform_min, const float uniform_max, const float t) {
-  if (t > uniform_max || t < uniform_min)
-    return 0.0f;
-
-  return 1.0f / (uniform_max - uniform_min);
-}
-
-__device__ float2 bridges_initial_vertex_uniform_sample_bounds(
-  const DeviceTask task, const float limit, const TriangleLight light, const vec3 light_center, const ushort2 pixel) {
-  const float light_center_dist = dot_product(sub_vector(light_center, task.origin), task.ray);
-
-  const float uniform_min = 0.0f;
-  const float uniform_max = fmaxf(fminf(light_center_dist, limit), 0.0f);
-
-  return make_float2(uniform_min, uniform_max);
-}
-
-__device__ vec3 bridges_sample_initial_vertex(
-  const DeviceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const uint32_t seed,
-  const ushort2 pixel, float& pdf, RGBF& transmittance) {
-  pdf           = 1.0f;
-  transmittance = get_color(0.0f, 0.0f, 0.0f);
-
-  float selected_target_pdf = 1.0f;
-  float selected_t          = -FLT_MAX;
-
-  const vec3 light_center = add_vector(light.vertex, scale_vector(add_vector(light.edge1, light.edge2), 0.33f));
-
-  const float2 uniform_bounds = bridges_initial_vertex_uniform_sample_bounds(task, limit, light, light_center, pixel);
-  const float uniform_min     = uniform_bounds.x;
-  const float uniform_max     = uniform_bounds.y;
-
-  float sum_weight = 0.0f;
-
-  const uint32_t uniform_sample_count  = 60;
-  const uint32_t distance_sample_count = 4;
-  // TODO: Try out sampling technique from "Practical product sampling for single scattering in media" by Villeneuve et al.
-
-  float random_resampling = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_RESAMPLING + seed, task.index);
-
-  uint32_t sample_id = 0;
-
-  for (uint32_t i = 0; i < uniform_sample_count; i++) {
-    const float sample_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_DISTANCE + seed * 32 + sample_id, task.index);
-    sample_id++;
-
-    const float t = bridges_initial_vertex_uniform_sample(uniform_min, uniform_max, sample_random);
-
-    const float uniform_sample_pdf  = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max, t);
-    const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
-
-    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, t);
-
-    const float weight = target_pdf / (distance_sample_pdf * distance_sample_count + uniform_sample_pdf * uniform_sample_count);
-
-    sum_weight += weight;
-
-    const float resampling_probability = weight / sum_weight;
-
-    if (random_resampling < resampling_probability) {
-      selected_t          = t;
-      selected_target_pdf = target_pdf;
-
-      random_resampling = random_resampling / resampling_probability;
-    }
-    else {
-      random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
-    }
-  }
-
-  for (uint32_t i = 0; i < distance_sample_count; i++) {
-    const float sample_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_DISTANCE + seed * 32 + sample_id, task.index);
-    sample_id++;
-
-    const float t = volume_sample_intersection(volume, task.origin, task.ray, 0.0f, limit, sample_random);
-
-    if (t == FLT_MAX)
-      continue;
-
-    const float uniform_sample_pdf  = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max, t);
-    const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
-
-    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, t);
-
-    const float weight = target_pdf / (distance_sample_pdf * distance_sample_count + uniform_sample_pdf * uniform_sample_count);
-
-    sum_weight += weight;
-
-    const float resampling_probability = weight / sum_weight;
-
-    if (random_resampling < resampling_probability) {
-      selected_t          = t;
-      selected_target_pdf = target_pdf;
-
-      random_resampling = random_resampling / resampling_probability;
-    }
-    else {
-      random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
-    }
-  }
-
-  pdf = (sum_weight > 0.0f) ? selected_target_pdf / sum_weight : FLT_MAX;
-
-  transmittance.r = expf(-selected_t * (volume.scattering.r + volume.absorption.r));
-  transmittance.g = expf(-selected_t * (volume.scattering.g + volume.absorption.g));
-  transmittance.b = expf(-selected_t * (volume.scattering.b + volume.absorption.b));
-
-  return add_vector(task.origin, scale_vector(task.ray, selected_t));
-}
-
 __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
-  uint32_t selected_seed                     = 0xFFFFFFFF;
-  TriangleHandle selected_handle             = triangle_handle_get(LIGHT_ID_NONE, 0);
-  Quaternion selected_rotation               = {0.0f, 0.0f, 0.0f, 1.0f};
-  vec3 selected_initial_vertex               = get_vector(0.0f, 0.0f, 0.0f);
-  RGBF selected_initial_vertex_transmittance = get_color(0.0f, 0.0f, 0.0f);
-  float selected_scale                       = 0.0f;
-  float selected_target_pdf                  = FLT_MAX;
+  uint32_t selected_seed         = 0xFFFFFFFF;
+  TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
+  Quaternion selected_rotation   = {0.0f, 0.0f, 0.0f, 1.0f};
+  float selected_scale           = 0.0f;
+  float selected_target_pdf      = FLT_MAX;
 
   float sum_weight = 0.0f;
 
@@ -506,41 +363,30 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     TriangleLight light = light_load_sample_init(light_handle, light_transform, light_packed_uv);
 
     ////////////////////////////////////////////////////////////////////
-    // Sample initial vertex
-    ////////////////////////////////////////////////////////////////////
-
-    float initial_vertex_pdf;
-    RGBF sample_initial_vertex_transmittance;
-    const vec3 sample_initial_vertex =
-      bridges_sample_initial_vertex(task, volume, limit, light, i, task.index, initial_vertex_pdf, sample_initial_vertex_transmittance);
-
-    sample_pdf *= initial_vertex_pdf;
-
-    ////////////////////////////////////////////////////////////////////
     // Sample light point
     ////////////////////////////////////////////////////////////////////
 
     const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + i, task.index);
 
     vec3 light_dir;
-    float solid_angle, light_dist;
-    light_load_sample_finalize(light, light_packed_uv, sample_initial_vertex, random_light_point, light_dir, light_dist, solid_angle);
+    float area, light_dist;
+    light_load_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
 
-    if (light_dist == FLT_MAX || solid_angle == 0.0f)
+    if (light_dist == FLT_MAX || area < eps)
       continue;
 
     RGBF light_color = light_get_color(light);
 
     // We sampled a point that emits no light, skip.
-    if (color_importance(light_color) == 0.0f || solid_angle < eps)
+    if (color_importance(light_color) == 0.0f)
       continue;
 
-    const vec3 light_point = add_vector(sample_initial_vertex, scale_vector(light_dir, light_dist));
+    const vec3 light_point = add_vector(task.origin, scale_vector(light_dir, light_dist));
 
     if (light_point.y < volume.min_height || light_point.y > volume.max_height)
       continue;
 
-    sample_pdf *= 1.0f / solid_angle;
+    sample_pdf *= 1.0f / area;
 
     ////////////////////////////////////////////////////////////////////
     // Sample path
@@ -549,13 +395,12 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     float sample_path_pdf;
     float sample_path_scale;
     vec3 sample_path_end_vertex;
-    RGBF sample_path_weight = bridges_sample_bridge(
-      sample_initial_vertex, volume, light_point, i, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
+    RGBF sample_path_weight =
+      bridges_sample_bridge(task.origin, volume, light_point, i, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
     if (sample_path_pdf == 0.0f)
       continue;
 
-    // TODO: I noticed I never even used the light color, just test if this was indeed a fuck up or maybe there was a reason behind that.
     sample_path_weight = mul_color(sample_path_weight, light_color);
 
     sample_pdf *= sample_path_pdf;
@@ -564,7 +409,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     // Modify path
     ////////////////////////////////////////////////////////////////////
 
-    const Quaternion sample_rotation = bridges_compute_rotation(sample_initial_vertex, light_point, sample_path_end_vertex);
+    const Quaternion sample_rotation = bridges_compute_rotation(task.origin, light_point, sample_path_end_vertex);
 
     const vec3 rotation_initial_direction = quaternion_apply(sample_rotation, light_dir);
     const float cos_angle                 = dot_product(rotation_initial_direction, task.ray);
@@ -572,7 +417,6 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     const float phase_function_weight = bridges_phase_function(cos_angle);
 
     sample_path_weight = scale_color(sample_path_weight, phase_function_weight);
-    sample_path_weight = mul_color(sample_path_weight, sample_initial_vertex_transmittance);
 
     ////////////////////////////////////////////////////////////////////
     // Resample
@@ -590,13 +434,11 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     const float resampling_probability = weight / sum_weight;
 
     if (random_resampling < resampling_probability) {
-      selected_seed                         = i;
-      selected_handle                       = light_handle;
-      selected_rotation                     = sample_rotation;
-      selected_scale                        = sample_path_scale;
-      selected_target_pdf                   = target_pdf;
-      selected_initial_vertex               = sample_initial_vertex;
-      selected_initial_vertex_transmittance = sample_initial_vertex_transmittance;
+      selected_seed       = i;
+      selected_handle     = light_handle;
+      selected_rotation   = sample_rotation;
+      selected_scale      = sample_path_scale;
+      selected_target_pdf = target_pdf;
 
       random_resampling = random_resampling / resampling_probability;
     }
@@ -614,9 +456,8 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
   if (selected_seed == 0xFFFFFFFF)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  RGBF bridge_color = bridges_evaluate_bridge(
-    task, volume, selected_initial_vertex, selected_handle, selected_seed, selected_rotation, selected_scale,
-    selected_initial_vertex_transmittance, ior, task.index);
+  RGBF bridge_color =
+    bridges_evaluate_bridge(task, volume, selected_handle, selected_seed, selected_rotation, selected_scale, ior, task.index);
 
   bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : get_color(0.0f, 0.0f, 0.0f);
 
