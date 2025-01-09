@@ -857,6 +857,10 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       // Prepare the next nodes to be constructed from the respective binary nodes.
       for (uint64_t i = 0; i < child_count; i++) {
+        // There is nothing left to construct if this is a leaf.
+        if (child_binary_index[i] == 0xFFFFFFFF)
+          continue;
+
         node_paths[write_ptr]        = current_node_path | (i << (3 * current_node_depth));
         node_depths[write_ptr]       = current_node_depth + 1;
         nodes[write_ptr++].child_ptr = child_binary_index[i];
