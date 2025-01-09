@@ -34,7 +34,7 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
     double time;
     LUM_FAILURE_HANDLE(luminary_host_get_current_sample_time(host, &time));
 
-    sprintf(text, "%.1f SPPS", 1.0 / time);
+    sprintf(text, "%.1f SPPPS", 1.0 / time);
 
     element_text(
       window, display, mouse_state,

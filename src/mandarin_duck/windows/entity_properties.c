@@ -353,60 +353,67 @@ static bool _window_entity_properties_sky_action(Window* window, Display* displa
 
   bool update_data = false;
 
-  update_data |= _window_entity_properties_add_slider(
-    data, "Geometry Offset", &sky.geometry_offset, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Azimuth", &sky.azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Altitude", &sky.altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Moon Azimuth", &sky.moon_azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Moon Altitude", &sky.moon_altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Moon Texture Offset", &sky.moon_tex_offset, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Sun Intensity", &sky.sun_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Density", &sky.base_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-
-  update_data |= _window_entity_properties_add_slider(data, "Num Steps", &sky.steps, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
-
-  update_data |= _window_entity_properties_add_slider(
-    data, "Rayleigh Density", &sky.rayleigh_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Rayleigh Falloff", &sky.rayleigh_falloff, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-
-  update_data |=
-    _window_entity_properties_add_slider(data, "Mie Density", &sky.mie_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Mie Falloff", &sky.mie_falloff, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Mie Diameter", &sky.mie_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-
-  update_data |= _window_entity_properties_add_checkbox(data, "Ozone Absorption", &sky.ozone_absorption);
-
-  if (sky.ozone_absorption) {
-    update_data |=
-      _window_entity_properties_add_slider(data, "Ozone Density", &sky.ozone_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Ozone Layer Thickness", &sky.ozone_layer_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  }
-
-  update_data |= _window_entity_properties_add_slider(
-    data, "Ground Visibility", &sky.ground_visibility, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Multiscattering Factor", &sky.multiscattering_factor, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-
-  update_data |= _window_entity_properties_add_checkbox(data, "Aerial Perspective", &sky.aerial_perspective);
-  update_data |= _window_entity_properties_add_checkbox(data, "Ambient Sampling", &sky.ambient_sampling);
-
   update_data |= _window_entity_properties_add_dropdown(data, "Mode", LUMINARY_SKY_MODE_COUNT, (char**) luminary_strings_sky_mode, &mode);
 
-  if ((LuminarySkyMode) mode == LUMINARY_SKY_MODE_CONSTANT_COLOR) {
-    update_data |=
-      _window_entity_properties_add_slider(data, "Color", &sky.constant_color, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, FLT_MAX, 1.0f);
+  switch ((LuminarySkyMode) mode) {
+    case LUMINARY_SKY_MODE_DEFAULT:
+    case LUMINARY_SKY_MODE_HDRI:
+    default:
+      update_data |= _window_entity_properties_add_slider(
+        data, "Geometry Offset", &sky.geometry_offset, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Azimuth", &sky.azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Altitude", &sky.altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Moon Azimuth", &sky.moon_azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Moon Altitude", &sky.moon_altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Moon Texture Offset", &sky.moon_tex_offset, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Sun Intensity", &sky.sun_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Density", &sky.base_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+      update_data |=
+        _window_entity_properties_add_slider(data, "Num Steps", &sky.steps, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+
+      update_data |= _window_entity_properties_add_slider(
+        data, "Rayleigh Density", &sky.rayleigh_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Rayleigh Falloff", &sky.rayleigh_falloff, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+      update_data |=
+        _window_entity_properties_add_slider(data, "Mie Density", &sky.mie_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Mie Falloff", &sky.mie_falloff, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Mie Diameter", &sky.mie_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+      update_data |= _window_entity_properties_add_checkbox(data, "Ozone Absorption", &sky.ozone_absorption);
+
+      if (sky.ozone_absorption) {
+        update_data |= _window_entity_properties_add_slider(
+          data, "Ozone Density", &sky.ozone_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+        update_data |= _window_entity_properties_add_slider(
+          data, "Ozone Layer Thickness", &sky.ozone_layer_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      }
+
+      update_data |= _window_entity_properties_add_slider(
+        data, "Ground Visibility", &sky.ground_visibility, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Multiscattering Factor", &sky.multiscattering_factor, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+      update_data |= _window_entity_properties_add_checkbox(data, "Aerial Perspective", &sky.aerial_perspective);
+      break;
+    case LUMINARY_SKY_MODE_CONSTANT_COLOR:
+      update_data |=
+        _window_entity_properties_add_slider(data, "Color", &sky.constant_color, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, FLT_MAX, 1.0f);
+      break;
   }
+
+  update_data |= _window_entity_properties_add_checkbox(data, "Ambient Sampling", &sky.ambient_sampling);
 
   if (update_data) {
     sky.mode = (LuminarySkyMode) mode;
