@@ -74,7 +74,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
       // We want to sample over the whole unoccluded ray path so sampling scattering events before
       // that would shorten the path.
 
-      if (args->render_lights) {
+      if (args->render_lights && depth == 0) {
         action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
         action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES;
         __FAILURE_HANDLE(array_push(&renderer->queue, &action));

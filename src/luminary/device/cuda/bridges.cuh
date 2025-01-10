@@ -332,7 +332,7 @@ __device__ RGBF bridges_evaluate_bridge(
   return light_color;
 }
 
-__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
+__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float ior, const bool delayed_rotation) {
   uint32_t selected_seed         = 0xFFFFFFFF;
   TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
   Quaternion selected_rotation   = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -354,8 +354,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
 
     float light_list_pdf;
     DeviceTransform light_transform;
-    const TriangleHandle light_handle =
-      light_tree_query(volume, task.origin, task.ray, limit, random_light_tree, light_list_pdf, light_transform);
+    const TriangleHandle light_handle = light_tree_query(volume, task.origin, task.ray, random_light_tree, light_list_pdf, light_transform);
 
     sample_pdf *= light_list_pdf;
 
