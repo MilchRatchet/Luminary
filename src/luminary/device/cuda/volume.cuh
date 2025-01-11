@@ -48,7 +48,7 @@ LUMINARY_KERNEL void volume_process_events() {
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
+        const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
 
         if (volume_dist < depth) {
           depth              = volume_dist;
@@ -84,7 +84,7 @@ LUMINARY_KERNEL void volume_process_events() {
         const bool allow_ocean_volume_hit = device.ocean.multiscattering || !(task.state & STATE_FLAG_OCEAN_SCATTERED);
 
         if (allow_ocean_volume_hit) {
-          const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
+          const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
 
           if (volume_dist < depth) {
             depth              = volume_dist;

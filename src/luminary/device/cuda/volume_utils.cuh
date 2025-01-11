@@ -191,14 +191,11 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  * based pdf.
  *
  * @param volume VolumeDescriptor of the corresponding volume.
- * @param origin Origin of ray in world space.
- * @param ray Direction of ray.
  * @param start Start offset of ray.
  * @param max_dist Maximum dist ray may travel after start.
  * @result Distance of intersection point and origin in world space.
  */
-__device__ float volume_sample_intersection(
-  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist, const float random) {
+__device__ float volume_sample_intersection(const VolumeDescriptor volume, const float start, const float max_dist, const float random) {
   // [FonWKH17] Equation 15
   const float t = (-logf(random)) / volume.max_scattering;
 
@@ -208,8 +205,7 @@ __device__ float volume_sample_intersection(
   return start + t;
 }
 
-__device__ float volume_sample_intersection_pdf(
-  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float t) {
+__device__ float volume_sample_intersection_pdf(const VolumeDescriptor volume, const float start, const float t) {
   return volume.max_scattering * expf(-volume.max_scattering * (t - start));
 }
 

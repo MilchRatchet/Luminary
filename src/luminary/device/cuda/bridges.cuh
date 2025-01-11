@@ -71,7 +71,7 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
 
   const float n = (float) (vertex_count - 1);
 
-  // Ramanjuan approximation
+  // Ramanujan approximation
   const float t0 = n * logf(n);
   const float t1 = (1.0f / 6.0f) * logf(n * (1.0f + 4.0f * n * (1.0f + 2.0f * n)));
   const float t2 = 0.5f * logf(PI);
@@ -134,6 +134,7 @@ __device__ uint32_t
   float count_importance[BRIDGES_MAX_DEPTH];
 
   for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
+    // TODO: The paper uses some additional terms here for the importance
     const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
 
     count_importance[i] = importance;
@@ -241,8 +242,8 @@ __device__ RGBF bridges_sample_bridge(
 
 // TODO: Check if I can maybe get rid of all these duplicate computations and just reuse what I computed in the RIS step.
 __device__ RGBF bridges_evaluate_bridge(
-  const DeviceTask task, const VolumeDescriptor volume, const TriangleHandle light_handle, const uint32_t seed, const Quaternion rotation,
-  const float scale, const float ior, const ushort2 pixel) {
+  const DeviceTask task, const VolumeDescriptor volume, const vec3 start_vertex, const TriangleHandle light_handle, const uint32_t seed,
+  const Quaternion rotation, const float scale, const float ior, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Get light sample
   ////////////////////////////////////////////////////////////////////
@@ -259,7 +260,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     vec3 light_dir;
     float light_dist, area;
-    light_load_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
+    light_load_sample_finalize_bridges(light, light_packed_uv, start_vertex, random_light_point, light_dir, light_dist, area);
 
     light_color  = light_get_color(light);
     light_vector = scale_vector(light_dir, light_dist);
@@ -286,7 +287,7 @@ __device__ RGBF bridges_evaluate_bridge(
   // Compute visibility of path
   ////////////////////////////////////////////////////////////////////
 
-  vec3 current_vertex            = task.origin;
+  vec3 current_vertex            = start_vertex;
   vec3 current_direction_sampled = normalize_vector(light_vector);
   vec3 current_direction         = quaternion_apply(rotation, current_direction_sampled);
 
@@ -313,7 +314,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
 
-    current_direction_sampled = bridges_phase_sample(current_direction, random_phase);
+    current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
 
     current_direction = quaternion_apply(rotation, current_direction_sampled);
 
@@ -332,7 +333,32 @@ __device__ RGBF bridges_evaluate_bridge(
   return light_color;
 }
 
-__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float ior, const bool delayed_rotation) {
+__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float ior, const bool sample_prefix) {
+  vec3 start_vertex = task.origin;
+  RGBF prefix_color = get_color(1.0f, 1.0f, 1.0f);
+
+  if (sample_prefix) {
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PREFIX, task.index);
+    const float dist        = volume_sample_intersection(volume, 0.0f, FLT_MAX, random_dist);
+    const float pdf         = volume_sample_intersection_pdf(volume, 0.0f, dist);
+
+    prefix_color = scale_color(prefix_color, 1.0f / pdf);
+
+    unsigned int compressed_ior = ior_compress(ior);
+
+    // Invalid handle, we don't have a target light yet.
+    const TriangleHandle target_light = triangle_handle_get(HIT_TYPE_INVALID, 0);
+
+    const RGBF visibility = optix_geometry_shadowing(start_vertex, task.ray, dist, target_light, task.index, compressed_ior);
+    prefix_color          = mul_color(prefix_color, visibility);
+
+    prefix_color.r *= expf(-dist * (volume.scattering.r + volume.absorption.r)) * volume.scattering.r;
+    prefix_color.g *= expf(-dist * (volume.scattering.g + volume.absorption.g)) * volume.scattering.g;
+    prefix_color.b *= expf(-dist * (volume.scattering.b + volume.absorption.b)) * volume.scattering.b;
+
+    start_vertex = add_vector(task.origin, scale_vector(task.ray, dist));
+  }
+
   uint32_t selected_seed         = 0xFFFFFFFF;
   TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
   Quaternion selected_rotation   = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -354,7 +380,8 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
 
     float light_list_pdf;
     DeviceTransform light_transform;
-    const TriangleHandle light_handle = light_tree_query(volume, task.origin, task.ray, random_light_tree, light_list_pdf, light_transform);
+    const TriangleHandle light_handle =
+      light_tree_query(volume, start_vertex, task.ray, random_light_tree, light_list_pdf, light_transform);
 
     sample_pdf *= light_list_pdf;
 
@@ -369,7 +396,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
 
     vec3 light_dir;
     float area, light_dist;
-    light_load_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
+    light_load_sample_finalize_bridges(light, light_packed_uv, start_vertex, random_light_point, light_dir, light_dist, area);
 
     if (light_dist == FLT_MAX || area < eps)
       continue;
@@ -380,7 +407,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     if (color_importance(light_color) == 0.0f)
       continue;
 
-    const vec3 light_point = add_vector(task.origin, scale_vector(light_dir, light_dist));
+    const vec3 light_point = add_vector(start_vertex, scale_vector(light_dir, light_dist));
 
     if (light_point.y < volume.min_height || light_point.y > volume.max_height)
       continue;
@@ -395,7 +422,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     float sample_path_scale;
     vec3 sample_path_end_vertex;
     RGBF sample_path_weight =
-      bridges_sample_bridge(task.origin, volume, light_point, i, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
+      bridges_sample_bridge(start_vertex, volume, light_point, i, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
     if (sample_path_pdf == 0.0f)
       continue;
@@ -408,7 +435,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     // Modify path
     ////////////////////////////////////////////////////////////////////
 
-    const Quaternion sample_rotation = bridges_compute_rotation(task.origin, light_point, sample_path_end_vertex);
+    const Quaternion sample_rotation = bridges_compute_rotation(start_vertex, light_point, sample_path_end_vertex);
 
     const vec3 rotation_initial_direction = quaternion_apply(sample_rotation, light_dir);
     const float cos_angle                 = dot_product(rotation_initial_direction, task.ray);
@@ -456,9 +483,10 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF bridge_color =
-    bridges_evaluate_bridge(task, volume, selected_handle, selected_seed, selected_rotation, selected_scale, ior, task.index);
+    bridges_evaluate_bridge(task, volume, start_vertex, selected_handle, selected_seed, selected_rotation, selected_scale, ior, task.index);
 
   bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : get_color(0.0f, 0.0f, 0.0f);
+  bridge_color = mul_color(bridge_color, prefix_color);
 
   UTILS_CHECK_NANS(task.index, bridge_color);
 
