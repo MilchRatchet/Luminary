@@ -17,6 +17,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->supersampling              = 1;
   settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
   settings->max_sample_count           = 0xFFFFFFFF;
+  settings->num_indirect_buckets       = 2;
 
   return LUMINARY_SUCCESS;
 }
@@ -50,6 +51,7 @@ LuminaryResult settings_check_for_dirty(
   __SETTINGS_STANDARD_DIRTY(width);
   __SETTINGS_STANDARD_DIRTY(height);
   __SETTINGS_STANDARD_DIRTY(supersampling);
+  __SETTINGS_STANDARD_DIRTY(num_indirect_buckets);
   __SETTINGS_INTEGRATION_DIRTY(bridge_max_num_vertices);
   __SETTINGS_INTEGRATION_DIRTY(bridge_num_ris_samples);
   __SETTINGS_INTEGRATION_DIRTY(light_num_ris_samples);

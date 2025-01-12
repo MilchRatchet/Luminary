@@ -177,6 +177,8 @@ static bool _window_entity_properties_renderer_settings_action(
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Num Indirect Lighting Buckets", &settings.num_indirect_buckets, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 4.0f, 1.0f);
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 
@@ -233,6 +235,7 @@ static bool _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Firefly Clamping", &camera.do_firefly_clamping);
+  update_data |= _window_entity_properties_add_checkbox(data, "Only Indirect Lighting", &camera.indirect_only);
   update_data |= _window_entity_properties_add_slider(
     data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 

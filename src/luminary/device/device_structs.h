@@ -16,8 +16,9 @@ struct DeviceRendererSettings {
 
   uint16_t width;
   uint16_t height;
+  uint16_t num_indirect_buckets;
 } typedef DeviceRendererSettings;
-LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x08u);
+LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x0Cu);
 
 struct DeviceCamera {
   uint32_t aperture_shape : 1;
@@ -27,6 +28,7 @@ struct DeviceCamera {
   uint32_t purkinje : 1;
   uint32_t use_color_correction : 1;
   uint32_t do_firefly_clamping : 1;
+  uint32_t indirect_only : 1;
 
   vec3 pos;
   Quaternion rotation;

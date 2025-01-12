@@ -241,12 +241,14 @@ struct DevicePointers {
   DEVICE uint16_t* task_counts;
   DEVICE uint16_t* task_offsets;
   DEVICE uint32_t* ior_stack;
-  DEVICE float* frame_variance;
   DEVICE RGBF* frame_accumulate;
   DEVICE RGBF* frame_direct_buffer;
   DEVICE RGBF* frame_direct_accumulate;
   DEVICE RGBF* frame_indirect_buffer;
-  DEVICE RGBF* frame_indirect_accumulate;
+  DEVICE RGBF* frame_indirect_accumulate0;
+  DEVICE RGBF* frame_indirect_accumulate1;
+  DEVICE RGBF* frame_indirect_accumulate2;
+  DEVICE RGBF* frame_indirect_accumulate3;
   DEVICE RGBF* frame_post;
   DEVICE RGBF* frame_final;
   DEVICE GBufferMetaData* gbuffer_meta;

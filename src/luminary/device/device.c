@@ -538,6 +538,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   const uint32_t internal_pixel_count     = device->constant_memory->settings.width * device->constant_memory->settings.height;
   const uint32_t external_pixel_count     = (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2));
+  const uint32_t variance_pixel_count     = external_pixel_count >> 2;
   const uint32_t gbuffer_meta_pixel_count = external_pixel_count >> 2;
 
   const uint32_t thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
@@ -551,17 +552,29 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 7 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 6 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_variance, sizeof(float) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_post, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * external_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
+
+  const uint32_t num_indirect_buckets = device->constant_memory->settings.num_indirect_buckets;
+
+  switch (num_indirect_buckets) {
+    case 4:
+      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate3, sizeof(RGBF) * internal_pixel_count);
+    case 3:
+      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate2, sizeof(RGBF) * internal_pixel_count);
+    case 2:
+      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate1, sizeof(RGBF) * internal_pixel_count);
+    default:
+      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate0, sizeof(RGBF) * internal_pixel_count);
+      break;
+  }
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
   memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
@@ -584,12 +597,14 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
   __DEVICE_BUFFER_FREE(ior_stack);
-  __DEVICE_BUFFER_FREE(frame_variance);
   __DEVICE_BUFFER_FREE(frame_accumulate);
   __DEVICE_BUFFER_FREE(frame_direct_buffer);
   __DEVICE_BUFFER_FREE(frame_direct_accumulate);
   __DEVICE_BUFFER_FREE(frame_indirect_buffer);
-  __DEVICE_BUFFER_FREE(frame_indirect_accumulate);
+  __DEVICE_BUFFER_FREE(frame_indirect_accumulate0);
+  __DEVICE_BUFFER_FREE(frame_indirect_accumulate1);
+  __DEVICE_BUFFER_FREE(frame_indirect_accumulate2);
+  __DEVICE_BUFFER_FREE(frame_indirect_accumulate3);
   __DEVICE_BUFFER_FREE(frame_post);
   __DEVICE_BUFFER_FREE(frame_final);
   __DEVICE_BUFFER_FREE(gbuffer_meta);

@@ -310,11 +310,12 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, callback_data));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-        CUDAKernelType accumulation_kernel = (device->sample_count.current_sample_count == 0)
-                                               ? CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE
-                                               : CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION;
-
-        __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[accumulation_kernel], device->stream_main));
+        if (device->sample_count.current_sample_count == 0) {
+          __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE], device->stream_main));
+        }
+        else {
+          __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE], device->stream_main));
+        }
 
         if ((device->undersampling_state & ~UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0) {
           sample_count->current_sample_count++;

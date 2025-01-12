@@ -342,22 +342,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
-__device__ RGBF load_pair_of_pixels_and_sum(const KernelArgsGenerateFinalImage args, const uint32_t x, const uint32_t y) {
-  const float2* src_ptr0 = (const float2*) (args.src + x + y * device.settings.width);
-
-  const float2 data0 = __ldg(src_ptr0 + 0);
-  const float2 data1 = __ldg(src_ptr0 + 1);
-  const float2 data2 = __ldg(src_ptr0 + 2);
-
-  RGBF pixel0 = get_color(data0.x, data0.y, data1.x);
-  pixel0      = tonemap_apply(pixel0, x + 0, y, args.color_correction, args.agx_params);
-
-  RGBF pixel1 = get_color(data1.y, data2.x, data2.y);
-  pixel1      = tonemap_apply(pixel1, x + 1, y, args.color_correction, args.agx_params);
-
-  return add_color(pixel0, pixel1);
-}
-
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
   HANDLE_DEVICE_ABORT();
 

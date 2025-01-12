@@ -165,6 +165,29 @@ __device__ void trace_depth_store(const float depth, const uint32_t offset) {
   __stcs((float*) (device.ptrs.trace_depths + offset), depth);
 }
 
+__device__ void RGBF_load_pair(const RGBF* src, const uint32_t x, const uint32_t y, const uint32_t ld, RGBF& pixel0, RGBF& pixel1) {
+  const float2* src_ptr = (const float2*) (src + x + y * ld);
+
+  const float2 data0 = __ldg(src_ptr + 0);
+  const float2 data1 = __ldg(src_ptr + 1);
+  const float2 data2 = __ldg(src_ptr + 2);
+
+  pixel0 = get_color(data0.x, data0.y, data1.x);
+  pixel1 = get_color(data1.y, data2.x, data2.y);
+}
+
+__device__ void RGBF_store_pair(RGBF* dst, const uint32_t x, const uint32_t y, const uint32_t ld, const RGBF pixel0, const RGBF pixel1) {
+  float2* dst_ptr = (float2*) (dst + x + y * ld);
+
+  const float2 data0 = make_float2(pixel0.r, pixel0.g);
+  const float2 data1 = make_float2(pixel0.b, pixel1.r);
+  const float2 data2 = make_float2(pixel1.g, pixel1.b);
+
+  __stwt(dst_ptr + 0, data0);
+  __stwt(dst_ptr + 1, data1);
+  __stwt(dst_ptr + 2, data2);
+}
+
 ////////////////////////////////////////////////////////////////////
 // Beauty Buffer IO
 ////////////////////////////////////////////////////////////////////

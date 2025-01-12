@@ -49,6 +49,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t supersampling;
   LuminaryShadingMode shading_mode;
   uint32_t max_sample_count;
+  uint32_t num_indirect_buckets;
 } typedef LuminaryRendererSettings;
 
 LUMINARY_API struct LuminaryDeviceInfo {
@@ -149,6 +150,7 @@ LUMINARY_API struct LuminaryCamera {
   LuminaryRGBF color_correction;
   bool do_firefly_clamping;
   float film_grain;
+  bool indirect_only;
 } typedef LuminaryCamera;
 
 ////////////////////////////////////////////////////////////////////

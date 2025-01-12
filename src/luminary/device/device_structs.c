@@ -18,8 +18,9 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->light_num_ris_samples   = settings->light_num_ris_samples;
   device_settings->supersampling           = settings->supersampling;
 
-  device_settings->width  = settings->width << settings->supersampling;
-  device_settings->height = settings->height << settings->supersampling;
+  device_settings->width                = settings->width << settings->supersampling;
+  device_settings->height               = settings->height << settings->supersampling;
+  device_settings->num_indirect_buckets = settings->num_indirect_buckets;
 
   return LUMINARY_SUCCESS;
 }
@@ -60,6 +61,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->purkinje             = camera->purkinje;
   device_camera->use_color_correction = camera->use_color_correction;
   device_camera->do_firefly_clamping  = camera->do_firefly_clamping;
+  device_camera->indirect_only        = camera->indirect_only;
 
   device_camera->pos = camera->pos;
   __FAILURE_HANDLE(_device_struct_get_quaternion(&device_camera->rotation, camera->rotation));
