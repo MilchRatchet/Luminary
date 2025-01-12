@@ -315,6 +315,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         }
         else {
           __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE], device->stream_main));
+          __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1], device->stream_main));
         }
 
         if ((device->undersampling_state & ~UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0) {

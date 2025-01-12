@@ -170,7 +170,7 @@ static bool _window_entity_properties_renderer_settings_action(
   update_data |= _window_entity_properties_add_slider(
     data, "Num Light Rays", &settings.light_num_rays, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 31.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 7.0f, 1.0f);
+    data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 8.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
     data, "Bridges Num RIS Samples", &settings.bridge_num_ris_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
   update_data |=
@@ -178,7 +178,7 @@ static bool _window_entity_properties_renderer_settings_action(
   update_data |=
     _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Num Indirect Lighting Buckets", &settings.num_indirect_buckets, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 4.0f, 1.0f);
+    data, "Num Indirect Lighting Buckets", &settings.num_indirect_buckets, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 8.0f, 1.0f);
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 

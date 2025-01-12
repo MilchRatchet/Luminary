@@ -538,7 +538,6 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   const uint32_t internal_pixel_count     = device->constant_memory->settings.width * device->constant_memory->settings.height;
   const uint32_t external_pixel_count     = (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2));
-  const uint32_t variance_pixel_count     = external_pixel_count >> 2;
   const uint32_t gbuffer_meta_pixel_count = external_pixel_count >> 2;
 
   const uint32_t thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
@@ -564,16 +563,8 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   const uint32_t num_indirect_buckets = device->constant_memory->settings.num_indirect_buckets;
 
-  switch (num_indirect_buckets) {
-    case 4:
-      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate3, sizeof(RGBF) * internal_pixel_count);
-    case 3:
-      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate2, sizeof(RGBF) * internal_pixel_count);
-    case 2:
-      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate1, sizeof(RGBF) * internal_pixel_count);
-    default:
-      __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate0, sizeof(RGBF) * internal_pixel_count);
-      break;
+  for (uint32_t bucket_id = 0; bucket_id < num_indirect_buckets; bucket_id++) {
+    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate[bucket_id], sizeof(RGBF) * internal_pixel_count);
   }
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
@@ -601,10 +592,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(frame_direct_buffer);
   __DEVICE_BUFFER_FREE(frame_direct_accumulate);
   __DEVICE_BUFFER_FREE(frame_indirect_buffer);
-  __DEVICE_BUFFER_FREE(frame_indirect_accumulate0);
-  __DEVICE_BUFFER_FREE(frame_indirect_accumulate1);
-  __DEVICE_BUFFER_FREE(frame_indirect_accumulate2);
-  __DEVICE_BUFFER_FREE(frame_indirect_accumulate3);
   __DEVICE_BUFFER_FREE(frame_post);
   __DEVICE_BUFFER_FREE(frame_final);
   __DEVICE_BUFFER_FREE(gbuffer_meta);
@@ -627,6 +614,10 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
   __DEVICE_BUFFER_FREE(abort_flag);
+
+  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
+    __DEVICE_BUFFER_FREE(frame_indirect_accumulate[bucket_id]);
+  }
 
   return LUMINARY_SUCCESS;
 }

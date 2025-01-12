@@ -229,6 +229,8 @@ LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
 
 typedef DeviceLightTreeNode LightTreeNode8Packed;
 
+#define MAX_NUM_INDIRECT_BUCKETS 8
+
 ////////////////////////////////////////////////////////////////////
 // Globals
 ////////////////////////////////////////////////////////////////////
@@ -245,10 +247,7 @@ struct DevicePointers {
   DEVICE RGBF* frame_direct_buffer;
   DEVICE RGBF* frame_direct_accumulate;
   DEVICE RGBF* frame_indirect_buffer;
-  DEVICE RGBF* frame_indirect_accumulate0;
-  DEVICE RGBF* frame_indirect_accumulate1;
-  DEVICE RGBF* frame_indirect_accumulate2;
-  DEVICE RGBF* frame_indirect_accumulate3;
+  DEVICE RGBF* frame_indirect_accumulate[MAX_NUM_INDIRECT_BUCKETS];
   DEVICE RGBF* frame_post;
   DEVICE RGBF* frame_final;
   DEVICE GBufferMetaData* gbuffer_meta;

@@ -108,10 +108,6 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device output is set to a size of 0.");
   }
 
-  if (device->sample_count.current_sample_count != 0) {
-    __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1], device->stream_main));
-  }
-
   KernelArgsGenerateFinalImage generate_final_image_args;
 
   // TODO: Use the correct buffer based on post
