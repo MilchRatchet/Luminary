@@ -189,7 +189,7 @@ void text_renderer_render(
 
   for (int32_t y_offset = 0; y_offset < blit_height; y_offset++) {
     for (int32_t x_offset = 0; x_offset < blit_width; x_offset++) {
-      dst[(x + x_offset) * 4 + (y + y_offset) * display->ld + 3] = 0xFF;
+      dst[(x + x_offset) * 4 + (y + y_offset) * display->pitch + 3] = 0xFF;
     }
   }
 }

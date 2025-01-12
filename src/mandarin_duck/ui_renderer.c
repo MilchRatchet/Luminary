@@ -157,7 +157,8 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
 
   _ui_renderer_render_rounded_box(
     renderer, window->width, window->height, window->background_blur_buffer, 0, 0, window->background_blur_buffer_ld, display->buffer,
-    window->x, window->y, display->ld, rounding_size, height, 0, MD_COLOR_WINDOW_BACKGROUND, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
+    window->x, window->y, display->pitch, rounding_size, height, 0, MD_COLOR_WINDOW_BACKGROUND,
+    UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 }
 
 void ui_renderer_render_rounded_box(
@@ -172,7 +173,7 @@ void ui_renderer_render_rounded_box(
   const uint32_t height_clip = (y + height > display->height) ? display->height - y : height;
 
   _ui_renderer_render_rounded_box(
-    renderer, width, height, display->buffer, x, y, display->ld, display->buffer, x, y, display->ld, rounding_size, height_clip,
+    renderer, width, height, display->buffer, x, y, display->pitch, display->buffer, x, y, display->pitch, rounding_size, height_clip,
     border_color, background_color, background_mode);
 }
 
@@ -216,11 +217,11 @@ void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display) 
       shape_col++;
     }
 
-    dst       = dst + display->ld;
+    dst       = dst + display->pitch;
     disk_mask = disk_mask + shape_mask_ld;
   }
 
-  dst = dst + display->ld * (display->height - 2 * shape_mask_half_size);
+  dst = dst + display->pitch * (display->height - 2 * shape_mask_half_size);
 
   for (uint32_t row = display->height - shape_mask_half_size; row < display->height; row++) {
     uint32_t shape_col = 0;
@@ -235,7 +236,7 @@ void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display) 
       shape_col++;
     }
 
-    dst       = dst + display->ld;
+    dst       = dst + display->pitch;
     disk_mask = disk_mask + shape_mask_ld;
   }
 }

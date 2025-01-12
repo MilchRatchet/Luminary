@@ -83,7 +83,7 @@ LUMINARY_API LuminaryResult
  * @param output_handle The destination the handle will be written to.
  */
 LUMINARY_API LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHandle* output_handle);
-LUMINARY_API LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void** output_buffer);
+LUMINARY_API LuminaryResult luminary_host_get_image(LuminaryHost* host, LuminaryOutputHandle output_handle, LuminaryImage* image);
 LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle output_handle);
 
 LUMINARY_API LuminaryResult luminary_host_get_pixel_info(LuminaryHost* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result);
@@ -111,5 +111,7 @@ LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, Lumi
 
 LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
 LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
+
+LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryImage image, LuminaryPath* path);
 
 #endif /* LUMINARY_HOST_H */

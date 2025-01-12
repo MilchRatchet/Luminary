@@ -19,7 +19,7 @@ static void _element_button_render_circle(Element* button, Display* display) {
   const uint32_t size = display->ui_renderer->shape_mask_size[data->shape_size_id];
   const uint8_t* src  = display->ui_renderer->disk_mask[data->shape_size_id];
 
-  uint8_t* dst = display->buffer + 4 * button->x + button->y * display->ld;
+  uint8_t* dst = display->buffer + 4 * button->x + button->y * display->pitch;
 
   const uint32_t cols = size >> UI_RENDERER_STRIDE_LOG;
   const uint32_t rows = size;
@@ -33,7 +33,7 @@ static void _element_button_render_circle(Element* button, Display* display) {
     }
 
     src = src + 4 * size;
-    dst = dst + display->ld;
+    dst = dst + display->pitch;
   }
 }
 

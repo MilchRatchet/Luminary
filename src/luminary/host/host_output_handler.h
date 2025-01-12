@@ -35,7 +35,7 @@ LuminaryResult output_handler_acquire_from_promise(OutputHandler* output, uint32
 LuminaryResult output_handler_acquire_new(OutputHandler* output, OutputDescriptor descriptor, uint32_t* handle);
 LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, OutputDescriptor descriptor, uint32_t* handle);
 LuminaryResult output_handler_release_new(OutputHandler* output, uint32_t handle);
-LuminaryResult output_handler_get_buffer(OutputHandler* output, uint32_t handle, void** buffer);
+LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, Image* image);
 LuminaryResult output_handler_destroy(OutputHandler** output);
 
 #endif /* LUMINARY_HOST_OUTPUT_HANDLER_H */

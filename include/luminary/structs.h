@@ -64,6 +64,7 @@ LUMINARY_API struct LuminaryOutputProperties {
   uint32_t height;
 } typedef LuminaryOutputProperties;
 
+#define LUMINARY_OUTPUT_HANDLE_INVALID 0xFFFFFFFF
 LUMINARY_API typedef uint32_t LuminaryOutputHandle;
 
 LUMINARY_API struct LuminaryOutputRequestProperties {
@@ -81,6 +82,13 @@ LUMINARY_API struct LuminaryPixelQueryResult {
   float depth;
   LuminaryVec3 rel_hit_pos;
 } typedef LuminaryPixelQueryResult;
+
+LUMINARY_API struct LuminaryImage {
+  uint8_t* buffer;
+  uint32_t width;
+  uint32_t height;
+  size_t ld;
+} typedef LuminaryImage;
 
 ////////////////////////////////////////////////////////////////////
 // Camera

@@ -49,5 +49,6 @@ typedef LuminaryHost Host;
 typedef LuminaryWallTime WallTime;
 
 typedef LuminaryPath Path;
+typedef LuminaryImage Image;
 
 #endif /* LUMINARY_INTERNAL_API_RESOLVE */

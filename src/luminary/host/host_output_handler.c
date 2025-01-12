@@ -5,7 +5,7 @@
 #include "internal_error.h"
 #include "internal_walltime.h"
 
-#define OUTPUT_HANDLE_INVALID 0xFFFFFFFF
+#define OUTPUT_HANDLE_INVALID LUMINARY_OUTPUT_HANDLE_INVALID
 #define MIN_OUTPUT_HANDLE_COUNT 4
 
 LuminaryResult output_handler_create(OutputHandler** output) {
@@ -411,12 +411,12 @@ LuminaryResult output_handler_release_new(OutputHandler* output, uint32_t handle
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult output_handler_get_buffer(OutputHandler* output, uint32_t handle, void** buffer) {
+LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, Image* image) {
   __CHECK_NULL_ARGUMENT(output);
-  __CHECK_NULL_ARGUMENT(buffer);
+  __CHECK_NULL_ARGUMENT(image);
 
   if (handle == OUTPUT_HANDLE_INVALID) {
-    *buffer = (void*) 0;
+    *image = (Image){.buffer = (uint8_t*) 0, .width = 0, .height = 0, .ld = 0};
     return LUMINARY_SUCCESS;
   }
 
@@ -434,7 +434,11 @@ LuminaryResult output_handler_get_buffer(OutputHandler* output, uint32_t handle,
     __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Output handle %u was not previously acquired.", handle);
   }
 
-  *buffer = output->objects[handle].descriptor.data;
+  *image = (Image){
+    .buffer = output->objects[handle].descriptor.data,
+    .width  = output->objects[handle].descriptor.meta_data.width,
+    .height = output->objects[handle].descriptor.meta_data.height,
+    .ld     = output->objects[handle].descriptor.meta_data.width};
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

@@ -1,6 +1,7 @@
 #include "display.h"
 
 #include <float.h>
+#include <time.h>
 
 static uint32_t __num_displays = 0;
 
@@ -11,12 +12,17 @@ static void _display_handle_resize(Display* display) {
 
   display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
   display->buffer      = display->sdl_surface->pixels;
-  display->ld          = (uint32_t) display->sdl_surface->pitch;
+  display->pitch       = (uint32_t) display->sdl_surface->pitch;
 }
 
-static void _display_blit_to_display_buffer(Display* display, uint8_t* output) {
-  for (uint32_t y = 0; y < display->height; y++) {
-    memcpy(display->buffer + y * display->ld, output + y * sizeof(uint8_t) * 4 * display->width, sizeof(uint8_t) * 4 * display->width);
+static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
+  uint8_t* buffer = image.buffer;
+
+  const uint32_t width  = (display->width < image.width) ? display->width : image.width;
+  const uint32_t height = (display->height < image.height) ? display->height : image.height;
+
+  for (uint32_t y = 0; y < height; y++) {
+    memcpy(display->buffer + y * display->pitch, buffer + y * image.ld * sizeof(LuminaryARGB8), sizeof(LuminaryARGB8) * width);
   }
 }
 
@@ -298,6 +304,39 @@ static WindowVisibilityMask _display_get_window_visibility_mask(Display* display
   return WINDOW_VISIBILITY_NONE;
 }
 
+static void _display_generate_screenshot_name(char* string) {
+  time_t rawtime;
+  struct tm timeinfo;
+
+  time(&rawtime);
+  timeinfo = *localtime(&rawtime);
+  strftime(string, 4096, "%Y-%m-%d-%H-%M-%S.png", &timeinfo);
+}
+
+static void _display_generate_screenshot(LuminaryHost* host) {
+  LuminaryOutputHandle output_handle;
+  LUM_FAILURE_HANDLE(luminary_host_acquire_output(host, &output_handle));
+
+  if (output_handle != LUMINARY_OUTPUT_HANDLE_INVALID) {
+    LuminaryImage output_image;
+    LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
+
+    LuminaryPath* image_path;
+    LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
+
+    char string[4096];
+    _display_generate_screenshot_name(string);
+
+    LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
+
+    LUM_FAILURE_HANDLE(luminary_host_save_png(host, output_image, image_path));
+
+    LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
+
+    LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
+  }
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -308,6 +347,10 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     display->show_ui                = !display->show_ui;
     display->active_camera_movement = !display->show_ui;
     display_set_mouse_visible(display, display->show_ui);
+  }
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_F2].phase == KEY_PHASE_PRESSED) {
+    _display_generate_screenshot(host);
   }
 
   if (display->awaiting_pixel_query_result) {
@@ -430,20 +473,18 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
   LuminaryOutputHandle output_handle;
   LUM_FAILURE_HANDLE(luminary_host_acquire_output(host, &output_handle));
 
-  uint8_t* output_buffer;
-  LUM_FAILURE_HANDLE(luminary_host_get_output_buffer(host, output_handle, (void**) &output_buffer));
-
-  // No output buffer means that the renderer has never produced an output image.
-  if (!output_buffer) {
+  if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID) {
     for (uint32_t y = 0; y < display->height; y++) {
-      memset(display->buffer + y * display->ld, 0xFF, sizeof(uint8_t) * 4 * display->width);
+      memset(display->buffer + y * display->pitch, 0xFF, sizeof(uint8_t) * 4 * display->width);
     }
 
-    LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
     return;
   }
 
-  _display_blit_to_display_buffer(display, output_buffer);
+  LuminaryImage output_image;
+  LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
+
+  _display_blit_to_display_buffer(display, output_image);
 
   LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
 }

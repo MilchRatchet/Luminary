@@ -9,6 +9,7 @@
 #include "internal_host.h"
 #include "internal_path.h"
 #include "lum.h"
+#include "png.h"
 #include "wavefront.h"
 
 #define HOST_RINGBUFFER_SIZE (0x100000ull)
@@ -163,10 +164,10 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor*
     __FAILURE_HANDLE(output_handler_acquire_from_request_new(host->output_handler, *args, &handle));
   }
 
-  void* dst;
-  __FAILURE_HANDLE(output_handler_get_buffer(host->output_handler, handle, &dst));
+  Image dst;
+  __FAILURE_HANDLE(output_handler_get_image(host->output_handler, handle, &dst));
 
-  memcpy(dst, args->data, args->meta_data.width * args->meta_data.height * sizeof(ARGB8));
+  memcpy(dst.buffer, args->data, args->meta_data.width * args->meta_data.height * sizeof(ARGB8));
 
   __FAILURE_HANDLE(output_handler_release_new(host->output_handler, handle));
 
@@ -691,11 +692,11 @@ LuminaryResult luminary_host_acquire_output(Host* host, LuminaryOutputHandle* ou
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_output_buffer(Host* host, LuminaryOutputHandle output_handle, void** output_buffer) {
+LuminaryResult luminary_host_get_image(LuminaryHost* host, LuminaryOutputHandle output_handle, Image* image) {
   __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(output_buffer);
+  __CHECK_NULL_ARGUMENT(image);
 
-  __FAILURE_HANDLE(output_handler_get_buffer(host->output_handler, output_handle, output_buffer));
+  __FAILURE_HANDLE(output_handler_get_image(host->output_handler, output_handle, image));
 
   return LUMINARY_SUCCESS;
 }
@@ -760,6 +761,18 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_save_png(Host* host, Image image, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
+  const char* file_path_string;
+  __FAILURE_HANDLE(path_apply(path, (const char*) 0, &file_path_string));
+
+  __FAILURE_HANDLE(png_store_image(image, file_path_string));
 
   return LUMINARY_SUCCESS;
 }

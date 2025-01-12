@@ -779,26 +779,32 @@ LuminaryResult png_load_from_file(Texture** texture, const char* filename) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult png_store_ARGB8(const char* filename, const ARGB8* image, const int width, const int height) {
-  if (!filename) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Filename is NULL.");
-  }
+LuminaryResult png_store_image(Image image, const char* file_path) {
+  __CHECK_NULL_ARGUMENT(file_path);
 
-  if (!image) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Image is NULL.");
-  }
+  const uint32_t width  = image.width;
+  const uint32_t height = image.height;
+
+  const uint32_t image_size = width * height * sizeof(RGBA8);
 
   uint8_t* buffer;
-  __FAILURE_HANDLE(host_malloc(&buffer, width * height * sizeof(RGB8)));
+  __FAILURE_HANDLE(host_malloc(&buffer, image_size));
 
-  RGB8* buffer_rgb8 = (RGB8*) buffer;
-  for (int i = 0; i < height * width; i++) {
-    ARGB8 a        = image[i];
-    RGB8 result    = {.r = a.r, .g = a.g, .b = a.b};
-    buffer_rgb8[i] = result;
+  RGBA8* buffer_rgb8 = (RGBA8*) buffer;
+  for (uint32_t y = 0; y < height; y++) {
+    for (uint32_t x = 0; x < width; x++) {
+      RGBA8 pixel;
+
+      pixel.r = image.buffer[4 * (x + y * image.ld) + 2];
+      pixel.g = image.buffer[4 * (x + y * image.ld) + 1];
+      pixel.b = image.buffer[4 * (x + y * image.ld) + 0];
+      pixel.a = image.buffer[4 * (x + y * image.ld) + 3];
+
+      buffer_rgb8[x + y * width] = pixel;
+    }
   }
 
-  __FAILURE_HANDLE(png_store(filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8));
+  __FAILURE_HANDLE(png_store(file_path, buffer, image_size, width, height, PNG_COLORTYPE_TRUECOLOR_ALPHA, PNG_BITDEPTH_8));
 
   __FAILURE_HANDLE(host_free(&buffer));
 
