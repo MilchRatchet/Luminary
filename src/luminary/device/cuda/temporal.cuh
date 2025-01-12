@@ -59,6 +59,45 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
   return sample;
 }
 
+LUMINARY_KERNEL void temporal_accumulation_first_sample() {
+  HANDLE_DEVICE_ABORT();
+
+  const uint32_t amount = device.settings.width * device.settings.height;
+
+  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+
+  for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    const uint32_t y = offset / device.settings.width;
+    const uint32_t x = offset - y * device.settings.width;
+
+    const float pixel_x = x + 0.5f;
+    const float pixel_y = y + 0.5f;
+
+    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
+    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
+
+    // Direct Lighting
+    RGBF direct_buffer = temporal_gather_pixel(
+      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+
+    direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
+
+    store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_buffer);
+
+    // Indirect Lighting
+    RGBF indirect_buffer = temporal_gather_pixel(
+      device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+
+    indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
+
+    store_RGBF(device.ptrs.frame_indirect_accumulate + offset, indirect_buffer);
+
+    RGBF output = add_color(direct_buffer, indirect_buffer);
+
+    store_RGBF(device.ptrs.frame_accumulate + offset, output);
+  }
+}
+
 LUMINARY_KERNEL void temporal_accumulation() {
   HANDLE_DEVICE_ABORT();
 
@@ -66,7 +105,6 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
-  const bool load_accumulate = (device.state.sample_id > 0);
   const float prev_scale     = device.state.sample_id;
   const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
 
@@ -83,7 +121,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     // Direct Lighting
     RGBF direct_buffer = temporal_gather_pixel(
       device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
-    RGBF direct_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_direct_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
+    RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
@@ -96,12 +134,11 @@ LUMINARY_KERNEL void temporal_accumulation() {
     // Indirect Lighting
     RGBF indirect_buffer = temporal_gather_pixel(
       device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
-    RGBF indirect_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_indirect_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
+    RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
-    // Firefly clamping only takes effect after undersampling has stopped.
-    if (device.camera.do_firefly_clamping && device.state.sample_id) {
+    if (device.camera.do_firefly_clamping) {
       float variance = (device.state.sample_id < 2) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
       float luminance_buffer = color_importance(indirect_buffer);
