@@ -434,11 +434,15 @@ LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, 
     __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Output handle %u was not previously acquired.", handle);
   }
 
+  OutputObject* object = output->objects + handle;
+
   *image = (Image){
-    .buffer = output->objects[handle].descriptor.data,
-    .width  = output->objects[handle].descriptor.meta_data.width,
-    .height = output->objects[handle].descriptor.meta_data.height,
-    .ld     = output->objects[handle].descriptor.meta_data.width};
+    .buffer                 = object->descriptor.data,
+    .width                  = object->descriptor.meta_data.width,
+    .height                 = object->descriptor.meta_data.height,
+    .ld                     = object->descriptor.meta_data.width,
+    .meta_data.time         = object->descriptor.meta_data.time,
+    .meta_data.sample_count = object->descriptor.meta_data.sample_count};
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

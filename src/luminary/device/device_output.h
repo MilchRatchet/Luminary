@@ -32,7 +32,7 @@ DEVICE_CTX_FUNC LuminaryResult device_output_create(DeviceOutput** output);
 DEVICE_CTX_FUNC LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height);
 DEVICE_CTX_FUNC LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProperties props);
 DEVICE_CTX_FUNC LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data);
-DEVICE_CTX_FUNC LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device);
+DEVICE_CTX_FUNC LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id);
 DEVICE_CTX_FUNC LuminaryResult device_output_destroy(DeviceOutput** output);
 
 #endif /* LUMINARY_DEVICE_OUTPUT_H */

@@ -88,6 +88,10 @@ LUMINARY_API struct LuminaryImage {
   uint32_t width;
   uint32_t height;
   size_t ld;
+  struct {
+    float time;
+    uint32_t sample_count;
+  } meta_data;
 } typedef LuminaryImage;
 
 ////////////////////////////////////////////////////////////////////

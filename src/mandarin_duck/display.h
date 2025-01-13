@@ -20,6 +20,11 @@ enum DisplayMouseMode {
   DISPLAY_MOUSE_MODE_COUNT
 } typedef DisplayMouseMode;
 
+struct RenderMetaData {
+  float elapsed_time;
+  uint32_t sample_count;
+} typedef RenderMetaData;
+
 struct Display {
   SDL_Window* sdl_window;
   SDL_Surface* sdl_surface;
@@ -45,6 +50,7 @@ struct Display {
   bool awaiting_pixel_query_result;
   uint32_t reference_x;
   uint32_t reference_y;
+  RenderMetaData current_render_meta_data;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);

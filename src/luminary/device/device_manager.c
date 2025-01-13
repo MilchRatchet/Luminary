@@ -179,6 +179,9 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
+  Device* device = device_manager->devices[data->common.device_index];
+
+  __FAILURE_HANDLE(device_renderer_get_render_time(device->renderer, data->render_event_id, &data->descriptor.meta_data.time));
   __FAILURE_HANDLE(host_queue_output_copy_from_device(device_manager->host, data->descriptor));
 
   return LUMINARY_SUCCESS;
@@ -349,7 +352,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     render_args.render_inscattering = scene->sky.aerial_perspective && scene->sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
     render_args.render_particles    = scene->particles.active;
     render_args.render_volumes      = scene->fog.active || scene->ocean.active;
-    render_args.render_lights       = false;
+    render_args.render_lights       = true;
     render_args.shading_mode        = scene->settings.shading_mode;
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {

@@ -239,6 +239,11 @@ LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
 
   renderer->render_id++;
+  renderer->event_id = 0;
+
+  for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
+    renderer->total_render_time[event_id] = 0.0f;
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -256,10 +261,15 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
 
   if (renderer->event_id >= DEVICE_RENDERER_TIMING_EVENTS_COUNT) {
-    CUDA_FAILURE_HANDLE(cuEventElapsedTime(&renderer->last_time, renderer->time_start[event_id], renderer->time_end[event_id]));
+    float event_time;
+    CUDA_FAILURE_HANDLE(cuEventElapsedTime(&event_time, renderer->time_start[event_id], renderer->time_end[event_id]));
 
     // Convert from milliseconds to seconds.
-    renderer->last_time *= 0.001;
+    event_time *= 0.001;
+
+    renderer->total_render_time[event_id] = renderer->total_render_time[(event_id - 1) & DEVICE_RENDERER_TIMING_EVENTS_MASK] + event_time;
+
+    renderer->last_time = event_time;
   }
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
@@ -302,8 +312,9 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         __FAILURE_HANDLE(
           ringbuffer_allocate_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData), (void**) &callback_data));
 
-        callback_data->common    = renderer->callback_data;
-        callback_data->render_id = renderer->render_id;
+        callback_data->common          = renderer->callback_data;
+        callback_data->render_id       = renderer->render_id;
+        callback_data->render_event_id = renderer->event_id;
 
         CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, device->stream_main));
         CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
@@ -332,6 +343,14 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         return LUMINARY_SUCCESS;
     }
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  *time = renderer->total_render_time[event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK];
 
   return LUMINARY_SUCCESS;
 }

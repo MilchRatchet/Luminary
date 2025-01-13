@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "display.h"
 #include "elements/checkbox.h"
 #include "elements/separator.h"
 #include "elements/text.h"
@@ -94,6 +95,77 @@ static bool _window_about_action(Window* window, Display* display, LuminaryHost*
       .cache_text   = true,
       .auto_size    = false,
       .is_clickable = false});
+
+  element_separator(
+    window, mouse_state,
+    (ElementSeparatorArgs){
+      .text = "Current Render", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
+  window_push_section(window, 32, 4);
+  {
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.85f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .text     = "Sample Count",
+        .center_x = false,
+        .center_y = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false});
+
+    char string[256];
+    sprintf(string, "%5u", display->current_render_meta_data.sample_count);
+
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .text     = string,
+        .center_x = true,
+        .center_y = true,
+        .highlighting = false,
+        .cache_text   = false,
+        .auto_size    = false,
+        .is_clickable = false});
+  }
+  window_pop_section(window);
+
+  window_push_section(window, 32, 4);
+  {
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.85f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .text     = "Elapsed Time",
+        .center_x = false,
+        .center_y = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false});
+
+    char string[256];
+    sprintf(string, "%7.1fs", display->current_render_meta_data.elapsed_time);
+
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .text     = string,
+        .center_x = true,
+        .center_y = true,
+        .highlighting = false,
+        .cache_text   = false,
+        .auto_size    = false,
+        .is_clickable = false});
+  }
+  window_pop_section(window);
 
   element_separator(
     window, mouse_state,

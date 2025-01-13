@@ -1,6 +1,8 @@
 #include "display.h"
 
 #include <float.h>
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 static uint32_t __num_displays = 0;
@@ -304,13 +306,17 @@ static WindowVisibilityMask _display_get_window_visibility_mask(Display* display
   return WINDOW_VISIBILITY_NONE;
 }
 
-static void _display_generate_screenshot_name(char* string) {
+static void _display_generate_screenshot_name(char* string, LuminaryImage image) {
   time_t rawtime;
   struct tm timeinfo;
 
+  char time_string[2048];
+
   time(&rawtime);
   timeinfo = *localtime(&rawtime);
-  strftime(string, 4096, "%Y-%m-%d-%H-%M-%S.png", &timeinfo);
+  strftime(time_string, 2048, "%Y-%m-%d-%H-%M-%S", &timeinfo);
+
+  sprintf(string, "%s-%05u-%07.1fs.png", time_string, image.meta_data.sample_count, image.meta_data.time);
 }
 
 static void _display_generate_screenshot(LuminaryHost* host) {
@@ -325,7 +331,7 @@ static void _display_generate_screenshot(LuminaryHost* host) {
     LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
 
     char string[4096];
-    _display_generate_screenshot_name(string);
+    _display_generate_screenshot_name(string, output_image);
 
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
@@ -483,6 +489,9 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
 
   LuminaryImage output_image;
   LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
+
+  display->current_render_meta_data.elapsed_time = output_image.meta_data.time;
+  display->current_render_meta_data.sample_count = output_image.meta_data.sample_count;
 
   _display_blit_to_display_buffer(display, output_image);
 

@@ -1353,7 +1353,7 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
-  __FAILURE_HANDLE(device_output_generate_output(device->output, device))
+  __FAILURE_HANDLE(device_output_generate_output(device->output, device, 0))
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1378,7 +1378,7 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
   generate_output |= (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0;
 
   if (generate_output) {
-    __FAILURE_HANDLE(device_output_generate_output(device->output, device));
+    __FAILURE_HANDLE(device_output_generate_output(device->output, device, callback_data->render_event_id));
   }
 
   __FAILURE_HANDLE(_device_update_undersampling(device));

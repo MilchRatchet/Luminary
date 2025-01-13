@@ -100,7 +100,7 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device) {
+LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
@@ -120,6 +120,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
+  data->render_event_id                      = render_event_id;
   data->descriptor.is_recurring_output       = true;
   data->descriptor.meta_data.width           = output->width;
   data->descriptor.meta_data.height          = output->height;

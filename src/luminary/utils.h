@@ -189,6 +189,7 @@ struct OutputDescriptor {
     uint32_t height;
     uint32_t sample_count;
     bool is_first_output;
+    float time;
   } meta_data;
   void* data;
 } typedef OutputDescriptor;
