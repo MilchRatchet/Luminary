@@ -66,7 +66,7 @@ extern "C" __global__ void __raygen__optix() {
 
     accumulated_light = mul_color(accumulated_light, record);
 
-    write_beauty_buffer_indirect(accumulated_light, pixel);
+    write_beauty_buffer(accumulated_light, pixel, task.state);
 
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite
