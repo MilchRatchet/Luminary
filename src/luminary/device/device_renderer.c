@@ -239,7 +239,6 @@ LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
 
   renderer->render_id++;
-  renderer->event_id = 0;
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     renderer->total_render_time[event_id] = 0.0f;
