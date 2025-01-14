@@ -34,6 +34,14 @@ struct KernelArgsCloudComputeWeatherNoise {
   uint32_t ld;
 } typedef KernelArgsCloudComputeWeatherNoise;
 
+struct KernelArgsSkyComputeHDRI {
+  float4* dst_color;
+  float* dst_shadow;
+  uint32_t dim;
+  vec3 origin;
+  uint32_t sample_count;
+} typedef KernelArgsSkyComputeHDRI;
+
 struct KernelArgsSkyComputeTransmittanceLUT {
   float4* dst_low;
   float4* dst_high;

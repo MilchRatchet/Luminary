@@ -277,11 +277,34 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(device);
 
-  // TODO: Compute the HDRI
-  // Currently emulating the side effects
-  memset(hdri->color_tex->data, 0, hdri->color_tex->pitch * hdri->color_tex->height);
-  memset(hdri->shadow_tex->data, 0, hdri->shadow_tex->pitch * hdri->shadow_tex->height);
-  hdri->sample_count.current_sample_count = hdri->sample_count.end_sample_count;
+  DeviceSkyHDRI* device_hdri = device->sky_hdri;
+
+  hdri->id++;
+
+  bool has_changed;
+  __FAILURE_HANDLE(device_sky_hdri_update(device_hdri, device, hdri, &has_changed));
+
+  KernelArgsSkyComputeHDRI args;
+
+  args.dst_color    = DEVICE_PTR(device_hdri->color_tex->memory);
+  args.dst_shadow   = DEVICE_PTR(device_hdri->shadow_tex->memory);
+  args.dim          = hdri->sky.hdri_dim;
+  args.origin       = hdri->sky.hdri_origin;
+  args.sample_count = hdri->sky.hdri_samples;
+
+  for (uint32_t sample_id = 0; sample_id < hdri->sky.hdri_samples; sample_id++) {
+    __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_id, 0xFFFF, 0xFFFF));
+    __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], &args, device->stream_main));
+  }
+
+  __FAILURE_HANDLE(device_download2D(
+    hdri->color_tex->data, device_hdri->color_tex->memory, device_hdri->color_tex->pitch, hdri->sky.hdri_dim * sizeof(RGBAF),
+    hdri->sky.hdri_dim, device->stream_main));
+  __FAILURE_HANDLE(device_download2D(
+    hdri->shadow_tex->data, device_hdri->shadow_tex->memory, device_hdri->shadow_tex->pitch, hdri->sky.hdri_dim * sizeof(float),
+    hdri->sky.hdri_dim, device->stream_main));
+
+  device_hdri->force_device_update = true;
 
   return LUMINARY_SUCCESS;
 }
@@ -345,6 +368,7 @@ LuminaryResult device_sky_hdri_create(DeviceSkyHDRI** hdri) {
   __CHECK_NULL_ARGUMENT(hdri);
 
   __FAILURE_HANDLE(host_malloc(hdri, sizeof(DeviceSkyHDRI)));
+  memset(*hdri, 0, sizeof(DeviceSkyHDRI));
 
   (*hdri)->reference_id = 0;
 
@@ -386,6 +410,11 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Devic
     }
 
     hdri->reference_id = source_hdri->id;
+  }
+
+  if (hdri->force_device_update) {
+    *has_changed              = true;
+    hdri->force_device_update = false;
   }
 
   return LUMINARY_SUCCESS;

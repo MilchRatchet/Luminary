@@ -21,7 +21,7 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS]               = {.name = "sky_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG]         = {.name = "sky_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS] = {.name = "sky_process_inscattering_events", .param_size = 0},
-  [CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI]                = {.name = "sky_compute_hdri", .param_size = 0},
+  [CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI]                = {.name = "sky_compute_hdri", .param_size = sizeof(KernelArgsSkyComputeHDRI)},
   [CUDA_KERNEL_TYPE_SKY_COMPUTE_TRANSMITTANCE_LUT] =
     {.name = "sky_compute_transmittance_lut", .param_size = sizeof(KernelArgsSkyComputeTransmittanceLUT)},
   [CUDA_KERNEL_TYPE_SKY_COMPUTE_MULTISCATTERING_LUT] =

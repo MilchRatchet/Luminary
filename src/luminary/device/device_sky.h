@@ -45,6 +45,7 @@ struct SkyHDRI {
 } typedef SkyHDRI;
 
 struct DeviceSkyHDRI {
+  bool force_device_update;
   uint32_t reference_id;
   DeviceTexture* color_tex;
   DeviceTexture* shadow_tex;
