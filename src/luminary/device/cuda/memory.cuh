@@ -292,7 +292,7 @@ __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, co
   DeviceMaterial mat;
   mat.flags            = __float_as_uint(v0.x) & 0x00FF;
   mat.roughness_clamp  = random_uint16_t_to_float(__float_as_uint(v0.x) & 0xFF00);
-  mat.metallic         = random_uint16_t_to_float(__float_as_uint(v0.x) >> 16);
+  mat.metallic_tex     = __float_as_uint(v0.x) >> 16;
   mat.roughness        = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
   mat.refraction_index = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;
   mat.albedo.r         = random_uint16_t_to_float(__float_as_uint(v0.z) & 0xFFFF);
@@ -305,7 +305,7 @@ __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, co
   mat.emission_scale   = unpack_float_from_uint16(__float_as_uint(v1.y) >> 16);
   mat.albedo_tex       = __float_as_uint(v1.z) & 0xFFFF;
   mat.luminance_tex    = __float_as_uint(v1.z) >> 16;
-  mat.material_tex     = __float_as_uint(v1.w) & 0xFFFF;
+  mat.roughness_tex    = __float_as_uint(v1.w) & 0xFFFF;
   mat.normal_tex       = __float_as_uint(v1.w) >> 16;
 
   mat.emission = scale_color(mat.emission, mat.emission_scale);
@@ -394,6 +394,29 @@ __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
   float4_to_tex_converter.data = v0;
 
   return float4_to_tex_converter.tex;
+}
+
+//===========================================================================================
+// Defaults
+//===========================================================================================
+
+__device__ GBufferData gbuffer_data_default() {
+  GBufferData data;
+
+  data.instance_id = HIT_TYPE_INVALID;
+  data.tri_id      = 0;
+  data.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
+  data.emission    = get_color(0.0f, 0.0f, 0.0f);
+  data.normal      = get_vector(0.0f, 0.0f, 1.0f);
+  data.position    = get_vector(0.0f, 0.0f, 0.0f);
+  data.V           = get_vector(0.0f, 0.0f, 1.0f);
+  data.roughness   = 0.5f;
+  data.state       = 0;
+  data.flags       = 0;
+  data.ior_in      = 1.0f;
+  data.ior_out     = 1.0f;
+
+  return data;
 }
 
 #endif /* CU_MEMORY_H */

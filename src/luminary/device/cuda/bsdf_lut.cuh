@@ -2,6 +2,7 @@
 #define CU_BSDF_LUT_H
 
 #include "bsdf_utils.cuh"
+#include "memory.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 
@@ -28,11 +29,11 @@ LUMINARY_KERNEL void bsdf_generate_ss_lut(KernelArgsBSDFGenerateSSLUT args) {
   const float NdotV     = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
   const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
 
-  GBufferData data;
-  data.normal    = get_vector(0.0f, 0.0f, 1.0f);
-  data.metallic  = 1.0f;
-  data.roughness = roughness;
-  data.V         = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
+  GBufferData data = gbuffer_data_default();
+  data.flags       = G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE | G_BUFFER_FLAG_METALLIC;
+  data.normal      = get_vector(0.0f, 0.0f, 1.0f);
+  data.roughness   = roughness;
+  data.V           = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
 
   float sum = 0.0f;
 
@@ -65,8 +66,8 @@ LUMINARY_KERNEL void bsdf_generate_glossy_lut(KernelArgsBSDFGenerateGlossyLUT ar
   const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
 
   GBufferData data;
+  data.flags     = G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE | G_BUFFER_FLAG_METALLIC;
   data.normal    = get_vector(0.0f, 0.0f, 1.0f);
-  data.metallic  = 1.0f;
   data.roughness = roughness;
   data.V         = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
 
@@ -112,8 +113,8 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
   const float ior       = 1.0f + z * (1.0f / (BSDF_LUT_SIZE - 1)) * 2.0f;
 
   GBufferData data;
+  data.flags     = G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
   data.normal    = get_vector(0.0f, 0.0f, 1.0f);
-  data.metallic  = 1.0f;
   data.roughness = roughness;
   data.V         = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
   data.ior_in    = 1.0f;

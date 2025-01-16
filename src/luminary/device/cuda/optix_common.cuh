@@ -12,22 +12,20 @@ enum OptixAlphaResult {
   OPTIX_ALPHA_RESULT_TRANSPARENT = 2
 } typedef OptixAlphaResult;
 
-// TODO: Port over.
-#if 0
 /*
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ OptixAlphaResult optix_alpha_test() {
-  const unsigned int hit_id = optixGetPrimitiveIndex();
+__device__ OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
+  const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const uint32_t material_id = load_triangle_material_id(hit_id);
+  const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
   const uint16_t tex         = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
 
   if (tex != TEXTURE_NONE) {
-    const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
+    const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
-    const float alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].handle, uv.u, 1.0f - uv.v).w;
+    const float alpha = tex2D<float4>(load_texture_object(tex).handle, uv.u, 1.0f - uv.v).w;
 
     if (alpha == 0.0f) {
       return OPTIX_ALPHA_RESULT_TRANSPARENT;
@@ -40,7 +38,6 @@ __device__ OptixAlphaResult optix_alpha_test() {
 
   return OPTIX_ALPHA_RESULT_OPAQUE;
 }
-#endif
 
 #define SKIP_IOR_CHECK (0xFFFFFFFF)
 #define MAX_COMPRESSABLE_COLOR (1.99999988079071044921875f)
@@ -96,35 +93,27 @@ __device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort
   return false;
 }
 
-__device__ RGBAF optix_get_albedo_with_ior_check(const TriangleHandle handle, const uint32_t material_id, const unsigned int ray_ior) {
-  // Don't check for IOR when querying a light from a BSDF sample
-  if (ray_ior != SKIP_IOR_CHECK) {
-    const uint32_t compressed_ior = ior_compress(__ldg(&(device.ptrs.materials[material_id].refraction_index)));
+__device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, const DeviceMaterial material) {
+  RGBAF albedo = material.albedo;
 
-    // This assumes that IOR is compressed into 8 bits.
-    if (compressed_ior != (ray_ior & 0xFF)) {
-      // Terminate ray.
-      return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
-    }
-  }
-
-  const uint16_t tex = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
-
-  if (tex != TEXTURE_NONE) {
+  if (material.albedo_tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
-    const float4 tex_value = tex2D<float4>(load_texture_object(tex).handle, uv.u, 1.0f - uv.v);
+    const float4 tex_value = tex2D<float4>(load_texture_object(material.albedo_tex).handle, uv.u, 1.0f - uv.v);
 
-    RGBAF albedo;
-    albedo.r = tex_value.x;
-    albedo.g = tex_value.y;
-    albedo.b = tex_value.z;
-    albedo.a = tex_value.w;
-
-    return albedo;
+    albedo = get_RGBAF(tex_value.x, tex_value.y, tex_value.z, tex_value.w);
   }
 
-  return load_material_albedo(device.ptrs.materials, material_id);
+  // Invisible
+  if (albedo.a == 0.0f)
+    return albedo;
+
+  // Opaque base substrate only handles opacity
+  if ((material.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK) == DEVICE_MATERIAL_BASE_SUBSTRATE_OPAQUE)
+    return albedo;
+
+  // Translucent base substrates are treated as fully opaque, even if IOR matches. This is a performance optimization, matching IOR is rare.
+  return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 __device__ bool particle_opacity_cutout(const float2 coord) {

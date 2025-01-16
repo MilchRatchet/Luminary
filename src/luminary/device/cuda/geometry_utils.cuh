@@ -114,12 +114,10 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   }
 
   float roughness = mat.roughness;
-  float metallic  = mat.metallic;
-  if (mat.material_tex != TEXTURE_NONE) {
-    const float4 material_f = texture_load(load_texture_object(mat.material_tex), tex_coords);
+  if (mat.roughness_tex != TEXTURE_NONE) {
+    const float4 material_f = texture_load(load_texture_object(mat.roughness_tex), tex_coords);
 
     roughness = material_f.x;
-    metallic  = material_f.y;
   }
 
   // We clamp the roughness to avoid caustics which would never clean up.
@@ -129,6 +127,17 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
 
   uint32_t flags = G_BUFFER_FLAG_USE_LIGHT_RAYS;
 
+  if (mat.metallic_tex != TEXTURE_NONE) {
+    // TODO: Stochastic filtering of metallic texture.
+  }
+  else if (mat.flags & DEVICE_MATERIAL_FLAG_METALLIC) {
+    flags |= G_BUFFER_FLAG_METALLIC;
+  }
+
+  if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
+    flags |= G_BUFFER_FLAG_COLORED_TRANSPARENCY;
+  }
+
   if (is_inside) {
     flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
   }
@@ -136,10 +145,6 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const IORStackMethod ior_stack_method =
     (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
-
-  if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
-    flags |= G_BUFFER_FLAG_COLORED_DIELECTRIC;
-  }
 
   GBufferData data;
   data.instance_id = triangle_handle.instance_id;
@@ -150,7 +155,6 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = roughness;
-  data.metallic    = metallic;
   data.state       = task.state;
   data.flags       = flags;
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;

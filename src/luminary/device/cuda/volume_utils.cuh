@@ -285,7 +285,6 @@ __device__ GBufferData
   data.position  = task.origin;
   data.V         = scale_vector(task.ray, -1.0f);
   data.roughness = device.fog.droplet_diameter;
-  data.metallic  = 0.0f;
   data.state     = task.state;
   data.flags     = 0;
   data.ior_in    = ray_ior;

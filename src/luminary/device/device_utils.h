@@ -165,9 +165,13 @@ struct TriangleHandle {
 } typedef TriangleHandle;
 
 enum GBufferFlags {
-  G_BUFFER_FLAG_REFRACTION_IS_INSIDE = 0b1,
-  G_BUFFER_FLAG_COLORED_DIELECTRIC   = 0b10,
-  G_BUFFER_FLAG_USE_LIGHT_RAYS       = 0b100
+  G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE      = 0,
+  G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT = 1,
+  G_BUFFER_FLAG_BASE_SUBSTRATE_MASK        = 1,
+  G_BUFFER_FLAG_REFRACTION_IS_INSIDE       = 0b10,
+  G_BUFFER_FLAG_METALLIC                   = 0b100,
+  G_BUFFER_FLAG_USE_LIGHT_RAYS             = 0b1000,
+  G_BUFFER_FLAG_COLORED_TRANSPARENCY       = 0b10000
 } typedef GBufferFlags;
 
 struct GBufferData {
@@ -179,7 +183,6 @@ struct GBufferData {
   vec3 V;
   vec3 normal;
   float roughness;
-  float metallic;
   uint16_t state;
   uint8_t flags;
   /* IOR of medium in direction of V. */

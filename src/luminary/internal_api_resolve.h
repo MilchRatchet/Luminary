@@ -38,8 +38,8 @@ typedef LuminaryFog Fog;
 
 typedef LuminaryParticles Particles;
 
+typedef LuminaryMaterialBaseSubstrate MaterialBaseSubstrate;
 typedef LuminaryMaterial Material;
-typedef LuminaryMaterialFlags MaterialFlags;
 
 typedef LuminaryQueue Queue;
 typedef LuminaryRingBuffer RingBuffer;

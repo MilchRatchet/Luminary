@@ -369,6 +369,12 @@ __device__ RGBF bsdf_conductor(
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  if ((data.flags & G_BUFFER_FLAG_METALLIC) == 0)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
@@ -402,6 +408,12 @@ __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float r
 __device__ RGBF
   bsdf_glossy(const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  if ((data.flags & G_BUFFER_FLAG_METALLIC) != 0)
     return get_color(0.0f, 0.0f, 0.0f);
 
   float ss_term;
@@ -462,6 +474,9 @@ __device__ RGBF bsdf_dielectric(
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   float term;
   if (ctx.is_refraction) {
     switch (sampling_hint) {
@@ -508,7 +523,7 @@ __device__ RGBF bsdf_dielectric(
     term = (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION) ? 1.0f : 0.0f;
   }
 
-  return (data.flags & G_BUFFER_FLAG_COLORED_DIELECTRIC) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
+  return scale_color(opaque_color(data.albedo), term);
 }
 
 ///////////////////////////////////////////////////
@@ -518,13 +533,13 @@ __device__ RGBF bsdf_dielectric(
 __device__ RGBF bsdf_multiscattering_evaluate(
   const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.is_refraction)
-    return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
+    return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a);
 
-  RGBF conductor  = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * data.metallic);
-  RGBF glossy     = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * (1.0f - data.metallic));
-  RGBF dielectric = scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
+  RGBF conductor  = bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF glossy     = bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF dielectric = bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf);
 
-  return add_color(add_color(conductor, glossy), dielectric);
+  return scale_color(add_color(add_color(conductor, glossy), dielectric), data.albedo.a);
 }
 
 #endif /* CU_BSDF_UTILS_H */

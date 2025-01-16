@@ -319,27 +319,30 @@ LUMINARY_API struct LuminaryParticles {
 // Material
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_API struct LuminaryMaterialFlags {
-  bool emission_active : 1;
-  bool ior_shadowing : 1;
-  bool thin_walled : 1;
-  bool colored_transparency : 1;
-} typedef LuminaryMaterialFlags;
+enum LuminaryMaterialBaseSubstrate {
+  LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE,
+  LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT,
+  LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT
+} typedef LuminaryMaterialBaseSubstrate;
 
 LUMINARY_API struct LuminaryMaterial {
   uint32_t id;
+  LuminaryMaterialBaseSubstrate base_substrate;
   LuminaryRGBAF albedo;
   LuminaryRGBF emission;
   float emission_scale;
-  float metallic;
   float roughness;
   float roughness_clamp;
   float refraction_index;
+  bool emission_active;
+  bool thin_walled;
+  bool metallic;
+  bool colored_transparency;
   uint16_t albedo_tex;
   uint16_t luminance_tex;
-  uint16_t material_tex;
+  uint16_t roughness_tex;
+  uint16_t metallic_tex;
   uint16_t normal_tex;
-  LuminaryMaterialFlags flags;
 } typedef LuminaryMaterial;
 
 ////////////////////////////////////////////////////////////////////

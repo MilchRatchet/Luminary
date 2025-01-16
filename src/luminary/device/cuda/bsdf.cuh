@@ -132,6 +132,19 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   return scatter_ray;
 #else
+
+  if (data.albedo.a < 1.0f) {
+    const float transparency_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_OPACITY, pixel);
+
+    if (transparency_random > data.albedo.a) {
+      info.weight = (data.flags & G_BUFFER_FLAG_COLORED_TRANSPARENCY) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+      info.is_microfacet_based = true;
+      info.is_transparent_pass = true;
+
+      return scale_vector(data.V, -1.0f);
+    }
+  }
+
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = quaternion_apply(rotation_to_z, data.V);
@@ -147,16 +160,19 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   vec3 ray_local;
 
-  if (ior_compress(data_local.ior_in) == ior_compress(data_local.ior_out) && data_local.albedo.a == 0.0f) {
+  const uint32_t base_substrate = data_local.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK;
+
+  if (ior_compress(data_local.ior_in) == ior_compress(data_local.ior_out) && (base_substrate == G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)) {
     // Fast path for transparent surfaces without refraction/reflection
-    ray_local   = scale_vector(data_local.V, -1.0f);
-    info.weight = (data_local.state & G_BUFFER_FLAG_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+    ray_local                = scale_vector(data_local.V, -1.0f);
+    info.weight              = opaque_color(data.albedo);
     info.is_transparent_pass = true;
     info.is_microfacet_based = true;
   }
   else {
-    const bool include_diffuse    = data_local.albedo.a > 0.0f && data_local.metallic < 1.0f;
-    const bool include_refraction = data_local.albedo.a < 1.0f;
+    const bool include_diffuse =
+      (base_substrate == G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE) && ((data_local.flags & G_BUFFER_FLAG_METALLIC) == 0);
+    const bool include_refraction = (base_substrate == G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
 
     // Microfacet evaluation is not numerically stable for very low roughness. We clamp the evaluation here.
     data_local.roughness = fmaxf(data_local.roughness, BSDF_ROUGHNESS_CLAMP);
@@ -290,9 +306,22 @@ __device__ void bsdf_sample_for_light_probabilities(
   // TODO: Consider creating a context and sampling also proportional to albedo etc.
   // TODO: There is this issue where I importance sample the lights too well but end up picking occluded
   // lights which will give me terrible convergence.
-  const float microfacet_reflection_weight = 1.0f;
-  const float microfacet_refraction_weight = 1.0f - data.albedo.a;
-  const float diffuse_weight               = (1.0f - data.metallic) * data.albedo.a;
+  float microfacet_reflection_weight;
+  float microfacet_refraction_weight;
+  float diffuse_weight;
+
+  switch (data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) {
+    case G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE:
+      microfacet_reflection_weight = 1.0f;
+      microfacet_refraction_weight = 0.0f;
+      diffuse_weight               = (data.flags & G_BUFFER_FLAG_METALLIC) ? 0.0f : 1.0f;
+      break;
+    case G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT:
+      microfacet_reflection_weight = 1.0f;
+      microfacet_refraction_weight = 1.0f;
+      diffuse_weight               = 0.0f;
+      break;
+  }
 
   const float sum_weights = microfacet_reflection_weight + microfacet_refraction_weight + diffuse_weight;
 

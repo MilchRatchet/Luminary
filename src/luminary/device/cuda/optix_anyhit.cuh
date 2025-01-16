@@ -10,16 +10,15 @@
 // OPTIX_SBT_OFFSET_GEOMETRY_TRACE
 ////////////////////////////////////////////////////////////////////
 
-// TODO: This is fucked, I need to fix it by checking for IOR aswell.
-
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(geometry_trace)() {
-#if 0
-  const OptixAlphaResult alpha_result = optix_alpha_test();
+  // TODO: Add OMMs again.
+  const TriangleHandle handle = optixGetTriangleHandle();
+
+  const OptixAlphaResult alpha_result = optix_alpha_test(handle);
 
   if (alpha_result == OPTIX_ALPHA_RESULT_TRANSPARENT) {
     optixIgnoreIntersection();
   }
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -57,11 +56,10 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
 
-  const bool material_has_ior_shadowing = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_IOR_SHADOWING) != 0;
+  // Currently, materials are just two loads so it makes no sense to only load parts of it.
+  const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
 
-  unsigned int ray_ior = (!material_has_ior_shadowing) ? SKIP_IOR_CHECK : optixGetPayloadIOR();
-
-  const RGBAF albedo = optix_get_albedo_with_ior_check(handle, material_id, ray_ior);
+  const RGBAF albedo = optix_get_albedo_for_shadowing(handle, material);
 
   if (albedo.a == 1.0f) {
     optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
@@ -69,23 +67,12 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
     optixTerminateRay();
   }
 
-  int8_t ray_ior_pop_balance = (int8_t) ((ray_ior >> 16) & 0xFF);
-  int8_t ray_ior_pop_max     = (int8_t) (ray_ior >> 24);
-
-  ray_ior_pop_balance += (optixIsBackFaceHit()) ? 1 : -1;
-  ray_ior_pop_max = max(ray_ior_pop_max, ray_ior_pop_balance);
-
-  ray_ior = (ray_ior & 0xFFFF) | (uint32_t) (ray_ior_pop_balance << 16) | (uint32_t) (ray_ior_pop_max << 24);
-
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_IOR, ray_ior);
-
   if (albedo.a == 0.0f) {
     optixIgnoreIntersection();
   }
 
-  const RGBF alpha = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY)
-                       ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
-                       : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
+  const RGBF alpha = (material.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) ? scale_color(opaque_color(albedo), albedo.a)
+                                                                                  : get_color(albedo.a, albedo.a, albedo.a);
 
   CompressedAlpha compressed_alpha = optixGetPayloadCompressedAlpha();
 

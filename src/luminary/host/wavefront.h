@@ -41,8 +41,9 @@ struct WavefrontTriangle {
 enum WavefrontTextureType {
   WF_ALBEDO    = 0,
   WF_LUMINANCE = 1,
-  WF_MATERIAL  = 2,
-  WF_NORMAL    = 3,
+  WF_ROUGHNESS = 2,
+  WF_METALLIC  = 3,
+  WF_NORMAL    = 4,
   WF_TEX_TYPE_COUNT
 } typedef WavefrontTextureType;
 

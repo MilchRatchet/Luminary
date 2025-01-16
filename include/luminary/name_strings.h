@@ -24,5 +24,6 @@ extern const char* const luminary_strings_tonemap[LUMINARY_TONEMAP_COUNT];
 extern const char* const luminary_strings_aperture[LUMINARY_APERTURE_COUNT];
 extern const char* const luminary_strings_jerlov_water_type[LUMINARY_JERLOV_WATER_TYPE_COUNT];
 extern const char* const luminary_strings_sky_mode[LUMINARY_SKY_MODE_COUNT];
+extern const char* const luminary_strings_material_base_substrate[LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT];
 
 #endif /* LUMINARY_NAME_STRINGS_H */

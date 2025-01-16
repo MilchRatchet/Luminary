@@ -39,7 +39,8 @@ static WavefrontMaterial _wavefront_get_default_material() {
   default_material.refraction_index        = 1.0f;
   default_material.texture[WF_ALBEDO]      = TEXTURE_NONE;
   default_material.texture[WF_LUMINANCE]   = TEXTURE_NONE;
-  default_material.texture[WF_MATERIAL]    = TEXTURE_NONE;
+  default_material.texture[WF_ROUGHNESS]   = TEXTURE_NONE;
+  default_material.texture[WF_METALLIC]    = TEXTURE_NONE;
   default_material.texture[WF_NORMAL]      = TEXTURE_NONE;
 
   return default_material;
@@ -164,7 +165,11 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
     type = WF_LUMINANCE;
   }
   else if (!strncmp(line + 4, "Ns", 2)) {
-    type = WF_MATERIAL;
+    type = WF_ROUGHNESS;
+  }
+  else if (!strncmp(line + 4, "refl", 4)) {
+    type        = WF_METALLIC;
+    path_offset = 9;
   }
   else if (!strncmp(line + 4, "Bump", 4)) {
     type        = WF_NORMAL;
@@ -753,25 +758,25 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
     Material mat;
-    mat.id                         = material_id_offset + mat_id;
-    mat.albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
-    mat.albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
-    mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
-    mat.albedo.a                   = wavefront_mat.dissolve;
-    mat.emission                   = wavefront_mat.emission;
-    mat.emission_scale             = content->args.emission_scale;
-    mat.refraction_index           = wavefront_mat.refraction_index;
-    mat.metallic                   = wavefront_mat.specular_reflectivity.r;
-    mat.roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
-    mat.roughness_clamp            = 0.25f;
-    mat.albedo_tex                 = texture_offset + wavefront_mat.texture[WF_ALBEDO];
-    mat.luminance_tex              = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
-    mat.material_tex               = texture_offset + wavefront_mat.texture[WF_MATERIAL];
-    mat.normal_tex                 = texture_offset + wavefront_mat.texture[WF_NORMAL];
-    mat.flags.emission_active      = true;
-    mat.flags.ior_shadowing        = true;
-    mat.flags.thin_walled          = false;
-    mat.flags.colored_transparency = true;
+    mat.id               = material_id_offset + mat_id;
+    mat.base_substrate   = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
+    mat.albedo.r         = wavefront_mat.diffuse_reflectivity.r;
+    mat.albedo.g         = wavefront_mat.diffuse_reflectivity.g;
+    mat.albedo.b         = wavefront_mat.diffuse_reflectivity.b;
+    mat.albedo.a         = wavefront_mat.dissolve;
+    mat.emission         = wavefront_mat.emission;
+    mat.emission_scale   = content->args.emission_scale;
+    mat.refraction_index = wavefront_mat.refraction_index;
+    mat.roughness        = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
+    mat.roughness_clamp  = 0.25f;
+    mat.emission_active  = false;
+    mat.thin_walled      = false;
+    mat.metallic         = wavefront_mat.specular_reflectivity.r > 0.5f;
+    mat.albedo_tex       = texture_offset + wavefront_mat.texture[WF_ALBEDO];
+    mat.luminance_tex    = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
+    mat.roughness_tex    = texture_offset + wavefront_mat.texture[WF_ROUGHNESS];
+    mat.metallic_tex     = texture_offset + wavefront_mat.texture[WF_METALLIC];
+    mat.normal_tex       = texture_offset + wavefront_mat.texture[WF_NORMAL];
 
     if (content->args.legacy_smoothness) {
       mat.roughness = 1.0f - mat.roughness;

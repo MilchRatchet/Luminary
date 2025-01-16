@@ -161,16 +161,22 @@ union DeviceSceneEntityCover {
 } typedef DeviceSceneEntityCover;
 
 enum DeviceMaterialFlags {
-  DEVICE_MATERIAL_FLAG_EMISSION             = 0x01,
-  DEVICE_MATERIAL_FLAG_IOR_SHADOWING        = 0x02,
+  // 1 bit for the base substrate
+  DEVICE_MATERIAL_BASE_SUBSTRATE_OPAQUE      = 0x00,
+  DEVICE_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT = 0x01,
+  DEVICE_MATERIAL_BASE_SUBSTRATE_MASK        = 0x01,
+
+  DEVICE_MATERIAL_FLAG_EMISSION             = 0x02,
   DEVICE_MATERIAL_FLAG_THIN_WALLED          = 0x04,
-  DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY = 0x08
+  DEVICE_MATERIAL_FLAG_METALLIC             = 0x08,
+  DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY = 0x10
+  // 3 bits unused
 } typedef DeviceMaterialFlags;
 
 struct DeviceMaterialCompressed {
   uint8_t flags;
   uint8_t roughness_clamp;
-  uint16_t metallic;
+  uint16_t metallic_tex;
   uint16_t roughness;
   uint16_t refraction_index;
 
@@ -186,7 +192,7 @@ struct DeviceMaterialCompressed {
 
   uint16_t albedo_tex;
   uint16_t luminance_tex;
-  uint16_t material_tex;
+  uint16_t roughness_tex;
   uint16_t normal_tex;
 } typedef DeviceMaterialCompressed;
 LUM_STATIC_SIZE_ASSERT(DeviceMaterialCompressed, 0x20u);
@@ -194,7 +200,6 @@ LUM_STATIC_SIZE_ASSERT(DeviceMaterialCompressed, 0x20u);
 struct DeviceMaterial {
   uint8_t flags;
   float roughness_clamp;
-  float metallic;
   float roughness;
   float refraction_index;
 
@@ -204,7 +209,8 @@ struct DeviceMaterial {
 
   uint16_t albedo_tex;
   uint16_t luminance_tex;
-  uint16_t material_tex;
+  uint16_t roughness_tex;
+  uint16_t metallic_tex;
   uint16_t normal_tex;
 } typedef DeviceMaterial;
 

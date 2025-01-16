@@ -442,7 +442,7 @@ __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint
     normal = scale_vector(normal, -1.0f);
   }
 
-  uint32_t flags = 0;
+  uint32_t flags = G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
 
   if (inside_water) {
     flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
@@ -461,13 +461,12 @@ __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint
   GBufferData data;
   data.instance_id = HIT_TYPE_OCEAN;
   data.tri_id      = 0;
-  data.albedo      = get_RGBAF(0.0f, 0.0f, 0.0f, 0.0f);  // Albedo doesn't matter because it is not a colored dielectric
+  data.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
   data.emission    = get_color(0.0f, 0.0f, 0.0f);
   data.normal      = normal;
   data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = roughness;
-  data.metallic    = 1.0f;
   data.state       = task.state;
   data.flags       = flags;
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;

@@ -642,9 +642,12 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   LuminaryMaterial material;
   LUM_FAILURE_HANDLE(luminary_host_get_material(host, display->pixel_query_result.material_id, &material));
 
-  bool emission_active = material.flags.emission_active != 0;
+  uint32_t base_substrate = (uint32_t) material.base_substrate;
 
   bool update_data = false;
+
+  update_data |= _window_entity_properties_add_dropdown(
+    data, "Base Substrate", LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT, (char**) luminary_strings_material_base_substrate, &base_substrate);
 
   if (material.albedo_tex == 0xFFFF) {
     update_data |= _window_entity_properties_add_slider(data, "Albedo", &material.albedo, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
@@ -652,9 +655,9 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
       _window_entity_properties_add_slider(data, "Opacity", &material.albedo.a, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   }
 
-  update_data |= _window_entity_properties_add_checkbox(data, "Emission Active", &emission_active);
+  update_data |= _window_entity_properties_add_checkbox(data, "Emission Active", &material.emission_active);
 
-  if (emission_active) {
+  if (material.emission_active) {
     if (material.luminance_tex != 0xFFFF) {
       update_data |= _window_entity_properties_add_slider(
         data, "Emission Scale", &material.emission_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
@@ -665,21 +668,30 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
     }
   }
 
-  if (material.material_tex == 0xFFFF) {
-    update_data |=
-      _window_entity_properties_add_slider(data, "Metallic", &material.metallic, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  if (material.roughness_tex == 0xFFFF) {
     update_data |=
       _window_entity_properties_add_slider(data, "Roughness", &material.roughness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   }
 
+  if ((LuminaryMaterialBaseSubstrate) base_substrate == LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE) {
+    if (material.metallic_tex == 0xFFFF) {
+      update_data |= _window_entity_properties_add_checkbox(data, "Metallic", &material.metallic);
+    }
+  }
+
   update_data |= _window_entity_properties_add_slider(
     data, "Roughness Clamp", &material.roughness_clamp, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "IOR", &material.refraction_index, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
 
-  material.flags.emission_active = (emission_active) ? 1 : 0;
+  if ((LuminaryMaterialBaseSubstrate) base_substrate == LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "IOR", &material.refraction_index, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
+  }
+
+  update_data |= _window_entity_properties_add_checkbox(data, "Colored Transparency", &material.colored_transparency);
 
   if (update_data) {
+    material.base_substrate = (LuminaryMaterialBaseSubstrate) base_substrate;
+
     LUM_FAILURE_HANDLE(luminary_host_set_material(host, display->pixel_query_result.material_id, &material));
   }
 

@@ -260,14 +260,24 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   __CHECK_NULL_ARGUMENT(device_material);
 
   device_material->flags = 0;
-  device_material->flags |= material->flags.emission_active ? DEVICE_MATERIAL_FLAG_EMISSION : 0;
-  device_material->flags |= material->flags.ior_shadowing ? DEVICE_MATERIAL_FLAG_IOR_SHADOWING : 0;
-  device_material->flags |= material->flags.thin_walled ? DEVICE_MATERIAL_FLAG_THIN_WALLED : 0;
-  device_material->flags |= material->flags.colored_transparency ? DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY : 0;
+  device_material->flags |= material->emission_active ? DEVICE_MATERIAL_FLAG_EMISSION : 0;
+  device_material->flags |= material->thin_walled ? DEVICE_MATERIAL_FLAG_THIN_WALLED : 0;
+  device_material->flags |= material->metallic ? DEVICE_MATERIAL_FLAG_METALLIC : 0;
+  device_material->flags |= material->colored_transparency ? DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY : 0;
+
+  switch (material->base_substrate) {
+    case LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE:
+      device_material->flags |= DEVICE_MATERIAL_BASE_SUBSTRATE_OPAQUE;
+      break;
+    case LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT:
+      device_material->flags |= DEVICE_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT;
+      break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid base substrate.");
+  }
 
   device_material->roughness_clamp = _device_struct_convert_float01_to_uint16(material->roughness_clamp) >> 8;
 
-  device_material->metallic         = _device_struct_convert_float01_to_uint16(material->metallic);
   device_material->roughness        = _device_struct_convert_float01_to_uint16(material->roughness);
   device_material->refraction_index = _device_struct_convert_float01_to_uint16(0.5f * (material->refraction_index - 1.0f));
 
@@ -287,7 +297,8 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->emission_scale = _device_struct_convert_float_to_uint16(material->emission_scale / emission_normalization);
   device_material->albedo_tex     = material->albedo_tex;
   device_material->luminance_tex  = material->luminance_tex;
-  device_material->material_tex   = material->material_tex;
+  device_material->roughness_tex  = material->roughness_tex;
+  device_material->metallic_tex   = material->metallic_tex;
   device_material->normal_tex     = material->normal_tex;
 
   return LUMINARY_SUCCESS;

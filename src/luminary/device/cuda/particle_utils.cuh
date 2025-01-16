@@ -34,7 +34,6 @@ __device__ GBufferData particle_generate_g_buffer(const DeviceTask task, const u
   data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = device.particles.phase_diameter;
-  data.metallic    = 0.0f;
   data.state       = task.state;
   data.flags       = 0;
   data.ior_in      = ray_ior;
