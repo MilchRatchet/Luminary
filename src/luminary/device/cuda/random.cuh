@@ -327,9 +327,8 @@ __device__ uint2
 
   uint2 quasi = random_r2(sequence_id);
 
-  // 0s are detrimental, hence we fix the lowest bit to 1, shouldn't be an issue.
-  quasi.x *= random_uint32_t_base(0xfcbd6e15, dimension_index) | 1;
-  quasi.y *= random_uint32_t_base(0x4bf53ed9, dimension_index) | 1;
+  quasi.x *= (dimension_index + 1);
+  quasi.y *= (dimension_index + 1);
 
   const uint2 pixel_offset = random_r2(dimension_index);
   const uint2 blue_noise   = random_blue_noise_mask_2D(pixel.x + (pixel_offset.x >> 25), pixel.y + (pixel_offset.y >> 25));
