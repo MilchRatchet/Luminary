@@ -39,6 +39,7 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_POWER]                = {.name = "light_compute_power", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE] = {.name = "temporal_accumulation_first_sample", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE]       = {.name = "temporal_accumulation_update", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_0]     = {.name = "temporal_accumulation_output_0", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1]     = {.name = "temporal_accumulation_output_1", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV]          = {.name = "temporal_accumulation_aov", .param_size = 0},
   [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]         = {.name = "generate_final_image", .param_size = sizeof(KernelArgsGenerateFinalImage)},

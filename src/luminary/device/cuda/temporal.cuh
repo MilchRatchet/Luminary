@@ -164,7 +164,14 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   }
 }
 
-__device__ void temporal_load_buckets(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
+__device__ void temporal_load_buckets_0(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
+  if (device.settings.num_indirect_buckets > bucket_id && device.state.sample_id > bucket_id) {
+    const RGBF* src        = device.ptrs.frame_indirect_accumulate[bucket_id];
+    buckets[num_buckets++] = load_RGBF(src + x + y * device.settings.width);
+  }
+}
+
+__device__ void temporal_load_buckets_1(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
   if (device.settings.num_indirect_buckets > bucket_id && device.state.sample_id > bucket_id) {
     const RGBF* src = device.ptrs.frame_indirect_accumulate[bucket_id];
     RGBF_load_pair(src, x, y, device.settings.width, buckets[num_buckets + 0], buckets[num_buckets + 1]);
@@ -331,6 +338,55 @@ __device__ RGBF temporal_apply_median_of_means(RGBF buckets[], const uint32_t nu
   return output;
 }
 
+LUMINARY_KERNEL void temporal_accumulation_output_0() {
+  HANDLE_DEVICE_ABORT();
+
+  const uint32_t width  = device.settings.width;
+  const uint32_t height = device.settings.height;
+
+  const uint32_t amount = width * height;
+
+  for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    const uint32_t y = offset / width;
+    const uint32_t x = offset - y * width;
+
+    uint32_t num_buckets = 0;
+    RGBF buckets[4 * 8];
+
+    temporal_load_buckets_0(0, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(1, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(2, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(3, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(4, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(5, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(6, x, y, buckets, num_buckets);
+    temporal_load_buckets_0(7, x, y, buckets, num_buckets);
+
+    RGBF output;
+
+    if (device.camera.do_firefly_clamping) {
+      output = temporal_apply_median_of_means(buckets, num_buckets);
+    }
+    else {
+      output = get_color(0.0f, 0.0f, 0.0f);
+
+      for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
+        output = add_color(output, buckets[bucket_id]);
+      }
+
+      output = scale_color(output, 1.0f / num_buckets);
+    }
+
+    if (device.camera.indirect_only == false) {
+      const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + x + y * device.settings.width);
+
+      output = add_color(output, direct);
+    }
+
+    store_RGBF(device.ptrs.frame_accumulate + x + y * device.settings.width, output);
+  }
+}
+
 LUMINARY_KERNEL void temporal_accumulation_output_1() {
   HANDLE_DEVICE_ABORT();
 
@@ -349,14 +405,14 @@ LUMINARY_KERNEL void temporal_accumulation_output_1() {
     uint32_t num_buckets = 0;
     RGBF buckets[4 * 8];
 
-    temporal_load_buckets(0, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(1, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(2, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(3, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(4, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(5, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(6, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets(7, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(0, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(1, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(2, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(3, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(4, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(5, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(6, base_x, base_y, buckets, num_buckets);
+    temporal_load_buckets_1(7, base_x, base_y, buckets, num_buckets);
 
     RGBF output00;
     RGBF output01;

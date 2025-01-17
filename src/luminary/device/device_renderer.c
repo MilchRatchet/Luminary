@@ -320,12 +320,20 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, callback_data));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-        if (device->sample_count.current_sample_count == 0) {
+        if (device->sample_count.current_sample_count == 0 || (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK)) {
           __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE], device->stream_main));
         }
         else {
           __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE], device->stream_main));
-          __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1], device->stream_main));
+
+          if (device->constant_memory->settings.supersampling == 0) {
+            __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_0], device->stream_main));
+          }
+          else if (device->constant_memory->settings.supersampling == 1) {
+            __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1], device->stream_main));
+          }
+          else {
+          }
         }
 
         if ((device->undersampling_state & ~UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0) {
