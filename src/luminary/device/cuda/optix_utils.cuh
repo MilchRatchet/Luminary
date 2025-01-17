@@ -13,10 +13,6 @@
 #define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
 #endif
 
-#ifndef OPTIX_PAYLOAD_IOR
-#define OPTIX_PAYLOAD_IOR 0
-#endif
-
 #ifndef OPTIX_PAYLOAD_COMPRESSED_ALPHA
 #define OPTIX_PAYLOAD_COMPRESSED_ALPHA 0
 #endif
@@ -106,14 +102,6 @@ __device__ CompressedAlpha optixGetPayloadCompressedAlpha() {
 __device__ void optixSetPayloadCompressedAlpha(const CompressedAlpha alpha) {
   optixSetPayloadGeneric(OPTIX_PAYLOAD_COMPRESSED_ALPHA, alpha.data0);
   optixSetPayloadGeneric(OPTIX_PAYLOAD_COMPRESSED_ALPHA + 1, alpha.data1);
-}
-
-__device__ uint32_t optixGetPayloadIOR() {
-  return optixGetPayloadGeneric(OPTIX_PAYLOAD_IOR);
-}
-
-__device__ void optixSetPayloadIOR(const unsigned int ior) {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_IOR, ior);
 }
 
 __device__ float optixGetPayloadDepth() {

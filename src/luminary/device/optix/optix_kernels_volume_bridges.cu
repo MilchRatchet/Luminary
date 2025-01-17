@@ -7,7 +7,6 @@
 
 #define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
 #define OPTIX_PAYLOAD_COMPRESSED_ALPHA 2
-#define OPTIX_PAYLOAD_IOR 4
 
 #include "bridges.cuh"
 #include "bsdf.cuh"
@@ -66,7 +65,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const float ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
 
-    RGBF light_color  = bridges_sample(task, volume, ior, true);
+    RGBF light_color  = bridges_sample(task, volume, true);
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
     light_color       = mul_color(light_color, record);
 

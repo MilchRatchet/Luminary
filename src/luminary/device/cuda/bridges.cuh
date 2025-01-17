@@ -243,7 +243,7 @@ __device__ RGBF bridges_sample_bridge(
 // TODO: Check if I can maybe get rid of all these duplicate computations and just reuse what I computed in the RIS step.
 __device__ RGBF bridges_evaluate_bridge(
   const DeviceTask task, const VolumeDescriptor volume, const vec3 start_vertex, const TriangleHandle light_handle, const uint32_t seed,
-  const Quaternion rotation, const float scale, const float ior, const ushort2 pixel) {
+  const Quaternion rotation, const float scale, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Get light sample
   ////////////////////////////////////////////////////////////////////
@@ -291,8 +291,6 @@ __device__ RGBF bridges_evaluate_bridge(
   vec3 current_direction_sampled = normalize_vector(light_vector);
   vec3 current_direction         = quaternion_apply(rotation, current_direction_sampled);
 
-  unsigned int compressed_ior = ior_compress(ior);
-
   // Apply phase function of first direction.
   const float cos_angle = dot_product(current_direction, task.ray);
 
@@ -304,8 +302,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
   float dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel)) * scale;
 
-  light_color =
-    mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel, compressed_ior));
+  light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel));
 
   sum_dist += dist;
 
@@ -320,8 +317,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel)) * scale;
 
-    light_color =
-      mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel, compressed_ior));
+    light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel));
 
     sum_dist += dist;
   }
@@ -333,7 +329,7 @@ __device__ RGBF bridges_evaluate_bridge(
   return light_color;
 }
 
-__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float ior, const bool sample_prefix) {
+__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const bool sample_prefix) {
   vec3 start_vertex = task.origin;
   RGBF prefix_color = get_color(1.0f, 1.0f, 1.0f);
 
@@ -344,12 +340,10 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
 
     prefix_color = scale_color(prefix_color, 1.0f / pdf);
 
-    unsigned int compressed_ior = ior_compress(ior);
-
     // Invalid handle, we don't have a target light yet.
     const TriangleHandle target_light = triangle_handle_get(HIT_TYPE_INVALID, 0);
 
-    const RGBF visibility = optix_geometry_shadowing(start_vertex, task.ray, dist, target_light, task.index, compressed_ior);
+    const RGBF visibility = optix_geometry_shadowing(start_vertex, task.ray, dist, target_light, task.index);
     prefix_color          = mul_color(prefix_color, visibility);
 
     prefix_color.r *= expf(-dist * (volume.scattering.r + volume.absorption.r)) * volume.scattering.r;
@@ -483,7 +477,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF bridge_color =
-    bridges_evaluate_bridge(task, volume, start_vertex, selected_handle, selected_seed, selected_rotation, selected_scale, ior, task.index);
+    bridges_evaluate_bridge(task, volume, start_vertex, selected_handle, selected_seed, selected_rotation, selected_scale, task.index);
 
   bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : get_color(0.0f, 0.0f, 0.0f);
   bridge_color = mul_color(bridge_color, prefix_color);

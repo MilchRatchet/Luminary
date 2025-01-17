@@ -7,7 +7,6 @@
 
 #define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
 #define OPTIX_PAYLOAD_COMPRESSED_ALPHA 2
-#define OPTIX_PAYLOAD_IOR 4
 
 #include "bsdf.cuh"
 #include "directives.cuh"

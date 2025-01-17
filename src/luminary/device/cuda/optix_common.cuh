@@ -126,8 +126,8 @@ __device__ bool particle_opacity_cutout(const float2 coord) {
 }
 
 #ifdef SHADING_KERNEL
-__device__ RGBF optix_geometry_shadowing(
-  const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const ushort2 index, unsigned int& compressed_ior) {
+__device__ RGBF
+  optix_geometry_shadowing(const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const ushort2 index) {
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
@@ -142,18 +142,13 @@ __device__ RGBF optix_geometry_shadowing(
 
   OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 0);
   OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_COMPRESSED_ALPHA, 2);
-  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_IOR, 4);
   optixTrace(
     device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, OPTIX_SBT_OFFSET_SHADOW_TRACE, 0, 0,
-    target_light.instance_id, target_light.tri_id, alpha.data0, alpha.data1, compressed_ior);
+    target_light.instance_id, target_light.tri_id, alpha.data0, alpha.data1);
 
   RGBF visibility = optix_decompress_color(alpha);
 
   if (target_light.instance_id == HIT_TYPE_REJECT) {
-    visibility = get_color(0.0f, 0.0f, 0.0f);
-  }
-
-  if (optix_evaluate_ior_culling(compressed_ior, index)) {
     visibility = get_color(0.0f, 0.0f, 0.0f);
   }
 

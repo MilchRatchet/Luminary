@@ -116,10 +116,9 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   ////////////////////////////////////////////////////////////////////
 
   // TODO: Add specialized anyhit shaders for non geometry lights
-  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index);
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
@@ -241,11 +240,10 @@ __device__ RGBF
   // Compute visibility term
   ////////////////////////////////////////////////////////////////////
 
-  unsigned int compressed_ior = ior_compress(is_underwater ? device.ocean.refractive_index : 1.0f);
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
-  visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, handle, index, compressed_ior));
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index);
+  visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, handle, index));
   visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, sun_dist));
 
   if (is_underwater) {
@@ -361,9 +359,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
 
   position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
-  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, light_handle, index, compressed_ior);
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, light_handle, index);
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   light_color = mul_color(light_color, visibility);
@@ -404,10 +400,9 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
 
   RGBF sky_light = sky_color_no_compute(position, ray, data.state, get_pixel_id(index), index);
 
-  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  sky_light = mul_color(sky_light, optix_geometry_shadowing(position, ray, FLT_MAX, handle, index, compressed_ior));
+  sky_light = mul_color(sky_light, optix_geometry_shadowing(position, ray, FLT_MAX, handle, index));
   sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
   sky_light = mul_color(sky_light, sample_weight);
 
