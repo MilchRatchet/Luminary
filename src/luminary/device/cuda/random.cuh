@@ -94,14 +94,19 @@
 // a key of alternating 0s and 1s in binary plus the thread ID.
 //
 
-#define BLUENOISE_TEX_DIM 128
-#define BLUENOISE_TEX_DIM_MASK 0x7F
+#define BLUENOISE_TEX_DIM 256
+#define BLUENOISE_TEX_DIM_MASK 0xFF
 
 enum QuasiRandomTargetAllocation : uint32_t {
+  // Elevated importance targets
+  QUASI_RANDOM_TARGET_ALLOCATION_LENS            = 1,
+  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_MICROFACET = 1,
+  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_DIFFUSE    = 1,
+  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_REFRACTION = 1,
+  // Standard importance targets
   QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_DIR_CHOICE        = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_DIR               = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_OPACITY           = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_LENS                     = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_LENS_BLADE               = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_VOLUME_DIST              = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_RUSSIAN_ROULETTE         = 1,
@@ -112,9 +117,6 @@ enum QuasiRandomTargetAllocation : uint32_t {
   QUASI_RANDOM_TARGET_ALLOCATION_CLOUD_DIR                = 128,
   QUASI_RANDOM_TARGET_ALLOCATION_SKY_STEP_OFFSET          = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_SKY_INSCATTERING_STEP    = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_MICROFACET          = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_DIFFUSE             = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_REFRACTION          = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BSDF_RIS_DIFFUSE         = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BSDF_RIS_REFRACTION      = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_RIS_LIGHT_ID             = (32 * 32),
@@ -124,7 +126,7 @@ enum QuasiRandomTargetAllocation : uint32_t {
   QUASI_RANDOM_TARGET_ALLOCATION_CAUSTIC_INITIAL          = 128,
   QUASI_RANDOM_TARGET_ALLOCATION_CAUSTIC_RESAMPLE         = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_CAUSTIC_SUN_DIR          = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_BSDF           = 2,
+  QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_BSDF           = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_BSDF               = (2 * 32),
   QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_RAY            = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_RIS_RESAMPLING = 1,
@@ -140,11 +142,14 @@ enum QuasiRandomTargetAllocation : uint32_t {
 #define QUASI_RANDOM_TARGET_ALLOC(name) (QUASI_RANDOM_TARGET_##name + QUASI_RANDOM_TARGET_ALLOCATION_##name)
 
 enum QuasiRandomTarget : uint32_t {
-  QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE        = 0,
-  QUASI_RANDOM_TARGET_BOUNCE_DIR               = QUASI_RANDOM_TARGET_ALLOC(BOUNCE_DIR_CHOICE),
-  QUASI_RANDOM_TARGET_BOUNCE_OPACITY           = QUASI_RANDOM_TARGET_ALLOC(BOUNCE_DIR),
-  QUASI_RANDOM_TARGET_LENS                     = QUASI_RANDOM_TARGET_ALLOC(BOUNCE_OPACITY),
-  QUASI_RANDOM_TARGET_LENS_BLADE               = QUASI_RANDOM_TARGET_ALLOC(LENS),
+  // Elevated importance targets
+  QUASI_RANDOM_TARGET_LENS            = 0,
+  QUASI_RANDOM_TARGET_BSDF_MICROFACET = QUASI_RANDOM_TARGET_ALLOC(LENS),
+  QUASI_RANDOM_TARGET_BSDF_DIFFUSE    = QUASI_RANDOM_TARGET_ALLOC(BSDF_MICROFACET),
+  QUASI_RANDOM_TARGET_BSDF_REFRACTION = QUASI_RANDOM_TARGET_ALLOC(BSDF_DIFFUSE),
+  // Standard importance targets
+  QUASI_RANDOM_TARGET_BOUNCE_OPACITY           = QUASI_RANDOM_TARGET_ALLOC(BSDF_REFRACTION),
+  QUASI_RANDOM_TARGET_LENS_BLADE               = QUASI_RANDOM_TARGET_ALLOC(BOUNCE_OPACITY),
   QUASI_RANDOM_TARGET_VOLUME_DIST              = QUASI_RANDOM_TARGET_ALLOC(LENS_BLADE),
   QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE         = QUASI_RANDOM_TARGET_ALLOC(VOLUME_DIST),
   QUASI_RANDOM_TARGET_CAMERA_JITTER            = QUASI_RANDOM_TARGET_ALLOC(RUSSIAN_ROULETTE),
@@ -154,10 +159,7 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_CLOUD_DIR                = QUASI_RANDOM_TARGET_ALLOC(CLOUD_STEP_COUNT),
   QUASI_RANDOM_TARGET_SKY_STEP_OFFSET          = QUASI_RANDOM_TARGET_ALLOC(CLOUD_DIR),
   QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP    = QUASI_RANDOM_TARGET_ALLOC(SKY_STEP_OFFSET),
-  QUASI_RANDOM_TARGET_BSDF_MICROFACET          = QUASI_RANDOM_TARGET_ALLOC(SKY_INSCATTERING_STEP),
-  QUASI_RANDOM_TARGET_BSDF_DIFFUSE             = QUASI_RANDOM_TARGET_ALLOC(BSDF_MICROFACET),
-  QUASI_RANDOM_TARGET_BSDF_REFRACTION          = QUASI_RANDOM_TARGET_ALLOC(BSDF_DIFFUSE),
-  QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE         = QUASI_RANDOM_TARGET_ALLOC(BSDF_REFRACTION),
+  QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE         = QUASI_RANDOM_TARGET_ALLOC(SKY_INSCATTERING_STEP),
   QUASI_RANDOM_TARGET_BSDF_RIS_REFRACTION      = QUASI_RANDOM_TARGET_ALLOC(BSDF_RIS_DIFFUSE),
   QUASI_RANDOM_TARGET_RIS_LIGHT_ID             = QUASI_RANDOM_TARGET_ALLOC(BSDF_RIS_REFRACTION),
   QUASI_RANDOM_TARGET_RIS_RAY_DIR              = QUASI_RANDOM_TARGET_ALLOC(RIS_LIGHT_ID),
@@ -180,6 +182,10 @@ enum QuasiRandomTarget : uint32_t {
 
   QUASI_RANDOM_TARGET_COUNT = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_RESAMPLING)
 } typedef QuasiRandomTarget;
+
+// Target reuse, these targets are used mutually exclusive with the other
+#define QUASI_RANDOM_TARGET_BSDF_VOLUME QUASI_RANDOM_TARGET_BSDF_MICROFACET
+#define QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE QUASI_RANDOM_TARGET_BSDF_DIFFUSE
 
 ////////////////////////////////////////////////////////////////////
 // Literature
@@ -232,17 +238,33 @@ __device__ float random_saturate(const float random) {
 
 // Integer fractions of the actual numbers
 #define R1_PHI1 2654435769u /* 0.61803398875f */
-#define R2_PHI1 3242174889u /* 0.7548776662f  */
-#define R2_PHI2 2447445413u /* 0.56984029f    */
+// #define R2_PHI1 3242174889u /* 0.7548776662f  */
+// #define R2_PHI2 2447445413u /* 0.56984029f    */
+#define R2_PHI1 (908u << 22)
+#define R2_PHI2 (704u << 22)
+#define K2_PHI1 3316612455u /* 0.7548776662f  */
+#define K2_PHI2 1538627357u /* 0.56984029f    */
+
+#define RANDOM_KRONECKER_SEQUENCE_MASK 0x3
+#define RANDOM_KRONECKER_SEQUENCE_SHIFT 2
+
+__constant__ uint32_t kronecker_params[] = {
+  3242174889u,  2447445413u,   // Roberts 2018
+  3242174889u,  2447445413u,   // Patel 2022
+  (908u << 22), (704u << 22),  // Generated
+  (540u << 22), (832u << 22)   // Generated
+};
 
 __device__ uint32_t random_r1(const uint32_t offset) {
   return offset * R1_PHI1;
 }
 
-// [Rob18]
-__device__ uint2 random_r2(const uint32_t offset) {
-  const uint32_t v1 = offset * R2_PHI1;
-  const uint32_t v2 = offset * R2_PHI2;
+__device__ uint2 random_k2(const uint32_t offset, const uint32_t dimension) {
+  uint32_t v1 = offset * kronecker_params[2 * (dimension & RANDOM_KRONECKER_SEQUENCE_MASK) + 0];
+  uint32_t v2 = offset * kronecker_params[2 * (dimension & RANDOM_KRONECKER_SEQUENCE_MASK) + 1];
+
+  v1 *= (1 + (dimension >> RANDOM_KRONECKER_SEQUENCE_SHIFT));
+  v2 *= (1 + (dimension >> RANDOM_KRONECKER_SEQUENCE_SHIFT));
 
   return make_uint2(v1, v2);
 }
@@ -325,13 +347,10 @@ __device__ uint2
   quasirandom_sequence_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   uint32_t dimension_index = target + depth * QUASI_RANDOM_TARGET_COUNT;
 
-  uint2 quasi = random_r2(sequence_id);
+  uint2 quasi = random_k2(sequence_id + 1, dimension_index);
 
-  quasi.x *= (dimension_index + 1);
-  quasi.y *= (dimension_index + 1);
-
-  const uint2 pixel_offset = random_r2(dimension_index);
-  const uint2 blue_noise   = random_blue_noise_mask_2D(pixel.x + (pixel_offset.x >> 25), pixel.y + (pixel_offset.y >> 25));
+  const uint2 pixel_offset = random_k2(dimension_index, 0);
+  const uint2 blue_noise   = random_blue_noise_mask_2D(pixel.x + (pixel_offset.x >> 24), pixel.y + (pixel_offset.y >> 24));
 
   quasi.x += blue_noise.x;
   quasi.y += blue_noise.y;
