@@ -14,9 +14,8 @@
 
 enum DisplayMouseMode {
   DISPLAY_MOUSE_MODE_DEFAULT,
-  DISPLAY_MOUSE_MODE_SELECT_MATERIAL,
-  DISPLAY_MOUSE_MODE_SELECT_INSTANCE,
-  DISPLAY_MOUSE_MODE_FOCUS_CAMERA,
+  DISPLAY_MOUSE_MODE_SELECT,
+  DISPLAY_MOUSE_MODE_FOCUS,
   DISPLAY_MOUSE_MODE_COUNT
 } typedef DisplayMouseMode;
 
@@ -46,7 +45,9 @@ struct Display {
   SDL_Cursor* sdl_cursors[SDL_SYSTEM_CURSOR_COUNT];
   SDL_SystemCursor selected_cursor;
   DisplayMouseMode mouse_mode;
-  LuminaryPixelQueryResult pixel_query_result;
+  LuminaryPixelQueryResult move_pixel_data;
+  LuminaryPixelQueryResult select_pixel_data;
+  LuminaryPixelQueryResult focus_pixel_data;
   bool awaiting_pixel_query_result;
   uint32_t reference_x;
   uint32_t reference_y;

@@ -619,7 +619,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
     window, mouse_state,
     (ElementSeparatorArgs){.text = "Material", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
-  const bool material_is_selected = display->pixel_query_result.pixel_query_is_valid && display->pixel_query_result.material_id != 0xFFFF;
+  const bool material_is_selected = display->select_pixel_data.pixel_query_is_valid && display->select_pixel_data.material_id != 0xFFFF;
 
   // TODO: If there is a selected material.
   if (!material_is_selected) {
@@ -640,7 +640,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   }
 
   LuminaryMaterial material;
-  LUM_FAILURE_HANDLE(luminary_host_get_material(host, display->pixel_query_result.material_id, &material));
+  LUM_FAILURE_HANDLE(luminary_host_get_material(host, display->select_pixel_data.material_id, &material));
 
   uint32_t base_substrate = (uint32_t) material.base_substrate;
 
@@ -692,7 +692,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
   if (update_data) {
     material.base_substrate = (LuminaryMaterialBaseSubstrate) base_substrate;
 
-    LUM_FAILURE_HANDLE(luminary_host_set_material(host, display->pixel_query_result.material_id, &material));
+    LUM_FAILURE_HANDLE(luminary_host_set_material(host, display->select_pixel_data.material_id, &material));
   }
 
   return update_data;

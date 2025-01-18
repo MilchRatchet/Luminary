@@ -63,17 +63,13 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
   return false;
 }
 
-static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] = {
-  [DISPLAY_MOUSE_MODE_DEFAULT]         = "Move",
-  [DISPLAY_MOUSE_MODE_SELECT_MATERIAL] = "Select Material",
-  [DISPLAY_MOUSE_MODE_SELECT_INSTANCE] = "Select Instance",
-  [DISPLAY_MOUSE_MODE_FOCUS_CAMERA]    = "Focus Camera"};
+static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] =
+  {[DISPLAY_MOUSE_MODE_DEFAULT] = "Move", [DISPLAY_MOUSE_MODE_SELECT] = "Select", [DISPLAY_MOUSE_MODE_FOCUS] = "Focus Camera"};
 
 static const ElementButtonImage _window_mouse_modes_button_images[DISPLAY_MOUSE_MODE_COUNT] = {
-  [DISPLAY_MOUSE_MODE_DEFAULT]         = ELEMENT_BUTTON_IMAGE_MOVE,
-  [DISPLAY_MOUSE_MODE_SELECT_MATERIAL] = ELEMENT_BUTTON_IMAGE_SELECT_MATERIAL,
-  [DISPLAY_MOUSE_MODE_SELECT_INSTANCE] = ELEMENT_BUTTON_IMAGE_SELECT_INSTANCE,
-  [DISPLAY_MOUSE_MODE_FOCUS_CAMERA]    = ELEMENT_BUTTON_IMAGE_FOCUS};
+  [DISPLAY_MOUSE_MODE_DEFAULT] = ELEMENT_BUTTON_IMAGE_MOVE,
+  [DISPLAY_MOUSE_MODE_SELECT]  = ELEMENT_BUTTON_IMAGE_SELECT,
+  [DISPLAY_MOUSE_MODE_FOCUS]   = ELEMENT_BUTTON_IMAGE_FOCUS};
 
 static bool _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);

@@ -160,8 +160,8 @@ void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
   display->mouse_mode = mouse_mode;
 
   // Invalidate the result
-  if (mouse_mode == DISPLAY_MOUSE_MODE_FOCUS_CAMERA) {
-    display->pixel_query_result.pixel_query_is_valid = false;
+  if (mouse_mode == DISPLAY_MOUSE_MODE_FOCUS) {
+    display->focus_pixel_data.pixel_query_is_valid = false;
   }
 
   _display_set_hittest(display, (mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
@@ -260,9 +260,8 @@ static void _display_set_default_cursor(Display* display) {
     default:
       cursor = SDL_SYSTEM_CURSOR_DEFAULT;
       break;
-    case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
-    case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
-    case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
+    case DISPLAY_MOUSE_MODE_SELECT:
+    case DISPLAY_MOUSE_MODE_FOCUS:
       cursor = (mouse_hovers_background) ? SDL_SYSTEM_CURSOR_POINTER : SDL_SYSTEM_CURSOR_DEFAULT;
       break;
   }
@@ -282,12 +281,26 @@ static void _display_query_pixel_info(Display* display, LuminaryHost* host, floa
   const uint16_t x = rel_x * settings.width;
   const uint16_t y = rel_y * settings.height;
 
-  LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &display->pixel_query_result));
+  LuminaryPixelQueryResult result;
+
+  LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &result));
 
   display->reference_x = request_x;
   display->reference_y = request_y;
 
-  display->awaiting_pixel_query_result = !display->pixel_query_result.pixel_query_is_valid;
+  display->awaiting_pixel_query_result = !result.pixel_query_is_valid;
+
+  switch (display->mouse_mode) {
+    case DISPLAY_MOUSE_MODE_DEFAULT:
+      display->move_pixel_data = result;
+      break;
+    case DISPLAY_MOUSE_MODE_SELECT:
+      display->select_pixel_data = result;
+      break;
+    case DISPLAY_MOUSE_MODE_FOCUS:
+      display->focus_pixel_data = result;
+      break;
+  }
 }
 
 static void _display_start_camera_mode(Display* display, const bool left_pressed) {
@@ -295,7 +308,7 @@ static void _display_start_camera_mode(Display* display, const bool left_pressed
   display_set_mouse_visible(display, false);
 
   camera_handler_set_mode(display->camera_handler, (left_pressed) ? CAMERA_MODE_ORBIT : CAMERA_MODE_ZOOM);
-  camera_handler_set_reference_pos(display->camera_handler, display->pixel_query_result.rel_hit_pos);
+  camera_handler_set_reference_pos(display->camera_handler, display->move_pixel_data.rel_hit_pos);
 }
 
 static WindowVisibilityMask _display_get_window_visibility_mask(Display* display) {
@@ -372,14 +385,13 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
         if ((left_down || right_down) && alt_down) {
           _display_query_pixel_info(display, host, display->reference_x, display->reference_y);
 
-          if (display->pixel_query_result.pixel_query_is_valid) {
+          if (display->move_pixel_data.pixel_query_is_valid) {
             _display_start_camera_mode(display, left_down);
           }
         }
       } break;
-      case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
-      case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
-      case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
+      case DISPLAY_MOUSE_MODE_SELECT:
+      case DISPLAY_MOUSE_MODE_FOCUS:
         _display_query_pixel_info(display, host, display->reference_x, display->reference_y);
         break;
     }
@@ -398,15 +410,11 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     }
 
     if (display->keyboard_state->keys[SDL_SCANCODE_2].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_MATERIAL);
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT);
     }
 
     if (display->keyboard_state->keys[SDL_SCANCODE_3].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT_INSTANCE);
-    }
-
-    if (display->keyboard_state->keys[SDL_SCANCODE_4].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS_CAMERA);
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
     }
 
     if (!ui_handled_mouse) {
@@ -421,7 +429,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             if ((left_pressed || right_pressed) && alt_down) {
               _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
 
-              if (display->pixel_query_result.pixel_query_is_valid) {
+              if (display->move_pixel_data.pixel_query_is_valid) {
                 _display_start_camera_mode(display, left_pressed);
               }
             }
@@ -442,9 +450,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             }
           }
           break;
-        case DISPLAY_MOUSE_MODE_SELECT_MATERIAL:
-        case DISPLAY_MOUSE_MODE_SELECT_INSTANCE:
-        case DISPLAY_MOUSE_MODE_FOCUS_CAMERA:
+        case DISPLAY_MOUSE_MODE_SELECT:
+        case DISPLAY_MOUSE_MODE_FOCUS:
           if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
             _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
           }
@@ -452,17 +459,17 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       }
     }
 
-    if (display->mouse_mode == DISPLAY_MOUSE_MODE_FOCUS_CAMERA && display->pixel_query_result.pixel_query_is_valid) {
-      if (display->pixel_query_result.depth != FLT_MAX && display->pixel_query_result.depth > 0) {
+    if (display->mouse_mode == DISPLAY_MOUSE_MODE_FOCUS && display->focus_pixel_data.pixel_query_is_valid) {
+      if (display->focus_pixel_data.depth != FLT_MAX && display->focus_pixel_data.depth > 0) {
         LuminaryCamera camera;
         LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
-        camera.focal_length = display->pixel_query_result.depth;
+        camera.focal_length = display->focus_pixel_data.depth;
 
         LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
 
         // Invalidate the pixel query so that it does not keep overriding the focal length now.
-        display->pixel_query_result.pixel_query_is_valid = false;
+        display->focus_pixel_data.pixel_query_is_valid = false;
       }
     }
   }
