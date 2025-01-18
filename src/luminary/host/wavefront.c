@@ -757,6 +757,13 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
+    const bool has_albedo_tex    = (wavefront_mat.texture[WF_ALBEDO] != TEXTURE_NONE);
+    const bool has_luminance_tex = (wavefront_mat.texture[WF_LUMINANCE] != TEXTURE_NONE);
+    const bool has_roughness_tex = (wavefront_mat.texture[WF_ROUGHNESS] != TEXTURE_NONE);
+    const bool has_metallic_tex  = (wavefront_mat.texture[WF_METALLIC] != TEXTURE_NONE);
+    const bool has_normal_tex    = (wavefront_mat.texture[WF_NORMAL] != TEXTURE_NONE);
+    const bool has_emission = (wavefront_mat.emission.r > 0.0f) || (wavefront_mat.emission.g > 0.0f) || (wavefront_mat.emission.b > 0.0f);
+
     Material mat;
     mat.id               = material_id_offset + mat_id;
     mat.base_substrate   = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
@@ -769,14 +776,14 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     mat.refraction_index = wavefront_mat.refraction_index;
     mat.roughness        = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
     mat.roughness_clamp  = 0.25f;
-    mat.emission_active  = false;
+    mat.emission_active  = has_luminance_tex || has_emission;
     mat.thin_walled      = false;
     mat.metallic         = wavefront_mat.specular_reflectivity.r > 0.5f;
-    mat.albedo_tex       = texture_offset + wavefront_mat.texture[WF_ALBEDO];
-    mat.luminance_tex    = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
-    mat.roughness_tex    = texture_offset + wavefront_mat.texture[WF_ROUGHNESS];
-    mat.metallic_tex     = texture_offset + wavefront_mat.texture[WF_METALLIC];
-    mat.normal_tex       = texture_offset + wavefront_mat.texture[WF_NORMAL];
+    mat.albedo_tex       = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
+    mat.luminance_tex    = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
+    mat.roughness_tex    = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
+    mat.metallic_tex     = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
+    mat.normal_tex       = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
 
     if (content->args.legacy_smoothness) {
       mat.roughness = 1.0f - mat.roughness;

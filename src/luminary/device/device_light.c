@@ -1345,19 +1345,22 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
   bool material_is_dirty = false;
   *meshes_need_update    = false;
 
-  const bool has_textured_emission = material->luminance_tex != TEXTURE_NONE;
-  if (cache->has_textured_emission != has_textured_emission) {
-    cache->has_textured_emission = has_textured_emission;
-    material_is_dirty            = true;
-  }
+  float intensity = 0.0f;
 
-  float intensity;
-  if (has_textured_emission) {
-    // TODO: Check if triangle_has_textured_emission && (emission texture hash are not equal) then reintegrate.
-    intensity = material->emission_scale;
-  }
-  else {
-    intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+  if (material->emission_active) {
+    const bool has_textured_emission = material->luminance_tex != TEXTURE_NONE;
+    if (cache->has_textured_emission != has_textured_emission) {
+      cache->has_textured_emission = has_textured_emission;
+      material_is_dirty            = true;
+    }
+
+    if (has_textured_emission) {
+      // TODO: Check if triangle_has_textured_emission && (emission texture hash are not equal) then reintegrate.
+      intensity = material->emission_scale;
+    }
+    else {
+      intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+    }
   }
 
   if (cache->constant_emission_intensity != intensity) {
