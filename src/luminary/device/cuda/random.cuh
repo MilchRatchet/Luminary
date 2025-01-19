@@ -98,12 +98,10 @@
 #define BLUENOISE_TEX_DIM_MASK 0xFF
 
 enum QuasiRandomTargetAllocation : uint32_t {
-  // Elevated importance targets
-  QUASI_RANDOM_TARGET_ALLOCATION_LENS            = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_MICROFACET = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_DIFFUSE    = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_REFRACTION = 1,
-  // Standard importance targets
+  QUASI_RANDOM_TARGET_ALLOCATION_LENS                     = 1,
+  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_MICROFACET          = 1,
+  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_DIFFUSE             = 1,
+  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_REFRACTION          = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_DIR_CHOICE        = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_DIR               = 1,
   QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_OPACITY           = 1,
@@ -142,12 +140,10 @@ enum QuasiRandomTargetAllocation : uint32_t {
 #define QUASI_RANDOM_TARGET_ALLOC(name) (QUASI_RANDOM_TARGET_##name + QUASI_RANDOM_TARGET_ALLOCATION_##name)
 
 enum QuasiRandomTarget : uint32_t {
-  // Elevated importance targets
-  QUASI_RANDOM_TARGET_LENS            = 0,
-  QUASI_RANDOM_TARGET_BSDF_MICROFACET = QUASI_RANDOM_TARGET_ALLOC(LENS),
-  QUASI_RANDOM_TARGET_BSDF_DIFFUSE    = QUASI_RANDOM_TARGET_ALLOC(BSDF_MICROFACET),
-  QUASI_RANDOM_TARGET_BSDF_REFRACTION = QUASI_RANDOM_TARGET_ALLOC(BSDF_DIFFUSE),
-  // Standard importance targets
+  QUASI_RANDOM_TARGET_LENS                     = 0,
+  QUASI_RANDOM_TARGET_BSDF_MICROFACET          = QUASI_RANDOM_TARGET_ALLOC(LENS),
+  QUASI_RANDOM_TARGET_BSDF_DIFFUSE             = QUASI_RANDOM_TARGET_ALLOC(BSDF_MICROFACET),
+  QUASI_RANDOM_TARGET_BSDF_REFRACTION          = QUASI_RANDOM_TARGET_ALLOC(BSDF_DIFFUSE),
   QUASI_RANDOM_TARGET_BOUNCE_OPACITY           = QUASI_RANDOM_TARGET_ALLOC(BSDF_REFRACTION),
   QUASI_RANDOM_TARGET_LENS_BLADE               = QUASI_RANDOM_TARGET_ALLOC(BOUNCE_OPACITY),
   QUASI_RANDOM_TARGET_VOLUME_DIST              = QUASI_RANDOM_TARGET_ALLOC(LENS_BLADE),
@@ -236,37 +232,48 @@ __device__ float random_saturate(const float random) {
 // Random number generators
 ////////////////////////////////////////////////////////////////////
 
+// Permutation function for padding from pbrt-v4, licensed under the Apache-2.0 license
+__device__ uint32_t random_permute_sequence(uint32_t index, const uint32_t length, const uint32_t hash) {
+  uint32_t w = length - 1;
+  w |= w >> 1;
+  w |= w >> 2;
+  w |= w >> 4;
+  w |= w >> 8;
+  w |= w >> 16;
+
+  do {
+    index ^= hash;
+    index *= 0xe170893d;
+    index ^= hash >> 16;
+    index ^= (index & w) >> 4;
+    index ^= hash >> 8;
+    index *= 0x0929eb3f;
+    index ^= hash >> 23;
+    index ^= (index & w) >> 1;
+    index *= 1 | hash >> 27;
+    index *= 0x6935fa69;
+    index ^= (index & w) >> 11;
+    index *= 0x74dcb303;
+    index ^= (index & w) >> 2;
+    index *= 0x9e501cc3;
+    index ^= (index & w) >> 2;
+    index *= 0xc860a3df;
+    index &= w;
+    index ^= index >> 5;
+  } while (index >= length);
+
+  return (index + hash) & (length - 1);
+}
+
 // Integer fractions of the actual numbers
 #define R1_PHI1 2654435769u /* 0.61803398875f */
-// #define R2_PHI1 3242174889u /* 0.7548776662f  */
-// #define R2_PHI2 2447445413u /* 0.56984029f    */
-#define R2_PHI1 (908u << 22)
-#define R2_PHI2 (704u << 22)
-#define K2_PHI1 3316612455u /* 0.7548776662f  */
-#define K2_PHI2 1538627357u /* 0.56984029f    */
+#define R2_PHI1 3242174889u /* 0.7548776662f  */
+#define R2_PHI2 2447445413u /* 0.56984029f    */
 
-#define RANDOM_KRONECKER_SEQUENCE_MASK 0x3
-#define RANDOM_KRONECKER_SEQUENCE_SHIFT 2
-
-__constant__ uint32_t kronecker_params[] = {
-  3242174889u,  2447445413u,   // Roberts 2018
-  3242174889u,  2447445413u,   // Patel 2022
-  (908u << 22), (704u << 22),  // Generated
-  (540u << 22), (832u << 22)   // Generated
-};
+#define RANDOM_KRONECKER_SEQUENCE_LENGTH (1u << 14)
 
 __device__ uint32_t random_r1(const uint32_t offset) {
   return offset * R1_PHI1;
-}
-
-__device__ uint2 random_k2(const uint32_t offset, const uint32_t dimension) {
-  uint32_t v1 = offset * kronecker_params[2 * (dimension & RANDOM_KRONECKER_SEQUENCE_MASK) + 0];
-  uint32_t v2 = offset * kronecker_params[2 * (dimension & RANDOM_KRONECKER_SEQUENCE_MASK) + 1];
-
-  v1 *= (1 + (dimension >> RANDOM_KRONECKER_SEQUENCE_SHIFT));
-  v2 *= (1 + (dimension >> RANDOM_KRONECKER_SEQUENCE_SHIFT));
-
-  return make_uint2(v1, v2);
 }
 
 // This is the base generator for random 32 bits.
@@ -312,6 +319,26 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
   return (x * x + y) >> 16;
 }
 
+__device__ uint2 random_r2_base(const uint32_t index) {
+  const uint32_t v1 = (1 + index) * R2_PHI1;
+  const uint32_t v2 = (1 + index) * R2_PHI2;
+
+  return make_uint2(v1, v2);
+}
+
+__device__ uint2 random_r2(const uint32_t offset, const uint32_t dimension) {
+  const uint32_t a = max(32 - __clz(offset), 5);
+
+  const uint32_t subsequence_length = 1 << (a - 1);
+  const uint32_t subsequence_start  = (offset < 32) ? 0 : subsequence_length;
+  const uint32_t mask               = subsequence_length - 1;
+
+  const uint32_t random_seed = random_uint32_t_base(0xfcbd6e15, dimension);
+  const uint32_t index       = random_permute_sequence(offset & mask, subsequence_length, random_seed);
+
+  return random_r2_base(subsequence_start + index);
+}
+
 ////////////////////////////////////////////////////////////////////
 // Wrapper
 ////////////////////////////////////////////////////////////////////
@@ -347,9 +374,9 @@ __device__ uint2
   quasirandom_sequence_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   uint32_t dimension_index = target + depth * QUASI_RANDOM_TARGET_COUNT;
 
-  uint2 quasi = random_k2(sequence_id + 1, dimension_index);
+  uint2 quasi = random_r2(sequence_id, dimension_index);
 
-  const uint2 pixel_offset = random_k2(dimension_index, 0);
+  const uint2 pixel_offset = random_r2_base(dimension_index);
   const uint2 blue_noise   = random_blue_noise_mask_2D(pixel.x + (pixel_offset.x >> 24), pixel.y + (pixel_offset.y >> 24));
 
   quasi.x += blue_noise.x;
