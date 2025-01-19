@@ -59,8 +59,8 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const uint32_t mesh_id      = mesh_id_load(triangle_handle.instance_id);
   const DeviceTransform trans = load_transform(triangle_handle.instance_id);
 
-  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
+  const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
+  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
 
   const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, triangle_handle.tri_id, triangle_count));
   const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, triangle_handle.tri_id, triangle_count));

@@ -76,4 +76,29 @@ struct KernelArgsConvertRGBFToARGB8 {
   LuminaryFilter filter;
 } typedef KernelArgsConvertRGBFToARGB8;
 
+struct KernelArgsOMMLevel0Format4 {
+  uint32_t mesh_id;
+  uint32_t triangle_count;
+  uint8_t* dst;
+  uint8_t* level_record;
+} typedef KernelArgsOMMLevel0Format4;
+
+struct KernelArgsOMMRefineFormat4 {
+  uint32_t mesh_id;
+  uint32_t triangle_count;
+  uint8_t* dst;
+  const uint8_t* src;
+  uint8_t* level_record;
+  const uint32_t src_level;
+} typedef KernelArgsOMMRefineFormat4;
+
+struct KernelArgsOMMGatherArrayFormat4 {
+  uint32_t triangle_count;
+  uint8_t* dst;
+  const uint8_t* src;
+  const uint32_t level;
+  const uint8_t* level_record;
+  const OptixOpacityMicromapDesc* desc;
+} typedef KernelArgsOMMGatherArrayFormat4;
+
 #endif /* LUMINARY_KERNEL_ARGS_H */
