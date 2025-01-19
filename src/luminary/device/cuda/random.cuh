@@ -4,96 +4,6 @@
 #include "intrinsics.cuh"
 #include "utils.cuh"
 
-//
-// This is the implementation for the random numbers used in Luminary.
-// First and foremost what we are trying to do is solve an integral using the Monte Carlo method.
-// This integral is the rendering equation and we need to solve it for each pixel.
-// A classic approach to accelerating Monte Carlo methods is using low-discrepancy random numbers.
-// This results in the so called quasi-Monte Carlo method. We can summarize the idea of that as follows:
-// Uncorrelated random numbers can clump, that is, multiple random numbers in a row could end up being
-// very close to each other. If we now think about integrating a function then another classical approach is
-// evaluating the function at equidistant points. For that we see that the equidistant points manage to cover
-// a large range of the functions domain and will only fail if the function has very different outputs
-// inbetween those points. Our clumped up random points however will fail to give a good representation of our
-// function even if the function is well behaved since we are not effectively covering the functions domain.
-// Hence we use low-discrepancy random numbers which are uniformly distributed but neighbouring numbers
-// in the sequence are far apart from another. The analogue to the equidistant points is then a sequence
-// of points that each split the existing sampling gaps in half, i.e., 1/2, 1/4, 3/4, 1/8, 5/8 and so on.
-// This sequence is called the "van der Corput" sequence. While the points are low-discrepency, they
-// have a visible pattern and hence more "randomly" distributed points are to be preferred.
-// A multitude of random number sequences have been proposed, one of the most notable is the Halton and
-// the Sobol sequence. Especially the latter in combination with Owen scrambling is known to produce
-// high quality low-discrepency numbers without any visible pattern. Another very simple sequence
-// is the sequence in which the i-th number is given by i * \alpha (mod 1). Here \alpha can be
-// chosen to be any irrational number. In particular, choosing \alpha to be the inverse of the
-// golden ratio turns out to give the sequence of lowest possible discrepancy (although via
-// Mobius transformation we can obtain similarly effective values of \alpha) [Rob18].
-//
-// So we have seen multiple ways of obtaining low-discrepancy random numbers and why they are useful.
-// While all of these can be generalized to give D-dimensional random numbers that are low-discrepancy
-// in the D-dimensional metric space. The number D of random numbers that we need to render a single sample
-// per pixel is a) often way too large to compute such a D-dimensional low-discrepancy random number and
-// b) it is often not known a-priori how many random numbers we even need. Hence the idea is to generate
-// a D-dimensional random number by computing one random number and modifying it using a different sequence
-// of random numbers. All entries inside this D-dimensional random number must be uncorrelated or else we would
-// obtain a biased result. You can think of this as we want the decision to use a diffuse importance sampled
-// direction to not be correlated with the actual sampled direction obtained from that method, i.e., we don't
-// want all diffuse samples to go up. Hence we modify them using a uncorrelated sequence of random numbers.
-// For this we take a direction vector s of dimension D and obtain our low-discrepancy D-dimensional random numbers
-// each by multiplying s with the low-discrepancy number and then applying modulo 1 to wrap the entries back into
-// the [0,1) range.
-//
-// Now that we can generate low-discrepancy D-dimensional random numbers to perform quasi-Monte Carlo integration for
-// each pixel, we need to think about the sequences for all our pixels. If we were to use the same random number
-// sequence for each pixel, we would obtain almost identical errors in each pixel. On the surface this does not sound
-// too bad but visually this means that the error is much more prominent and the image after a few samples per pixel
-// will not look anything like the final converged image. To fix this we can apply a shift of the form a + b (mod 1)
-// to the D-dimensional low-discrepancy random numbers that is different for each pixel. This is also called a Cranley-Patterson rotation.
-// This will distribute the error across pixels which gives a much more visually pleasing result. In fact, this
-// is the point where our images start to become noisy, without this they would look almost noise free but heavily biased
-// instead. It is also much clearer to understand if an image is (pretty much) converged based on the noise levels
-// as otherwise it is impossible to visually identify the error if no reference image exists. For the choice of the shift number
-// we could use standard uncorrelated random numbers but if we do that we would run into clumping again which means
-// that the error would not be evenly distributed over the image. Hence we again use low-discrepancy numbers to perform
-// this shift. A common approach for this are so called blue noise masks which are specifically crafted images that shift
-// each sequence of D-dimensional random numbers such that the error is very evenly distributed across pixels. Since these
-// images are only of low dimensionality, we use low-discrepancy numbers to shift our pixel coordinates such that we effectively
-// obtain D many images. Alternatively, other approach likes using Hilbert or Morton indexing together with scrambling have been
-// shown to be a good alternative that don't need any precomputed texture. They work by having a very large base sequence of
-// low-discrepancy numbers and computing a different index in this sequence for each pixel.
-//
-// Now we come to the actual implementation here. First it is important to note that this whole area of low-discrepancy
-// random numbers for Monte Carlo rendering is a very ongoing research topic currently and it is not always clear what
-// is the best approach now and in the future. We made the observation that blue noise masks provide much better error
-// diffusion than Hilbert or Morton order based approaches. Hence we decided to use blue noise masks. A lot of the
-// above makes use of Cranley-Patterson rotations which according to a paper by Heitz et al. (2019) is detrimental
-// to the quality of the samples. However, they demonstrated this in the context of Sobol sequences and for other
-// sequences like rank-1 lattices like the golden ratio based sequence this is not the case as they talked about
-// in a revision of said paper in a 2021 SIGGRAPH talk [Bel21]. Also the Owen scrambled Sobol sequence is generally known
-// to produce the highest quality low-discrepancy random numbers, however, they have also shown that the golden ratio
-// based sequence is not meaningfully worse. Hence, we decided to use the above in detail described
-// Cranley-Patterson rotation approach for generating our random numbers in combination with a blue noise mask
-// provided by Cristoph Peters (http://momentsingraphics.de/BlueNoise.html) and a golden ratio based Rank-1 lattice
-// sequence. This approach was also demonstrated to provide very good results in [Wol22]
-// and was called a "blue noise animated golden ratio" sequence.
-// To obtain a direction vector, we use the Squares random number generator which is a very fast
-// minimal state high quality random number generated. This random number generator was used in Luminary
-// already before so it was the obvious choice. It also provides very nice statistical properties (Though
-// we have no idea about what that exactly means). Since a lot of the use cases in Luminary are 2D random
-// points, we work always with pairs of randoms numbers using a generalization of the golden ratio based Rank-1 lattice that uses
-// the inverse of the plastic number and its square.
-//
-// Now some small implementation details. For one, we perform all our operations using uint32_ts because
-// we are working only with numbers in [0,1) due to the (mod 1) and integer addition and multiplication map
-// perfectly to such a scenario. This also avoids some precision issues can run into when computing
-// i * \alpha (mod 1) for large i. The conversion from the integer to the float is done by constructing
-// a float whose significand is given by the integer. The Squares random number generator normally produces
-// 64 bit numbers from 64 bit inputs but since we only need 32 bit outputs and only have 32 bit inputs, we
-// modified the method to work with 32 bits. Similarly, was done for the 64 bit -> 32 bit version which we
-// modified into a 32 bit -> 16 bit generator. The seed of this generator in general use cases is
-// a key of alternating 0s and 1s in binary plus the thread ID.
-//
-
 #define BLUENOISE_TEX_DIM 256
 #define BLUENOISE_TEX_DIM_MASK 0xFF
 
@@ -203,6 +113,14 @@ enum QuasiRandomTarget : uint32_t {
 // Laurent Belcour and Eric Heitz, "Lessons Learned and Improvements when Building Screen-Space Samplers with Blue-Noise Error Distribution"
 // ACM SIGGRAPH 2021 Talks, pp. 1-2, 2021.
 
+// [Bur20]
+// Brent Burley, "Practical Hash-based Owen Scrambling"
+// Journal of Computer Graphics Techniques (JCGT), pp. 1-20, 2020.
+
+// [Ahm24]
+// Abdalla G. M. Ahmed, "An Implementation Algorithm of 2D Sobol Sequence Fast, Elegant, and Compact"
+// Eurographics Symposium on Rendering, 2024.
+
 ////////////////////////////////////////////////////////////////////
 // Unsigned integer to float [0, 1] conversion
 // Based on the uint64 conversion from Sebastiano Vigna and David Blackman (https://prng.di.unimi.it/)
@@ -231,50 +149,6 @@ __device__ float random_saturate(const float random) {
 ////////////////////////////////////////////////////////////////////
 // Random number generators
 ////////////////////////////////////////////////////////////////////
-
-// Permutation function for padding from pbrt-v4, licensed under the Apache-2.0 license
-__device__ uint32_t random_permute_sequence(uint32_t index, const uint32_t length, const uint32_t hash) {
-  uint32_t w = length - 1;
-  w |= w >> 1;
-  w |= w >> 2;
-  w |= w >> 4;
-  w |= w >> 8;
-  w |= w >> 16;
-
-  do {
-    index ^= hash;
-    index *= 0xe170893d;
-    index ^= hash >> 16;
-    index ^= (index & w) >> 4;
-    index ^= hash >> 8;
-    index *= 0x0929eb3f;
-    index ^= hash >> 23;
-    index ^= (index & w) >> 1;
-    index *= 1 | hash >> 27;
-    index *= 0x6935fa69;
-    index ^= (index & w) >> 11;
-    index *= 0x74dcb303;
-    index ^= (index & w) >> 2;
-    index *= 0x9e501cc3;
-    index ^= (index & w) >> 2;
-    index *= 0xc860a3df;
-    index &= w;
-    index ^= index >> 5;
-  } while (index >= length);
-
-  return (index + hash) & (length - 1);
-}
-
-// Integer fractions of the actual numbers
-#define R1_PHI1 2654435769u /* 0.61803398875f */
-#define R2_PHI1 3242174889u /* 0.7548776662f  */
-#define R2_PHI2 2447445413u /* 0.56984029f    */
-
-#define RANDOM_KRONECKER_SEQUENCE_LENGTH (1u << 14)
-
-__device__ uint32_t random_r1(const uint32_t offset) {
-  return offset * R1_PHI1;
-}
 
 // This is the base generator for random 32 bits.
 __device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
@@ -319,24 +193,79 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
   return (x * x + y) >> 16;
 }
 
-__device__ uint2 random_r2_base(const uint32_t index) {
+////////////////////////////////////////////////////////////////////
+// Kronecker [Rob18]
+////////////////////////////////////////////////////////////////////
+
+// Integer fractions of the actual numbers
+#define R1_PHI1 2654435769u /* 0.61803398875f */
+#define R2_PHI1 3242174889u /* 0.7548776662f  */
+#define R2_PHI2 2447445413u /* 0.56984029f    */
+
+__device__ uint32_t random_r1(const uint32_t offset) {
+  return (offset + 1) * R1_PHI1;
+}
+
+__device__ uint2 random_r2(const uint32_t index) {
   const uint32_t v1 = (1 + index) * R2_PHI1;
   const uint32_t v2 = (1 + index) * R2_PHI2;
 
   return make_uint2(v1, v2);
 }
 
-__device__ uint2 random_r2(const uint32_t offset, const uint32_t dimension) {
-  const uint32_t a = max(32 - __clz(offset), 5);
+////////////////////////////////////////////////////////////////////
+// Sobol [Bur20] [Ahm24]
+////////////////////////////////////////////////////////////////////
 
-  const uint32_t subsequence_length = 1 << (a - 1);
-  const uint32_t subsequence_start  = (offset < 32) ? 0 : subsequence_length;
-  const uint32_t mask               = subsequence_length - 1;
+__device__ uint32_t random_laine_karras_permutation(uint32_t x, uint32_t seed) {
+  x += seed;
+  x ^= x * 0x6c50b47cu;
+  x ^= x * 0xb82f1e52u;
+  x ^= x * 0xc7afe638u;
+  x ^= x * 0x8d22f6e6u;
+  return x;
+}
 
-  const uint32_t random_seed = random_uint32_t_base(0xfcbd6e15, dimension);
-  const uint32_t index       = random_permute_sequence(offset & mask, subsequence_length, random_seed);
+__device__ uint32_t random_nested_uniform_scramble_base2(uint32_t x, uint32_t seed) {
+  x = __brev(x);
+  x = random_laine_karras_permutation(x, seed);
+  x = __brev(x);
+  return x;
+}
 
-  return random_r2_base(subsequence_start + index);
+__device__ uint32_t random_hash_combine(uint32_t seed, uint32_t v) {
+  return seed ^ (v + (seed << 6) + (seed >> 2));
+}
+
+__device__ uint32_t random_sobol_P(uint32_t v) {
+  v ^= v << 16;
+  v ^= (v & 0x00FF00FF) << 8;
+  v ^= (v & 0x0F0F0F0F) << 4;
+  v ^= (v & 0x33333333) << 2;
+  v ^= (v & 0x55555555) << 1;
+  return v;
+}
+
+__device__ uint2 random_sobol_base(uint32_t offset, const uint32_t seed) {
+  // The index into the sequence is given by:
+  // const uint32_t index = random_nested_uniform_scramble_base2(offset, seed);
+  // Then applying the J matrix to the index as in [Ahm24]:
+  // const uint32_t J = __brev(index);
+  // We can get rid of the 2 consecutive __brev here and obtain J as follows:
+  const uint32_t J = random_laine_karras_permutation(__brev(offset), seed);
+
+  return make_uint2(J, random_sobol_P(J));
+}
+
+__device__ uint2 random_sobol(const uint32_t offset, const uint32_t dimension) {
+  const uint32_t seed = random_uint32_t_base(0xfcbd6e15, dimension);
+
+  const uint2 sobol = random_sobol_base(offset, seed);
+
+  const uint32_t v1 = random_nested_uniform_scramble_base2(sobol.x, random_hash_combine(seed, 0));
+  const uint32_t v2 = random_nested_uniform_scramble_base2(sobol.y, random_hash_combine(seed, 1));
+
+  return make_uint2(v1, v2);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -374,9 +303,9 @@ __device__ uint2
   quasirandom_sequence_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   uint32_t dimension_index = target + depth * QUASI_RANDOM_TARGET_COUNT;
 
-  uint2 quasi = random_r2(sequence_id, dimension_index);
+  uint2 quasi = random_sobol(sequence_id, dimension_index);
 
-  const uint2 pixel_offset = random_r2_base(dimension_index);
+  const uint2 pixel_offset = random_r2(dimension_index);
   const uint2 blue_noise   = random_blue_noise_mask_2D(pixel.x + (pixel_offset.x >> 24), pixel.y + (pixel_offset.y >> 24));
 
   quasi.x += blue_noise.x;

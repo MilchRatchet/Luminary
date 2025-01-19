@@ -237,3 +237,5 @@ This is a list of papers I have used for this project so far. Note that some tec
 - A. C. Estevez, P. Lecocq, C. Hellmuth, _A Resampled Tree for Many Lights Rendering_, ACM SIGGRAPH 2024 Talks, 2024.
 - V. Schüßler, J. Hanika, C. Dachsbacher, _Bridge Sampling for Connections via Multiple Scattering Events_, Computer Graphics Forum Proceedings of Eurographics Symposium on Rendering, 43(4), 2024.
 - J. Buisine, S. Delepoulle, C. Renaud, _Firefly Removal in Monte Carlo Rendering with Adaptive Median of meaNs_, Eurographics Symposium on Rendering, 2021.
+- B. Burley, _Practical Hash-based Owen Scrambling_, Journal of Computer Graphics Techniques (JCGT), pp. 1-20, 2020.
+- A. G. M. Ahmed, _An Implementation Algorithm of 2D Sobol Sequence Fast, Elegant, and Compact_, Eurographics Symposium on Rendering, 2024.
