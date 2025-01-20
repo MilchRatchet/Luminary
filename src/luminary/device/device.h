@@ -6,6 +6,7 @@
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
+#include "device_omm.h"
 #include "device_output.h"
 #include "device_particle.h"
 #include "device_post.h"
@@ -92,6 +93,8 @@ struct Device {
   uint32_t num_materials;
   uint32_t num_instances;
   ARRAY DeviceMesh** meshes;
+  ARRAY OpacityMicromap** omms;
+  bool meshes_need_building;
   OptixBVHInstanceCache* optix_instance_cache;
   OptixBVH* optix_bvh_ias;
   OptixBVH* optix_bvh_light;

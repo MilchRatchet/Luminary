@@ -297,14 +297,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     }
   }
 
-  if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
-    __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_material_updates(device_manager));
-  }
-
-  if (flags & SCENE_DIRTY_FLAG_INSTANCES) {
-    __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_instance_updates(device_manager));
-  }
-
   if (flags & SCENE_DIRTY_FLAG_OUTPUT) {
     // TODO: Signal main device to output current image again.
 
@@ -324,6 +316,14 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     }
 
     // TODO: Reallocate buffers on all devices
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
+    __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_material_updates(device_manager));
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_INSTANCES) {
+    __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_instance_updates(device_manager));
   }
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {

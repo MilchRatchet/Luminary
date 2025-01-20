@@ -30,7 +30,7 @@ static size_t _omm_array_size(const uint32_t count, const uint32_t level, const 
   return state_size * count;
 }
 
-LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
+LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device) {
   __CHECK_NULL_ARGUMENT(omm);
   __CHECK_NULL_ARGUMENT(mesh);
   __CHECK_NULL_ARGUMENT(device);
@@ -72,7 +72,6 @@ LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
   for (; num_levels < max_num_levels;) {
     const size_t data_size = _omm_array_size(total_tri_count, num_levels, format);
     __FAILURE_HANDLE(device_malloc(data + num_levels, data_size));
-    CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
     if (num_levels) {
       KernelArgsOMMRefineFormat4 args = {
@@ -87,6 +86,9 @@ LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4], &args, device->stream_main));
     }
     else {
+      // Make sure that all the data is actually present
+      __FAILURE_HANDLE(device_sync_constant_memory(device));
+
       KernelArgsOMMLevel0Format4 args = {
         .mesh_id        = mesh->id,
         .triangle_count = total_tri_count,
@@ -96,10 +98,8 @@ LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4], &args, device->stream_main));
     }
-    CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
     __FAILURE_HANDLE(device_download(triangle_level, triangle_level_buffer, 0, total_tri_count, device->stream_main));
-    CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
     remaining_triangles         = 0;
     uint32_t triangles_at_level = 0;
@@ -182,8 +182,8 @@ LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
     array_offset_per_level[level] += state_size;
   }
 
-  free(array_offset_per_level);
-  free(array_size_per_level);
+  __FAILURE_HANDLE(host_free(&array_offset_per_level));
+  __FAILURE_HANDLE(host_free(&array_size_per_level));
 
   DEVICE void* desc_buffer;
   __FAILURE_HANDLE(device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
@@ -203,24 +203,21 @@ LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
       kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4], &args, device->stream_main));
   }
 
-  CUDA_FAILURE_HANDLE(cuCtxSynchronize());
-
   __FAILURE_HANDLE(host_free(&triangle_level));
   __FAILURE_HANDLE(device_free(&triangle_level_buffer));
 
   for (uint32_t i = 0; i < num_levels; i++) {
-    const size_t data_size = _omm_array_size(total_tri_count, i, format);
     __FAILURE_HANDLE(device_free(&data[i]));
   }
 
-  free(data);
+  __FAILURE_HANDLE(host_free(&data));
 
   ////////////////////////////////////////////////////////////////////
   // Histogram setup
   ////////////////////////////////////////////////////////////////////
 
-  OptixOpacityMicromapHistogramEntry* histogram =
-    (OptixOpacityMicromapHistogramEntry*) malloc(sizeof(OptixOpacityMicromapHistogramEntry) * num_levels);
+  OptixOpacityMicromapHistogramEntry* histogram;
+  __FAILURE_HANDLE(host_malloc(&histogram, sizeof(OptixOpacityMicromapHistogramEntry) * num_levels));
 
   for (uint32_t i = 0; i < num_levels; i++) {
     histogram[i].count            = triangles_per_level[i];
@@ -232,14 +229,16 @@ LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device) {
   // Usage count setup
   ////////////////////////////////////////////////////////////////////
 
-  OptixOpacityMicromapUsageCount* usage = (OptixOpacityMicromapUsageCount*) malloc(sizeof(OptixOpacityMicromapUsageCount) * num_levels);
+  OptixOpacityMicromapUsageCount* usage;
+  __FAILURE_HANDLE(host_malloc(&usage, sizeof(OptixOpacityMicromapUsageCount) * num_levels));
+
   for (uint32_t i = 0; i < num_levels; i++) {
     usage[i].count            = triangles_per_level[i];
     usage[i].subdivisionLevel = i;
     usage[i].format           = format;
   }
 
-  free(triangles_per_level);
+  __FAILURE_HANDLE(host_free(&triangles_per_level));
 
   ////////////////////////////////////////////////////////////////////
   // DMM array construction

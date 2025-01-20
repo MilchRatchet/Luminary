@@ -10,7 +10,7 @@ struct OpacityMicromap {
 } typedef OpacityMicromap;
 
 LuminaryResult omm_create(OpacityMicromap** omm);
-DEVICE_CTX_FUNC LuminaryResult omm_build(OpacityMicromap* omm, Mesh* mesh, Device* device);
+DEVICE_CTX_FUNC LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device);
 LuminaryResult omm_destroy(OpacityMicromap** omm);
 
 #endif /* LUMINARY_DEVICE_OMM_H */

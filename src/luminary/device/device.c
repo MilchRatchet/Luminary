@@ -707,6 +707,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(array_create(&device->meshes, sizeof(DeviceMesh*), 4));
+  __FAILURE_HANDLE(array_create(&device->omms, sizeof(OpacityMicromap*), 4));
   __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
@@ -909,17 +910,22 @@ LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
   }
 
   DeviceMesh* device_mesh;
-  __FAILURE_HANDLE(device_mesh_create(device, &device_mesh, mesh));
+  OpacityMicromap* omm;
 
   if (mesh->id == num_meshes) {
+    __FAILURE_HANDLE(device_mesh_create(&device_mesh, device, mesh));
     __FAILURE_HANDLE(array_push(&device->meshes, &device_mesh));
+
+    __FAILURE_HANDLE(omm_create(&omm));
+    __FAILURE_HANDLE(array_push(&device->omms, &omm));
 
     num_meshes++;
     __DEVICE_BUFFER_REALLOC(triangles, sizeof(DeviceTriangle*) * num_meshes);
     __DEVICE_BUFFER_REALLOC(triangle_counts, sizeof(uint32_t) * num_meshes);
   }
   else {
-    device->meshes[mesh->id] = device_mesh;
+    device_mesh = device->meshes[mesh->id];
+    omm         = device->omms[mesh->id];
   }
 
   void** direct_access_buffer;
@@ -934,6 +940,8 @@ LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
     (void**) &direct_access_buffer));
 
   *(uint32_t*) direct_access_buffer = mesh->data.triangle_count;
+
+  device->meshes_need_building = true;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1013,6 +1021,17 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
       sizeof(DeviceTransform), (void**) &transform));
 
     __FAILURE_HANDLE(device_struct_instance_transform_convert(&instance_updates[update_id].instance, transform));
+  }
+
+  if (device->meshes_need_building) {
+    uint32_t num_meshes;
+    __FAILURE_HANDLE(array_get_num_elements(device->meshes, &num_meshes));
+
+    for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+      __FAILURE_HANDLE(device_mesh_build_structures(device->meshes[mesh_id], device->omms[mesh_id], device));
+    }
+
+    device->meshes_need_building = false;
   }
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));
@@ -1508,9 +1527,11 @@ LuminaryResult device_destroy(Device** device) {
 
   for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
     __FAILURE_HANDLE(device_mesh_destroy(&(*device)->meshes[mesh_id]));
+    __FAILURE_HANDLE(omm_destroy(&(*device)->omms[mesh_id]));
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
+  __FAILURE_HANDLE(array_destroy(&(*device)->omms));
 
   __FAILURE_HANDLE(device_output_destroy(&(*device)->output));
   __FAILURE_HANDLE(device_renderer_destroy(&(*device)->renderer));
