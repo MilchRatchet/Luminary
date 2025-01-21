@@ -78,12 +78,10 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
+  pipeline_compile_options.allowOpacityMicromaps            = true;
 
   // TODO: Handle OMMs and DMMs.
 #if 0
-  if (settings.use_opacity_micromaps)
-    pipeline_compile_options.allowOpacityMicromaps = 1;
-
   if (settings.use_displacement_micromaps)
     pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
 #endif

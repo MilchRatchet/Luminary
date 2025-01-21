@@ -104,16 +104,7 @@ __device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, con
     albedo = get_RGBAF(tex_value.x, tex_value.y, tex_value.z, tex_value.w);
   }
 
-  // Invisible
-  if (albedo.a == 0.0f)
-    return albedo;
-
-  // Opaque base substrate only handles opacity
-  if ((material.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK) == DEVICE_MATERIAL_BASE_SUBSTRATE_OPAQUE)
-    return albedo;
-
-  // Translucent base substrates are treated as fully opaque, even if IOR matches. This is a performance optimization, matching IOR is rare.
-  return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
+  return albedo;
 }
 
 __device__ bool particle_opacity_cutout(const float2 coord) {

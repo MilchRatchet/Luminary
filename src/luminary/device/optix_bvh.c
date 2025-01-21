@@ -176,10 +176,11 @@ static LuminaryResult _optix_bvh_free(OptixBVH* bvh) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* mesh) {
+LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* mesh, const OpacityMicromap* omm) {
   __CHECK_NULL_ARGUMENT(bvh);
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(mesh);
+  __CHECK_NULL_ARGUMENT(omm);
 
   __FAILURE_HANDLE(_optix_bvh_free(bvh));
 
@@ -225,8 +226,9 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
     inputFlags |= (type == OPTIX_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
 
-    build_input.triangleArray.flags         = &inputFlags;
-    build_input.triangleArray.numSbtRecords = 1;
+    build_input.triangleArray.flags           = &inputFlags;
+    build_input.triangleArray.numSbtRecords   = 1;
+    build_input.triangleArray.opacityMicromap = omm->optix_build_input;
 
     // Reminder: OptiX requires pointers to be null if there is no data for the OMM and DMM.
 

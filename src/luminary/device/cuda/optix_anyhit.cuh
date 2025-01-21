@@ -62,8 +62,6 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
   const RGBAF albedo = optix_get_albedo_for_shadowing(handle, material);
 
   if (albedo.a == 1.0f) {
-    optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
-
     optixTerminateRay();
   }
 

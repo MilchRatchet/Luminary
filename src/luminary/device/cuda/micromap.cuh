@@ -50,7 +50,7 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mes
 }
 
 // Load triangle only once for the refinement steps
-__device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
+__device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
   // TODO: Handle texture less transparency of materials.
   if (tri.tex_id == TEXTURE_NONE) {
     return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
@@ -145,14 +145,12 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
   while (tri_id < args.triangle_count) {
     OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
 
-    const int opacity = micromap_get_opacity(tri, 0, 0);
-
-    const uint8_t v = opacity;
+    const uint8_t opacity = micromap_get_opacity(tri, 0, 0);
 
     if (opacity != OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
       args.level_record[tri_id] = 0;
 
-    args.dst[tri_id] = v;
+    args.dst[tri_id] = opacity;
 
     tri_id += blockDim.x * gridDim.x;
   }

@@ -45,6 +45,7 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(light_bsdf_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(shadow_trace)() {
+  optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
 }
 
 #endif /* CU_LUMINARY_OPTIX_CLOSESTHIT_H */

@@ -77,9 +77,9 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
       KernelArgsOMMRefineFormat4 args = {
         .mesh_id        = mesh->id,
         .triangle_count = total_tri_count,
-        .dst            = (uint8_t*) data[num_levels],
-        .src            = (const uint8_t*) data[num_levels - 1],
-        .level_record   = (uint8_t*) triangle_level_buffer,
+        .dst            = (uint8_t*) DEVICE_PTR(data[num_levels]),
+        .src            = (const uint8_t*) DEVICE_PTR(data[num_levels - 1]),
+        .level_record   = (uint8_t*) DEVICE_PTR(triangle_level_buffer),
         .src_level      = num_levels - 1,
       };
 
@@ -88,12 +88,13 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
     else {
       // Make sure that all the data is actually present
       __FAILURE_HANDLE(device_sync_constant_memory(device));
+      __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
       KernelArgsOMMLevel0Format4 args = {
         .mesh_id        = mesh->id,
         .triangle_count = total_tri_count,
-        .dst            = (uint8_t*) data[0],
-        .level_record   = (uint8_t*) triangle_level_buffer,
+        .dst            = (uint8_t*) DEVICE_PTR(data[0]),
+        .level_record   = (uint8_t*) DEVICE_PTR(triangle_level_buffer),
       };
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4], &args, device->stream_main));
@@ -168,7 +169,8 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   // Description setup
   ////////////////////////////////////////////////////////////////////
 
-  OptixOpacityMicromapDesc* desc = (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * total_tri_count);
+  OptixOpacityMicromapDesc* desc;
+  __FAILURE_HANDLE(host_malloc(&desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
 
   for (uint32_t i = 0; i < total_tri_count; i++) {
     const uint32_t level = (triangle_level[i] == 0xFF) ? max_num_levels - 1 : triangle_level[i];
@@ -192,16 +194,18 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   for (uint32_t i = 0; i < num_levels; i++) {
     KernelArgsOMMGatherArrayFormat4 args = {
       .triangle_count = total_tri_count,
-      .dst            = (uint8_t*) omm_array,
-      .src            = (const uint8_t*) data[i],
+      .dst            = (uint8_t*) DEVICE_PTR(omm_array),
+      .src            = (const uint8_t*) DEVICE_PTR(data[i]),
       .level          = i,
-      .level_record   = (const uint8_t*) triangle_level_buffer,
-      .desc           = (const OptixOpacityMicromapDesc*) desc_buffer,
+      .level_record   = (const uint8_t*) DEVICE_PTR(triangle_level_buffer),
+      .desc           = (const OptixOpacityMicromapDesc*) DEVICE_PTR(desc_buffer),
     };
 
     __FAILURE_HANDLE(
       kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4], &args, device->stream_main));
   }
+
+  __FAILURE_HANDLE(host_free(&desc));
 
   __FAILURE_HANDLE(host_free(&triangle_level));
   __FAILURE_HANDLE(device_free(&triangle_level_buffer));
@@ -248,10 +252,10 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   memset(&array_build_input, 0, sizeof(OptixOpacityMicromapArrayBuildInput));
 
   array_build_input.flags                        = OPTIX_OPACITY_MICROMAP_FLAG_PREFER_FAST_TRACE;
-  array_build_input.inputBuffer                  = (CUdeviceptr) omm_array;
+  array_build_input.inputBuffer                  = DEVICE_CUPTR(omm_array);
   array_build_input.numMicromapHistogramEntries  = num_levels;
   array_build_input.micromapHistogramEntries     = histogram;
-  array_build_input.perMicromapDescBuffer        = (CUdeviceptr) desc_buffer;
+  array_build_input.perMicromapDescBuffer        = DEVICE_CUPTR(desc_buffer);
   array_build_input.perMicromapDescStrideInBytes = sizeof(OptixOpacityMicromapDesc);
 
   OptixMicromapBufferSizes buffer_sizes;
@@ -267,9 +271,9 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   OptixMicromapBuffers buffers;
   memset(&buffers, 0, sizeof(OptixMicromapBuffers));
 
-  buffers.output            = (CUdeviceptr) output_buffer;
+  buffers.output            = DEVICE_CUPTR(output_buffer);
   buffers.outputSizeInBytes = buffer_sizes.outputSizeInBytes;
-  buffers.temp              = (CUdeviceptr) temp_buffer;
+  buffers.temp              = DEVICE_CUPTR(temp_buffer);
   buffers.tempSizeInBytes   = buffer_sizes.tempSizeInBytes;
 
   OPTIX_FAILURE_HANDLE(optixOpacityMicromapArrayBuild(device->optix_ctx, 0, &array_build_input, &buffers));
@@ -286,9 +290,11 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   memset(&bvh_input, 0, sizeof(OptixBuildInputOpacityMicromap));
 
   bvh_input.indexingMode           = OPTIX_OPACITY_MICROMAP_ARRAY_INDEXING_MODE_LINEAR;
-  bvh_input.opacityMicromapArray   = (CUdeviceptr) output_buffer;
+  bvh_input.opacityMicromapArray   = DEVICE_CUPTR(output_buffer);
   bvh_input.numMicromapUsageCounts = num_levels;
   bvh_input.micromapUsageCounts    = usage;
+
+  omm->optix_build_input = bvh_input;
 
   return LUMINARY_SUCCESS;
 }

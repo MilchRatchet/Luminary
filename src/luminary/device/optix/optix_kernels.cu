@@ -83,8 +83,8 @@ extern "C" __global__ void __raygen__optix() {
     OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_DEPTH, 0);
     OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 1);
     optixTrace(
-      device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), 0, OPTIX_SBT_OFFSET_GEOMETRY_TRACE, 0, 0, depth,
-      handle.instance_id, handle.tri_id);
+      device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, OPTIX_SBT_OFFSET_GEOMETRY_TRACE, 0,
+      0, depth, handle.instance_id, handle.tri_id);
 
     optix_write_out_gbuffer_meta(task, __uint_as_float(depth), handle);
 

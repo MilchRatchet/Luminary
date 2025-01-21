@@ -6,6 +6,7 @@
 #include "device_utils.h"
 
 struct Device typedef Device;
+struct OpacityMicromap typedef OpacityMicromap;
 
 enum OptixBVHType { OPTIX_BVH_TYPE_DEFAULT = 0, OPTIX_BVH_TYPE_SHADOW = 1, OPTIX_BVH_TYPE_COUNT } typedef OptixBVHType;
 
@@ -29,7 +30,7 @@ struct OptixBVH {
 } typedef OptixBVH;
 
 DEVICE_CTX_FUNC LuminaryResult optix_bvh_create(OptixBVH** bvh);
-DEVICE_CTX_FUNC LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* mesh);
+DEVICE_CTX_FUNC LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* mesh, const OpacityMicromap* omm);
 DEVICE_CTX_FUNC LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device);
 DEVICE_CTX_FUNC LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightTree* tree);
 DEVICE_CTX_FUNC LuminaryResult optix_bvh_particles_build(OptixBVH* bvh, Device* device, const DeviceParticlesHandle* particles_handle);

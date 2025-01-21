@@ -328,8 +328,8 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   // TODO: Add a ray flag to skip anyhit because we don't use it right now.
   OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_ID, 0);
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE,
-    0, 0, bsdf_sample_light_key);
+    device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+    OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE, 0, 0, bsdf_sample_light_key);
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions

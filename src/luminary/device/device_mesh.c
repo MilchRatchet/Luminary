@@ -50,7 +50,7 @@ LuminaryResult device_mesh_build_structures(DeviceMesh* device_mesh, OpacityMicr
     return LUMINARY_SUCCESS;
 
   __FAILURE_HANDLE(omm_build(omm, device_mesh->mesh, device));
-  __FAILURE_HANDLE(optix_bvh_gas_build(device_mesh->bvh, device, device_mesh->mesh));
+  __FAILURE_HANDLE(optix_bvh_gas_build(device_mesh->bvh, device, device_mesh->mesh, omm));
 
   device_mesh->bvh_is_dirty = false;
 

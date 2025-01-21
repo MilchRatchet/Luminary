@@ -245,9 +245,10 @@ __device__ uint32_t mesh_id_load(const uint32_t instance_id) {
 }
 
 __device__ uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
-  const uint32_t data =
-    __ldg((uint32_t*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 3, 3, triangle_id, device.ptrs.triangle_counts[mesh_id]));
-  const uint16_t material_id = data & 0xFFFF;
+  const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
+  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+  const uint32_t data           = __ldg((uint32_t*) triangle_get_entry_address(ptr, 3, 3, triangle_id, triangle_count));
+  const uint16_t material_id    = data & 0xFFFF;
 
   return material_id;
 }
@@ -255,8 +256,10 @@ __device__ uint16_t material_id_load(const uint32_t mesh_id, const uint32_t tria
 __device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const float4 data =
-    __ldg((float4*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 2, 0, handle.tri_id, device.ptrs.triangle_counts[mesh_id]));
+  const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
+  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+
+  const float4 data = __ldg((float4*) triangle_get_entry_address(ptr, 2, 0, handle.tri_id, triangle_count));
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(data.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(data.z));
