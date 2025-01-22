@@ -559,7 +559,6 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * external_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(hit_id_history, sizeof(TriangleHandle) * internal_pixel_count);
 
   const uint32_t num_indirect_buckets = device->constant_memory->settings.num_indirect_buckets;
 
@@ -569,8 +568,6 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
   memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
-
-  __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(TriangleHandle) * internal_pixel_count, device->stream_main));
 
   DEVICE_UPDATE_CONSTANT_MEMORY(max_task_count, max_task_count);
   DEVICE_UPDATE_CONSTANT_MEMORY(pixels_per_thread, pixels_per_thread);
@@ -597,7 +594,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(records);
   __DEVICE_BUFFER_FREE(buffer_8bit);
-  __DEVICE_BUFFER_FREE(hit_id_history);
   __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);

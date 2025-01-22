@@ -255,7 +255,6 @@ struct DevicePointers {
   DEVICE RGBF* frame_final;
   DEVICE GBufferMetaData* gbuffer_meta;
   DEVICE RGBF* records;
-  DEVICE TriangleHandle* hit_id_history;
   DEVICE ARGB8* buffer_8bit;
   DEVICE const DeviceTextureObject* textures;
   DEVICE const uint16_t* bluenoise_1D;
