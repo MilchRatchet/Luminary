@@ -65,12 +65,15 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
     optixTerminateRay();
   }
 
-  if (albedo.a == 0.0f) {
+  const bool is_colored_transparency = material.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY;
+
+  if (albedo.a == 0.0f && !is_colored_transparency) {
     optixIgnoreIntersection();
   }
 
-  const RGBF alpha = (material.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) ? scale_color(opaque_color(albedo), albedo.a)
-                                                                                  : get_color(albedo.a, albedo.a, albedo.a);
+  const float transparency = 1.0f - albedo.a;
+
+  const RGBF alpha = is_colored_transparency ? scale_color(opaque_color(albedo), transparency) : splat_color(transparency);
 
   CompressedAlpha compressed_alpha = optixGetPayloadCompressedAlpha();
 

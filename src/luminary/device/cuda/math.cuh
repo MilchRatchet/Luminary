@@ -700,6 +700,16 @@ __device__ RGBF get_color(const float r, const float g, const float b) {
   return result;
 }
 
+__device__ RGBF splat_color(const float v) {
+  RGBF result;
+
+  result.r = v;
+  result.g = v;
+  result.b = v;
+
+  return result;
+}
+
 __device__ RGBAF get_RGBAF(const float r, const float g, const float b, const float a) {
   RGBAF result;
 

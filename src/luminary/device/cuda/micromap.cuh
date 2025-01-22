@@ -51,9 +51,9 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mes
 
 // Load triangle only once for the refinement steps
 __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
-  // TODO: Handle texture less transparency of materials.
   if (tri.tex_id == TEXTURE_NONE) {
-    return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
+    // Materials without an albedo texture can have their opacity changed, so we cannot use OMMs there.
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
   }
 
   float2 bary0;
