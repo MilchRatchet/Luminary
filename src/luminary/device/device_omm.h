@@ -7,6 +7,7 @@ struct Device typedef Device;
 
 struct OpacityMicromap {
   OptixBuildInputOpacityMicromap optix_build_input;
+  DEVICE void* buffer;
 } typedef OpacityMicromap;
 
 LuminaryResult omm_create(OpacityMicromap** omm);

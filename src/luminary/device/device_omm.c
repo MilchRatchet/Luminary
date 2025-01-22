@@ -263,15 +263,14 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
 
   OPTIX_FAILURE_HANDLE(optixOpacityMicromapArrayComputeMemoryUsage(device->optix_ctx, &array_build_input, &buffer_sizes));
 
-  DEVICE void* output_buffer;
-  __FAILURE_HANDLE(device_malloc(&output_buffer, buffer_sizes.outputSizeInBytes));
+  __FAILURE_HANDLE(device_malloc(&omm->buffer, buffer_sizes.outputSizeInBytes));
   DEVICE void* temp_buffer;
   __FAILURE_HANDLE(device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes));
 
   OptixMicromapBuffers buffers;
   memset(&buffers, 0, sizeof(OptixMicromapBuffers));
 
-  buffers.output            = DEVICE_CUPTR(output_buffer);
+  buffers.output            = DEVICE_CUPTR(omm->buffer);
   buffers.outputSizeInBytes = buffer_sizes.outputSizeInBytes;
   buffers.temp              = DEVICE_CUPTR(temp_buffer);
   buffers.tempSizeInBytes   = buffer_sizes.tempSizeInBytes;
@@ -281,6 +280,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   __FAILURE_HANDLE(device_free(&desc_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
   __FAILURE_HANDLE(device_free(&omm_array));
+  __FAILURE_HANDLE(host_free(&histogram));
 
   ////////////////////////////////////////////////////////////////////
   // BVH input construction
@@ -290,7 +290,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   memset(&bvh_input, 0, sizeof(OptixBuildInputOpacityMicromap));
 
   bvh_input.indexingMode           = OPTIX_OPACITY_MICROMAP_ARRAY_INDEXING_MODE_LINEAR;
-  bvh_input.opacityMicromapArray   = DEVICE_CUPTR(output_buffer);
+  bvh_input.opacityMicromapArray   = DEVICE_CUPTR(omm->buffer);
   bvh_input.numMicromapUsageCounts = num_levels;
   bvh_input.micromapUsageCounts    = usage;
 
@@ -302,7 +302,13 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
 LuminaryResult omm_destroy(OpacityMicromap** omm) {
   __CHECK_NULL_ARGUMENT(omm);
 
-  __FAILURE_HANDLE(host_free(&(*omm)->optix_build_input.micromapUsageCounts));
+  if ((*omm)->buffer) {
+    __FAILURE_HANDLE(device_free(&(*omm)->buffer));
+  }
+
+  if ((*omm)->optix_build_input.micromapUsageCounts) {
+    __FAILURE_HANDLE(host_free(&(*omm)->optix_build_input.micromapUsageCounts));
+  }
 
   __FAILURE_HANDLE(host_free(omm));
 
