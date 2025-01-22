@@ -125,7 +125,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
-  uint32_t flags = G_BUFFER_FLAG_USE_LIGHT_RAYS;
+  uint32_t flags = G_BUFFER_FLAG_USE_LIGHT_RAYS | (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
 
   if (mat.metallic_tex != TEXTURE_NONE) {
     // TODO: Stochastic filtering of metallic texture.
