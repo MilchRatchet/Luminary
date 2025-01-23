@@ -68,8 +68,8 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_handle.tri_id, triangle_count));
 
   const vec3 vertex = transform_apply(trans, get_vector(t0.x, t0.y, t0.z));
-  const vec3 edge1  = transform_apply(trans, get_vector(t0.w, t1.x, t1.y));
-  const vec3 edge2  = transform_apply(trans, get_vector(t1.z, t1.w, t2.x));
+  const vec3 edge1  = transform_apply_relative(trans, get_vector(t0.w, t1.x, t1.y));
+  const vec3 edge2  = transform_apply_relative(trans, get_vector(t1.z, t1.w, t2.x));
 
   const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.origin);
 

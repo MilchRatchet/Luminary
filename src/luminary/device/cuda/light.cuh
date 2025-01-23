@@ -51,8 +51,8 @@ __device__ TriangleLight
   triangle.edge2  = get_vector(v1.z, v1.w, v2.x);
 
   triangle.vertex = transform_apply(trans, triangle.vertex);
-  triangle.edge1  = transform_apply(trans, triangle.edge1);
-  triangle.edge2  = transform_apply(trans, triangle.edge2);
+  triangle.edge1  = transform_apply_relative(trans, triangle.edge1);
+  triangle.edge2  = transform_apply_relative(trans, triangle.edge2);
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(v2.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(v2.z));
