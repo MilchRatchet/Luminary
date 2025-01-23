@@ -350,6 +350,8 @@ LUMINARY_API struct LuminaryMaterial {
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_API struct LuminaryInstance {
+  uint32_t id;
+  uint32_t mesh_id;
   LuminaryVec3 position;
   LuminaryVec3 rotation;
   LuminaryVec3 scale;

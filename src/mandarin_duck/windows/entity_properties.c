@@ -621,7 +621,6 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
 
   const bool material_is_selected = display->select_pixel_data.pixel_query_is_valid && display->select_pixel_data.material_id != 0xFFFF;
 
-  // TODO: If there is a selected material.
   if (!material_is_selected) {
     element_text(
       window, display, mouse_state,
@@ -710,8 +709,9 @@ static bool _window_entity_properties_instance_action(Window* window, Display* d
     window, mouse_state,
     (ElementSeparatorArgs){.text = "Instance", .size = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
 
-  // TODO: If there is a selected instance.
-  if (true) {
+  const bool instance_is_selected = display->select_pixel_data.pixel_query_is_valid && display->select_pixel_data.instance_id != 0xFFFFFFFF;
+
+  if (!instance_is_selected) {
     element_text(
       window, display, mouse_state,
       (ElementTextArgs){
@@ -729,6 +729,7 @@ static bool _window_entity_properties_instance_action(Window* window, Display* d
   }
 
   LuminaryInstance instance;
+  LUM_FAILURE_HANDLE(luminary_host_get_instance(host, display->select_pixel_data.instance_id, &instance));
 
   bool update_data = false;
 
@@ -739,6 +740,7 @@ static bool _window_entity_properties_instance_action(Window* window, Display* d
   update_data |= _window_entity_properties_add_slider(data, "Scale", &instance.scale, ELEMENT_SLIDER_DATA_TYPE_VECTOR, 0.0f, FLT_MAX, 1.0f);
 
   if (update_data) {
+    LUM_FAILURE_HANDLE(luminary_host_set_instance(host, display->select_pixel_data.instance_id, &instance));
   }
 
   return update_data;

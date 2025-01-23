@@ -89,28 +89,31 @@ LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, Lum
 LUMINARY_API LuminaryResult luminary_host_get_pixel_info(LuminaryHost* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result);
 
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
-LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
+LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, const LuminaryRendererSettings* settings);
 
 LUMINARY_API LuminaryResult luminary_host_get_camera(LuminaryHost* host, LuminaryCamera* camera);
-LUMINARY_API LuminaryResult luminary_host_set_camera(LuminaryHost* host, LuminaryCamera* camera);
+LUMINARY_API LuminaryResult luminary_host_set_camera(LuminaryHost* host, const LuminaryCamera* camera);
 
 LUMINARY_API LuminaryResult luminary_host_get_ocean(LuminaryHost* host, LuminaryOcean* ocean);
-LUMINARY_API LuminaryResult luminary_host_set_ocean(LuminaryHost* host, LuminaryOcean* ocean);
+LUMINARY_API LuminaryResult luminary_host_set_ocean(LuminaryHost* host, const LuminaryOcean* ocean);
 
 LUMINARY_API LuminaryResult luminary_host_get_sky(LuminaryHost* host, LuminarySky* sky);
-LUMINARY_API LuminaryResult luminary_host_set_sky(LuminaryHost* host, LuminarySky* sky);
+LUMINARY_API LuminaryResult luminary_host_set_sky(LuminaryHost* host, const LuminarySky* sky);
 
 LUMINARY_API LuminaryResult luminary_host_get_cloud(LuminaryHost* host, LuminaryCloud* cloud);
-LUMINARY_API LuminaryResult luminary_host_set_cloud(LuminaryHost* host, LuminaryCloud* cloud);
+LUMINARY_API LuminaryResult luminary_host_set_cloud(LuminaryHost* host, const LuminaryCloud* cloud);
 
 LUMINARY_API LuminaryResult luminary_host_get_fog(LuminaryHost* host, LuminaryFog* fog);
-LUMINARY_API LuminaryResult luminary_host_set_fog(LuminaryHost* host, LuminaryFog* fog);
+LUMINARY_API LuminaryResult luminary_host_set_fog(LuminaryHost* host, const LuminaryFog* fog);
 
 LUMINARY_API LuminaryResult luminary_host_get_particles(LuminaryHost* host, LuminaryParticles* particles);
-LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, LuminaryParticles* particles);
+LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, const LuminaryParticles* particles);
 
 LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
-LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
+LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, const LuminaryMaterial* material);
+
+LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint32_t id, LuminaryInstance* instance);
+LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, uint32_t id, const LuminaryInstance* instance);
 
 LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryImage image, LuminaryPath* path);
 

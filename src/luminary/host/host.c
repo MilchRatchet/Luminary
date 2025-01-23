@@ -9,6 +9,7 @@
 #include "internal_host.h"
 #include "internal_path.h"
 #include "lum.h"
+#include "mesh.h"
 #include "png.h"
 #include "wavefront.h"
 
@@ -521,7 +522,7 @@ LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_settings(Host* host, RendererSettings* settings) {
+LuminaryResult luminary_host_set_settings(Host* host, const RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
@@ -539,7 +540,7 @@ LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
+LuminaryResult luminary_host_set_camera(Host* host, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
@@ -557,7 +558,7 @@ LuminaryResult luminary_host_get_ocean(Host* host, Ocean* ocean) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_ocean(Host* host, Ocean* ocean) {
+LuminaryResult luminary_host_set_ocean(Host* host, const Ocean* ocean) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
@@ -575,7 +576,7 @@ LuminaryResult luminary_host_get_sky(Host* host, Sky* sky) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_sky(Host* host, Sky* sky) {
+LuminaryResult luminary_host_set_sky(Host* host, const Sky* sky) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
@@ -593,7 +594,7 @@ LuminaryResult luminary_host_get_cloud(Host* host, Cloud* cloud) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_cloud(Host* host, Cloud* cloud) {
+LuminaryResult luminary_host_set_cloud(Host* host, const Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
@@ -611,7 +612,7 @@ LuminaryResult luminary_host_get_fog(Host* host, Fog* fog) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_fog(Host* host, Fog* fog) {
+LuminaryResult luminary_host_set_fog(Host* host, const Fog* fog) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
@@ -629,7 +630,7 @@ LuminaryResult luminary_host_get_particles(Host* host, Particles* particles) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_particles(Host* host, Particles* particles) {
+LuminaryResult luminary_host_set_particles(Host* host, const Particles* particles) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
@@ -647,11 +648,35 @@ LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint1
   return LUMINARY_SUCCESS;
 }
 
-LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material) {
+LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, const LuminaryMaterial* material) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(material);
 
   __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) material, SCENE_ENTITY_MATERIALS, id));
+
+  return LUMINARY_SUCCESS;
+}
+
+LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint32_t id, LuminaryInstance* instance) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(instance);
+
+  MeshInstance mesh_instance;
+  __FAILURE_HANDLE(scene_get_entry(host->scene_caller, &mesh_instance, SCENE_ENTITY_INSTANCES, id));
+
+  __FAILURE_HANDLE(mesh_instance_to_public_api_instance(instance, &mesh_instance));
+
+  return LUMINARY_SUCCESS;
+}
+
+LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, uint32_t id, const LuminaryInstance* instance) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(instance);
+
+  MeshInstance mesh_instance;
+  __FAILURE_HANDLE(mesh_instance_from_public_api_instance(&mesh_instance, instance));
+
+  __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) &mesh_instance, SCENE_ENTITY_INSTANCES, id));
 
   return LUMINARY_SUCCESS;
 }

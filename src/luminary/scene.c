@@ -231,7 +231,6 @@ LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity 
 
   switch (entity) {
     case SCENE_ENTITY_MATERIALS: {
-      // Get canonical new material ID.
       uint32_t num_materials;
       __FAILURE_HANDLE(array_get_num_elements(scene->materials, &num_materials));
 
@@ -255,7 +254,27 @@ LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity 
       }
     } break;
     case SCENE_ENTITY_INSTANCES: {
-      __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Not implemented :(");
+      uint32_t num_instances;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instances, &num_instances));
+
+      if (index >= num_instances) {
+        __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Invalid instance ID.");
+      }
+
+      MeshInstance instance = scene->instances[index];
+
+      __FAILURE_HANDLE_CRITICAL(mesh_instance_check_for_dirty((MeshInstance*) object, &instance, &is_dirty));
+
+      if (is_dirty) {
+        MeshInstanceUpdate update;
+        update.instance_id = index;
+
+        memcpy(&update.instance, object, sizeof(MeshInstance));
+
+        __FAILURE_HANDLE(array_push(&scene->instance_updates, &update));
+
+        scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_INSTANCES;
+      }
     } break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
