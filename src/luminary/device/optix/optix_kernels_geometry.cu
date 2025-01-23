@@ -25,9 +25,12 @@ extern "C" __global__ void __raygen__optix() {
 
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset                = get_task_address(task_offset + i);
-    const DeviceTask task                = task_load(offset);
+    DeviceTask task                      = task_load(offset);
     const TriangleHandle triangle_handle = triangle_handle_load(offset);
+    const float depth                    = trace_depth_load(offset);
     const uint32_t pixel                 = get_pixel_id(task.index);
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
     GBufferData data;
     if (triangle_handle.instance_id == HIT_TYPE_OCEAN) {

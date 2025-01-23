@@ -310,22 +310,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     }
   }
 
-  // process data
-  for (uint32_t i = 0; i < num_tasks; i++) {
-    const uint32_t offset       = get_task_address(i);
-    const TriangleHandle handle = triangle_handle_load(offset);
-
-    if (handle.instance_id != HIT_TYPE_SKY) {
-      DeviceTask task   = task_load(offset);
-      const float depth = trace_depth_load(offset);
-
-      // TODO: This is wasteful, either move this to the next kernel or keep it if the hit_id history trick is worth it still.
-      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
-
-      task_store(task, offset);
-    }
-  }
-
   const uint16_t geometry_kernel_task_count = geometry_task_count + ocean_task_count;
 
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY]   = geometry_kernel_task_count;

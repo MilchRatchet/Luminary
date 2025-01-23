@@ -42,6 +42,12 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = depth};
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
+    // TODO: Figure out better ways of doing this.
+    if (depth == 0) {
+      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
     if (depth == 0) {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
       action.cuda_type = CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS;
@@ -50,12 +56,6 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     else {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
       action.cuda_type = CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    // TODO: Figure out better ways of doing this.
-    if (depth == 0) {
-      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
@@ -73,6 +73,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
       // It is important to compute bridges lighting before sampling volume scattering events.
       // We want to sample over the whole unoccluded ray path so sampling scattering events before
       // that would shorten the path.
+      // TODO: Move bridges into volume shading kernel
 
       if (args->render_lights && depth == 0) {
         action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
@@ -117,9 +118,11 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    if (args->render_procedural_sky) {
+      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+      action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
   }
 
   return LUMINARY_SUCCESS;

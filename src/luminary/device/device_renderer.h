@@ -54,6 +54,7 @@ struct DeviceRendererQueueArgs {
   bool render_clouds;
   bool render_inscattering;
   bool render_lights;
+  bool render_procedural_sky;
   ShadingMode shading_mode;
 } typedef DeviceRendererQueueArgs;
 
