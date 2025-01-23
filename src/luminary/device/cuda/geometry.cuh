@@ -15,7 +15,10 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
     const uint32_t offset          = get_task_address(i);
     DeviceTask task                = task_load(offset);
     TriangleHandle triangle_handle = triangle_handle_load(offset);
+    const float depth              = trace_depth_load(offset);
     const uint32_t pixel           = get_pixel_id(task.index);
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
     switch (triangle_handle.instance_id) {
       case HIT_TYPE_OCEAN: {

@@ -13,12 +13,15 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
 
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset       = get_task_address(task_offset + i);
-    const DeviceTask task       = task_load(offset);
+    DeviceTask task             = task_load(offset);
     const TriangleHandle handle = triangle_handle_load(offset);
+    const float depth           = trace_depth_load(offset);
     const uint32_t pixel        = get_pixel_id(task.index);
 
     if (VOLUME_HIT_CHECK(handle.instance_id))
       continue;
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
       write_beauty_buffer_forced(device.particles.albedo, pixel);
