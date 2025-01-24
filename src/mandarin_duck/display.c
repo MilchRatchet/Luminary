@@ -167,7 +167,16 @@ void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
   _display_set_hittest(display, (mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
 }
 
-void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
+static void _display_handle_drop_event(DisplayFileDrop** file_drop_array, SDL_DropEvent event) {
+  if (event.type == SDL_EVENT_DROP_FILE) {
+    DisplayFileDrop file_drop;
+    file_drop.file_path = event.data;
+
+    LUM_FAILURE_HANDLE(array_push(file_drop_array, &file_drop));
+  }
+}
+
+void display_query_events(Display* display, DisplayFileDrop** file_drop_array, bool* exit_requested, bool* dirty) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(exit_requested);
 
@@ -213,7 +222,7 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
         mouse_state_update_wheel(display->mouse_state, event.wheel);
         break;
       case SDL_EVENT_DROP_FILE:
-        // TODO: Implement support for dragging and dropping files into Mandarin Duck.
+        _display_handle_drop_event(file_drop_array, event.drop);
         break;
       default:
         warn_message("Unhandled SDL event type: %u.", event.type);

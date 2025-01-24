@@ -11,6 +11,25 @@ static void _mandarin_duck_update_host_output_props(LuminaryHost* host, uint32_t
   LUM_FAILURE_HANDLE(luminary_host_set_output_properties(host, properties));
 }
 
+static void _mandarin_duck_handle_file_drop(LuminaryHost* host, DisplayFileDrop* file_drop_array) {
+  uint32_t num_file_drops;
+  LUM_FAILURE_HANDLE(array_get_num_elements(file_drop_array, &num_file_drops));
+
+  for (uint32_t file_drop_index = 0; file_drop_index < num_file_drops; file_drop_index++) {
+    DisplayFileDrop file_drop = file_drop_array[file_drop_index];
+
+    LuminaryPath* lum_path;
+    LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
+    LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, file_drop.file_path));
+
+    LUM_FAILURE_HANDLE(luminary_host_load_obj_file(host, lum_path));
+
+    LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+  }
+
+  LUM_FAILURE_HANDLE(array_clear(file_drop_array));
+}
+
 void mandarin_duck_create(MandarinDuck** _duck, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(_duck);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -38,12 +57,15 @@ void mandarin_duck_run(MandarinDuck* duck) {
 
   LUM_FAILURE_HANDLE(wall_time_start(md_timer));
 
+  DisplayFileDrop* file_drop_array;
+  LUM_FAILURE_HANDLE(array_create(&file_drop_array, sizeof(DisplayFileDrop), 4));
+
   while (!exit_requested) {
     bool display_dirty = false;
 
     // Measure the time between event queries
     LUM_FAILURE_HANDLE(wall_time_stop(md_timer));
-    display_query_events(duck->display, &exit_requested, &display_dirty);
+    display_query_events(duck->display, &file_drop_array, &exit_requested, &display_dirty);
 
     double time_step;
     LUM_FAILURE_HANDLE(wall_time_get_time(md_timer, &time_step));
@@ -54,12 +76,16 @@ void mandarin_duck_run(MandarinDuck* duck) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     }
 
+    _mandarin_duck_handle_file_drop(duck->host, file_drop_array);
+
     display_handle_inputs(duck->display, duck->host, time_step);
 
     display_render(duck->display, duck->host);
 
     display_update(duck->display);
   }
+
+  LUM_FAILURE_HANDLE(array_destroy(&file_drop_array));
 
   LUM_FAILURE_HANDLE(wall_time_destroy(&md_timer));
 }

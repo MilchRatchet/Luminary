@@ -24,6 +24,10 @@ struct RenderMetaData {
   uint32_t sample_count;
 } typedef RenderMetaData;
 
+struct DisplayFileDrop {
+  const char* file_path;
+} typedef DisplayFileDrop;
+
 struct Display {
   SDL_Window* sdl_window;
   SDL_Surface* sdl_surface;
@@ -58,7 +62,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height);
 void display_set_mouse_visible(Display* display, bool enable);
 void display_set_cursor(Display* display, SDL_SystemCursor cursor);
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode);
-void display_query_events(Display* display, bool* exit_requested, bool* dirty);
+void display_query_events(Display* display, DisplayFileDrop** file_drop_array, bool* exit_requested, bool* dirty);
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step);
 void display_render(Display* display, LuminaryHost* host);
 void display_update(Display* display);
