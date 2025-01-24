@@ -32,6 +32,7 @@
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
 #define MATERIAL_ID_INVALID 0xFFFF
+#define INSTANCE_ID_INVALID 0xFFFF
 #define DEPTH_INVALID -1.0f
 
 #define LIGHT_ID_SUN (0xffffffffu)

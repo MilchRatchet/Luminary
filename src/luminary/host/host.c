@@ -639,7 +639,7 @@ LuminaryResult luminary_host_set_particles(Host* host, const Particles* particle
   return LUMINARY_SUCCESS;
 }
 
-LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material) {
+LuminaryResult luminary_host_get_material(Host* host, uint16_t id, LuminaryMaterial* material) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(material);
 
@@ -648,7 +648,7 @@ LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint1
   return LUMINARY_SUCCESS;
 }
 
-LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, const LuminaryMaterial* material) {
+LuminaryResult luminary_host_set_material(Host* host, uint16_t id, const LuminaryMaterial* material) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(material);
 
@@ -657,7 +657,7 @@ LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint1
   return LUMINARY_SUCCESS;
 }
 
-LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint32_t id, LuminaryInstance* instance) {
+LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
 
@@ -669,14 +669,54 @@ LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint3
   return LUMINARY_SUCCESS;
 }
 
-LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, uint32_t id, const LuminaryInstance* instance) {
+LuminaryResult luminary_host_set_instance(Host* host, uint32_t id, const LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
 
   MeshInstance mesh_instance;
-  __FAILURE_HANDLE(mesh_instance_from_public_api_instance(&mesh_instance, instance));
+  __FAILURE_HANDLE(mesh_instance_from_public_api_instance(&mesh_instance, id, instance));
 
   __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) &mesh_instance, SCENE_ENTITY_INSTANCES, id));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_add_instance(Host* host, const LuminaryInstance* instance) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(instance);
+
+  MeshInstance mesh_instance;
+  __FAILURE_HANDLE(mesh_instance_from_public_api_instance(&mesh_instance, INSTANCE_ID_INVALID, instance));
+
+  __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mesh_instance, SCENE_ENTITY_INSTANCES));
+  __FAILURE_HANDLE(_host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_num_meshes(Host* host, uint32_t* num_meshes) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(num_meshes);
+
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, num_meshes));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_num_materials(Host* host, uint32_t* num_materials) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(num_materials);
+
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, num_materials));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_num_instances(Host* host, uint32_t* num_instances) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(num_instances);
+
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_INSTANCES, num_instances));
 
   return LUMINARY_SUCCESS;
 }

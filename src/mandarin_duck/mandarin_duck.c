@@ -18,6 +18,9 @@ static void _mandarin_duck_handle_file_drop(LuminaryHost* host, DisplayFileDrop*
   for (uint32_t file_drop_index = 0; file_drop_index < num_file_drops; file_drop_index++) {
     DisplayFileDrop file_drop = file_drop_array[file_drop_index];
 
+    uint32_t mesh_id;
+    LUM_FAILURE_HANDLE(luminary_host_get_num_meshes(host, &mesh_id));
+
     LuminaryPath* lum_path;
     LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, file_drop.file_path));
@@ -25,6 +28,14 @@ static void _mandarin_duck_handle_file_drop(LuminaryHost* host, DisplayFileDrop*
     LUM_FAILURE_HANDLE(luminary_host_load_obj_file(host, lum_path));
 
     LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+
+    LuminaryInstance instance;
+    instance.mesh_id  = mesh_id;
+    instance.position = (LuminaryVec3){.x = 0.0f, .y = 0.0f, .z = 0.0f};
+    instance.rotation = (LuminaryVec3){.x = 0.0f, .y = 0.0f, .z = 0.0f};
+    instance.scale    = (LuminaryVec3){.x = 1.0f, .y = 1.0f, .z = 1.0f};
+
+    LUM_FAILURE_HANDLE(luminary_host_add_instance(host, &instance));
   }
 
   LUM_FAILURE_HANDLE(array_clear(file_drop_array));
