@@ -67,11 +67,14 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, triangle_handle.tri_id, triangle_count));
   const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_handle.tri_id, triangle_count));
 
-  const vec3 vertex = transform_apply(trans, get_vector(t0.x, t0.y, t0.z));
-  const vec3 edge1  = transform_apply_relative(trans, get_vector(t0.w, t1.x, t1.y));
-  const vec3 edge2  = transform_apply_relative(trans, get_vector(t1.z, t1.w, t2.x));
+  const vec3 position = transform_apply_inv(trans, task.origin);
+  const vec3 ray      = transform_apply_relative_inv(trans, task.ray);
 
-  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.origin);
+  const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
+  const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
+  const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
+
+  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, position);
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
@@ -82,16 +85,16 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const uint16_t material_id = __float_as_uint(t3.w) & 0xFFFF;
   const DeviceMaterial mat   = load_material(device.ptrs.materials, material_id);
 
-  const vec3 vertex_normal  = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.x)));
-  const vec3 vertex1_normal = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.y)));
-  const vec3 vertex2_normal = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.z)));
+  const vec3 vertex_normal  = normal_unpack(__float_as_uint(t3.x));
+  const vec3 vertex1_normal = normal_unpack(__float_as_uint(t3.y));
+  const vec3 vertex2_normal = normal_unpack(__float_as_uint(t3.z));
 
   const vec3 edge1_normal = sub_vector(vertex1_normal, vertex_normal);
   const vec3 edge2_normal = sub_vector(vertex2_normal, vertex_normal);
 
   bool is_inside;
   const vec3 normal = geometry_compute_normal(
-    vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, uv_sub(vertex_texture, vertex1_texture),
+    vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, uv_sub(vertex_texture, vertex1_texture),
     uv_sub(vertex_texture, vertex2_texture), mat.normal_tex, coords, tex_coords, is_inside);
 
   RGBAF albedo = mat.albedo;
@@ -151,7 +154,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   data.tri_id      = triangle_handle.tri_id;
   data.albedo      = albedo;
   data.emission    = emission;
-  data.normal      = normal;
+  data.normal      = transform_apply_relative(trans, normal);
   data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = roughness;

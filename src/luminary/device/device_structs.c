@@ -436,17 +436,11 @@ LuminaryResult _device_struct_quaternion_to_quaternion16(Quaternion16* dst, cons
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
-  const int64_t x = (int64_t) ((src->x * 0x7FFF) + 0.5f);
-  dst->x          = (int16_t) ((x >> 48) | (x & 0x7FFF));
-
-  const int64_t y = (int64_t) ((src->y * 0x7FFF) + 0.5f);
-  dst->y          = (int16_t) ((y >> 48) | (y & 0x7FFF));
-
-  const int64_t z = (int64_t) ((src->z * 0x7FFF) + 0.5f);
-  dst->z          = (int16_t) ((z >> 48) | (z & 0x7FFF));
-
-  const int64_t w = (int64_t) ((src->w * 0x7FFF) + 0.5f);
-  dst->w          = (int16_t) ((w >> 48) | (w & 0x7FFF));
+  // We use the inverse of the quaternion so that it matches with our Quaternion to Matrix conversion for the OptiX BVH.
+  dst->x = (uint16_t) (((1.0f - src->x) * 0x7FFF) + 0.5f);
+  dst->y = (uint16_t) (((1.0f - src->y) * 0x7FFF) + 0.5f);
+  dst->z = (uint16_t) (((1.0f - src->z) * 0x7FFF) + 0.5f);
+  dst->w = (uint16_t) (((1.0f + src->w) * 0x7FFF) + 0.5f);
 
   return LUMINARY_SUCCESS;
 }

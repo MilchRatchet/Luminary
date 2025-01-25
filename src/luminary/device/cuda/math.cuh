@@ -409,21 +409,22 @@ __device__ vec3 quaternion_apply(const Quaternion q, const vec3 v) {
 
 __device__ vec3 quaternion16_apply(const Quaternion16 q, const vec3 v) {
   Quaternion quat;
-  quat.x = q.x * (1.0f / 0x7FFF);
-  quat.y = q.y * (1.0f / 0x7FFF);
-  quat.z = q.z * (1.0f / 0x7FFF);
-  quat.w = q.w * (1.0f / 0x7FFF);
+  quat.x = (q.x * (1.0f / 0x7FFF)) - 1.0f;
+  quat.y = (q.y * (1.0f / 0x7FFF)) - 1.0f;
+  quat.z = (q.z * (1.0f / 0x7FFF)) - 1.0f;
+  quat.w = (q.w * (1.0f / 0x7FFF)) - 1.0f;
 
   return quaternion_apply(quat, v);
 }
 
-__device__ Quaternion16 quaternion16_inverse(const Quaternion16 q) {
-  Quaternion16 result;
-  result.x = -q.x;
-  result.y = -q.y;
-  result.z = -q.z;
-  result.w = q.w;
-  return result;
+__device__ vec3 quaternion16_apply_inv(const Quaternion16 q, const vec3 v) {
+  Quaternion quat;
+  quat.x = 1.0f - (q.x * (1.0f / 0x7FFF));
+  quat.y = 1.0f - (q.y * (1.0f / 0x7FFF));
+  quat.z = 1.0f - (q.z * (1.0f / 0x7FFF));
+  quat.w = (q.w * (1.0f / 0x7FFF)) - 1.0f;
+
+  return quaternion_apply(quat, v);
 }
 
 __device__ vec3 transform_vec4_3_position(const Mat3x4 m, const vec3 p) {
@@ -463,7 +464,7 @@ __device__ vec3 transform_apply_relative(const DeviceTransform trans, const vec3
 }
 
 __device__ vec3 transform_apply_relative_inv(const DeviceTransform trans, const vec3 v) {
-  return mul_vector(quaternion16_apply(quaternion16_inverse(trans.rotation), v), inv_vector(trans.scale));
+  return quaternion16_apply_inv(trans.rotation, mul_vector(v, inv_vector(trans.scale)));
 }
 
 __device__ vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
@@ -471,7 +472,7 @@ __device__ vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
 }
 
 __device__ vec3 transform_apply_inv(const DeviceTransform trans, const vec3 v) {
-  return transform_apply_absolute_inv(trans, transform_apply_relative_inv(trans, v));
+  return transform_apply_relative_inv(trans, transform_apply_absolute_inv(trans, v));
 }
 
 /*
