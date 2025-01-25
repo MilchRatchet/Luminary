@@ -68,14 +68,18 @@ __device__ TriangleHandle ris_sample_light(
 
       const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, bsdf_sample_ray);
 
-      const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_light_key);
-      const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
+      float mis_weight;
+      if (reservoir_size > 0) {
+        const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_light_key);
+        const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
 
-      // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
-      const float mis_weight = (reservoir_size > 0)
-                                 ? bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf
-                                     / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f)
-                                 : 1.0f / bsdf_sample_pdf;
+        // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
+        mis_weight = bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf
+                     / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+      }
+      else {
+        mis_weight = 1.0f / bsdf_sample_pdf;
+      }
 
       const float weight = target_pdf * mis_weight;
 

@@ -716,23 +716,58 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       uint32_t child_light_ptr = 0;
 
-      // Now we copy the triangles for all of our leaf child nodes.
-      for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
-        const uint32_t light_ptr   = child_leaf_light_ptr[child_ptr];
-        const uint32_t light_count = child_leaf_light_count[child_ptr];
+      if (child_leaf_count > 0) {
+        // The non-leaf nodes must come first, so we partition the children by swapping the non-leaf
+        // nodes to the beginning.
+        for (uint32_t child_ptr = 0; child_ptr < child_count - child_leaf_count; child_ptr++) {
+          const uint32_t child_light_count = child_leaf_light_count[child_ptr];
 
-        // If this child is not a leaf, then skip.
-        if (light_count == 0)
-          continue;
+          // Child is a leaf in the non-leaf section of the children, find a mis-positioned non-leaf child.
+          if (child_light_count > 0) {
+            uint32_t child_swap_ptr;
+            for (child_swap_ptr = child_count - child_leaf_count; child_swap_ptr < child_count; child_swap_ptr++) {
+              const uint32_t child_swap_light_count = child_leaf_light_count[child_swap_ptr];
 
-        for (uint32_t i = 0; i < light_count; i++) {
-          new_fragments[triangles_ptr + child_light_ptr + i]  = light_ptr + i;
-          fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
+              if (child_swap_light_count == 0)
+                break;
+            }
+
+            LightTreeChildNode children_swap = children[child_ptr];
+            children[child_ptr]              = children[child_swap_ptr];
+            children[child_swap_ptr]         = children_swap;
+
+            uint32_t child_binary_index_swap   = child_binary_index[child_ptr];
+            child_binary_index[child_ptr]      = child_binary_index[child_swap_ptr];
+            child_binary_index[child_swap_ptr] = child_binary_index_swap;
+
+            uint32_t child_leaf_light_ptr_swap   = child_leaf_light_ptr[child_ptr];
+            child_leaf_light_ptr[child_ptr]      = child_leaf_light_ptr[child_swap_ptr];
+            child_leaf_light_ptr[child_swap_ptr] = child_leaf_light_ptr_swap;
+
+            uint32_t child_leaf_light_count_swap   = child_leaf_light_count[child_ptr];
+            child_leaf_light_count[child_ptr]      = child_leaf_light_count[child_swap_ptr];
+            child_leaf_light_count[child_swap_ptr] = child_leaf_light_count_swap;
+          }
         }
 
-        children[child_ptr].light_count = light_count;
+        // Now we copy the triangles for all of our leaf child nodes.
+        for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
+          const uint32_t light_ptr   = child_leaf_light_ptr[child_ptr];
+          const uint32_t light_count = child_leaf_light_count[child_ptr];
 
-        child_light_ptr += light_count;
+          // If this child is not a leaf, then skip.
+          if (light_count == 0)
+            continue;
+
+          for (uint32_t i = 0; i < light_count; i++) {
+            new_fragments[triangles_ptr + child_light_ptr + i]  = light_ptr + i;
+            fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
+          }
+
+          children[child_ptr].light_count = light_count;
+
+          child_light_ptr += light_count;
+        }
       }
 
       vec3 min_point       = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};

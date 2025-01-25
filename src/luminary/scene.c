@@ -620,7 +620,7 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
       else {
         // Search for the first deleted instance and replace it.
         for (uint32_t instance_list_id = 0; instance_list_id < instances_count; instance_list_id++) {
-          if (scene->instances[instance_list_id].active) {
+          if (scene->instances[instance_list_id].active == false) {
             instance_id = instance_list_id;
             break;
           }
