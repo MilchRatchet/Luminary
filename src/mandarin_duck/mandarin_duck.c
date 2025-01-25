@@ -11,7 +11,7 @@ static void _mandarin_duck_update_host_output_props(LuminaryHost* host, uint32_t
   LUM_FAILURE_HANDLE(luminary_host_set_output_properties(host, properties));
 }
 
-static void _mandarin_duck_handle_file_drop(LuminaryHost* host, DisplayFileDrop* file_drop_array) {
+static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* host, DisplayFileDrop* file_drop_array) {
   uint32_t num_file_drops;
   LUM_FAILURE_HANDLE(array_get_num_elements(file_drop_array, &num_file_drops));
 
@@ -34,6 +34,8 @@ static void _mandarin_duck_handle_file_drop(LuminaryHost* host, DisplayFileDrop*
     instance.position = (LuminaryVec3){.x = 0.0f, .y = 0.0f, .z = 0.0f};
     instance.rotation = (LuminaryVec3){.x = 0.0f, .y = 0.0f, .z = 0.0f};
     instance.scale    = (LuminaryVec3){.x = 1.0f, .y = 1.0f, .z = 1.0f};
+
+    camera_handler_center_instance(duck->display->camera_handler, host, &instance);
 
     LUM_FAILURE_HANDLE(luminary_host_add_instance(host, &instance));
   }
@@ -87,7 +89,7 @@ void mandarin_duck_run(MandarinDuck* duck) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     }
 
-    _mandarin_duck_handle_file_drop(duck->host, file_drop_array);
+    _mandarin_duck_handle_file_drop(duck, duck->host, file_drop_array);
 
     display_handle_inputs(duck->display, duck->host, time_step);
 

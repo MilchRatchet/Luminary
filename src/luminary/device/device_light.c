@@ -1585,7 +1585,7 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
     LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
 
-    if (!instance->active)
+    if (!instance->active || (instance->fragments == (LightTreeFragment*) 0))
       continue;
 
     uint32_t num_fragments;
@@ -1603,7 +1603,7 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
     LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
 
-    if (!instance->active)
+    if (!instance->active || (instance->fragments == (LightTreeFragment*) 0))
       continue;
 
     uint32_t num_fragments;

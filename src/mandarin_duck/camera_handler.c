@@ -197,6 +197,25 @@ void camera_handler_update(
   }
 }
 
+void camera_handler_center_instance(CameraHandler* camera_handler, LuminaryHost* host, LuminaryInstance* instance) {
+  MD_CHECK_NULL_ARGUMENT(camera_handler);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  LuminaryCamera camera;
+  LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
+
+  LuminaryVec3 forward = {.x = 0.0f, .y = 0.0f, .z = -1.0f};
+  Quaternion q         = _camera_handler_rotation_to_quaternion(camera.rotation);
+  forward              = _camera_handler_rotate_vector_by_quaternion(forward, q);
+
+  // TODO: Position object based on size of object.
+  const float dist = 10.0f;
+
+  instance->position.x = camera.pos.x + dist * forward.x;
+  instance->position.y = camera.pos.y + dist * forward.y;
+  instance->position.z = camera.pos.z + dist * forward.z;
+}
+
 void camera_handler_destroy(CameraHandler** camera_handler) {
   MD_CHECK_NULL_ARGUMENT(camera_handler);
   MD_CHECK_NULL_ARGUMENT(*camera_handler);

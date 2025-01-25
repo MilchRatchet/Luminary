@@ -19,6 +19,7 @@ void camera_handler_set_mode(CameraHandler* camera_handler, CameraMode mode);
 void camera_handler_set_reference_pos(CameraHandler* camera_handler, LuminaryVec3 ref_pos);
 void camera_handler_update(
   CameraHandler* camera_handler, LuminaryHost* host, KeyboardState* keyboard_state, MouseState* mouse_state, float time_step);
+void camera_handler_center_instance(CameraHandler* camera_handler, LuminaryHost* host, LuminaryInstance* instance);
 void camera_handler_destroy(CameraHandler** camera_handler);
 
 #endif /* MANDARIN_DUCK_CAMERA_HANDLER_H */
