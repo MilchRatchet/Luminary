@@ -68,7 +68,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_handle.tri_id, triangle_count));
 
   const vec3 position = transform_apply_inv(trans, task.origin);
-  const vec3 ray      = transform_apply_relative_inv(trans, task.ray);
+  const vec3 ray      = transform_apply_rotation_inv(trans, task.ray);
 
   const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
   const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
@@ -154,7 +154,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   data.tri_id      = triangle_handle.tri_id;
   data.albedo      = albedo;
   data.emission    = emission;
-  data.normal      = transform_apply_relative(trans, normal);
+  data.normal      = transform_apply_rotation(trans, normal);
   data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = roughness;

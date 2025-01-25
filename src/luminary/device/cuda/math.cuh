@@ -451,6 +451,14 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
 // Transformation API
 ////////////////////////////////////////////////////////////////////
 
+__device__ vec3 transform_apply_rotation(const DeviceTransform trans, const vec3 v) {
+  return quaternion16_apply(trans.rotation, v);
+}
+
+__device__ vec3 transform_apply_rotation_inv(const DeviceTransform trans, const vec3 v) {
+  return quaternion16_apply_inv(trans.rotation, v);
+}
+
 __device__ vec3 transform_apply_absolute(const DeviceTransform trans, const vec3 v) {
   return add_vector(v, trans.translation);
 }
@@ -460,11 +468,11 @@ __device__ vec3 transform_apply_absolute_inv(const DeviceTransform trans, const 
 }
 
 __device__ vec3 transform_apply_relative(const DeviceTransform trans, const vec3 v) {
-  return mul_vector(quaternion16_apply(trans.rotation, v), trans.scale);
+  return mul_vector(transform_apply_rotation(trans, v), trans.scale);
 }
 
 __device__ vec3 transform_apply_relative_inv(const DeviceTransform trans, const vec3 v) {
-  return quaternion16_apply_inv(trans.rotation, mul_vector(v, inv_vector(trans.scale)));
+  return transform_apply_rotation_inv(trans, mul_vector(v, inv_vector(trans.scale)));
 }
 
 __device__ vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
