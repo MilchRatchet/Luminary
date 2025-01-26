@@ -1,7 +1,10 @@
 #include "device_post.h"
 
+#include "device.h"
 #include "device_memory.h"
 #include "internal_error.h"
+#include "kernel.h"
+#include "kernel_args.h"
 
 ////////////////////////////////////////////////////////////////////
 // Bloom
@@ -60,31 +63,70 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(device);
 
-  /*
-const float blend = instance->scene.camera.bloom_blend;
+  uint32_t width  = post->width;
+  uint32_t height = post->height;
 
-image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
+  {
+    KernelArgsCameraPostImageDownsample args;
 
-for (int i = 0; i < mip_count - 1; i++) {
-  const int sw = width >> (i + 1);
-  const int sh = height >> (i + 1);
-  const int tw = width >> (i + 2);
-  const int th = height >> (i + 2);
-  image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i + 1], tw, th);
-}
+    args.src = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.sw  = width;
+    args.sh  = height;
+    args.dst = DEVICE_PTR(post->bloom_mips[0]);
+    args.tw  = width >> 1;
+    args.th  = height >> 1;
 
-for (int i = mip_count - 1; i > 0; i--) {
-  const int sw = width >> (i + 1);
-  const int sh = height >> (i + 1);
-  const int tw = width >> i;
-  const int th = height >> i;
-  image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
-}
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
+  }
 
-image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-  instance->bloom_mips_gpu[0], width >> 1, height >> 1, dst, dst, width, height, blend / mip_count, 1.0f - blend);
-  */
+  for (uint32_t i = 0; i < post->bloom_mip_count - 1; i++) {
+    KernelArgsCameraPostImageDownsample args;
+
+    args.src = DEVICE_PTR(post->bloom_mips[i]);
+    args.sw  = width >> (i + 1);
+    args.sh  = height >> (i + 1);
+    args.dst = DEVICE_PTR(post->bloom_mips[i + 1]);
+    args.tw  = width >> (i + 2);
+    args.th  = height >> (i + 2);
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
+  }
+
+  for (uint32_t i = post->bloom_mip_count - 1; i > 0; i--) {
+    KernelArgsCameraPostImageUpsample args;
+
+    args.src  = DEVICE_PTR(post->bloom_mips[i]);
+    args.sw   = width >> (i + 1);
+    args.sh   = height >> (i + 1);
+    args.dst  = DEVICE_PTR(post->bloom_mips[i - 1]);
+    args.base = DEVICE_PTR(post->bloom_mips[i - 1]);
+    args.tw   = width >> i;
+    args.th   = height >> i;
+    args.sa   = 1.0f;
+    args.sb   = 1.0f;
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+  }
+
+  {
+    KernelArgsCameraPostImageUpsample args;
+
+    args.src  = DEVICE_PTR(post->bloom_mips[0]);
+    args.sw   = width >> 1;
+    args.sh   = height >> 1;
+    args.dst  = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.base = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.tw   = width;
+    args.th   = height;
+    args.sa   = post->bloom_blend / post->bloom_mip_count;
+    args.sb   = 1.0f - post->bloom_blend;
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -96,7 +138,7 @@ static LuminaryResult _device_post_bloom_destroy(DevicePost* post) {
     return LUMINARY_SUCCESS;
 
   for (uint32_t i = 0; i < post->bloom_mip_count; i++) {
-    __FAILURE_HANDLE(device_free(post->bloom_mips[i]));
+    __FAILURE_HANDLE(device_free(&post->bloom_mips[i]));
   }
 
   __FAILURE_HANDLE(host_free(&post->bloom_mips));

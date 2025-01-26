@@ -42,18 +42,21 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_0]     = {.name = "temporal_accumulation_output_0", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1]     = {.name = "temporal_accumulation_output_1", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV]          = {.name = "temporal_accumulation_aov", .param_size = 0},
-  [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]         = {.name = "generate_final_image", .param_size = sizeof(KernelArgsGenerateFinalImage)},
-  [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8]        = {.name = "convert_RGBF_to_ARGB8", .param_size = sizeof(KernelArgsConvertRGBFToARGB8)},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE] = {.name = "camera_post_image_downsample", .param_size = 0},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD] = {.name = "camera_post_image_downsample_threshold", .param_size = 0},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE]             = {.name = "camera_post_image_upsample", .param_size = 0},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS]          = {.name = "camera_post_lens_flare_ghosts", .param_size = 0},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO]            = {.name = "camera_post_lens_flare_halo", .param_size = 0},
-  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4]      = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
-  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]       = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
-  [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] = {
-    .name       = "omm_gather_array_format_4",
-    .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)}};
+  [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]  = {.name = "generate_final_image", .param_size = sizeof(KernelArgsGenerateFinalImage)},
+  [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8] = {.name = "convert_RGBF_to_ARGB8", .param_size = sizeof(KernelArgsConvertRGBFToARGB8)},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE] =
+    {.name = "camera_post_image_downsample", .param_size = sizeof(KernelArgsCameraPostImageDownsample)},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD] =
+    {.name = "camera_post_image_downsample_threshold", .param_size = sizeof(KernelArgsCameraPostImageDownsampleThreshold)},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE] =
+    {.name = "camera_post_image_upsample", .param_size = sizeof(KernelArgsCameraPostImageUpsample)},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS] = {.name = "camera_post_lens_flare_ghosts", .param_size = 0},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO]   = {.name = "camera_post_lens_flare_halo", .param_size = 0},
+  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4]          = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
+  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]           = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
+  [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4]     = {
+        .name       = "omm_gather_array_format_4",
+        .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)}};
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 
 LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type) {

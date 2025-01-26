@@ -257,6 +257,17 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     current_entity++;
   }
 
+  if (flags & SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_CAMERA)) {
+    Camera camera;
+    __FAILURE_HANDLE_CRITICAL(scene_get(scene, &camera, SCENE_ENTITY_CAMERA));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+
+      __FAILURE_HANDLE_CRITICAL(device_post_update(device->post, &camera));
+    }
+  }
+
   if (flags & SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_SKY)) {
     Sky sky;
     __FAILURE_HANDLE_CRITICAL(scene_get(scene, &sky, SCENE_ENTITY_SKY));

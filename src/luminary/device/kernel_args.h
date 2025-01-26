@@ -76,6 +76,37 @@ struct KernelArgsConvertRGBFToARGB8 {
   LuminaryFilter filter;
 } typedef KernelArgsConvertRGBFToARGB8;
 
+struct KernelArgsCameraPostImageDownsample {
+  const RGBF* src;
+  uint32_t sw;
+  uint32_t sh;
+  RGBF* dst;
+  uint32_t tw;
+  uint32_t th;
+} typedef KernelArgsCameraPostImageDownsample;
+
+struct KernelArgsCameraPostImageDownsampleThreshold {
+  const RGBF* src;
+  uint32_t sw;
+  uint32_t sh;
+  RGBF* dst;
+  uint32_t tw;
+  uint32_t th;
+  float threshold;
+} typedef KernelArgsCameraPostImageDownsampleThreshold;
+
+struct KernelArgsCameraPostImageUpsample {
+  const RGBF* src;
+  uint32_t sw;
+  uint32_t sh;
+  RGBF* dst;
+  const RGBF* base;
+  uint32_t tw;
+  uint32_t th;
+  float sa;
+  float sb;
+} typedef KernelArgsCameraPostImageUpsample;
+
 struct KernelArgsOMMLevel0Format4 {
   uint32_t mesh_id;
   uint32_t triangle_count;
