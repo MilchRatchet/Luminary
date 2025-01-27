@@ -1271,6 +1271,19 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_post(Device* device, const Camera* camera) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(camera);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_post_update(device->post, camera));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_clear_lighting_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 

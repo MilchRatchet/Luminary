@@ -63,8 +63,8 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(device);
 
-  uint32_t width  = post->width;
-  uint32_t height = post->height;
+  const uint32_t width  = post->width;
+  const uint32_t height = post->height;
 
   {
     KernelArgsCameraPostImageDownsample args;
@@ -151,17 +151,15 @@ static LuminaryResult _device_post_bloom_destroy(DevicePost* post) {
 // Lens Flare
 ////////////////////////////////////////////////////////////////////
 
-#define LENS_FLARE_NUM_BUFFERS 4
+#define LENS_FLARE_NUM_BUFFERS 2
 
 static LuminaryResult _device_post_lens_flare_create(DevicePost* post) {
   __CHECK_NULL_ARGUMENT(post);
 
   __FAILURE_HANDLE(host_malloc(&post->lens_flare_buffers, sizeof(RGBF*) * LENS_FLARE_NUM_BUFFERS));
 
-  __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[0], sizeof(RGBF) * post->width * post->height));
+  __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[0], sizeof(RGBF) * (post->width >> 1) * (post->height >> 1)));
   __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[1], sizeof(RGBF) * (post->width >> 1) * (post->height >> 1)));
-  __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[2], sizeof(RGBF) * (post->width >> 1) * (post->height >> 1)));
-  __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[3], sizeof(RGBF) * (post->width >> 2) * (post->height >> 2)));
 
   return LUMINARY_SUCCESS;
 }
@@ -170,37 +168,99 @@ static LuminaryResult _device_post_lens_flare_apply(DevicePost* post, Device* de
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(device);
 
-  /*
-static void _lens_flare_apply_ghosts(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
-  int width  = instance->internal_width;
-  int height = instance->internal_height;
+  const uint32_t width  = post->width;
+  const uint32_t height = post->height;
 
-  _lens_flare_ghosts<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width >> 1, height >> 1, dst, width >> 1, height >> 1);
-}
+  {
+    KernelArgsCameraPostImageDownsampleThreshold args;
 
-static void _lens_flare_apply_halo(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
-  int width  = instance->internal_width;
-  int height = instance->internal_height;
+    args.src       = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.sw        = width;
+    args.sh        = height;
+    args.dst       = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.tw        = width >> 1;
+    args.th        = height >> 1;
+    args.threshold = post->lens_flare_threshold;
 
-  _lens_flare_halo<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width >> 1, height >> 1, dst, width >> 1, height >> 1);
-}
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD], &args, device->stream_main));
+  }
 
-image_downsample_threshold<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-  src, width, height, instance->lens_flare_buffers_gpu[2], width >> 1, height >> 1, instance->scene.camera.lens_flare_threshold);
+  {
+    KernelArgsCameraPostImageDownsample args;
 
-image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-  instance->lens_flare_buffers_gpu[2], width >> 1, height >> 1, instance->lens_flare_buffers_gpu[3], width >> 2, height >> 2);
+    args.src = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.sw  = width >> 1;
+    args.sh  = height >> 1;
+    args.dst = DEVICE_PTR(post->lens_flare_buffers[1]);
+    args.tw  = width >> 2;
+    args.th  = height >> 2;
 
-image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-  instance->lens_flare_buffers_gpu[3], width >> 2, height >> 2, instance->lens_flare_buffers_gpu[2], instance->lens_flare_buffers_gpu[2],
-  width >> 1, height >> 1, 0.5f, 0.5f);
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
+  }
 
-_lens_flare_apply_ghosts(instance, instance->lens_flare_buffers_gpu[2], instance->lens_flare_buffers_gpu[1]);
-_lens_flare_apply_halo(instance, instance->lens_flare_buffers_gpu[1], instance->lens_flare_buffers_gpu[2]);
+  {
+    KernelArgsCameraPostImageUpsample args;
 
-image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-  instance->lens_flare_buffers_gpu[2], width >> 1, height >> 1, dst, dst, width, height, 1.0f, 1.0f);
-  */
+    args.src  = DEVICE_PTR(post->lens_flare_buffers[1]);
+    args.sw   = width >> 2;
+    args.sh   = height >> 2;
+    args.base = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.dst  = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.tw   = width >> 1;
+    args.th   = height >> 1;
+    args.sa   = 0.5f;
+    args.sb   = 0.5f;
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+  }
+
+  {
+    KernelArgsCameraPostLensFlareGhosts args;
+
+    args.src = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.sw  = width >> 1;
+    args.sh  = height >> 1;
+    args.dst = DEVICE_PTR(post->lens_flare_buffers[1]);
+    args.tw  = width >> 1;
+    args.th  = height >> 1;
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS], &args, device->stream_main));
+  }
+
+  {
+    KernelArgsCameraPostLensFlareHalo args;
+
+    args.src = DEVICE_PTR(post->lens_flare_buffers[1]);
+    args.sw  = width >> 1;
+    args.sh  = height >> 1;
+    args.dst = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.tw  = width >> 1;
+    args.th  = height >> 1;
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO], &args, device->stream_main));
+  }
+
+  {
+    KernelArgsCameraPostImageUpsample args;
+
+    args.src  = DEVICE_PTR(post->lens_flare_buffers[0]);
+    args.sw   = width >> 1;
+    args.sh   = height >> 1;
+    args.base = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.dst  = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.tw   = width;
+    args.th   = height;
+    args.sa   = 1.0f;
+    args.sb   = 1.0f;
+
+    __FAILURE_HANDLE(
+      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -213,8 +273,6 @@ static LuminaryResult _device_post_lens_flare_destroy(DevicePost* post) {
 
   __FAILURE_HANDLE(device_free((void**) &post->lens_flare_buffers[0]));
   __FAILURE_HANDLE(device_free((void**) &post->lens_flare_buffers[1]));
-  __FAILURE_HANDLE(device_free((void**) &post->lens_flare_buffers[2]));
-  __FAILURE_HANDLE(device_free((void**) &post->lens_flare_buffers[3]));
 
   __FAILURE_HANDLE(host_free(&post->lens_flare_buffers));
 
@@ -255,15 +313,17 @@ DEVICE_CTX_FUNC LuminaryResult device_post_allocate(DevicePost* post, uint32_t w
   return LUMINARY_SUCCESS;
 }
 
-DEVICE_CTX_FUNC LuminaryResult device_post_update(DevicePost* post, Camera* camera) {
+DEVICE_CTX_FUNC LuminaryResult device_post_update(DevicePost* post, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(camera);
+
+  const bool camera_bloom = camera->bloom_blend > 0.0f;
 
   post->bloom_blend          = camera->bloom_blend;
   post->lens_flare_threshold = camera->lens_flare_threshold;
 
-  if (post->bloom != camera->bloom) {
-    post->bloom = camera->bloom;
+  if (post->bloom != camera_bloom) {
+    post->bloom = camera_bloom;
 
     if (post->bloom) {
       __FAILURE_HANDLE(_device_post_bloom_create(post));

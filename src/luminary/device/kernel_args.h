@@ -107,6 +107,24 @@ struct KernelArgsCameraPostImageUpsample {
   float sb;
 } typedef KernelArgsCameraPostImageUpsample;
 
+struct KernelArgsCameraPostLensFlareGhosts {
+  const RGBF* src;
+  uint32_t sw;
+  uint32_t sh;
+  RGBF* dst;
+  uint32_t tw;
+  uint32_t th;
+} typedef KernelArgsCameraPostLensFlareGhosts;
+
+struct KernelArgsCameraPostLensFlareHalo {
+  const RGBF* src;
+  uint32_t sw;
+  uint32_t sh;
+  RGBF* dst;
+  uint32_t tw;
+  uint32_t th;
+} typedef KernelArgsCameraPostLensFlareHalo;
+
 struct KernelArgsOMMLevel0Format4 {
   uint32_t mesh_id;
   uint32_t triangle_count;

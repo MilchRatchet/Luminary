@@ -21,7 +21,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->min_exposure               = 10.0f;
   camera->max_exposure               = 400.0f;
   camera->auto_exposure              = 0;
-  camera->bloom                      = 1;
   camera->bloom_blend                = 0.01f;
   camera->lens_flare                 = 0;
   camera->lens_flare_threshold       = 1.0f;
@@ -95,7 +94,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   }
 
   __CAMERA_OUTPUT_DIRTY(exposure);
-  __CAMERA_OUTPUT_DIRTY(bloom);
   __CAMERA_OUTPUT_DIRTY(bloom_blend);
   __CAMERA_OUTPUT_DIRTY(lens_flare);
   __CAMERA_OUTPUT_DIRTY(lens_flare_threshold);

@@ -11,6 +11,7 @@ struct LegacyLumFileSettings {
   bool force_transparency_cutout;
   bool force_thin_walled;
   float emission_scale;
+  bool force_no_bloom;
 } typedef LegacyLumFileSettings;
 
 static LuminaryResult parse_general_settings(
@@ -135,7 +136,7 @@ static void parse_material_settings(LegacyLumFileSettings* settings, char* line)
   }
 }
 
-static LuminaryResult parse_camera_settings(Camera* camera, char* line) {
+static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSettings* legacy_settings, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
   uint32_t bool_uint = 0;
@@ -189,7 +190,7 @@ static LuminaryResult parse_camera_settings(Camera* camera, char* line) {
     /* BLOOM___ */
     case 6872316342038383682u:
       sscanf(value, "%u\n", &bool_uint);
-      camera->bloom = bool_uint;
+      legacy_settings->force_no_bloom = bool_uint == 0;
       break;
     /* BLOOMBLE */
     case 4993438986657549378u:
@@ -677,7 +678,11 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
 
   LegacyLumFileSettings legacy_settings = {
-    .legacy_smoothness = false, .force_transparency_cutout = false, .force_thin_walled = false, .emission_scale = 1.0f};
+    .legacy_smoothness         = false,
+    .force_transparency_cutout = false,
+    .force_thin_walled         = false,
+    .emission_scale            = 1.0f,
+    .force_no_bloom            = false};
 
   while (1) {
     fgets(line, LINE_SIZE, file);
@@ -689,7 +694,7 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
       parse_material_settings(&legacy_settings, line + 8 + 1);
     }
     else if (line[0] == 'C' && line[1] == 'A') {
-      __FAILURE_HANDLE(parse_camera_settings(&content->camera, line + 6 + 1));
+      __FAILURE_HANDLE(parse_camera_settings(&content->camera, &legacy_settings, line + 6 + 1));
     }
     else if (line[0] == 'S') {
       __FAILURE_HANDLE(parse_sky_settings(&content->sky, line + 3 + 1));
@@ -718,6 +723,10 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
 
     if (feof(file))
       break;
+  }
+
+  if (legacy_settings.force_no_bloom) {
+    content->camera.bloom_blend = 0.0f;
   }
 
   content->wavefront_args.legacy_smoothness         = legacy_settings.legacy_smoothness;

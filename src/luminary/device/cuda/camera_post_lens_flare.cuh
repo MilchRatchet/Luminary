@@ -8,33 +8,32 @@
  * https://www.froyok.fr/blog/2021-09-ue4-custom-lens-flare/
  */
 
-LUMINARY_KERNEL void camera_post_lens_flare_ghosts(
-  const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
-  unsigned int id = THREAD_ID;
+LUMINARY_KERNEL void camera_post_lens_flare_ghosts(const KernelArgsCameraPostLensFlareGhosts args) {
+  uint32_t id = THREAD_ID;
 
-  const int ghost_count      = 8;
+  const uint32_t ghost_count = 8;
   const float ghost_scales[] = {-1.0f, -0.5f, -0.25f, -2.0f, -3.0f, -4.0f, 2.0f, 0.25f};
   const RGBF ghost_colors[]  = {get_color(1.0f, 0.5f, 1.0f),   get_color(0.1f, 0.5f, 1.0f),  get_color(1.0f, 1.0f, 0.5f),
                                 get_color(1.0f, 0.75f, 0.1f),  get_color(1.0f, 0.1f, 1.0f),  get_color(1.0f, 0.5f, 0.1f),
                                 get_color(0.25f, 0.1f, 0.75f), get_color(0.75f, 0.1f, 0.25f)};
 
-  const float scale_x = 1.0f / (tw - 1);
-  const float scale_y = 1.0f / (th - 1);
+  const float scale_x = 1.0f / (args.tw - 1);
+  const float scale_y = 1.0f / (args.th - 1);
 
-  while (id < tw * th) {
-    const int y = id / tw;
-    const int x = id - y * tw;
+  while (id < args.tw * args.th) {
+    const uint32_t y = id / args.tw;
+    const uint32_t x = id - y * args.tw;
 
     const float sx = scale_x * x;
     const float sy = scale_y * y;
 
     RGBF pixel = get_color(0.0f, 0.0f, 0.0f);
 
-    for (int i = 0; i < ghost_count; i++) {
+    for (uint32_t i = 0; i < ghost_count; i++) {
       const float sxi = ((sx - 0.5f) * ghost_scales[i]) + 0.5f;
       const float syi = ((sy - 0.5f) * ghost_scales[i]) + 0.5f;
 
-      RGBF ghost = sample_pixel_border(source, sxi, syi, sw, sh);
+      RGBF ghost = sample_pixel_border(args.src, sxi, syi, args.sw, args.sh);
 
       ghost = scale_color(ghost, 0.0005f);
       ghost = mul_color(ghost, ghost_colors[i]);
@@ -42,7 +41,7 @@ LUMINARY_KERNEL void camera_post_lens_flare_ghosts(
       pixel = add_color(pixel, ghost);
     }
 
-    store_RGBF(target + x + y * tw, pixel);
+    store_RGBF(args.dst + x + y * args.tw, pixel);
 
     id += blockDim.x * gridDim.x;
   }
@@ -65,15 +64,15 @@ __device__ UV _lens_flare_fisheye(UV uv, const float compression, const float zo
   return result;
 }
 
-LUMINARY_KERNEL void camera_post_lens_flare_halo(const RGBF* src, const int sw, const int sh, RGBF* target, const int tw, const int th) {
-  unsigned int id = THREAD_ID;
+LUMINARY_KERNEL void camera_post_lens_flare_halo(const KernelArgsCameraPostLensFlareHalo args) {
+  uint32_t id = THREAD_ID;
 
-  const float scale_x = 1.0f / (tw - 1);
-  const float scale_y = 1.0f / (th - 1);
+  const float scale_x = 1.0f / (args.tw - 1);
+  const float scale_y = 1.0f / (args.th - 1);
 
-  while (id < tw * th) {
-    const int y = id / tw;
-    const int x = id - y * tw;
+  while (id < args.tw * args.th) {
+    const uint32_t y = id / args.tw;
+    const uint32_t x = id - y * args.tw;
 
     const float width        = 0.45f;
     const float chroma_shift = 0.005f;
@@ -100,13 +99,13 @@ LUMINARY_KERNEL void camera_post_lens_flare_halo(const RGBF* src, const int sw, 
     src_uv_b.u = (fish_uv.u - 0.5f) * (1.0f - chroma_shift) + 0.5f + v_halo.x;
     src_uv_b.v = (fish_uv.v - 0.5f) * (1.0f - chroma_shift) + 0.5f + v_halo.y;
 
-    const RGBF pr = sample_pixel_border(src, src_uv_r.u, src_uv_r.v, sw, sh);
-    const RGBF pg = sample_pixel_border(src, src_uv_g.u, src_uv_g.v, sw, sh);
-    const RGBF pb = sample_pixel_border(src, src_uv_b.u, src_uv_b.v, sw, sh);
+    const RGBF pr = sample_pixel_border(args.src, src_uv_r.u, src_uv_r.v, args.sw, args.sh);
+    const RGBF pg = sample_pixel_border(args.src, src_uv_g.u, src_uv_g.v, args.sw, args.sh);
+    const RGBF pb = sample_pixel_border(args.src, src_uv_b.u, src_uv_b.v, args.sw, args.sh);
 
-    RGBF pixel = get_color(pr.r, pg.g, pb.b);
+    const RGBF pixel = get_color(pr.r, pg.g, pb.b);
 
-    store_RGBF(target + x + y * tw, pixel);
+    store_RGBF(args.dst + x + y * args.tw, pixel);
 
     id += blockDim.x * gridDim.x;
   }

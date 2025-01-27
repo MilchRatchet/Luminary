@@ -21,7 +21,7 @@ struct DevicePost {
 
 DEVICE_CTX_FUNC LuminaryResult device_post_create(DevicePost** post);
 DEVICE_CTX_FUNC LuminaryResult device_post_allocate(DevicePost* post, uint32_t width, uint32_t height);
-DEVICE_CTX_FUNC LuminaryResult device_post_update(DevicePost* post, Camera* camera);
+DEVICE_CTX_FUNC LuminaryResult device_post_update(DevicePost* post, const Camera* camera);
 DEVICE_CTX_FUNC LuminaryResult device_post_apply(DevicePost* post, Device* device);
 DEVICE_CTX_FUNC LuminaryResult device_post_destroy(DevicePost** post);
 

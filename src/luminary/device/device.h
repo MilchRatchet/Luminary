@@ -137,6 +137,7 @@ LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
 LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud);
 LuminaryResult device_update_particles(Device* device, const Particles* particles);
+LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
