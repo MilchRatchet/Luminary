@@ -251,7 +251,6 @@ struct DevicePointers {
   DEVICE RGBF* frame_direct_accumulate;
   DEVICE RGBF* frame_indirect_buffer;
   DEVICE RGBF* frame_indirect_accumulate[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE RGBF* frame_post;
   DEVICE RGBF* frame_final;
   DEVICE GBufferMetaData* gbuffer_meta;
   DEVICE RGBF* records;
