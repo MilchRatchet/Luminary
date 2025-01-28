@@ -100,6 +100,7 @@ struct Device {
   OptixBVH* optix_bvh_light;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
+  DeviceSkyStars* sky_stars;
   DeviceBSDFLUT* bsdf_lut;
   DevicePost* post;
   DeviceRenderer* renderer;
@@ -133,6 +134,7 @@ LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut);
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
+LuminaryResult device_update_sky_stars(Device* device, const SkyStars* sky_stars);
 LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
 LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud);

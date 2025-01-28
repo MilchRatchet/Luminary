@@ -278,11 +278,14 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky));
     __FAILURE_HANDLE_CRITICAL(device_build_sky_hdri(device_manager->devices[device_manager->main_device_index], device_manager->sky_hdri));
 
+    __FAILURE_HANDLE_CRITICAL(sky_stars_update(device_manager->sky_stars, &sky));
+
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
 
       __FAILURE_HANDLE_CRITICAL(device_update_sky_lut(device, device_manager->sky_lut));
       __FAILURE_HANDLE_CRITICAL(device_update_sky_hdri(device, device_manager->sky_hdri));
+      __FAILURE_HANDLE_CRITICAL(device_update_sky_stars(device, device_manager->sky_stars));
     }
   }
 
@@ -663,6 +666,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
   __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
+  __FAILURE_HANDLE(sky_stars_create(&device_manager->sky_stars));
   __FAILURE_HANDLE(bsdf_lut_create(&device_manager->bsdf_lut));
   __FAILURE_HANDLE(sample_time_create(&device_manager->sample_time));
 
@@ -934,6 +938,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
   __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
+  __FAILURE_HANDLE(sky_stars_destroy(&(*device_manager)->sky_stars));
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
   __FAILURE_HANDLE(bsdf_lut_destroy(&(*device_manager)->bsdf_lut));
   __FAILURE_HANDLE(sample_time_destroy(&(*device_manager)->sample_time));

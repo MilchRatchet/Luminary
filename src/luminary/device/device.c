@@ -720,6 +720,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
+  __FAILURE_HANDLE(device_sky_stars_create(&device->sky_stars));
   __FAILURE_HANDLE(device_bsdf_lut_create(&device->bsdf_lut));
   __FAILURE_HANDLE(device_cloud_noise_create(&device->cloud_noise, device));
   __FAILURE_HANDLE(device_particles_handle_create(&device->particles_handle));
@@ -1197,6 +1198,25 @@ LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_sky_stars(Device* device, const SkyStars* sky_stars) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sky_stars);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  bool stars_has_changed = false;
+  __FAILURE_HANDLE(device_sky_stars_update(device->sky_stars, device, sky_stars, &stars_has_changed));
+
+  if (stars_has_changed) {
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stars, DEVICE_PTR(device->sky_stars->data));
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stars_offsets, DEVICE_PTR(device->sky_stars->offsets));
+  }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(bsdf_lut);
@@ -1548,6 +1568,7 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));
+  __FAILURE_HANDLE(device_sky_stars_destroy(&(*device)->sky_stars));
   __FAILURE_HANDLE(device_bsdf_lut_destroy(&(*device)->bsdf_lut));
   __FAILURE_HANDLE(device_cloud_noise_destroy(&(*device)->cloud_noise));
   __FAILURE_HANDLE(device_particles_handle_destroy(&(*device)->particles_handle));

@@ -407,6 +407,13 @@ static bool _window_entity_properties_sky_action(Window* window, Display* displa
       update_data |= _window_entity_properties_add_slider(
         data, "Multiscattering Factor", &sky.multiscattering_factor, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
+      update_data |=
+        _window_entity_properties_add_slider(data, "Stars Seed", &sky.stars_seed, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Stars Count", &sky.stars_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Stars Intensity", &sky.stars_intensity, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
       update_data |= _window_entity_properties_add_checkbox(data, "Aerial Perspective", &sky.aerial_perspective);
       break;
     case LUMINARY_SKY_MODE_CONSTANT_COLOR:

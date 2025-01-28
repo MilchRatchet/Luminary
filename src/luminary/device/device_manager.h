@@ -43,6 +43,7 @@ struct DeviceManager {
   LightTree* light_tree;
   SkyLUT* sky_lut;
   SkyHDRI* sky_hdri;
+  SkyStars* sky_stars;
   BSDFLUT* bsdf_lut;
   SampleTime* sample_time;
 } typedef DeviceManager;

@@ -37,8 +37,8 @@ LuminaryResult sky_get_default(Sky* sky) {
   sky->hdri_origin.z          = 0.0f;
   sky->hdri_mip_bias          = 0.0f;
   sky->stars_seed             = 0;
+  sky->stars_count            = 10000;
   sky->stars_intensity        = 1.0f;
-  sky->settings_stars_count   = 10000;
   sky->constant_color.r       = 1.0f;
   sky->constant_color.g       = 1.0f;
   sky->constant_color.b       = 1.0f;
@@ -93,6 +93,9 @@ LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* dirty
       __SKY_DIRTY(multiscattering_factor);
       __SKY_DIRTY(rayleigh_density);
       __SKY_DIRTY(aerial_perspective);
+      __SKY_DIRTY(stars_count);
+      __SKY_DIRTY(stars_seed);
+      __SKY_DIRTY(stars_intensity);
       break;
     case LUMINARY_SKY_MODE_HDRI:
       __SKY_DIRTY(altitude);

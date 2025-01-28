@@ -467,9 +467,7 @@ __device__ Spectrum sky_compute_atmosphere(
       }
     }
 
-    // TODO: Implement stars again
-#if 0
-    if (sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
+    if ((device.ptrs.stars != (Star*) 0) && sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
       const float ray_altitude = asinf(ray.y);
       const float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
 
@@ -478,10 +476,11 @@ __device__ Spectrum sky_compute_atmosphere(
 
       const uint32_t grid = x + y * STARS_GRID_LD;
 
-      const uint32_t a = device.ptrs.stars_offsets[grid];
-      const uint32_t b = device.ptrs.stars_offsets[grid + 1];
+      const uint32_t a = __ldg(device.ptrs.stars_offsets + grid);
+      const uint32_t b = __ldg(device.ptrs.stars_offsets + grid + 1);
 
       for (uint32_t i = a; i < b; i++) {
+        // TODO: Load using vector instructions.
         const Star star     = device.ptrs.stars[i];
         const vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
 
@@ -490,7 +489,6 @@ __device__ Spectrum sky_compute_atmosphere(
         }
       }
     }
-#endif
   }
 
   transmittance_out = spectrum_mul(transmittance_out, transmittance);

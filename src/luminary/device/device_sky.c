@@ -430,3 +430,181 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_destroy(DeviceSkyHDRI** hdri) {
 
   return LUMINARY_SUCCESS;
 }
+
+#define STARS_GRID_X STARS_GRID_LD
+#define STARS_GRID_Y 32
+
+LuminaryResult sky_stars_create(SkyStars** stars) {
+  __CHECK_NULL_ARGUMENT(stars);
+
+  __FAILURE_HANDLE(host_malloc(stars, sizeof(SkyStars)));
+  memset(*stars, 0, sizeof(SkyStars));
+
+  __FAILURE_HANDLE(host_malloc(&(*stars)->offsets, sizeof(uint32_t) * (STARS_GRID_X * STARS_GRID_Y + 1)));
+
+  return LUMINARY_SUCCESS;
+}
+
+// @ Lycium: Don't you dare judge me. This is some 2021 code.
+static float _sky_stars_random_float() {
+  return (float) (((double) rand()) / RAND_MAX);
+}
+
+static LuminaryResult _sky_stars_generate(SkyStars* stars) {
+  __CHECK_NULL_ARGUMENT(stars);
+
+  srand(stars->seed);
+
+  Star* star_buffer;
+  __FAILURE_HANDLE(host_malloc(&star_buffer, sizeof(Star) * stars->count));
+
+  uint32_t* counts;
+  __FAILURE_HANDLE(host_malloc(&counts, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y));
+
+  memset(counts, 0, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y);
+
+  for (uint32_t i = 0; i < stars->count; i++) {
+    const Star s = {
+      .altitude  = -PI * 0.5f + PI * (1.0f - sqrtf(_sky_stars_random_float())),
+      .azimuth   = 2.0f * PI * _sky_stars_random_float(),
+      .radius    = 0.0001f + 0.0004f * (1.0f - sqrtf(_sky_stars_random_float())),
+      .intensity = 0.0001f + 0.0015f * (0.1f + 0.9f * (1.0f - sqrtf(_sky_stars_random_float())))};
+
+    const uint32_t x = (uint32_t) (s.azimuth * 10.0f);
+    const uint32_t y = (uint32_t) ((s.altitude + PI * 0.5f) * 10.0f);
+
+    if (x >= STARS_GRID_X || y >= STARS_GRID_Y) {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Star generation exception.");
+    }
+
+    counts[x + y * STARS_GRID_X]++;
+
+    star_buffer[i] = s;
+  }
+
+  uint32_t offset = 0;
+  for (uint32_t i = 0; i < STARS_GRID_X * STARS_GRID_Y; i++) {
+    stars->offsets[i] = offset;
+    offset += counts[i];
+    counts[i] = 0;
+  }
+
+  stars->offsets[STARS_GRID_X * STARS_GRID_Y] = offset;
+
+  for (uint32_t i = 0; i < stars->count; i++) {
+    const Star s = star_buffer[i];
+
+    const uint32_t x = (uint32_t) (s.azimuth * 10.0f);
+    const uint32_t y = (uint32_t) ((s.altitude + PI * 0.5f) * 10.0f);
+
+    const uint32_t p = x + y * STARS_GRID_X;
+    const uint32_t o = stars->offsets[p];
+    const uint32_t c = counts[p]++;
+
+    stars->data[o + c] = s;
+  }
+
+  __FAILURE_HANDLE(host_free(&star_buffer));
+  __FAILURE_HANDLE(host_free(&counts));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult sky_stars_update(SkyStars* stars, const Sky* sky) {
+  __CHECK_NULL_ARGUMENT(stars);
+  __CHECK_NULL_ARGUMENT(sky);
+
+  const bool seed_changed  = stars->seed != sky->stars_seed;
+  const bool count_changed = stars->count != sky->stars_count;
+
+  if (seed_changed || count_changed) {
+    stars->seed  = sky->stars_seed;
+    stars->count = sky->stars_count;
+
+    if (count_changed) {
+      if (stars->data) {
+        __FAILURE_HANDLE(host_free(&stars->data));
+      }
+
+      __FAILURE_HANDLE(host_malloc(&stars->data, stars->count * sizeof(Star)));
+    }
+
+    __FAILURE_HANDLE(_sky_stars_generate(stars));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult sky_stars_destroy(SkyStars** stars) {
+  __CHECK_NULL_ARGUMENT(stars);
+  __CHECK_NULL_ARGUMENT(*stars);
+
+  __FAILURE_HANDLE(host_free(&(*stars)->data));
+  __FAILURE_HANDLE(host_free(&(*stars)->offsets));
+
+  __FAILURE_HANDLE(host_free(stars));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_sky_stars_create(DeviceSkyStars** stars) {
+  __CHECK_NULL_ARGUMENT(stars);
+
+  __FAILURE_HANDLE(host_malloc(stars, sizeof(DeviceSkyStars)));
+  memset(*stars, 0, sizeof(DeviceSkyStars));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_sky_stars_update(DeviceSkyStars* stars, Device* device, const SkyStars* source_stars, bool* has_changed) {
+  __CHECK_NULL_ARGUMENT(stars);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(source_stars);
+  __CHECK_NULL_ARGUMENT(has_changed);
+
+  *has_changed = false;
+
+  const bool seed_changed  = stars->seed != source_stars->seed;
+  const bool count_changed = stars->count != source_stars->count;
+
+  if (seed_changed || count_changed) {
+    stars->seed  = source_stars->seed;
+    stars->count = source_stars->count;
+
+    if (stars->offsets == (DEVICE uint32_t*) 0) {
+      __FAILURE_HANDLE(device_malloc(&stars->offsets, sizeof(uint32_t) * (STARS_GRID_X * STARS_GRID_Y + 1)));
+    }
+
+    if (count_changed) {
+      if (stars->data) {
+        __FAILURE_HANDLE(device_free(&stars->data));
+      }
+
+      __FAILURE_HANDLE(device_malloc(&stars->data, sizeof(Star) * stars->count));
+
+      *has_changed = true;
+    }
+
+    __FAILURE_HANDLE(device_upload(stars->data, source_stars->data, 0, sizeof(Star) * stars->count, device->stream_main));
+    __FAILURE_HANDLE(
+      device_upload(stars->offsets, source_stars->offsets, 0, sizeof(uint32_t) * (STARS_GRID_X * STARS_GRID_Y + 1), device->stream_main));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_sky_stars_destroy(DeviceSkyStars** stars) {
+  __CHECK_NULL_ARGUMENT(stars);
+
+  if ((*stars)->offsets) {
+    __FAILURE_HANDLE(device_free(&(*stars)->offsets));
+  }
+
+  if ((*stars)->data) {
+    __FAILURE_HANDLE(device_free(&(*stars)->data));
+  }
+
+  __FAILURE_HANDLE(host_free(stars));
+
+  return LUMINARY_SUCCESS;
+}

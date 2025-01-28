@@ -60,4 +60,27 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_create(DeviceSkyHDRI** hdri);
 DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Device* device, const SkyHDRI* source_hdri, bool* has_changed);
 DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_destroy(DeviceSkyHDRI** hdri);
 
+struct SkyStars {
+  Star* data;
+  uint32_t* offsets;
+  uint32_t seed;
+  uint32_t count;
+} typedef SkyStars;
+
+struct DeviceSkyStars {
+  DEVICE Star* data;
+  DEVICE uint32_t* offsets;
+  uint32_t seed;
+  uint32_t count;
+} typedef DeviceSkyStars;
+
+LuminaryResult sky_stars_create(SkyStars** stars);
+LuminaryResult sky_stars_update(SkyStars* stars, const Sky* sky);
+LuminaryResult sky_stars_destroy(SkyStars** stars);
+
+DEVICE_CTX_FUNC LuminaryResult device_sky_stars_create(DeviceSkyStars** stars);
+DEVICE_CTX_FUNC LuminaryResult
+  device_sky_stars_update(DeviceSkyStars* stars, Device* device, const SkyStars* source_stars, bool* has_changed);
+DEVICE_CTX_FUNC LuminaryResult device_sky_stars_destroy(DeviceSkyStars** stars);
+
 #endif /* LUMINARY_DEVICE_SKY_H */

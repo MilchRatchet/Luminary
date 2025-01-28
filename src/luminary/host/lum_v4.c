@@ -305,7 +305,7 @@ static LuminaryResult parse_sky_settings(Sky* sky, char* line) {
       break;
     /* STARNUM_ */
     case 6867238801685697619u:
-      sscanf(value, "%u\n", &sky->settings_stars_count);
+      sscanf(value, "%u\n", &sky->stars_count);
       break;
     /* AZIMUTH_ */
     case 6865830357271927361u:

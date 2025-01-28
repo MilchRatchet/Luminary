@@ -221,8 +221,7 @@ struct LuminarySky {
   float base_density;
   bool ozone_absorption;
   uint32_t steps;
-  uint32_t settings_stars_count;
-  uint32_t current_stars_count;
+  uint32_t stars_count;
   uint32_t stars_seed;
   float stars_intensity;
   float rayleigh_density;
