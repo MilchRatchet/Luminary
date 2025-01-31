@@ -18,6 +18,10 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTask task = task_load(offset);
     float tmax            = trace_depth_load(offset);
 
+    // Particles can not be hit by non delta path due to their negligible contribution
+    if ((task.state & STATE_FLAG_DELTA_PATH) == 0)
+      continue;
+
     const float time         = quasirandom_sequence_1D_base_float(QUASI_RANDOM_TARGET_CAMERA_TIME, task.index, device.state.sample_id, 0);
     const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
     const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
