@@ -3,10 +3,6 @@
 #define SHADING_KERNEL
 #define OPTIX_KERNEL
 
-#define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
-#define OPTIX_PAYLOAD_TRIANGLE_ID 0
-#define OPTIX_PAYLOAD_COMPRESSED_ALPHA 2
-
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "geometry_utils.cuh"

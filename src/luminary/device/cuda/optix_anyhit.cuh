@@ -11,7 +11,8 @@
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(geometry_trace)() {
-  // TODO: Add OMMs again.
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_GEOMETRY_TRACE);
+
   const TriangleHandle handle = optixGetTriangleHandle();
 
   const OptixAlphaResult alpha_result = optix_alpha_test(handle);
@@ -26,6 +27,8 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(geometry_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_PARTICLE_TRACE);
+
   if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
     optixIgnoreIntersection();
   }
@@ -36,6 +39,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE);
   // TODO: Add support to check for fully transparent hits, we want to ignore those.
 }
 
@@ -44,9 +48,11 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_TRACE);
+
   const TriangleHandle handle = optixGetTriangleHandle();
 
-  const TriangleHandle target_light = optixGetPayloadTriangleHandle();
+  const TriangleHandle target_light = optixGetPayloadTriangleHandle(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE);
 
   if (triangle_handle_equal(handle, target_light)) {
     optixIgnoreIntersection();
@@ -75,13 +81,13 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   const RGBF alpha = is_colored_transparency ? scale_color(opaque_color(albedo), transparency) : splat_color(transparency);
 
-  CompressedAlpha compressed_alpha = optixGetPayloadCompressedAlpha();
+  CompressedAlpha compressed_alpha = optixGetPayloadCompressedAlpha(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA);
 
   RGBF accumulated_alpha = optix_decompress_color(compressed_alpha);
   accumulated_alpha      = mul_color(accumulated_alpha, alpha);
   compressed_alpha       = optix_compress_color(accumulated_alpha);
 
-  optixSetPayloadCompressedAlpha(compressed_alpha);
+  optixSetPayloadCompressedAlpha(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA, compressed_alpha);
 
   optixIgnoreIntersection();
 }

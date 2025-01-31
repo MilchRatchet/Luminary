@@ -1,8 +1,5 @@
 #define OPTIX_KERNEL
 
-#define OPTIX_PAYLOAD_DEPTH 0
-#define OPTIX_PAYLOAD_TRIANGLE_HANDLE 1
-
 #include "math.cuh"
 #include "memory.cuh"
 #include "optix_include.cuh"
@@ -75,20 +72,16 @@ extern "C" __global__ void __raygen__optix() {
     TriangleHandle handle;
     const float tmax = trace_preprocess(task, handle);
 
-    const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
-    const float3 ray    = make_float3(task.ray.x, task.ray.y, task.ray.z);
+    OptixKernelFunctionGeometryTracePayload payload;
+    payload.depth  = tmax;
+    payload.handle = handle;
 
-    unsigned int depth = __float_as_uint(tmax);
+    optixKernelFunctionGeometryTrace(
+      device.optix_bvh, task.origin, task.ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, payload);
 
-    OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_DEPTH, 0);
-    OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 1);
-    optixTrace(
-      device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, OPTIX_SBT_OFFSET_GEOMETRY_TRACE, 0,
-      0, depth, handle.instance_id, handle.tri_id);
+    optix_write_out_gbuffer_meta(task, payload.depth, handle);
 
-    optix_write_out_gbuffer_meta(task, __uint_as_float(depth), handle);
-
-    triangle_handle_store(handle, offset);
-    trace_depth_store(__uint_as_float(depth), offset);
+    triangle_handle_store(payload.handle, offset);
+    trace_depth_store(payload.depth, offset);
   }
 }

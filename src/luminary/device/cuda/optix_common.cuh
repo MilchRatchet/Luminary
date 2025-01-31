@@ -119,27 +119,21 @@ __device__ bool particle_opacity_cutout(const float2 coord) {
 #ifdef SHADING_KERNEL
 __device__ RGBF
   optix_geometry_shadowing(const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const ushort2 index) {
-  const float3 origin = make_float3(position.x, position.y, position.z);
-  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
-
-  // 21 bits for each color component.
-  CompressedAlpha alpha = optix_compress_color(get_color(1.0f, 1.0f, 1.0f));
-
   // For triangle lights, we cannot rely on fully opaque OMMs because if we first hit the target light and then execute the closest hit for
   // that, then we will never know if there is an occluder. Similarly, skipping anyhit for fully opaque needs to still terminate the ray so
   // I enforce anyhit.
-  const unsigned int ray_flag =
+  const uint32_t ray_flags =
     (target_light.instance_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
 
-  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 0);
-  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_COMPRESSED_ALPHA, 2);
-  optixTrace(
-    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, OPTIX_SBT_OFFSET_SHADOW_TRACE, 0, 0,
-    target_light.instance_id, target_light.tri_id, alpha.data0, alpha.data1);
+  OptixKernelFunctionShadowTracePayload payload;
+  payload.handle = target_light;
+  payload.alpha  = optix_compress_color(get_color(1.0f, 1.0f, 1.0f));
 
-  RGBF visibility = optix_decompress_color(alpha);
+  optixKernelFunctionShadowTrace(device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, payload);
 
-  if (target_light.instance_id == HIT_TYPE_REJECT) {
+  RGBF visibility = optix_decompress_color(payload.alpha);
+
+  if (payload.handle.instance_id == HIT_TYPE_REJECT) {
     visibility = get_color(0.0f, 0.0f, 0.0f);
   }
 

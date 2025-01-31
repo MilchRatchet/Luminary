@@ -159,9 +159,8 @@ struct AGXCustomParams {
 } typedef AGXCustomParams;
 
 struct TriangleHandle {
-  // Unsigned int for OptiX compatibility
-  unsigned int instance_id;
-  unsigned int tri_id;
+  uint32_t instance_id;
+  uint32_t tri_id;
 } typedef TriangleHandle;
 
 enum GBufferFlags {
@@ -200,6 +199,11 @@ struct GBufferMetaData {
   uint16_t material_id;
 } typedef GBufferMetaData;
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
+
+struct CompressedAlpha {
+  uint32_t data0;
+  uint32_t data1;
+} typedef CompressedAlpha;
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs

@@ -50,12 +50,6 @@ enum TaskAddressOffset {
   TASK_ADDRESS_COUNT_STRIDE      = 5
 } typedef TaskAddressOffset;
 
-struct CompressedAlpha {
-  // Unsigned int for OptiX compatibility
-  unsigned int data0;
-  unsigned int data1;
-} typedef CompressedAlpha;
-
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
 #define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))

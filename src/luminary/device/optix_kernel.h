@@ -2,10 +2,10 @@
 #define LUMINARY_OPTIX_KERNEL_H
 
 #include "device_utils.h"
+#include "optix_shared.h"
 
 struct Device typedef Device;
 
-#define OPTIX_KERNEL_FUNCTION_COUNT 4
 #define OPTIX_KERNEL_NUM_GROUPS (2 + OPTIX_KERNEL_FUNCTION_COUNT)
 
 enum OptixKernelType {

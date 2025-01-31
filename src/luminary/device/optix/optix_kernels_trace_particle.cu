@@ -1,8 +1,5 @@
 #define OPTIX_KERNEL
 
-#define OPTIX_PAYLOAD_DEPTH 0
-#define OPTIX_PAYLOAD_INSTANCE_ID 1
-
 #include "math.cuh"
 #include "memory.cuh"
 #include "optix_include.cuh"
@@ -28,43 +25,34 @@ extern "C" __global__ void __raygen__optix() {
     const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.particles.scale);
     const vec3 reference  = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.particles.scale);
 
-    const float3 origin = make_float3(reference.x, reference.y, reference.z);
-    const float3 ray    = make_float3(scaled_ray.x, scaled_ray.y, scaled_ray.z);
-
-    unsigned int depth       = __float_as_uint(tmax);
-    unsigned int instance_id = HIT_TYPE_REJECT;
-
-    const unsigned int vis_mask = OptixVisibilityMask(0xFFFF);
+    OptixKernelFunctionParticleTracePayload payload;
+    payload.depth       = tmax;
+    payload.instance_id = HIT_TYPE_REJECT;
 
     float t = 64.0f * eps;
 
     float3 inv_ray;
-    inv_ray.x = 1.0f / ((fabsf(ray.x) > eps) ? ray.x : copysignf(eps, ray.x));
-    inv_ray.y = 1.0f / ((fabsf(ray.y) > eps) ? ray.y : copysignf(eps, ray.y));
-    inv_ray.z = 1.0f / ((fabsf(ray.z) > eps) ? ray.z : copysignf(eps, ray.z));
+    inv_ray.x = 1.0f / ((fabsf(scaled_ray.x) > eps) ? scaled_ray.x : copysignf(eps, scaled_ray.x));
+    inv_ray.y = 1.0f / ((fabsf(scaled_ray.y) > eps) ? scaled_ray.y : copysignf(eps, scaled_ray.y));
+    inv_ray.z = 1.0f / ((fabsf(scaled_ray.z) > eps) ? scaled_ray.z : copysignf(eps, scaled_ray.z));
 
     for (int i = 0; i < 8; i++) {
-      float3 p = make_float3(origin.x + ray.x * t, origin.y + ray.y * t, origin.z + ray.z * t);
+      vec3 p = add_vector(reference, scale_vector(scaled_ray, t));
 
       // Map our current point into the particle tiling coordinate system
       p.x = p.x - floorf(p.x);
       p.y = p.y - floorf(p.y);
       p.z = p.z - floorf(p.z);
 
-      OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_DEPTH, 0);
-      OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_INSTANCE_ID, 1);
-      optixTrace(
-        device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, OPTIX_RAY_FLAG_NONE, OPTIX_SBT_OFFSET_PARTICLE_TRACE, 0, 0, depth,
-        instance_id);
+      optixKernelFunctionParticleTrace(
+        device.optix_bvh_particles, p, scaled_ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, payload);
 
-      const float intersection_dist = __uint_as_float(depth);
-
-      if (intersection_dist < tmax)
+      if (payload.depth < tmax)
         break;
 
-      const float tx = inv_ray.x * (((ray.x < 0.0f) ? 0.0f : 1.0f) - p.x);
-      const float ty = inv_ray.y * (((ray.y < 0.0f) ? 0.0f : 1.0f) - p.y);
-      const float tz = inv_ray.z * (((ray.z < 0.0f) ? 0.0f : 1.0f) - p.z);
+      const float tx = inv_ray.x * (((scaled_ray.x < 0.0f) ? 0.0f : 1.0f) - p.x);
+      const float ty = inv_ray.y * (((scaled_ray.y < 0.0f) ? 0.0f : 1.0f) - p.y);
+      const float tz = inv_ray.z * (((scaled_ray.z < 0.0f) ? 0.0f : 1.0f) - p.z);
 
       const float step = fminf(fminf(tx, ty), tz) + 128.0f * eps;
 
@@ -75,14 +63,14 @@ extern "C" __global__ void __raygen__optix() {
         break;
     }
 
-    if (instance_id != HIT_TYPE_REJECT) {
+    if (payload.instance_id != HIT_TYPE_REJECT) {
       // Hit ID contains the triangle ID but we only store the actual particle / quad ID
-      instance_id = HIT_TYPE_PARTICLE_MIN + (instance_id >> 1);
+      payload.instance_id = HIT_TYPE_PARTICLE_MIN + (payload.instance_id >> 1);
 
-      const TriangleHandle handle = triangle_handle_get(instance_id, 0);
+      const TriangleHandle handle = triangle_handle_get(payload.instance_id, 0);
 
       triangle_handle_store(handle, offset);
-      trace_depth_store(t + __uint_as_float(depth), offset);
+      trace_depth_store(t + payload.depth, offset);
     }
   }
 }

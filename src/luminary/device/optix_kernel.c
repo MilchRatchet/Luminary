@@ -32,6 +32,48 @@ static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
 static const char* optix_closesthit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__light_bsdf_trace", "__closesthit__shadow_trace"};
 
+static const uint32_t optix_kernel_function_payload_semantics_geometry_trace[OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_COUNT] = {
+  [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_DEPTH] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE,
+  [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE,
+  [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE};
+
+static const uint32_t optix_kernel_function_payload_semantics_particle_trace[OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_COUNT] = {
+  [OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_DEPTH] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE,
+  [OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_INSTANCE_ID] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE};
+
+static const uint32_t optix_kernel_function_payload_semantics_light_bsdf_trace[OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT] =
+  {[OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_ID] =
+     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE};
+
+static const uint32_t optix_kernel_function_payload_semantics_shadow_trace[OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT] = {
+  [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_READ,
+  [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_NONE | OPTIX_PAYLOAD_SEMANTICS_AH_READ,
+  [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE,
+  [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA2] =
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE};
+
+static const OptixPayloadType optix_kernel_function_payload_types[OPTIX_KERNEL_FUNCTION_COUNT] = {
+  [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE] =
+    {.numPayloadValues = OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_COUNT,
+     .payloadSemantics = optix_kernel_function_payload_semantics_geometry_trace},
+  [OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE] =
+    {.numPayloadValues = OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_COUNT,
+     .payloadSemantics = optix_kernel_function_payload_semantics_particle_trace},
+  [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE] =
+    {.numPayloadValues = OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT,
+     .payloadSemantics = optix_kernel_function_payload_semantics_light_bsdf_trace},
+  [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE] = {
+    .numPayloadValues = OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT,
+    .payloadSemantics = optix_kernel_function_payload_semantics_shadow_trace}};
+
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
@@ -65,6 +107,8 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   module_compile_options.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
   module_compile_options.optLevel         = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
   module_compile_options.debugLevel       = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+  module_compile_options.numPayloadTypes  = OPTIX_KERNEL_FUNCTION_COUNT;
+  module_compile_options.payloadTypes     = optix_kernel_function_payload_types;
 
   OptixPipelineCompileOptions pipeline_compile_options;
   memset(&pipeline_compile_options, 0, sizeof(OptixPipelineCompileOptions));
@@ -73,7 +117,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   pipeline_compile_options.traversableGraphFlags            = (optix_kernel_configs[type].allow_gas)
                                                                 ? OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY
                                                                 : OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
-  pipeline_compile_options.numPayloadValues                 = optix_kernel_configs[type].num_payloads;
+  pipeline_compile_options.numPayloadValues                 = 0;
   pipeline_compile_options.numAttributeValues               = 2;
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";

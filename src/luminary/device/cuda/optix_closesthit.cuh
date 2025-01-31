@@ -11,16 +11,16 @@
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(geometry_trace)() {
-  const float depth = optixGetRayTmax();
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_GEOMETRY_TRACE);
 
-  optixSetPayloadDepth(depth);
+  optixSetPayloadDepth(OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_DEPTH, optixGetRayTmax());
 
   TriangleHandle tri_handle;
 
   tri_handle.instance_id = optixGetInstanceId();
   tri_handle.tri_id      = optixGetPrimitiveIndex();
 
-  optixSetPayloadTriangleHandle(tri_handle);
+  optixSetPayloadTriangleHandle(OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE, tri_handle);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -28,8 +28,10 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(geometry_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(particle_trace)() {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_DEPTH, __float_as_uint(optixGetRayTmax()));
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_INSTANCE_ID, optixGetPrimitiveIndex());
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_PARTICLE_TRACE);
+
+  optixSetPayloadDepth(OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_DEPTH, optixGetRayTmax());
+  optixSetPayloadInstanceID(OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_INSTANCE_ID, optixGetPrimitiveIndex());
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -37,7 +39,9 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(particle_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(light_bsdf_trace)() {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_ID, optixGetPrimitiveIndex());
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE);
+
+  optixSetPayloadTriangleID(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_ID, optixGetPrimitiveIndex());
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -45,7 +49,9 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(light_bsdf_trace)() {
 ////////////////////////////////////////////////////////////////////
 
 extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(shadow_trace)() {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
+  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_TRACE);
+
+  optixSetPayloadInstanceID(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
 }
 
 #endif /* CU_LUMINARY_OPTIX_CLOSESTHIT_H */

@@ -1,53 +1,86 @@
 #ifndef CU_OPTIX_UTILS_H
 #define CU_OPTIX_UTILS_H
 
+#include "../optix_shared.h"
 #include "utils.cuh"
 
 #ifdef OPTIX_KERNEL
 
 ////////////////////////////////////////////////////////////////////
-// Dummy Payload defines
+// Payload Type bitmasks
 ////////////////////////////////////////////////////////////////////
 
-#ifndef OPTIX_PAYLOAD_TRIANGLE_HANDLE
-#define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
-#endif
+enum OptixKernelFunctionPayloadTypeID {
+  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_GEOMETRY_TRACE   = (1u << OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE),
+  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_PARTICLE_TRACE   = (1u << OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE),
+  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE = (1u << OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE),
+  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_TRACE     = (1u << OPTIX_KERNEL_FUNCTION_SHADOW_TRACE)
+} typedef OptixKernelFunctionPayloadTypeID;
 
-#ifndef OPTIX_PAYLOAD_COMPRESSED_ALPHA
-#define OPTIX_PAYLOAD_COMPRESSED_ALPHA 0
-#endif
-
-#ifndef OPTIX_PAYLOAD_DEPTH
-#define OPTIX_PAYLOAD_DEPTH 0
-#endif
-
-#ifndef OPTIX_PAYLOAD_INSTANCE_ID
-#define OPTIX_PAYLOAD_INSTANCE_ID 0
-#endif
-
-#ifndef OPTIX_PAYLOAD_TRIANGLE_ID
-#define OPTIX_PAYLOAD_TRIANGLE_ID 0
-#endif
+#define OPTIX_TRACE_PAYLOAD_ID(__macro_optix_kernel_function_name) \
+  ((OptixPayloadTypeID) (OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_##__macro_optix_kernel_function_name))
 
 ////////////////////////////////////////////////////////////////////
 // SBT Offsets
 ////////////////////////////////////////////////////////////////////
 
-#define OPTIX_SBT_OFFSET_GEOMETRY_TRACE 0
-#define OPTIX_SBT_OFFSET_PARTICLE_TRACE 1
-#define OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE 2
-#define OPTIX_SBT_OFFSET_SHADOW_TRACE 3
+enum OptixKernelFunctionSBTOffset {
+  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_GEOMETRY_TRACE   = OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE,
+  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_PARTICLE_TRACE   = OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE,
+  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_LIGHT_BSDF_TRACE = OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE,
+  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_SHADOW_TRACE     = OPTIX_KERNEL_FUNCTION_SHADOW_TRACE
+} typedef OptixKernelFunctionSBTOffset;
+
+#define OPTIX_TRACE_SBT_OFFSET(__macro_optix_kernel_function_name) \
+  ((uint32_t) (OPTIX_KERNEL_FUNCTION_SBT_OFFSET_##__macro_optix_kernel_function_name))
+
+////////////////////////////////////////////////////////////////////
+// Trace call definitions
+////////////////////////////////////////////////////////////////////
+
+static __forceinline__ __device__ void optixKernelFunctionGeometryTrace(
+  const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
+  const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, OptixKernelFunctionGeometryTracePayload& payload) {
+  optixTrace(
+    OPTIX_TRACE_PAYLOAD_ID(GEOMETRY_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin, tmax,
+    rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(GEOMETRY_TRACE), 0, 0, payload.v0, payload.v1, payload.v2);
+}
+
+static __forceinline__ __device__ void optixKernelFunctionParticleTrace(
+  const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
+  const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, OptixKernelFunctionParticleTracePayload& payload) {
+  optixTrace(
+    OPTIX_TRACE_PAYLOAD_ID(PARTICLE_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin, tmax,
+    rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(PARTICLE_TRACE), 0, 0, payload.v0, payload.v1);
+}
+
+static __forceinline__ __device__ void optixKernelFunctionLightBSDFTrace(
+  const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
+  const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, OptixKernelFunctionLightBSDFTracePayload& payload) {
+  optixTrace(
+    OPTIX_TRACE_PAYLOAD_ID(LIGHT_BSDF_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
+    tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(LIGHT_BSDF_TRACE), 0, 0, payload.v0);
+}
+
+static __forceinline__ __device__ void optixKernelFunctionShadowTrace(
+  const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
+  const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, OptixKernelFunctionShadowTracePayload& payload) {
+  optixTrace(
+    OPTIX_TRACE_PAYLOAD_ID(SHADOW_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin, tmax,
+    rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2, payload.v3);
+}
+
+////////////////////////////////////////////////////////////////////
+// Utility functions
+////////////////////////////////////////////////////////////////////
 
 __device__ TriangleHandle optixGetTriangleHandle() {
   return triangle_handle_get(optixGetInstanceId(), optixGetPrimitiveIndex());
 }
 
-// This is translation unit dependent so intellisense cannot verify this.
-#ifndef __INTELLISENSE__
-#define OPTIX_PAYLOAD_INDEX_REQUIRE(payload, index) static_assert(payload == index, "OptiX Payload is not in the correct index.")
-#else
-#define OPTIX_PAYLOAD_INDEX_REQUIRE(payload, index)
-#endif
+////////////////////////////////////////////////////////////////////
+// Payload generics
+////////////////////////////////////////////////////////////////////
 
 // IMPORTANT: Verify that OptiX still implements these intrinsics in this way whenever updating OptiX.
 // IMPORTANT: I suppose OptiX implemented these functions in this particular way because the index must be a compile time constant,
@@ -78,38 +111,54 @@ static __forceinline__ __device__ void optixSetPayloadGeneric(const uint32_t ind
 // Payload definitions
 ////////////////////////////////////////////////////////////////////
 
-__device__ TriangleHandle optixGetPayloadTriangleHandle() {
+__device__ TriangleHandle optixGetPayloadTriangleHandle(const uint32_t kernel_function_triangle_handle_index) {
   TriangleHandle handle;
-  handle.instance_id = optixGetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE);
-  handle.tri_id      = optixGetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE + 1);
+  handle.instance_id = optixGetPayloadGeneric(kernel_function_triangle_handle_index);
+  handle.tri_id      = optixGetPayloadGeneric(kernel_function_triangle_handle_index + 1);
 
   return handle;
 }
 
-__device__ void optixSetPayloadTriangleHandle(const TriangleHandle handle) {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, handle.instance_id);
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE + 1, handle.tri_id);
+__device__ void optixSetPayloadTriangleHandle(const uint32_t kernel_function_triangle_handle_index, const TriangleHandle handle) {
+  optixSetPayloadGeneric(kernel_function_triangle_handle_index, handle.instance_id);
+  optixSetPayloadGeneric(kernel_function_triangle_handle_index + 1, handle.tri_id);
 }
 
-__device__ CompressedAlpha optixGetPayloadCompressedAlpha() {
+__device__ uint32_t optixGetPayloadInstanceID(const uint32_t kernel_function_instance_id_index) {
+  return optixGetPayloadGeneric(kernel_function_instance_id_index);
+}
+
+__device__ void optixSetPayloadInstanceID(const uint32_t kernel_function_instance_id_index, const uint32_t instance_id) {
+  optixSetPayloadGeneric(kernel_function_instance_id_index, instance_id);
+}
+
+__device__ uint32_t optixGetPayloadTriangleID(const uint32_t kernel_function_triangle_id_index) {
+  return optixGetPayloadGeneric(kernel_function_triangle_id_index);
+}
+
+__device__ void optixSetPayloadTriangleID(const uint32_t kernel_function_triangle_id_index, const uint32_t triangle_id) {
+  optixSetPayloadGeneric(kernel_function_triangle_id_index, triangle_id);
+}
+
+__device__ CompressedAlpha optixGetPayloadCompressedAlpha(const uint32_t kernel_function_compressed_alpha_index) {
   CompressedAlpha alpha;
-  alpha.data0 = optixGetPayloadGeneric(OPTIX_PAYLOAD_COMPRESSED_ALPHA);
-  alpha.data1 = optixGetPayloadGeneric(OPTIX_PAYLOAD_COMPRESSED_ALPHA + 1);
+  alpha.data0 = optixGetPayloadGeneric(kernel_function_compressed_alpha_index);
+  alpha.data1 = optixGetPayloadGeneric(kernel_function_compressed_alpha_index + 1);
 
   return alpha;
 }
 
-__device__ void optixSetPayloadCompressedAlpha(const CompressedAlpha alpha) {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_COMPRESSED_ALPHA, alpha.data0);
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_COMPRESSED_ALPHA + 1, alpha.data1);
+__device__ void optixSetPayloadCompressedAlpha(const uint32_t kernel_function_compressed_alpha_index, const CompressedAlpha alpha) {
+  optixSetPayloadGeneric(kernel_function_compressed_alpha_index, alpha.data0);
+  optixSetPayloadGeneric(kernel_function_compressed_alpha_index + 1, alpha.data1);
 }
 
-__device__ float optixGetPayloadDepth() {
-  return optixGetPayloadGeneric(OPTIX_PAYLOAD_DEPTH);
+__device__ float optixGetPayloadDepth(const uint32_t kernel_function_depth_index) {
+  return __uint_as_float(optixGetPayloadGeneric(kernel_function_depth_index));
 }
 
-__device__ void optixSetPayloadDepth(const float depth) {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_DEPTH, __float_as_uint(depth));
+__device__ void optixSetPayloadDepth(const uint32_t kernel_function_depth_index, const float depth) {
+  optixSetPayloadGeneric(kernel_function_depth_index, __float_as_uint(depth));
 }
 
 #endif
