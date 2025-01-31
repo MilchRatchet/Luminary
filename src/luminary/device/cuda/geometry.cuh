@@ -24,9 +24,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
       case HIT_TYPE_OCEAN: {
         switch (device.settings.shading_mode) {
           case LUMINARY_SHADING_MODE_DEPTH: {
-            const float dist  = get_length(sub_vector(device.camera.pos, task.origin));
-            const float value = __saturatef((1.0f / dist) * 2.0f);
-            write_beauty_buffer_forced(get_color(value, value, value), pixel);
+            write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
           } break;
           case LUMINARY_SHADING_MODE_NORMAL: {
             vec3 normal = ocean_get_normal(task.origin);
@@ -52,9 +50,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
             write_beauty_buffer_forced(add_color(opaque_color(data.albedo), data.emission), pixel);
           } break;
           case LUMINARY_SHADING_MODE_DEPTH: {
-            const float dist  = get_length(sub_vector(device.camera.pos, task.origin));
-            const float value = __saturatef((1.0f / dist) * 2.0f);
-            write_beauty_buffer_forced(get_color(value, value, value), pixel);
+            write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
           } break;
           case LUMINARY_SHADING_MODE_NORMAL: {
             const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);

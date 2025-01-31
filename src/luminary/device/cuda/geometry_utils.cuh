@@ -55,7 +55,7 @@ __device__ vec3 geometry_compute_normal(
   return normal;
 }
 
-__device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const TriangleHandle triangle_handle, const int pixel) {
+__device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel) {
   const uint32_t mesh_id      = mesh_id_load(triangle_handle.instance_id);
   const DeviceTransform trans = load_transform(triangle_handle.instance_id);
 

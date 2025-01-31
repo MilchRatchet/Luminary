@@ -8,8 +8,8 @@
 LUMINARY_KERNEL void particle_process_tasks_debug() {
   HANDLE_DEVICE_ABORT();
 
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const uint16_t task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const uint16_t task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
 
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset       = get_task_address(task_offset + i);
@@ -27,9 +27,7 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
       write_beauty_buffer_forced(device.particles.albedo, pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      const float dist  = get_length(sub_vector(device.camera.pos, task.origin));
-      const float value = __saturatef((1.0f / dist) * 2.0f);
-      write_beauty_buffer_forced(get_color(value, value, value), pixel);
+      write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_NORMAL) {
       const GBufferData data = particle_generate_g_buffer(task, handle.instance_id, pixel);
