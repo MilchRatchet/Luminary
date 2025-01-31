@@ -13,18 +13,19 @@
 
 struct OptixKernelConfig {
   const char* name;
-  int num_payloads;
+  uint32_t register_count;
   bool allow_gas;
 } typedef OptixKernelConfig;
 
 // TODO: Rename the ptx to the same as the types.
+// TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx", .num_payloads = 3, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx", .num_payloads = 2, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx", .num_payloads = 4, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx", .num_payloads = 4, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .num_payloads = 4, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .num_payloads = 4, .allow_gas = false}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .register_count = 40, .allow_gas = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__light_bsdf_trace", "__anyhit__shadow_trace"};
@@ -104,7 +105,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   OptixModuleCompileOptions module_compile_options;
   memset(&module_compile_options, 0, sizeof(OptixModuleCompileOptions));
 
-  module_compile_options.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
+  module_compile_options.maxRegisterCount = optix_kernel_configs[type].register_count;
   module_compile_options.optLevel         = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
   module_compile_options.debugLevel       = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
   module_compile_options.numPayloadTypes  = OPTIX_KERNEL_FUNCTION_COUNT;
@@ -142,7 +143,6 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   // Group Creation
   ////////////////////////////////////////////////////////////////////
 
-  // TODO: Think about using custom payload types.
   OptixProgramGroupOptions group_options;
   memset(&group_options, 0, sizeof(OptixProgramGroupOptions));
 
