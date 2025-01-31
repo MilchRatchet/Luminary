@@ -68,10 +68,11 @@ struct OptixKernelFunctionShadowTracePayload {
     };
   };
   union {
-    CompressedAlpha alpha;
+    RGBF throughput;
     struct {
       unsigned int v2;
       unsigned int v3;
+      unsigned int v4;
     };
   };
 } typedef OptixKernelFunctionShadowTracePayload;
@@ -79,8 +80,9 @@ struct OptixKernelFunctionShadowTracePayload {
 enum OptixKernelFunctionShadowTracePayloadValue {
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA2,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT
 } typedef OptixKernelFunctionShadowTracePayloadValue;
 

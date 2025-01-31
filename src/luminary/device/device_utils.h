@@ -200,11 +200,6 @@ struct GBufferMetaData {
 } typedef GBufferMetaData;
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
 
-struct CompressedAlpha {
-  uint32_t data0;
-  uint32_t data1;
-} typedef CompressedAlpha;
-
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////

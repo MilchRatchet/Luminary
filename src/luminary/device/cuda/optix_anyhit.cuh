@@ -79,15 +79,12 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   const float transparency = 1.0f - albedo.a;
 
-  const RGBF alpha = is_colored_transparency ? scale_color(opaque_color(albedo), transparency) : splat_color(transparency);
+  const RGBF throughput = is_colored_transparency ? scale_color(opaque_color(albedo), transparency) : splat_color(transparency);
 
-  CompressedAlpha compressed_alpha = optixGetPayloadCompressedAlpha(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA);
+  RGBF total_throughput = optixGetPayloadColor(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT);
+  total_throughput      = mul_color(total_throughput, throughput);
 
-  RGBF accumulated_alpha = optix_decompress_color(compressed_alpha);
-  accumulated_alpha      = mul_color(accumulated_alpha, alpha);
-  compressed_alpha       = optix_compress_color(accumulated_alpha);
-
-  optixSetPayloadCompressedAlpha(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COMPRESSED_ALPHA, compressed_alpha);
+  optixSetPayloadColor(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT, total_throughput);
 
   optixIgnoreIntersection();
 }

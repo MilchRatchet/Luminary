@@ -39,60 +39,6 @@ __device__ OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
   return OPTIX_ALPHA_RESULT_OPAQUE;
 }
 
-#define SKIP_IOR_CHECK (0xFFFFFFFF)
-#define MAX_COMPRESSABLE_COLOR (1.99999988079071044921875f)
-
-__device__ CompressedAlpha optix_compress_color(const RGBF color) {
-  const uint32_t bits_r = (__float_as_uint(fminf(color.r + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
-  const uint32_t bits_g = (__float_as_uint(fminf(color.g + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
-  const uint32_t bits_b = (__float_as_uint(fminf(color.b + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
-
-  CompressedAlpha alpha;
-  alpha.data0 = bits_r | (bits_g << 21);
-  alpha.data1 = (bits_g >> 11) | (bits_b << 10);
-
-  return alpha;
-}
-
-__device__ RGBF optix_decompress_color(const CompressedAlpha alpha) {
-  const uint32_t bits_r = alpha.data0 & 0x1FFFFF;
-  const uint32_t bits_g = (alpha.data0 >> 21) & 0x7FF | ((alpha.data1 & 0x3FF) << 11);
-  const uint32_t bits_b = (alpha.data1 >> 10) & 0x1FFFFF;
-
-  RGBF color;
-  color.r = __uint_as_float(0x3F800000u | (bits_r << 2)) - 1.0f;
-  color.g = __uint_as_float(0x3F800000u | (bits_g << 2)) - 1.0f;
-  color.b = __uint_as_float(0x3F800000u | (bits_b << 2)) - 1.0f;
-
-  return color;
-}
-
-__device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort2 index) {
-  const int8_t ior_stack_pop_max = (int8_t) (ior_data >> 24);
-  if (ior_stack_pop_max > 0) {
-    const uint32_t ior_stack = device.ptrs.ior_stack[get_pixel_id(index)];
-
-    const uint32_t ray_ior = (ior_data & 0xFF);
-
-    if (ior_stack_pop_max >= 3) {
-      if (ray_ior != (ior_stack >> 24))
-        return true;
-    }
-
-    if (ior_stack_pop_max >= 2) {
-      if (ray_ior != (ior_stack >> 16))
-        return true;
-    }
-
-    if (ior_stack_pop_max >= 1) {
-      if (ray_ior != (ior_stack >> 8))
-        return true;
-    }
-  }
-
-  return false;
-}
-
 __device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, const DeviceMaterial material) {
   RGBAF albedo = material.albedo;
 
@@ -108,8 +54,8 @@ __device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, con
 }
 
 __device__ bool particle_opacity_cutout(const float2 coord) {
-  const float dx = fabsf(coord.x - 0.5f);
-  const float dy = fabsf(coord.y - 0.5f);
+  const float dx = coord.x - 0.5f;
+  const float dy = coord.y - 0.5f;
 
   const float r = dx * dx + dy * dy;
 
@@ -126,18 +72,16 @@ __device__ RGBF
     (target_light.instance_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
 
   OptixKernelFunctionShadowTracePayload payload;
-  payload.handle = target_light;
-  payload.alpha  = optix_compress_color(get_color(1.0f, 1.0f, 1.0f));
+  payload.handle     = target_light;
+  payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowTrace(device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, payload);
 
-  RGBF visibility = optix_decompress_color(payload.alpha);
-
   if (payload.handle.instance_id == HIT_TYPE_REJECT) {
-    visibility = get_color(0.0f, 0.0f, 0.0f);
+    payload.throughput = get_color(0.0f, 0.0f, 0.0f);
   }
 
-  return visibility;
+  return payload.throughput;
 }
 #endif
 

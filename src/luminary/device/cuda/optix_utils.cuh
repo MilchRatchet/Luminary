@@ -67,7 +67,8 @@ static __forceinline__ __device__ void optixKernelFunctionShadowTrace(
   const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, OptixKernelFunctionShadowTracePayload& payload) {
   optixTrace(
     OPTIX_TRACE_PAYLOAD_ID(SHADOW_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin, tmax,
-    rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2, payload.v3);
+    rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2, payload.v3,
+    payload.v4);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -140,17 +141,19 @@ __device__ void optixSetPayloadTriangleID(const uint32_t kernel_function_triangl
   optixSetPayloadGeneric(kernel_function_triangle_id_index, triangle_id);
 }
 
-__device__ CompressedAlpha optixGetPayloadCompressedAlpha(const uint32_t kernel_function_compressed_alpha_index) {
-  CompressedAlpha alpha;
-  alpha.data0 = optixGetPayloadGeneric(kernel_function_compressed_alpha_index);
-  alpha.data1 = optixGetPayloadGeneric(kernel_function_compressed_alpha_index + 1);
+__device__ RGBF optixGetPayloadColor(const uint32_t kernel_function_color_index) {
+  RGBF color;
+  color.r = __uint_as_float(optixGetPayloadGeneric(kernel_function_color_index + 0));
+  color.g = __uint_as_float(optixGetPayloadGeneric(kernel_function_color_index + 1));
+  color.b = __uint_as_float(optixGetPayloadGeneric(kernel_function_color_index + 2));
 
-  return alpha;
+  return color;
 }
 
-__device__ void optixSetPayloadCompressedAlpha(const uint32_t kernel_function_compressed_alpha_index, const CompressedAlpha alpha) {
-  optixSetPayloadGeneric(kernel_function_compressed_alpha_index, alpha.data0);
-  optixSetPayloadGeneric(kernel_function_compressed_alpha_index + 1, alpha.data1);
+__device__ void optixSetPayloadColor(const uint32_t kernel_function_color_index, const RGBF color) {
+  optixSetPayloadGeneric(kernel_function_color_index + 0, __float_as_uint(color.r));
+  optixSetPayloadGeneric(kernel_function_color_index + 1, __float_as_uint(color.g));
+  optixSetPayloadGeneric(kernel_function_color_index + 2, __float_as_uint(color.b));
 }
 
 __device__ float optixGetPayloadDepth(const uint32_t kernel_function_depth_index) {
