@@ -17,15 +17,17 @@ struct OptixKernelConfig {
   bool allow_gas;
 } typedef OptixKernelConfig;
 
-// TODO: Rename the ptx to the same as the types.
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .register_count = 40, .allow_gas = false}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernel_raytrace_geometry.optixir", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernel_raytrace_particles.optixir", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernel_shading_geometry.optixir", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernel_shading_volume.optixir", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernel_shading_particles.optixir", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {
+    .name           = "optix_kernel_shading_volume_bridges.optixir",
+    .register_count = 40,
+    .allow_gas      = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__light_bsdf_trace", "__anyhit__shadow_trace"};
@@ -86,18 +88,18 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   __FAILURE_HANDLE(host_malloc(kernel, sizeof(OptixKernel)));
 
   ////////////////////////////////////////////////////////////////////
-  // Get PTX
+  // Get OptiX-IR
   ////////////////////////////////////////////////////////////////////
 
-  int64_t ptx_length;
-  char* ptx;
-  uint64_t ptx_info;
+  int64_t optixir_length;
+  char* optixir;
+  uint64_t optixir_info;
 
-  ceb_access(optix_kernel_configs[type].name, (void**) &ptx, &ptx_length, &ptx_info);
+  ceb_access(optix_kernel_configs[type].name, (void**) &optixir, &optixir_length, &optixir_info);
 
-  if (ptx_info || !ptx_length) {
+  if (optixir_info || !optixir_length) {
     __RETURN_ERROR(
-      LUMINARY_ERROR_API_EXCEPTION, "Failed to load OptiX kernels %s. Ceb Error Code: %zu.", optix_kernel_configs[type].name, ptx_info);
+      LUMINARY_ERROR_API_EXCEPTION, "Failed to load OptiX kernels %s. Ceb Error Code: %zu.", optix_kernel_configs[type].name, optixir_info);
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -138,7 +140,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
 
   OPTIX_FAILURE_HANDLE_LOG(
     optixModuleCreate(
-      device->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &(*kernel)->module),
+      device->optix_ctx, &module_compile_options, &pipeline_compile_options, optixir, optixir_length, log, &log_size, &(*kernel)->module),
     log);
 
   ////////////////////////////////////////////////////////////////////
