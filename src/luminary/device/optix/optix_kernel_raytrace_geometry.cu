@@ -79,7 +79,7 @@ extern "C" __global__ void __raygen__optix() {
     optixKernelFunctionGeometryTrace(
       device.optix_bvh, task.origin, task.ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, payload);
 
-    optix_write_out_gbuffer_meta(task, payload.depth, handle);
+    optix_write_out_gbuffer_meta(task, payload.depth, payload.handle);
 
     triangle_handle_store(payload.handle, offset);
     trace_depth_store(payload.depth, offset);
