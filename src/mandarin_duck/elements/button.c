@@ -42,7 +42,7 @@ static const char* _button_image_string[ELEMENT_BUTTON_IMAGE_COUNT] = {
   [ELEMENT_BUTTON_IMAGE_WAVES] = "\ue176",    [ELEMENT_BUTTON_IMAGE_SUN] = "\uf157",           [ELEMENT_BUTTON_IMAGE_CLOUD] = "\ue2bd",
   [ELEMENT_BUTTON_IMAGE_MIST] = "\ue188",     [ELEMENT_BUTTON_IMAGE_PRECIPITATION] = "\ue810", [ELEMENT_BUTTON_IMAGE_MATERIAL] = "\uef8f",
   [ELEMENT_BUTTON_IMAGE_INSTANCE] = "\uead3", [ELEMENT_BUTTON_IMAGE_MOVE] = "\ue89f",          [ELEMENT_BUTTON_IMAGE_SELECT] = "\uf706",
-  [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4"};
+  [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4",    [ELEMENT_BUTTON_IMAGE_SYNC] = "\ue627"};
 
 static void _element_button_render_image(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
@@ -117,7 +117,7 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
       subwindow_tooltip_create(window->external_subwindow, args.tooltip_text, mouse_state->x + 16.0f, mouse_state->y + 16.0f);
 
       window->state_data =
-        (WindowInteractionStateData){.state = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER, .element_hash = button.hash};
+        (WindowInteractionStateData) {.state = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER, .element_hash = button.hash};
     }
   }
 

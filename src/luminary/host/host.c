@@ -841,3 +841,12 @@ LuminaryResult luminary_host_save_png(Host* host, Image image, Path* path) {
 
   return LUMINARY_SUCCESS;
 }
+
+LuminaryResult luminary_host_request_sky_hdri_build(Host* host) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  __FAILURE_HANDLE(scene_set_hdri_dirty(host->scene_caller));
+  __FAILURE_HANDLE(_host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}

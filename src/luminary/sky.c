@@ -56,14 +56,24 @@ LuminaryResult sky_get_default(Sky* sky) {
     }                             \
   }
 
-LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* dirty) {
+#define __SKY_DIRTY_HDRI(var)                              \
+  {                                                        \
+    if (input->var != old->var) {                          \
+      *dirty      = true;                                  \
+      *hdri_dirty = input->mode == LUMINARY_SKY_MODE_HDRI; \
+      return LUMINARY_SUCCESS;                             \
+    }                                                      \
+  }
+
+LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* dirty, bool* hdri_dirty) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
-  *dirty = false;
+  *dirty      = false;
+  *hdri_dirty = false;
 
-  __SKY_DIRTY(mode);
+  __SKY_DIRTY_HDRI(mode);
 
   __SKY_DIRTY(ambient_sampling);
 

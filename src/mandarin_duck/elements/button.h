@@ -6,7 +6,7 @@
 #include "elements_common.h"
 #include "utils.h"
 
-enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE = 0, ELEMENT_BUTTON_SHAPE_IMAGE = 1 } typedef ElementButtonShape;
+enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE, ELEMENT_BUTTON_SHAPE_IMAGE, ELEMENT_BUTTON_SHAPE_COUNT } typedef ElementButtonShape;
 
 enum ElementButtonImage {
   ELEMENT_BUTTON_IMAGE_CHECK,
@@ -22,6 +22,7 @@ enum ElementButtonImage {
   ELEMENT_BUTTON_IMAGE_MOVE,
   ELEMENT_BUTTON_IMAGE_SELECT,
   ELEMENT_BUTTON_IMAGE_FOCUS,
+  ELEMENT_BUTTON_IMAGE_SYNC,
   ELEMENT_BUTTON_IMAGE_COUNT
 } typedef ElementButtonImage;
 

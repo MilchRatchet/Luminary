@@ -275,17 +275,27 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     __FAILURE_HANDLE_CRITICAL(sky_lut_update(device_manager->sky_lut, &sky));
     __FAILURE_HANDLE_CRITICAL(device_build_sky_lut(device_manager->devices[device_manager->main_device_index], device_manager->sky_lut));
 
-    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky));
-    __FAILURE_HANDLE_CRITICAL(device_build_sky_hdri(device_manager->devices[device_manager->main_device_index], device_manager->sky_hdri));
-
     __FAILURE_HANDLE_CRITICAL(sky_stars_update(device_manager->sky_stars, &sky));
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
 
       __FAILURE_HANDLE_CRITICAL(device_update_sky_lut(device, device_manager->sky_lut));
-      __FAILURE_HANDLE_CRITICAL(device_update_sky_hdri(device, device_manager->sky_hdri));
       __FAILURE_HANDLE_CRITICAL(device_update_sky_stars(device, device_manager->sky_stars));
+    }
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_HDRI) {
+    Sky sky;
+    __FAILURE_HANDLE_CRITICAL(scene_get(scene, &sky, SCENE_ENTITY_SKY));
+
+    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky));
+    __FAILURE_HANDLE_CRITICAL(device_build_sky_hdri(device_manager->devices[device_manager->main_device_index], device_manager->sky_hdri));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+
+      __FAILURE_HANDLE_CRITICAL(device_update_sky_hdri(device, device_manager->sky_hdri));
     }
   }
 

@@ -131,6 +131,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   bool output_dirty      = false;
   bool integration_dirty = false;
   bool buffers_dirty     = false;
+  bool hdri_dirty        = false;
 
   *scene_changed = false;
 
@@ -148,7 +149,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_OCEAN : 0;
       break;
     case SCENE_ENTITY_SKY:
-      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &integration_dirty));
+      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &integration_dirty, &hdri_dirty));
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_SKY : 0;
       break;
     case SCENE_ENTITY_CLOUD:
@@ -170,6 +171,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_OUTPUT : 0;
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (buffers_dirty) ? SCENE_DIRTY_FLAG_BUFFERS : 0;
+  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (hdri_dirty) ? SCENE_DIRTY_FLAG_HDRI : 0;
 
   // We need to always update the scene because certain changes might not cause anything to be dirty.
   __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, object, entity));
@@ -643,6 +645,22 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
   }
 
   scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_set_hdri_dirty(Scene* scene) {
+  __CHECK_NULL_ARGUMENT(scene);
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(scene, SCENE_ENTITY_TYPE_GLOBAL));
+
+  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= SCENE_DIRTY_FLAG_HDRI | SCENE_DIRTY_FLAG_INTEGRATION;
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock(scene, SCENE_ENTITY_TYPE_GLOBAL));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }

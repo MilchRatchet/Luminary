@@ -61,8 +61,9 @@ LuminaryResult sky_lut_update(SkyLUT* lut, const Sky* sky) {
   __CHECK_NULL_ARGUMENT(lut);
   __CHECK_NULL_ARGUMENT(sky);
 
-  bool is_dirty = false;
-  __FAILURE_HANDLE(sky_check_for_dirty(sky, &lut->sky, &is_dirty));
+  bool is_dirty   = false;
+  bool hdri_dirty = false;
+  __FAILURE_HANDLE(sky_check_for_dirty(sky, &lut->sky, &is_dirty, &hdri_dirty));
 
   if (is_dirty) {
     memcpy(&lut->sky, sky, sizeof(Sky));
@@ -247,8 +248,9 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(sky);
 
-  bool is_dirty = false;
-  __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &is_dirty));
+  bool is_dirty   = false;
+  bool hdri_dirty = false;
+  __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &is_dirty, &hdri_dirty));
 
   if (is_dirty) {
     memcpy(&hdri->sky, sky, sizeof(Sky));

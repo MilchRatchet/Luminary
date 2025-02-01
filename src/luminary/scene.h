@@ -44,6 +44,7 @@ enum SceneDirtyFlag {
   SCENE_DIRTY_FLAG_OUTPUT      = 0x80000000ull,
   SCENE_DIRTY_FLAG_INTEGRATION = 0x40000000ull,
   SCENE_DIRTY_FLAG_BUFFERS     = 0x20000000ull,
+  SCENE_DIRTY_FLAG_HDRI        = 0x10000000ull,
   // Instances
   SCENE_DIRTY_FLAG_INSTANCES_LIGHT_LIST  = 0x01000000ull, /* Specifies that instances may have become lights or are no longer lights. */
   SCENE_DIRTY_FLAG_INSTANCES_LIGHT_DIRTY = 0x02000000ull, /* Specifies that instances that are lights, are dirty. */
@@ -125,6 +126,7 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
 LuminaryResult scene_get_list_changes(Scene* scene, ARRAYPTR void** object, SceneEntity entity);
 LuminaryResult scene_apply_changes(Scene* scene);
 LuminaryResult scene_propagate_changes(Scene* scene, Scene* src);
+LuminaryResult scene_set_hdri_dirty(Scene* scene);
 LuminaryResult scene_destroy(Scene** scene);
 
 #endif /* LUMINARY_SCENE_H */
