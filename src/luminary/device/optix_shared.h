@@ -6,6 +6,7 @@ enum OptixKernelFunction {
   OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE,
   OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE,
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE,
   OPTIX_KERNEL_FUNCTION_COUNT
 } typedef OptixKernelFunction;
 
@@ -85,5 +86,23 @@ enum OptixKernelFunctionShadowTracePayloadValue {
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT
 } typedef OptixKernelFunctionShadowTracePayloadValue;
+
+struct OptixKernelFunctionShadowSunTracePayload {
+  union {
+    RGBF throughput;
+    struct {
+      unsigned int v0;
+      unsigned int v1;
+      unsigned int v2;
+    };
+  };
+} typedef OptixKernelFunctionShadowSunTracePayload;
+
+enum OptixKernelFunctionShadowSunTracePayloadValue {
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT,
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_COUNT
+} typedef OptixKernelFunctionShadowSunTracePayloadValue;
 
 #endif /* LUMINARY_OPTIX_SHARED_H */

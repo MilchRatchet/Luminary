@@ -302,7 +302,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
   float dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel)) * scale;
 
-  light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel));
+  light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle));
 
   sum_dist += dist;
 
@@ -317,7 +317,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel)) * scale;
 
-    light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, pixel));
+    light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle));
 
     sum_dist += dist;
   }
@@ -343,7 +343,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     // Invalid handle, we don't have a target light yet.
     const TriangleHandle target_light = triangle_handle_get(HIT_TYPE_INVALID, 0);
 
-    const RGBF visibility = optix_geometry_shadowing(start_vertex, task.ray, dist, target_light, task.index);
+    const RGBF visibility = optix_geometry_shadowing(start_vertex, task.ray, dist, target_light);
     prefix_color          = mul_color(prefix_color, visibility);
 
     prefix_color.r *= expf(-dist * (volume.scattering.r + volume.absorption.r)) * volume.scattering.r;
