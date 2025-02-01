@@ -11,6 +11,8 @@
 #include "internal_error.h"
 #include "utils.h"
 
+#define OPTIX_LOG_SIZE (1u << 16)
+
 struct OptixKernelConfig {
   const char* name;
   uint32_t register_count;
@@ -135,20 +137,23 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
     pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
 #endif
 
-  char log[4096];
-  size_t log_size = sizeof(log);
+  char* log;
+  __FAILURE_HANDLE(host_malloc(&log, OPTIX_LOG_SIZE));
+  memset(log, 0, OPTIX_LOG_SIZE);
+
+  size_t log_size = OPTIX_LOG_SIZE;
 
   OPTIX_FAILURE_HANDLE_LOG(
     optixModuleCreate(
       device->optix_ctx, &module_compile_options, &pipeline_compile_options, optixir, optixir_length, log, &log_size, &(*kernel)->module),
-    log);
+    log, log_size);
 
   ////////////////////////////////////////////////////////////////////
   // Group Creation
   ////////////////////////////////////////////////////////////////////
 
-  OptixProgramGroupOptions group_options;
-  memset(&group_options, 0, sizeof(OptixProgramGroupOptions));
+  OptixProgramGroupOptions group_options[OPTIX_KERNEL_NUM_GROUPS];
+  memset(&group_options, 0, OPTIX_KERNEL_NUM_GROUPS * sizeof(OptixProgramGroupOptions));
 
   OptixProgramGroupDesc group_desc[OPTIX_KERNEL_NUM_GROUPS];
   memset(group_desc, 0, OPTIX_KERNEL_NUM_GROUPS * sizeof(OptixProgramGroupDesc));
@@ -168,8 +173,8 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   }
 
   OPTIX_FAILURE_HANDLE_LOG(
-    optixProgramGroupCreate(device->optix_ctx, group_desc, OPTIX_KERNEL_NUM_GROUPS, &group_options, log, &log_size, (*kernel)->groups),
-    log);
+    optixProgramGroupCreate(device->optix_ctx, group_desc, OPTIX_KERNEL_NUM_GROUPS, group_options, log, &log_size, (*kernel)->groups), log,
+    log_size);
 
   ////////////////////////////////////////////////////////////////////
   // Pipeline Creation
@@ -182,7 +187,9 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
     optixPipelineCreate(
       device->optix_ctx, &pipeline_compile_options, &pipeline_link_options, (*kernel)->groups, OPTIX_KERNEL_NUM_GROUPS, log, &log_size,
       &(*kernel)->pipeline),
-    log);
+    log, log_size);
+
+  __FAILURE_HANDLE(host_free(&log));
 
   ////////////////////////////////////////////////////////////////////
   // Shader Binding Table Creation

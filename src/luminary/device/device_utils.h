@@ -79,15 +79,23 @@ extern WallTime* __cuda_stall_validation_macro_walltime;
     }                                                                                                                                 \
   }
 
-#define OPTIX_FAILURE_HANDLE_LOG(command, log)                                                                                        \
-  {                                                                                                                                   \
-    const OptixResult __optix_err = (command);                                                                                        \
-                                                                                                                                      \
-    if (__optix_err != OPTIX_SUCCESS) {                                                                                               \
-      error_message("Optix returned message: %s", log);                                                                               \
-      __RETURN_ERROR(                                                                                                                 \
-        LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(__optix_err), __optix_err, #command); \
-    }                                                                                                                                 \
+#define OPTIX_FAILURE_HANDLE_LOG(__macro_command, __macro_log, __macro_log_size)                                                       \
+  {                                                                                                                                    \
+    const size_t __macro_actual_log_size = __macro_log_size;                                                                           \
+                                                                                                                                       \
+    const OptixResult __macro_optix_err = (__macro_command);                                                                           \
+                                                                                                                                       \
+    if (__macro_optix_err != OPTIX_SUCCESS) {                                                                                          \
+      error_message("Optix returned message: %s", __macro_log);                                                                        \
+      __RETURN_ERROR(                                                                                                                  \
+        LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(__macro_optix_err), __macro_optix_err, \
+        #__macro_command);                                                                                                             \
+    }                                                                                                                                  \
+    else {                                                                                                                             \
+      log_message("Optix returned message: %s", __macro_log);                                                                          \
+    }                                                                                                                                  \
+    memset(__macro_log, 0, __macro_actual_log_size);                                                                                   \
+    __macro_log_size = __macro_actual_log_size;                                                                                        \
   }
 
 ////////////////////////////////////////////////////////////////////
