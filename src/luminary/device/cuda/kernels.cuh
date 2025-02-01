@@ -98,20 +98,20 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 LUMINARY_KERNEL void balance_trace_tasks() {
   HANDLE_DEVICE_ABORT();
 
-  const int warp = THREAD_ID;
+  const uint32_t warp = THREAD_ID;
 
   if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5)
     return;
 
-  __shared__ uint16_t counts[THREADS_PER_BLOCK][32];
+  __shared__ uint16_t counts[32 * THREADS_PER_BLOCK];
   uint32_t sum = 0;
 
-  for (int i = 0; i < 32; i += 4) {
-    ushort4 c                  = __ldcs((ushort4*) (device.ptrs.trace_counts + 32 * warp + i));
-    counts[threadIdx.x][i + 0] = c.x;
-    counts[threadIdx.x][i + 1] = c.y;
-    counts[threadIdx.x][i + 2] = c.z;
-    counts[threadIdx.x][i + 3] = c.w;
+  for (uint32_t i = 0; i < 32; i += 4) {
+    ushort4 c                                         = __ldcs((ushort4*) (device.ptrs.trace_counts + 32 * warp + i));
+    counts[threadIdx.x + (i + 0) * THREADS_PER_BLOCK] = c.x;
+    counts[threadIdx.x + (i + 1) * THREADS_PER_BLOCK] = c.y;
+    counts[threadIdx.x + (i + 2) * THREADS_PER_BLOCK] = c.z;
+    counts[threadIdx.x + (i + 3) * THREADS_PER_BLOCK] = c.w;
     sum += c.x;
     sum += c.y;
     sum += c.z;
@@ -120,16 +120,16 @@ LUMINARY_KERNEL void balance_trace_tasks() {
 
   const uint16_t average = 1 + (sum >> 5);
 
-  for (int i = 0; i < 32; i++) {
-    uint16_t count        = counts[threadIdx.x][i];
+  for (uint32_t i = 0; i < 32; i++) {
+    uint16_t count        = counts[threadIdx.x + i * THREADS_PER_BLOCK];
     int source_index      = -1;
     uint16_t source_count = 0;
 
     if (count >= average)
       continue;
 
-    for (int j = 0; j < 32; j++) {
-      uint16_t c = counts[threadIdx.x][j];
+    for (uint32_t j = 0; j < 32; j++) {
+      uint16_t c = counts[threadIdx.x + j * THREADS_PER_BLOCK];
       if (c > average && c > count + 1 && c > source_count) {
         source_count = c;
         source_index = j;
@@ -137,13 +137,13 @@ LUMINARY_KERNEL void balance_trace_tasks() {
     }
 
     if (source_index != -1) {
-      const int swaps = (source_count - count) >> 1;
+      const uint32_t swaps = (source_count - count) >> 1;
 
       static_assert(THREADS_PER_BLOCK == 128, "The following code assumes that we have 4 warps per block.");
-      const int thread_id_base = ((warp & 0b11) << 5);
-      const int block_id       = warp >> 2;
+      const uint32_t thread_id_base = ((warp & 0b11) << 5);
+      const uint32_t block_id       = warp >> 2;
 
-      for (int j = 0; j < swaps; j++) {
+      for (uint32_t j = 0; j < swaps; j++) {
         // TODO: Write a function for this
         DeviceTask* source_ptr = device.ptrs.tasks + get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
         DeviceTask* sink_ptr   = device.ptrs.tasks + get_task_address_of_thread(thread_id_base + i, block_id, count);
@@ -157,13 +157,15 @@ LUMINARY_KERNEL void balance_trace_tasks() {
         source_ptr--;
         source_count--;
       }
-      counts[threadIdx.x][i]            = count;
-      counts[threadIdx.x][source_index] = source_count;
+      counts[threadIdx.x + i * THREADS_PER_BLOCK]            = count;
+      counts[threadIdx.x + source_index * THREADS_PER_BLOCK] = source_count;
     }
   }
 
-  for (int i = 0; i < 32; i += 4) {
-    ushort4 vals = make_ushort4(counts[threadIdx.x][i], counts[threadIdx.x][i + 1], counts[threadIdx.x][i + 2], counts[threadIdx.x][i + 3]);
+  for (uint32_t i = 0; i < 32; i += 4) {
+    const ushort4 vals = make_ushort4(
+      counts[threadIdx.x + (i + 0) * THREADS_PER_BLOCK], counts[threadIdx.x + (i + 1) * THREADS_PER_BLOCK],
+      counts[threadIdx.x + (i + 2) * THREADS_PER_BLOCK], counts[threadIdx.x + (i + 3) * THREADS_PER_BLOCK]);
     __stcs((ushort4*) (device.ptrs.trace_counts + 32 * warp + i), vals);
   }
 }
