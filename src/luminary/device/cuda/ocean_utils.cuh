@@ -29,10 +29,6 @@ __device__ float ocean_hash(const float2 p) {
   return fractf(sinf(x) * 43758.5453123f);
 }
 
-// TODO: This is just an interpolation of an height map defined at integer coordinates.
-//       We can replace it with a 8 bit texture with bilinear interpolation.
-//       A texture size of 256x256 might already suffice due to the octaves
-//       which would mean this texture would only need 16kB => L1 cache
 __device__ float ocean_noise(const float2 p) {
   float2 integral;
   integral.x = floorf(p.x);

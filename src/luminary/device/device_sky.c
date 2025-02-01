@@ -541,7 +541,10 @@ LuminaryResult sky_stars_destroy(SkyStars** stars) {
   __CHECK_NULL_ARGUMENT(stars);
   __CHECK_NULL_ARGUMENT(*stars);
 
-  __FAILURE_HANDLE(host_free(&(*stars)->data));
+  if ((*stars)->data) {
+    __FAILURE_HANDLE(host_free(&(*stars)->data));
+  }
+
   __FAILURE_HANDLE(host_free(&(*stars)->offsets));
 
   __FAILURE_HANDLE(host_free(stars));
