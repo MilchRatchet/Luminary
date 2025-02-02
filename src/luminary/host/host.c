@@ -186,6 +186,28 @@ static LuminaryResult _host_start_render_queue_work(Host* host, void* args) {
   return LUMINARY_SUCCESS;
 }
 
+struct HostAddOutputRequestArgs {
+  OutputRequestProperties props;
+} typedef HostAddOutputRequestArgs;
+
+static LuminaryResult _host_add_output_request_clear_work(Host* host, HostAddOutputRequestArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostAddOutputRequestArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _host_add_output_request_queue_work(Host* host, HostAddOutputRequestArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(device_manager_add_output_request(host->device_manager, args->props));
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
@@ -735,6 +757,21 @@ LuminaryResult luminary_host_request_output(Host* host, LuminaryOutputRequestPro
   __CHECK_NULL_ARGUMENT(handle);
 
   __FAILURE_HANDLE(output_handler_add_request(host->output_handler, properties, handle));
+
+  HostAddOutputRequestArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostAddOutputRequestArgs), (void**) &args));
+
+  args->props = properties;
+
+  QueueEntry entry;
+
+  entry.name              = "Add Output Request";
+  entry.function          = (QueueEntryFunction) _host_add_output_request_queue_work;
+  entry.clear_func        = (QueueEntryFunction) _host_add_output_request_clear_work;
+  entry.args              = (void*) args;
+  entry.remove_duplicates = false;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
   return LUMINARY_SUCCESS;
 }

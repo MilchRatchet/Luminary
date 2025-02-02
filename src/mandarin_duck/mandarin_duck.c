@@ -31,9 +31,9 @@ static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* ho
 
     LuminaryInstance instance;
     instance.mesh_id  = mesh_id;
-    instance.position = (LuminaryVec3){.x = 0.0f, .y = 0.0f, .z = 0.0f};
-    instance.rotation = (LuminaryVec3){.x = 0.0f, .y = 0.0f, .z = 0.0f};
-    instance.scale    = (LuminaryVec3){.x = 1.0f, .y = 1.0f, .z = 1.0f};
+    instance.position = (LuminaryVec3) {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+    instance.rotation = (LuminaryVec3) {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+    instance.scale    = (LuminaryVec3) {.x = 1.0f, .y = 1.0f, .z = 1.0f};
 
     camera_handler_center_instance(duck->display->camera_handler, host, &instance);
 
@@ -92,6 +92,7 @@ void mandarin_duck_run(MandarinDuck* duck) {
     _mandarin_duck_handle_file_drop(duck, duck->host, file_drop_array);
 
     display_handle_inputs(duck->display, duck->host, time_step);
+    display_handle_outputs(duck->display, duck->host);
 
     display_render(duck->display, duck->host);
 

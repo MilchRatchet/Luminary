@@ -137,6 +137,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 
   display_set_mouse_visible(display, display->show_ui);
 
+  display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
+
   *_display = display;
 }
 
@@ -341,28 +343,19 @@ static void _display_generate_screenshot_name(char* string, LuminaryImage image)
   sprintf(string, "%s-%05u-%07.1fs.png", time_string, image.meta_data.sample_count, image.meta_data.time);
 }
 
-static void _display_generate_screenshot(LuminaryHost* host) {
-  LuminaryOutputHandle output_handle;
-  LUM_FAILURE_HANDLE(luminary_host_acquire_output(host, &output_handle));
+static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
+  if (display->output_promise_handle != LUMINARY_OUTPUT_HANDLE_INVALID)
+    return;
 
-  if (output_handle != LUMINARY_OUTPUT_HANDLE_INVALID) {
-    LuminaryImage output_image;
-    LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
+  LuminaryRendererSettings settings;
+  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
-    LuminaryPath* image_path;
-    LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
+  LuminaryOutputRequestProperties properties;
+  properties.sample_count = 0;
+  properties.width        = settings.width;
+  properties.height       = settings.height;
 
-    char string[4096];
-    _display_generate_screenshot_name(string, output_image);
-
-    LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
-
-    LUM_FAILURE_HANDLE(luminary_host_save_png(host, output_image, image_path));
-
-    LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
-
-    LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
-  }
+  LUM_FAILURE_HANDLE(luminary_host_request_output(host, properties, &display->output_promise_handle));
 }
 
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
@@ -378,7 +371,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   }
 
   if (display->keyboard_state->keys[SDL_SCANCODE_F2].phase == KEY_PHASE_PRESSED) {
-    _display_generate_screenshot(host);
+    _display_generate_screenshot(display, host);
   }
 
   if (display->awaiting_pixel_query_result) {
@@ -485,6 +478,38 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
 
   if (display->active_camera_movement) {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
+  }
+}
+
+void display_handle_outputs(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  if (display->output_promise_handle != LUMINARY_OUTPUT_HANDLE_INVALID) {
+    LuminaryOutputHandle output_handle;
+    luminary_host_try_await_output(host, display->output_promise_handle, &output_handle);
+
+    if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID)
+      return;
+
+    LuminaryImage output_image;
+    LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
+
+    LuminaryPath* image_path;
+    LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
+
+    char string[4096];
+    _display_generate_screenshot_name(string, output_image);
+
+    LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
+
+    LUM_FAILURE_HANDLE(luminary_host_save_png(host, output_image, image_path));
+
+    LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
+
+    LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
+
+    display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
   }
 }
 

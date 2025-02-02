@@ -18,6 +18,30 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_output_allocate_device_buffer(DeviceOutput* output, uint32_t width, uint32_t height) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  bool allocate_device_buffer = true;
+  size_t required_output_size = width * height * sizeof(ARGB8);
+
+  if (output->device_buffer) {
+    size_t allocated_size;
+    device_memory_get_size(output->device_buffer, &allocated_size);
+
+    allocate_device_buffer = required_output_size > allocated_size;
+  }
+
+  if (allocate_device_buffer) {
+    if (output->device_buffer) {
+      __FAILURE_HANDLE(device_free(&output->device_buffer));
+    }
+
+    __FAILURE_HANDLE(device_malloc(&output->device_buffer, required_output_size));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height) {
   __CHECK_NULL_ARGUMENT(output);
 
@@ -33,11 +57,7 @@ LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint
       __FAILURE_HANDLE(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
     }
 
-    if (output->device_buffer) {
-      __FAILURE_HANDLE(device_free(&output->device_buffer));
-    }
-
-    __FAILURE_HANDLE(device_malloc(&output->device_buffer, width * height * sizeof(ARGB8)));
+    __FAILURE_HANDLE(_device_output_allocate_device_buffer(output, width, height));
   }
 
   return LUMINARY_SUCCESS;
@@ -53,6 +73,8 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
   output_request.props = props;
 
   __FAILURE_HANDLE(array_push(&output->output_requests, &output_request));
+
+  __FAILURE_HANDLE(_device_output_allocate_device_buffer(output, props.width, props.height));
 
   return LUMINARY_SUCCESS;
 }
@@ -141,15 +163,15 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     if (output_request->queued)
       continue;
 
-    if (output_request->props.sample_count != device->sample_count.current_sample_count)
+    if ((output_request->props.sample_count > 0) && output_request->props.sample_count != device->sample_count.current_sample_count)
       continue;
 
     data = output->callback_data + output->callback_index;
 
-    data->descriptor.is_recurring_output       = true;
+    data->descriptor.is_recurring_output       = false;
     data->descriptor.meta_data.width           = output_request->props.width;
     data->descriptor.meta_data.height          = output_request->props.height;
-    data->descriptor.meta_data.sample_count    = output_request->props.sample_count;
+    data->descriptor.meta_data.sample_count    = device->sample_count.current_sample_count;
     data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
     data->descriptor.data                      = output_request->buffer;
 
@@ -180,7 +202,7 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
   __FAILURE_HANDLE(array_get_num_elements((*output)->output_requests, &num_output_requests));
 
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
-    __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id]));
+    __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id].buffer));
   }
 
   __FAILURE_HANDLE(array_destroy(&(*output)->output_requests));

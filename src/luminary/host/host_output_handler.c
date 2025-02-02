@@ -52,7 +52,7 @@ LuminaryResult output_handler_add_request(OutputHandler* output, OutputRequestPr
   for (uint32_t promise_id = 0; promise_id < num_promises; promise_id++) {
     OutputPromise* promise = output->promises + promise_id;
 
-    if (promise->populated)
+    if (promise->pending)
       continue;
 
     selected_handle = promise_id;
@@ -69,7 +69,7 @@ LuminaryResult output_handler_add_request(OutputHandler* output, OutputRequestPr
   }
 
   OutputPromise* promise = output->promises + selected_handle;
-  promise->populated     = true;
+  promise->pending       = true;
   promise->properties    = properties;
   promise->handle        = OUTPUT_HANDLE_INVALID;
 
@@ -179,7 +179,7 @@ LuminaryResult output_handler_acquire_from_promise(OutputHandler* output, uint32
   if (returned_handle != OUTPUT_HANDLE_INVALID) {
     output->objects[returned_handle].reference_count++;
     output->objects[returned_handle].promise_reference = OUTPUT_HANDLE_INVALID;
-    promise->populated                                 = false;
+    promise->pending                                   = false;
   }
 
   *handle = returned_handle;
@@ -309,7 +309,7 @@ LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, Ou
   for (uint32_t promise_id = 0; promise_id < num_promises; promise_id++) {
     OutputPromise* promise = output->promises + promise_id;
 
-    if (promise->populated)
+    if (promise->pending == false)
       continue;
 
     if (promise->properties.width != descriptor.meta_data.width)
@@ -318,7 +318,7 @@ LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, Ou
     if (promise->properties.height != descriptor.meta_data.height)
       continue;
 
-    if (promise->properties.sample_count != descriptor.meta_data.sample_count)
+    if ((promise->properties.sample_count > 0) && promise->properties.sample_count != descriptor.meta_data.sample_count)
       continue;
 
     selected_promise_handle = promise_id;
@@ -346,8 +346,8 @@ LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, Ou
 
   OutputPromise* promise = output->promises + selected_promise_handle;
 
-  promise->populated = true;
-  promise->handle    = selected_handle;
+  promise->pending = true;
+  promise->handle  = selected_handle;
 
   OutputObject* selected_output = output->objects + selected_handle;
 
@@ -416,7 +416,7 @@ LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, 
   __CHECK_NULL_ARGUMENT(image);
 
   if (handle == OUTPUT_HANDLE_INVALID) {
-    *image = (Image){.buffer = (uint8_t*) 0, .width = 0, .height = 0, .ld = 0};
+    *image = (Image) {.buffer = (uint8_t*) 0, .width = 0, .height = 0, .ld = 0};
     return LUMINARY_SUCCESS;
   }
 
@@ -436,13 +436,12 @@ LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, 
 
   OutputObject* object = output->objects + handle;
 
-  *image = (Image){
-    .buffer                 = object->descriptor.data,
-    .width                  = object->descriptor.meta_data.width,
-    .height                 = object->descriptor.meta_data.height,
-    .ld                     = object->descriptor.meta_data.width,
-    .meta_data.time         = object->descriptor.meta_data.time,
-    .meta_data.sample_count = object->descriptor.meta_data.sample_count};
+  *image = (Image) {.buffer                 = object->descriptor.data,
+                    .width                  = object->descriptor.meta_data.width,
+                    .height                 = object->descriptor.meta_data.height,
+                    .ld                     = object->descriptor.meta_data.width,
+                    .meta_data.time         = object->descriptor.meta_data.time,
+                    .meta_data.sample_count = object->descriptor.meta_data.sample_count};
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

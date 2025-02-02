@@ -14,7 +14,7 @@ struct OutputObject {
 } typedef OutputObject;
 
 struct OutputPromise {
-  bool populated;
+  bool pending;
   OutputRequestProperties properties;
   uint32_t handle;
 } typedef OutputPromise;
