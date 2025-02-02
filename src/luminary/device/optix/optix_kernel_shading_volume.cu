@@ -67,6 +67,13 @@ extern "C" __global__ void __raygen__optix() {
 
     write_beauty_buffer(accumulated_light, pixel, task.state);
 
+    if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (device.ocean.triangle_light_contribution || volume_type != VOLUME_TYPE_OCEAN)) {
+      RGBF bridge_color = bridges_sample(task, volume);
+      bridge_color      = mul_color(bridge_color, record);
+
+      write_beauty_buffer_indirect(bridge_color, pixel);
+    }
+
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite
     // the values we will get garbage. I am not sure if this is a compiler bug or some undefined

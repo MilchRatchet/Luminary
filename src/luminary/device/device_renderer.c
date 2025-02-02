@@ -39,7 +39,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
 
   for (uint32_t depth = 0; depth <= args->max_depth; depth++) {
     action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
-    action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = depth};
+    action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = depth};
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
     // TODO: Figure out better ways of doing this.
@@ -70,17 +70,6 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     }
 
     if (args->render_volumes) {
-      // It is important to compute bridges lighting before sampling volume scattering events.
-      // We want to sample over the whole unoccluded ray path so sampling scattering events before
-      // that would shorten the path.
-      // TODO: Move bridges into volume shading kernel
-
-      if (args->render_lights && depth == 0) {
-        action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-        action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES;
-        __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-      }
-
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
       action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
@@ -135,7 +124,7 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   DeviceRendererQueueAction action;
 
   action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
-  action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = 0};
+  action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = 0};
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;

@@ -117,7 +117,6 @@ compile_optixir(optix_kernel_raytrace_particles)
 compile_optixir(optix_kernel_shading_geometry)
 compile_optixir(optix_kernel_shading_volume)
 compile_optixir(optix_kernel_shading_particles)
-compile_optixir(optix_kernel_shading_volume_bridges)
 
 #=============================================================
 # Embed files
@@ -135,7 +134,6 @@ ceb_embed_files(
   ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_geometry.optixir
   ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_volume.optixir
   ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_particles.optixir
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_volume_bridges.optixir
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_SOURCE_DIR}/data/LuminaryFontBold.ttf
   ${CMAKE_SOURCE_DIR}/data/MaterialSymbols.ttf
