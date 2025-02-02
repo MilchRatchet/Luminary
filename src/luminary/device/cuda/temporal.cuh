@@ -441,31 +441,36 @@ LUMINARY_KERNEL void temporal_accumulation_output_1() {
   }
 }
 
-// TODO: Actually start using this kernel again.
-LUMINARY_KERNEL void temporal_accumulation_aov(const CompressedRGBF* buffer, CompressedRGBF* accumulate) {
+LUMINARY_KERNEL void temporal_accumulation_aov() {
   HANDLE_DEVICE_ABORT();
 
   const uint32_t amount = device.settings.width * device.settings.height;
 
-  const float scale = 1.0f / (device.state.sample_id + 1);
+  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+
+  const float prev_scale     = device.state.sample_id;
+  const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
-    RGBF input = load_RGBF(buffer + offset);
-    RGBF output;
+    const uint32_t y = offset / device.settings.width;
+    const uint32_t x = offset - y * device.settings.width;
 
-    if (device.state.sample_id) {
-      output = load_RGBF(accumulate + offset);
+    const float pixel_x = x + 0.5f;
+    const float pixel_y = y + 0.5f;
 
-      output = scale_color(output, device.state.sample_id);
-      output = add_color(input, output);
-    }
-    else {
-      output = input;
-    }
+    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
+    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
 
-    output = scale_color(output, scale);
+    // Direct Lighting
+    RGBF direct_buffer = temporal_gather_pixel(
+      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+    RGBF direct_output = load_RGBF(device.ptrs.frame_accumulate + offset);
 
-    store_RGBF(accumulate, offset, output);
+    direct_output = scale_color(direct_output, prev_scale);
+    direct_output = add_color(direct_output, direct_buffer);
+    direct_output = scale_color(direct_output, curr_inv_scale);
+
+    store_RGBF(device.ptrs.frame_accumulate, offset, direct_output);
   }
 }
 

@@ -1311,8 +1311,11 @@ LuminaryResult device_clear_lighting_buffers(Device* device) {
 
   CUDA_FAILURE_HANDLE(
     cuMemsetD16Async(DEVICE_CUPTR(device->buffers.frame_direct_buffer), 0, internal_pixel_count * 3, device->stream_main));
-  CUDA_FAILURE_HANDLE(
-    cuMemsetD16Async(DEVICE_CUPTR(device->buffers.frame_indirect_buffer), 0, internal_pixel_count * 3, device->stream_main));
+
+  if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
+    CUDA_FAILURE_HANDLE(
+      cuMemsetD16Async(DEVICE_CUPTR(device->buffers.frame_indirect_buffer), 0, internal_pixel_count * 3, device->stream_main));
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

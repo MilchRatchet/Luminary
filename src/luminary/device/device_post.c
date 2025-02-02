@@ -353,6 +353,10 @@ DEVICE_CTX_FUNC LuminaryResult device_post_apply(DevicePost* post, Device* devic
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(device);
 
+  if (device->constant_memory->settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT) {
+    return LUMINARY_SUCCESS;
+  }
+
   if (post->bloom) {
     __FAILURE_HANDLE(_device_post_bloom_apply(post, device));
   }
