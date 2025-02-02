@@ -32,6 +32,7 @@ struct ArgumentParser {
   char** inputs;
   ParsedArgument* parsed_arguments;
   bool dry_run_requested;
+  const char* output_directory;
 };
 
 void argument_parser_create(ArgumentParser** parser);

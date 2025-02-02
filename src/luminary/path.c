@@ -165,13 +165,18 @@ static LuminaryResult _path_apply_no_override(Path* path) {
 
   memcpy(path->output, path->working_dir, path->working_dir_len);
 
+  uint32_t file_path_offset = 0;
+  if (path->working_dir_len) {
 #if defined(WIN32)
-  path->output[path->working_dir_len] = '\\';
+    path->output[path->working_dir_len] = '\\';
 #else  /* WIN32 */
-  path->output[path->working_dir_len] = '/';
+    path->output[path->working_dir_len] = '/';
 #endif /* !WIN32 */
 
-  memcpy(path->output + path->working_dir_len + 1, path->file_path, path->file_path_len + 1);
+    file_path_offset = path->working_dir_len + 1;
+  }
+
+  memcpy(path->output + file_path_offset, path->file_path, path->file_path_len + 1);
 
   return LUMINARY_SUCCESS;
 }

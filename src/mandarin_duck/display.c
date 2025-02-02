@@ -330,7 +330,7 @@ static WindowVisibilityMask _display_get_window_visibility_mask(Display* display
   return WINDOW_VISIBILITY_NONE;
 }
 
-static void _display_generate_screenshot_name(char* string, LuminaryImage image) {
+static void _display_generate_screenshot_name(const char* output_directory, char* string, LuminaryImage image) {
   time_t rawtime;
   struct tm timeinfo;
 
@@ -340,7 +340,7 @@ static void _display_generate_screenshot_name(char* string, LuminaryImage image)
   timeinfo = *localtime(&rawtime);
   strftime(time_string, 2048, "%Y-%m-%d-%H-%M-%S", &timeinfo);
 
-  sprintf(string, "%s-%05u-%07.1fs.png", time_string, image.meta_data.sample_count, image.meta_data.time);
+  sprintf(string, "%s/Snap-%s-%05u-%07.1fs.png", output_directory, time_string, image.meta_data.sample_count, image.meta_data.time);
 }
 
 static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
@@ -481,7 +481,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   }
 }
 
-void display_handle_outputs(Display* display, LuminaryHost* host) {
+void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
@@ -499,7 +499,7 @@ void display_handle_outputs(Display* display, LuminaryHost* host) {
     LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
 
     char string[4096];
-    _display_generate_screenshot_name(string, output_image);
+    _display_generate_screenshot_name(output_directory, string, output_image);
 
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 

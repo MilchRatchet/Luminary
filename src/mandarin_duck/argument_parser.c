@@ -43,6 +43,17 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
   parser->dry_run_requested = true;
 }
 
+static void _argument_parser_arg_func_output(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(parser);
+  UNUSED_ARG(host);
+  UNUSED_ARG(num_arguments);
+  UNUSED_ARG(arguments);
+
+  if (num_arguments > 0) {
+    parser->output_directory = arguments[0];
+  }
+}
+
 static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
   UNUSED_ARG(parser);
   UNUSED_ARG(host);
@@ -69,13 +80,13 @@ struct ParseResult {
 static void _argument_parser_parse_argument(ArgumentParser* parser, const char* argument, ParseResult* result) {
   if (argument[0] == '\0') {
     // This is an empty argument.
-    *result = (ParseResult){.is_empty = true, .is_argument = false, .matched_argument = (const ArgumentDescriptor*) 0};
+    *result = (ParseResult) {.is_empty = true, .is_argument = false, .matched_argument = (const ArgumentDescriptor*) 0};
     return;
   }
 
   if (argument[0] != '-') {
     // This is an input file
-    *result = (ParseResult){.is_empty = false, .is_argument = false, .matched_argument = (const ArgumentDescriptor*) 0};
+    *result = (ParseResult) {.is_empty = false, .is_argument = false, .matched_argument = (const ArgumentDescriptor*) 0};
     return;
   }
 
@@ -100,12 +111,12 @@ static void _argument_parser_parse_argument(ArgumentParser* parser, const char* 
       continue;
     }
 
-    *result = (ParseResult){.is_empty = false, .is_argument = true, .matched_argument = argument};
+    *result = (ParseResult) {.is_empty = false, .is_argument = true, .matched_argument = argument};
 
     return;
   }
 
-  *result = (ParseResult){.is_empty = false, .is_argument = true, .matched_argument = (const ArgumentDescriptor*) 0};
+  *result = (ParseResult) {.is_empty = false, .is_argument = true, .matched_argument = (const ArgumentDescriptor*) 0};
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -137,6 +148,16 @@ void argument_parser_create(ArgumentParser** parser) {
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
+  descriptor.long_name         = "output";
+  descriptor.short_name        = "o";
+  descriptor.description       = "Set output directory";
+  descriptor.subargument_count = 1;
+  descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_output;
+  descriptor.pre_execute       = false;
+
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "version";
   descriptor.short_name        = "v";
   descriptor.description       = "Print version information";
@@ -150,6 +171,11 @@ void argument_parser_create(ArgumentParser** parser) {
 void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** argv) {
   MD_CHECK_NULL_ARGUMENT(parser);
 
+  uint32_t subargs_left = 0;
+  ParseResult subarg_target;
+  const char** subargs;
+  LUM_FAILURE_HANDLE(array_create(&subargs, sizeof(const char*), 8));
+
   for (uint32_t argument_id = 1; argument_id < argc; argument_id++) {
     const char* argument = argv[argument_id];
 
@@ -158,6 +184,14 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
 
     if (result.is_empty) {
       continue;
+    }
+
+    if (result.is_argument) {
+      if (subargs_left > 0) {
+        warn_message("Encountered argument but expected sub-argument.");
+        subargs_left = 0;
+        LUM_FAILURE_HANDLE(array_clear(subargs));
+      }
     }
 
     if (result.is_argument && result.matched_argument == (ArgumentDescriptor*) 0) {
@@ -171,7 +205,7 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
 
         // Encountered argument that prevents Mandarin Duck from actually executing.
         parser->dry_run_requested = true;
-        return;
+        break;
       }
 
       ParsedArgument parsed_argument;
@@ -184,7 +218,32 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
       continue;
     }
 
-    // TODO: Handle sub-arguments
+    if (result.is_argument && result.matched_argument->subargument_count > 0) {
+      subarg_target = result;
+      subargs_left  = result.matched_argument->subargument_count;
+
+      continue;
+    }
+
+    if (result.is_argument == false && subargs_left > 0) {
+      LUM_FAILURE_HANDLE(array_push(&subargs, &argument));
+      subargs_left--;
+
+      if (subargs_left == 0) {
+        ParsedArgument parsed_argument;
+
+        parsed_argument.handler_func      = subarg_target.matched_argument->handler_func;
+        parsed_argument.subargument_count = subarg_target.matched_argument->subargument_count;
+
+        memcpy(parsed_argument.subarguments, subargs, subarg_target.matched_argument->subargument_count * sizeof(const char*));
+
+        LUM_FAILURE_HANDLE(array_push(&parser->parsed_arguments, &parsed_argument));
+
+        LUM_FAILURE_HANDLE(array_clear(subargs));
+      }
+
+      continue;
+    }
 
     if (!result.is_argument) {
       LUM_FAILURE_HANDLE(array_push(&parser->inputs, &argument));
@@ -192,6 +251,8 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
       continue;
     }
   }
+
+  LUM_FAILURE_HANDLE(array_destroy(&subargs));
 }
 
 void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host) {

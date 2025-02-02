@@ -65,7 +65,7 @@ void display_set_cursor(Display* display, SDL_SystemCursor cursor);
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode);
 void display_query_events(Display* display, DisplayFileDrop** file_drop_array, bool* exit_requested, bool* dirty);
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step);
-void display_handle_outputs(Display* display, LuminaryHost* host);
+void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory);
 void display_render(Display* display, LuminaryHost* host);
 void display_update(Display* display);
 void display_destroy(Display** display);

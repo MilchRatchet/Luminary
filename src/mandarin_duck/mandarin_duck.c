@@ -43,14 +43,16 @@ static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* ho
   LUM_FAILURE_HANDLE(array_clear(file_drop_array));
 }
 
-void mandarin_duck_create(MandarinDuck** _duck, LuminaryHost* host) {
+void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
   MD_CHECK_NULL_ARGUMENT(_duck);
-  MD_CHECK_NULL_ARGUMENT(host);
+  MD_CHECK_NULL_ARGUMENT(args.host);
 
   MandarinDuck* duck;
   LUM_FAILURE_HANDLE(host_malloc(&duck, sizeof(MandarinDuck)));
+  memset(duck, 0, sizeof(MandarinDuck));
 
-  duck->host = host;
+  duck->host             = args.host;
+  duck->output_directory = args.output_directory;
 
   LuminaryRendererSettings renderer_settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
@@ -92,7 +94,7 @@ void mandarin_duck_run(MandarinDuck* duck) {
     _mandarin_duck_handle_file_drop(duck, duck->host, file_drop_array);
 
     display_handle_inputs(duck->display, duck->host, time_step);
-    display_handle_outputs(duck->display, duck->host);
+    display_handle_outputs(duck->display, duck->host, duck->output_directory);
 
     display_render(duck->display, duck->host);
 
