@@ -132,7 +132,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   KernelArgsGenerateFinalImage generate_final_image_args;
 
-  generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_accumulate);
+  generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_current_result);
   generate_final_image_args.color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
   generate_final_image_args.agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
 

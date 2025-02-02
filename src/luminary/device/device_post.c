@@ -69,7 +69,7 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
   {
     KernelArgsCameraPostImageDownsample args;
 
-    args.src = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.src = DEVICE_PTR(device->buffers.frame_current_result);
     args.sw  = width;
     args.sh  = height;
     args.dst = DEVICE_PTR(post->bloom_mips[0]);
@@ -117,8 +117,8 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
     args.src  = DEVICE_PTR(post->bloom_mips[0]);
     args.sw   = width >> 1;
     args.sh   = height >> 1;
-    args.dst  = DEVICE_PTR(device->buffers.frame_accumulate);
-    args.base = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.dst  = DEVICE_PTR(device->buffers.frame_current_result);
+    args.base = DEVICE_PTR(device->buffers.frame_current_result);
     args.tw   = width;
     args.th   = height;
     args.sa   = post->bloom_blend / post->bloom_mip_count;
@@ -174,7 +174,7 @@ static LuminaryResult _device_post_lens_flare_apply(DevicePost* post, Device* de
   {
     KernelArgsCameraPostImageDownsampleThreshold args;
 
-    args.src       = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.src       = DEVICE_PTR(device->buffers.frame_current_result);
     args.sw        = width;
     args.sh        = height;
     args.dst       = DEVICE_PTR(post->lens_flare_buffers[0]);
@@ -251,8 +251,8 @@ static LuminaryResult _device_post_lens_flare_apply(DevicePost* post, Device* de
     args.src  = DEVICE_PTR(post->lens_flare_buffers[0]);
     args.sw   = width >> 1;
     args.sh   = height >> 1;
-    args.base = DEVICE_PTR(device->buffers.frame_accumulate);
-    args.dst  = DEVICE_PTR(device->buffers.frame_accumulate);
+    args.base = DEVICE_PTR(device->buffers.frame_current_result);
+    args.dst  = DEVICE_PTR(device->buffers.frame_current_result);
     args.tw   = width;
     args.th   = height;
     args.sa   = 1.0f;

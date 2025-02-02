@@ -13,7 +13,7 @@ __device__ float temporal_gather_pixel_weight(const float x, const float y) {
 }
 
 __device__ RGBF temporal_gather_pixel_load(
-  const CompressedRGBF* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
+  const RGB_E6M10* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
   const float sample_y) {
   const uint32_t index_x = (uint32_t) max(min((int32_t) sample_x, width - 1), 0);
   const uint32_t index_y = (uint32_t) max(min((int32_t) sample_y, height - 1), 0);
@@ -29,7 +29,7 @@ __device__ RGBF temporal_gather_pixel_load(
 }
 
 __device__ RGBF temporal_gather_pixel(
-  const CompressedRGBF* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
+  const RGB_E6M10* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
   const uint32_t height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
@@ -48,8 +48,8 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
-  const uint32_t bucket_id            = device.state.sample_id % device.settings.num_indirect_buckets;
-  CompressedRGBF* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
+  const uint32_t bucket_id       = device.state.sample_id % device.settings.num_indirect_buckets;
+  RGB_E6M10* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / device.settings.width;
@@ -75,7 +75,7 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
     RGBF output = add_color(direct_buffer, indirect_buffer);
 
-    store_RGBF(device.ptrs.frame_accumulate, offset, output);
+    store_RGBF(device.ptrs.frame_current_result, offset, output);
   }
 }
 
@@ -96,8 +96,8 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   const float prev_scale     = device.state.sample_id;
   const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
 
-  const uint32_t bucket_id            = device.state.sample_id % device.settings.num_indirect_buckets;
-  CompressedRGBF* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
+  const uint32_t bucket_id       = device.state.sample_id % device.settings.num_indirect_buckets;
+  RGB_E6M10* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
 
   const uint32_t bucket_sample_count = temporal_get_bucket_sample_count(bucket_id);
 
@@ -140,14 +140,14 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
 
 __device__ void temporal_load_buckets_0(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
   if (device.settings.num_indirect_buckets > bucket_id && device.state.sample_id > bucket_id) {
-    const CompressedRGBF* src = device.ptrs.frame_indirect_accumulate[bucket_id];
-    buckets[num_buckets++]    = load_RGBF(src + x + y * device.settings.width);
+    const RGB_E6M10* src   = device.ptrs.frame_indirect_accumulate[bucket_id];
+    buckets[num_buckets++] = load_RGBF(src + x + y * device.settings.width);
   }
 }
 
 __device__ void temporal_load_buckets_1(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
   if (device.settings.num_indirect_buckets > bucket_id && device.state.sample_id > bucket_id) {
-    const CompressedRGBF* src = device.ptrs.frame_indirect_accumulate[bucket_id];
+    const RGB_E6M10* src = device.ptrs.frame_indirect_accumulate[bucket_id];
     RGBF_load_pair(src, x, y, device.settings.width, buckets[num_buckets + 0], buckets[num_buckets + 1]);
     RGBF_load_pair(src, x, y + 1, device.settings.width, buckets[num_buckets + 2], buckets[num_buckets + 3]);
     num_buckets += 4;
@@ -357,7 +357,7 @@ LUMINARY_KERNEL void temporal_accumulation_output_0() {
       output = add_color(output, direct);
     }
 
-    store_RGBF(device.ptrs.frame_accumulate, x + y * device.settings.width, output);
+    store_RGBF(device.ptrs.frame_current_result, x + y * device.settings.width, output);
   }
 }
 
@@ -436,8 +436,8 @@ LUMINARY_KERNEL void temporal_accumulation_output_1() {
       output11 = add_color(output11, direct11);
     }
 
-    RGBF_store_pair(device.ptrs.frame_accumulate, base_x, base_y, device.settings.width, output00, output01);
-    RGBF_store_pair(device.ptrs.frame_accumulate, base_x, base_y + 1, device.settings.width, output10, output11);
+    RGBF_store_pair(device.ptrs.frame_current_result, base_x, base_y, device.settings.width, output00, output01);
+    RGBF_store_pair(device.ptrs.frame_current_result, base_x, base_y + 1, device.settings.width, output10, output11);
   }
 }
 
@@ -464,13 +464,13 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
     // Direct Lighting
     RGBF direct_buffer = temporal_gather_pixel(
       device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
-    RGBF direct_output = load_RGBF(device.ptrs.frame_accumulate + offset);
+    RGBF direct_output = load_RGBF(device.ptrs.frame_current_result + offset);
 
     direct_output = scale_color(direct_output, prev_scale);
     direct_output = add_color(direct_output, direct_buffer);
     direct_output = scale_color(direct_output, curr_inv_scale);
 
-    store_RGBF(device.ptrs.frame_accumulate, offset, direct_output);
+    store_RGBF(device.ptrs.frame_current_result, offset, direct_output);
   }
 }
 

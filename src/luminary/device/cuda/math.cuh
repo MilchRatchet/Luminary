@@ -827,37 +827,60 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   return result;
 }
 
-__device__ float color_decompress(const uint16_t value) {
+__device__ float color_decompress_impl(const uint32_t value, const uint32_t exponent_bits, const uint32_t mantissa_bits) {
+  const uint32_t mantissa_mask = ((1 << mantissa_bits) - 1);
+
   const uint32_t source_bits = value;
 
-  const uint32_t exponent_offset = ((1 << 7) - 1) - ((1 << 5) - 1);
+  const uint32_t exponent_offset = ((1 << 7) - 1) - ((1 << (exponent_bits - 1)) - 1);
 
-  const uint32_t exponent = (source_bits >> 10) + exponent_offset;
+  const uint32_t exponent = (source_bits >> mantissa_bits) + exponent_offset;
 
-  const uint32_t bits = (exponent << 23) | ((source_bits & 0x3FF) << 13);
+  const uint32_t bits = (exponent << 23) | ((source_bits & mantissa_mask) << (23 - mantissa_bits));
 
   return __uint_as_float(bits);
 }
 
-__device__ uint16_t color_compress(const float value) {
+__device__ uint32_t color_compress_impl(const float value, const uint32_t exponent_bits, const uint32_t mantissa_bits) {
   if (value <= 0.0f)
     return 0;
 
+  const uint32_t exponent_mask = ((1 << exponent_bits) - 1);
+  const uint32_t mantissa_mask = ((1 << mantissa_bits) - 1);
+
   const uint32_t source_bits = __float_as_uint(value);
 
-  const uint32_t exponent_offset = ((1 << 7) - 1) - ((1 << 5) - 1);
+  const uint32_t exponent_offset = ((1 << 7) - 1) - ((1 << (exponent_bits - 1)) - 1);
 
   // Add half an ulp to round instead of truncate.
-  const uint32_t mantissa = (((source_bits & 0x7FFFFF) + (1 << 12)) >> 13);
+  const uint32_t mantissa = (((source_bits & 0x7FFFFF) + (1 << (23 - mantissa_bits - 1))) >> (23 - mantissa_bits));
 
   // If the mantissa overflowed, we need to increment the exponent and shift the mantissa.
-  const uint32_t mantissa_overflow = mantissa >> 10;
+  const uint32_t mantissa_overflow = mantissa >> mantissa_bits;
 
-  const uint32_t exponent = min(max(source_bits >> 23, exponent_offset) - exponent_offset + mantissa_overflow, 0x3F);
+  const uint32_t exponent = min(max(source_bits >> 23, exponent_offset) - exponent_offset + mantissa_overflow, exponent_mask);
 
-  const uint32_t bits = (exponent << 10) | (mantissa & 0x3FF);
+  const uint32_t bits = (exponent << mantissa_bits) | (mantissa & mantissa_mask);
 
   return bits;
+}
+
+__device__ RGBF color_decompress_e6m10(const RGB_E6M10 data) {
+  RGBF color;
+  color.r = color_decompress_impl(data.r, 6, 10);
+  color.g = color_decompress_impl(data.g, 6, 10);
+  color.b = color_decompress_impl(data.b, 6, 10);
+
+  return color;
+}
+
+__device__ RGB_E6M10 color_compress_e6m10(const RGBF color) {
+  RGB_E6M10 data;
+  data.r = color_compress_impl(color.r, 6, 10);
+  data.g = color_compress_impl(color.g, 6, 10);
+  data.b = color_compress_impl(color.b, 6, 10);
+
+  return data;
 }
 
 //

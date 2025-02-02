@@ -64,7 +64,7 @@ struct KernelArgsParticleGenerate {
 } typedef KernelArgsParticleGenerate;
 
 struct KernelArgsGenerateFinalImage {
-  CompressedRGBF* src;
+  RGBF* src;
   RGBF color_correction;
   AGXCustomParams agx_params;
 } typedef KernelArgsGenerateFinalImage;
@@ -77,30 +77,30 @@ struct KernelArgsConvertRGBFToARGB8 {
 } typedef KernelArgsConvertRGBFToARGB8;
 
 struct KernelArgsCameraPostImageDownsample {
-  const CompressedRGBF* src;
+  const RGBF* src;
   uint32_t sw;
   uint32_t sh;
-  CompressedRGBF* dst;
+  RGBF* dst;
   uint32_t tw;
   uint32_t th;
 } typedef KernelArgsCameraPostImageDownsample;
 
 struct KernelArgsCameraPostImageDownsampleThreshold {
-  const CompressedRGBF* src;
+  const RGBF* src;
   uint32_t sw;
   uint32_t sh;
-  CompressedRGBF* dst;
+  RGBF* dst;
   uint32_t tw;
   uint32_t th;
   float threshold;
 } typedef KernelArgsCameraPostImageDownsampleThreshold;
 
 struct KernelArgsCameraPostImageUpsample {
-  const CompressedRGBF* src;
+  const RGBF* src;
   uint32_t sw;
   uint32_t sh;
-  CompressedRGBF* dst;
-  const CompressedRGBF* base;
+  RGBF* dst;
+  const RGBF* base;
   uint32_t tw;
   uint32_t th;
   float sa;
@@ -108,19 +108,19 @@ struct KernelArgsCameraPostImageUpsample {
 } typedef KernelArgsCameraPostImageUpsample;
 
 struct KernelArgsCameraPostLensFlareGhosts {
-  const CompressedRGBF* src;
+  const RGBF* src;
   uint32_t sw;
   uint32_t sh;
-  CompressedRGBF* dst;
+  RGBF* dst;
   uint32_t tw;
   uint32_t th;
 } typedef KernelArgsCameraPostLensFlareGhosts;
 
 struct KernelArgsCameraPostLensFlareHalo {
-  const CompressedRGBF* src;
+  const RGBF* src;
   uint32_t sw;
   uint32_t sh;
-  CompressedRGBF* dst;
+  RGBF* dst;
   uint32_t tw;
   uint32_t th;
 } typedef KernelArgsCameraPostLensFlareHalo;

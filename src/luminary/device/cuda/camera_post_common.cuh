@@ -6,8 +6,8 @@
 #include "utils.cuh"
 #include "utils.h"
 
-__device__ RGBF sample_pixel(
-  const CompressedRGBF* image, const float x, const float y, const uint32_t width, const uint32_t height, const float mem_scale = 1.0f) {
+__device__ RGBF
+  sample_pixel(const RGBF* image, const float x, const float y, const uint32_t width, const uint32_t height, const float mem_scale = 1.0f) {
   const float source_x = fmaxf(0.0f, x * (width - 1)) * mem_scale;
   const float source_y = fmaxf(0.0f, y * (height - 1)) * mem_scale;
 
@@ -44,8 +44,7 @@ __device__ RGBF sample_pixel(
   return result;
 }
 
-__device__ RGBF
-  sample_pixel_clamp(const CompressedRGBF* image, float x, float y, const int width, const int height, const float mem_scale = 1.0f) {
+__device__ RGBF sample_pixel_clamp(const RGBF* image, float x, float y, const int width, const int height, const float mem_scale = 1.0f) {
   x = fmaxf(x, 0.0f);
   y = fmaxf(y, 0.0f);
 
@@ -56,7 +55,7 @@ __device__ RGBF
   return sample_pixel(image, x, y, width, height, mem_scale);
 }
 
-__device__ RGBF sample_pixel_border(const CompressedRGBF* image, float x, float y, const int width, const int height) {
+__device__ RGBF sample_pixel_border(const RGBF* image, float x, float y, const int width, const int height) {
   if (x > __uint_as_float(0b00111111011111111111111111111111) || x < 0.0f) {
     return get_color(0.0f, 0.0f, 0.0f);
   }
