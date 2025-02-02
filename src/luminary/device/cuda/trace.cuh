@@ -12,7 +12,7 @@ __device__ float trace_preprocess(const DeviceTask task, TriangleHandle& handle_
   handle_result = triangle_handle_get(HIT_TYPE_SKY, 0);
 
   if (device.ocean.active) {
-    if (task.origin.y < OCEAN_MIN_HEIGHT && task.origin.y > OCEAN_MAX_HEIGHT) {
+    if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
       const float far_distance = ocean_far_distance(task.origin, task.ray);
 
       if (far_distance < depth) {
