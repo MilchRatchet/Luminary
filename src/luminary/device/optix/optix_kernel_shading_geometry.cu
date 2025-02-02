@@ -111,7 +111,7 @@ extern "C" __global__ void __raygen__optix() {
     // behaviour on my side.
     if (task_russian_roulette(bounce_task, bounce_record)) {
       task_store(bounce_task, get_task_address(trace_count++));
-      store_RGBF(device.ptrs.records + pixel, bounce_record);
+      store_RGBF(device.ptrs.records, pixel, bounce_record);
     }
   }
 

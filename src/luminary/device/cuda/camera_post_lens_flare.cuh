@@ -41,7 +41,7 @@ LUMINARY_KERNEL void camera_post_lens_flare_ghosts(const KernelArgsCameraPostLen
       pixel = add_color(pixel, ghost);
     }
 
-    store_RGBF(args.dst + x + y * args.tw, pixel);
+    store_RGBF(args.dst, x + y * args.tw, pixel);
 
     id += blockDim.x * gridDim.x;
   }
@@ -105,7 +105,7 @@ LUMINARY_KERNEL void camera_post_lens_flare_halo(const KernelArgsCameraPostLensF
 
     const RGBF pixel = get_color(pr.r, pg.g, pb.b);
 
-    store_RGBF(args.dst + x + y * args.tw, pixel);
+    store_RGBF(args.dst, x + y * args.tw, pixel);
 
     id += blockDim.x * gridDim.x;
   }

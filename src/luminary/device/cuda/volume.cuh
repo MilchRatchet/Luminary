@@ -106,7 +106,7 @@ LUMINARY_KERNEL void volume_process_events() {
 
     trace_depth_store(depth, offset);
     triangle_handle_store(handle, offset);
-    store_RGBF(device.ptrs.records + pixel, record);
+    store_RGBF(device.ptrs.records, pixel, record);
   }
 }
 

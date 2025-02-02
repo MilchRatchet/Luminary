@@ -81,10 +81,10 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
     const uint32_t pixel = get_pixel_id(task.index);
 
-    device.ptrs.records[pixel] = get_color(1.0f, 1.0f, 1.0f);
+    store_RGBF(device.ptrs.records, pixel, splat_color(1.0f));
 
-    device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
-    device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    device.ptrs.frame_direct_buffer[pixel]   = {};
+    device.ptrs.frame_indirect_buffer[pixel] = {};
 
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
@@ -195,7 +195,7 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
 
     const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
 
-    store_RGBF(device.ptrs.records + pixel, record);
+    store_RGBF(device.ptrs.records, pixel, record);
     write_beauty_buffer(inscattering, pixel, task.state);
   }
 }
@@ -376,7 +376,7 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
     }
 
     const uint32_t dst_index = x + y * output_width;
-    store_RGBF(device.ptrs.frame_final + dst_index, color);
+    store_RGBF(device.ptrs.frame_final, dst_index, color);
   }
 }
 

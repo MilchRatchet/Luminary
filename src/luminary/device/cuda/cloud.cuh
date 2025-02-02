@@ -346,7 +346,7 @@ LUMINARY_KERNEL void cloud_process_tasks() {
       }
     }
 
-    store_RGBF(device.ptrs.records + pixel, record);
+    store_RGBF(device.ptrs.records, pixel, record);
     write_beauty_buffer(color, pixel, task.state);
   }
 }

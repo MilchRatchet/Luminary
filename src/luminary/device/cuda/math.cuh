@@ -827,6 +827,39 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   return result;
 }
 
+__device__ float color_decompress(const uint16_t value) {
+  const uint32_t source_bits = value;
+
+  const uint32_t exponent_offset = ((1 << 7) - 1) - ((1 << 5) - 1);
+
+  const uint32_t exponent = (source_bits >> 10) + exponent_offset;
+
+  const uint32_t bits = (exponent << 23) | ((source_bits & 0x3FF) << 13);
+
+  return __uint_as_float(bits);
+}
+
+__device__ uint16_t color_compress(const float value) {
+  if (value <= 0.0f)
+    return 0;
+
+  const uint32_t source_bits = __float_as_uint(value);
+
+  const uint32_t exponent_offset = ((1 << 7) - 1) - ((1 << 5) - 1);
+
+  // Add half an ulp to round instead of truncate.
+  const uint32_t mantissa = (((source_bits & 0x7FFFFF) + (1 << 12)) >> 13);
+
+  // If the mantissa overflowed, we need to increment the exponent and shift the mantissa.
+  const uint32_t mantissa_overflow = mantissa >> 10;
+
+  const uint32_t exponent = min(max(source_bits >> 23, exponent_offset) - exponent_offset + mantissa_overflow, 0x3F);
+
+  const uint32_t bits = (exponent << 10) | (mantissa & 0x3FF);
+
+  return bits;
+}
+
 //
 // Linear RGB / sRGB conversion taken from https://www.shadertoy.com/view/lsd3zN
 // which is based os D3DX implementations
