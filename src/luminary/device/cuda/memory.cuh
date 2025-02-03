@@ -466,6 +466,17 @@ __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
   return float4_to_tex_converter.tex;
 }
 
+__device__ Star star_load(const uint32_t offset) {
+  union {
+    float4 data;
+    Star star;
+  } converter;
+
+  converter.data = __ldg((float4*) (device.ptrs.stars + offset));
+
+  return converter.star;
+}
+
 //===========================================================================================
 // Defaults
 //===========================================================================================

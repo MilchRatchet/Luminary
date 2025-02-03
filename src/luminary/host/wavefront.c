@@ -721,13 +721,6 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   return LUMINARY_SUCCESS;
 }
 
-// TODO: Remove, this was used for WavefrontMaterial -> PackedMaterial conversion.
-#if 0
-static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
-  return (uint16_t) (f * 0xFFFF + 0.5f);
-}
-#endif
-
 static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, ARRAYPTR Material** materials, ARRAYPTR Texture*** textures) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(materials);

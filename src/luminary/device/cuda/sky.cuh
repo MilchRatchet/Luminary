@@ -480,8 +480,7 @@ __device__ Spectrum sky_compute_atmosphere(
       const uint32_t b = __ldg(device.ptrs.stars_offsets + grid + 1);
 
       for (uint32_t i = a; i < b; i++) {
-        // TODO: Load using vector instructions.
-        const Star star     = device.ptrs.stars[i];
+        const Star star     = star_load(i);
         const vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
 
         if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
