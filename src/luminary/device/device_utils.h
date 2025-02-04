@@ -208,12 +208,14 @@ struct GBufferMetaData {
 } typedef GBufferMetaData;
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
 
-struct RGB_E6M10 {
-  uint16_t r;
-  uint16_t g;
-  uint16_t b;
-} typedef RGB_E6M10;
-LUM_STATIC_SIZE_ASSERT(RGB_E6M10, 0x06);
+struct RGB_E6M20 {
+  uint16_t v0;
+  uint16_t v1;
+  uint16_t v2;
+  uint16_t v3;
+  uint16_t v4;
+} typedef RGB_E6M20;
+LUM_STATIC_SIZE_ASSERT(RGB_E6M20, 0x0A);
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
@@ -261,14 +263,13 @@ struct DevicePointers {
   DEVICE uint16_t* task_offsets;
   DEVICE uint32_t* ior_stack;
   DEVICE RGBF* frame_current_result;
-  DEVICE RGB_E6M10* frame_direct_buffer;
-  DEVICE RGB_E6M10* frame_direct_accumulate;
-  DEVICE RGB_E6M10* frame_indirect_buffer;
-  DEVICE RGB_E6M10* frame_indirect_accumulate[MAX_NUM_INDIRECT_BUCKETS];
+  DEVICE RGB_E6M20* frame_direct_buffer;
+  DEVICE RGB_E6M20* frame_direct_accumulate;
+  DEVICE RGB_E6M20* frame_indirect_buffer;
+  DEVICE RGB_E6M20* frame_indirect_accumulate[MAX_NUM_INDIRECT_BUCKETS];
   DEVICE RGBF* frame_final;
   DEVICE GBufferMetaData* gbuffer_meta;
-  DEVICE RGB_E6M10* records;
-  DEVICE ARGB8* buffer_8bit;
+  DEVICE RGB_E6M20* records;
   DEVICE const DeviceTextureObject* textures;
   DEVICE const uint16_t* bluenoise_1D;
   DEVICE const uint32_t* bluenoise_2D;
