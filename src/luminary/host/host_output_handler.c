@@ -210,6 +210,10 @@ static LuminaryResult _output_handler_get_handle_for_write(OutputHandler* output
     if (object->reference_count)
       continue;
 
+    // This output is from a request and has not been accessed yet, don't overwrite it.
+    if (object->promise_reference != OUTPUT_HANDLE_INVALID)
+      continue;
+
     // Handles that use other dimensions are always eligible for overwriting.
     const bool handle_is_still_valid = ((object->descriptor.meta_data.width == descriptor.meta_data.width)
                                         && (object->descriptor.meta_data.height == descriptor.meta_data.height))
@@ -325,7 +329,7 @@ LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, Ou
     break;
   }
 
-  if (selected_promise_handle) {
+  if (selected_promise_handle == OUTPUT_HANDLE_INVALID) {
     __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Tried to create an output for a request that has no promise.");
   }
 
@@ -346,8 +350,7 @@ LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, Ou
 
   OutputPromise* promise = output->promises + selected_promise_handle;
 
-  promise->pending = true;
-  promise->handle  = selected_handle;
+  promise->handle = selected_handle;
 
   OutputObject* selected_output = output->objects + selected_handle;
 
