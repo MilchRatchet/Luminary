@@ -128,6 +128,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(scene, scene_entity_to_mutex[entity]))
 
+  bool passive_dirty     = false;
   bool output_dirty      = false;
   bool integration_dirty = false;
   bool buffers_dirty     = false;
@@ -149,8 +150,8 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
       scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_OCEAN : 0;
       break;
     case SCENE_ENTITY_SKY:
-      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &integration_dirty, &hdri_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_SKY : 0;
+      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
+      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (passive_dirty || integration_dirty || hdri_dirty) ? SCENE_DIRTY_FLAG_SKY : 0;
       break;
     case SCENE_ENTITY_CLOUD:
       __FAILURE_HANDLE_CRITICAL(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &integration_dirty));
@@ -176,7 +177,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   // We need to always update the scene because certain changes might not cause anything to be dirty.
   __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, object, entity));
 
-  if (output_dirty || integration_dirty || buffers_dirty) {
+  if (passive_dirty || output_dirty || integration_dirty || buffers_dirty || hdri_dirty) {
     *scene_changed = true;
   }
 

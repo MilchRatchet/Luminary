@@ -242,7 +242,7 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
     /* FIREFLYC */
     case 4852993938162862406u:
       sscanf(value, "%u\n", &bool_uint);
-      camera->do_firefly_clamping = bool_uint;
+      camera->do_firefly_rejection = bool_uint;
       break;
     /* FILMGRAI */
     case 5278590704447932742u:
@@ -362,7 +362,6 @@ static LuminaryResult parse_sky_settings(Sky* sky, char* line) {
       break;
     /* HDRIDIM_ */
     case 6867225564446606408u:
-      sscanf(value, "%u\n", &sky->settings_hdri_dim);
       sscanf(value, "%u\n", &sky->hdri_dim);
       break;
     /* HDRISAMP */
@@ -371,7 +370,7 @@ static LuminaryResult parse_sky_settings(Sky* sky, char* line) {
       break;
     /* HDRIMIPB */
     case 4778399800931533896u:
-      sscanf(value, "%f\n", &sky->hdri_mip_bias);
+      // Deprecated
       break;
     /* HDRIORIG */
     case 5136727350478783560u:

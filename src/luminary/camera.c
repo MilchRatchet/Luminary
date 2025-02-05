@@ -42,7 +42,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->color_correction.r         = 0.0f;
   camera->color_correction.g         = 0.0f;
   camera->color_correction.b         = 0.0f;
-  camera->do_firefly_clamping        = false;
+  camera->do_firefly_rejection       = false;
   camera->indirect_only              = false;
   camera->film_grain                 = 0.0f;
 
@@ -105,7 +105,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_OUTPUT_DIRTY(purkinje_kappa2);
   __CAMERA_OUTPUT_DIRTY(use_color_correction);
   __CAMERA_OUTPUT_DIRTY(film_grain);
-  __CAMERA_OUTPUT_DIRTY(do_firefly_clamping);
+  __CAMERA_OUTPUT_DIRTY(do_firefly_rejection);
   __CAMERA_OUTPUT_DIRTY(indirect_only);
 
   if (input->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {

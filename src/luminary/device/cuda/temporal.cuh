@@ -338,7 +338,7 @@ LUMINARY_KERNEL void temporal_accumulation_output_0() {
 
     RGBF output;
 
-    if (device.camera.do_firefly_clamping) {
+    if (device.camera.do_firefly_rejection) {
       output = temporal_apply_median_of_means(buckets, num_buckets);
     }
     else {
@@ -393,7 +393,7 @@ LUMINARY_KERNEL void temporal_accumulation_output_1() {
     RGBF output10;
     RGBF output11;
 
-    if (device.camera.do_firefly_clamping) {
+    if (device.camera.do_firefly_rejection) {
       const RGBF indirect_output = temporal_apply_median_of_means(buckets, num_buckets);
 
       output00 = indirect_output;

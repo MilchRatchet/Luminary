@@ -61,11 +61,12 @@ LuminaryResult sky_lut_update(SkyLUT* lut, const Sky* sky) {
   __CHECK_NULL_ARGUMENT(lut);
   __CHECK_NULL_ARGUMENT(sky);
 
-  bool is_dirty   = false;
-  bool hdri_dirty = false;
-  __FAILURE_HANDLE(sky_check_for_dirty(sky, &lut->sky, &is_dirty, &hdri_dirty));
+  bool passive_dirty     = false;
+  bool integration_dirty = false;
+  bool hdri_dirty        = false;
+  __FAILURE_HANDLE(sky_check_for_dirty(sky, &lut->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
 
-  if (is_dirty) {
+  if (integration_dirty) {
     memcpy(&lut->sky, sky, sizeof(Sky));
     lut->sky_is_dirty = true;
   }
@@ -230,6 +231,7 @@ LuminaryResult sky_hdri_create(SkyHDRI** hdri) {
   __CHECK_NULL_ARGUMENT(hdri);
 
   __FAILURE_HANDLE(host_malloc(hdri, sizeof(SkyHDRI)));
+  memset(*hdri, 0, sizeof(SkyHDRI));
 
   (*hdri)->sky_is_dirty    = true;
   (*hdri)->output_is_dirty = true;
@@ -238,9 +240,6 @@ LuminaryResult sky_hdri_create(SkyHDRI** hdri) {
   __FAILURE_HANDLE(sample_count_set(&(*hdri)->sample_count, 16));
   __FAILURE_HANDLE(sky_get_default(&(*hdri)->sky));
 
-  __FAILURE_HANDLE(texture_create(&(*hdri)->color_tex, 128, 128, 1, (void*) 0, TexDataFP32, 4));
-  __FAILURE_HANDLE(texture_create(&(*hdri)->shadow_tex, 128, 128, 1, (void*) 0, TexDataFP32, 1));
-
   return LUMINARY_SUCCESS;
 }
 
@@ -248,24 +247,19 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(sky);
 
-  bool is_dirty   = false;
-  bool hdri_dirty = false;
-  __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &is_dirty, &hdri_dirty));
+  bool passive_dirty     = false;
+  bool integration_dirty = false;
+  bool hdri_dirty        = false;
+  __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
 
-  if (is_dirty) {
+  if (passive_dirty || integration_dirty) {
     memcpy(&hdri->sky, sky, sizeof(Sky));
     hdri->sky_is_dirty = true;
 
     const uint32_t width  = sky->hdri_dim;
     const uint32_t height = sky->hdri_dim;
 
-    if (hdri->color_tex->width != width || hdri->color_tex->height != height) {
-      __FAILURE_HANDLE(texture_destroy(&hdri->color_tex));
-      __FAILURE_HANDLE(texture_destroy(&hdri->shadow_tex));
-
-      __FAILURE_HANDLE(texture_create(&hdri->color_tex, width, height, 1, (void*) 0, TexDataFP32, 4));
-      __FAILURE_HANDLE(texture_create(&hdri->shadow_tex, width, height, 1, (void*) 0, TexDataFP32, 1));
-
+    if (hdri->color_tex == ((Texture*) 0) || hdri->color_tex->width != width || hdri->color_tex->height != height) {
       hdri->output_is_dirty = true;
     }
 
@@ -323,17 +317,20 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
 
   if (requires_rendering) {
     if (hdri->output_is_dirty) {
-      if (hdri->color_tex->data) {
-        __FAILURE_HANDLE(host_free(&hdri->color_tex->data));
+      if (hdri->color_tex) {
+        __FAILURE_HANDLE(texture_destroy(&hdri->color_tex));
       }
 
-      if (hdri->shadow_tex->data) {
-        __FAILURE_HANDLE(host_free(&hdri->shadow_tex->data));
+      if (hdri->shadow_tex) {
+        __FAILURE_HANDLE(texture_destroy(&hdri->shadow_tex));
       }
     }
 
     if (hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
       if (hdri->output_is_dirty) {
+        __FAILURE_HANDLE(texture_create(&hdri->color_tex, hdri->sky.hdri_dim, hdri->sky.hdri_dim, 1, (void*) 0, TexDataFP32, 4));
+        __FAILURE_HANDLE(texture_create(&hdri->shadow_tex, hdri->sky.hdri_dim, hdri->sky.hdri_dim, 1, (void*) 0, TexDataFP32, 1));
+
         __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
         __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->pitch * sizeof(float) * hdri->shadow_tex->height));
       }

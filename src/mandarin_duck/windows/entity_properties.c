@@ -275,7 +275,7 @@ static bool _window_entity_properties_camera_action(Window* window, Display* dis
       _window_entity_properties_add_slider(data, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   }
 
-  update_data |= _window_entity_properties_add_checkbox(data, "Firefly Clamping", &camera.do_firefly_clamping);
+  update_data |= _window_entity_properties_add_checkbox(data, "Firefly Rejection", &camera.do_firefly_rejection);
   update_data |= _window_entity_properties_add_checkbox(data, "Only Indirect Lighting", &camera.indirect_only);
   update_data |= _window_entity_properties_add_slider(
     data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
@@ -346,11 +346,11 @@ static bool _window_entity_properties_ocean_action(Window* window, Display* disp
     update_data |=
       _window_entity_properties_add_slider(data, "Height", &ocean.height, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
     update_data |=
-      _window_entity_properties_add_slider(data, "Amplitude", &ocean.amplitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      _window_entity_properties_add_slider(data, "Amplitude", &ocean.amplitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |=
-      _window_entity_properties_add_slider(data, "Frequency", &ocean.frequency, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      _window_entity_properties_add_slider(data, "Frequency", &ocean.frequency, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |=
-      _window_entity_properties_add_slider(data, "Choppyness", &ocean.choppyness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      _window_entity_properties_add_slider(data, "Choppyness", &ocean.choppyness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |=
       _window_entity_properties_add_slider(data, "IOR", &ocean.refractive_index, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
     update_data |= _window_entity_properties_add_dropdown(
@@ -401,11 +401,27 @@ static bool _window_entity_properties_sky_action(Window* window, Display* displa
 
   switch ((LuminarySkyMode) mode) {
     case LUMINARY_SKY_MODE_HDRI:
-      if (_window_entity_properties_add_button(data, "Compute HDRI")) {
+      element_separator(
+        window, mouse_state,
+        (ElementSeparatorArgs) {.text = "HDRI Settings",
+                                .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
+      update_data |=
+        _window_entity_properties_add_slider(data, "Origin", &sky.hdri_origin, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Resolution", &sky.hdri_dim, ELEMENT_SLIDER_DATA_TYPE_UINT, 0, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Sample Count", &sky.hdri_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0, FLT_MAX, 1.0f);
+      if (_window_entity_properties_add_button(data, "Build")) {
         LUM_FAILURE_HANDLE(luminary_host_request_sky_hdri_build(host));
       }
     case LUMINARY_SKY_MODE_DEFAULT:
     default:
+      element_separator(
+        window, mouse_state,
+        (ElementSeparatorArgs) {.text = "Atmosphere and Celestials",
+                                .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+
       update_data |= _window_entity_properties_add_slider(
         data, "Geometry Offset", &sky.geometry_offset, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
       update_data |=

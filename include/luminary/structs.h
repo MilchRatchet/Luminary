@@ -159,7 +159,7 @@ LUMINARY_API struct LuminaryCamera {
   float russian_roulette_threshold;
   bool use_color_correction;
   LuminaryRGBF color_correction;
-  bool do_firefly_clamping;
+  bool do_firefly_rejection;
   float film_grain;
   bool indirect_only;
 } typedef LuminaryCamera;
@@ -233,13 +233,9 @@ struct LuminarySky {
   float ground_visibility;
   float ozone_layer_thickness;
   float multiscattering_factor;
-  bool lut_initialized;
-  bool hdri_initialized;
   uint32_t hdri_dim;
-  uint32_t settings_hdri_dim;
   uint32_t hdri_samples;
   LuminaryVec3 hdri_origin;
-  float hdri_mip_bias;
   bool aerial_perspective;
   LuminaryRGBF constant_color;
   bool ambient_sampling;

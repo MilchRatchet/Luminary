@@ -27,7 +27,7 @@ struct DeviceCamera {
   uint32_t dithering : 1;
   uint32_t purkinje : 1;
   uint32_t use_color_correction : 1;
-  uint32_t do_firefly_clamping : 1;
+  uint32_t do_firefly_rejection : 1;
   uint32_t indirect_only : 1;
 
   vec3 pos;
@@ -84,10 +84,9 @@ struct DeviceSky {
   vec3 sun_pos;
   vec3 moon_pos;
   vec3 hdri_origin;
-  float hdri_mip_bias;
   RGBF constant_color;
 } typedef DeviceSky;
-LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x78u);
+LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x74u);
 
 struct DeviceCloudLayer {
   float height_max;

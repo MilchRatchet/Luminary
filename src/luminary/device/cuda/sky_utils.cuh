@@ -45,14 +45,14 @@ __device__ bool sky_ray_hits_sun(const vec3 origin_sky, const vec3 ray) {
   return sphere_ray_intersection(ray, origin_sky, device.sky.sun_pos, SKY_SUN_RADIUS) != FLT_MAX;
 }
 
-__device__ RGBF sky_hdri_sample(const vec3 ray, const float mip_bias) {
+__device__ RGBF sky_hdri_sample(const vec3 ray) {
   const float theta = atan2f(ray.z, ray.x);
   const float phi   = asinf(ray.y);
 
   const float u = (theta + PI) / (2.0f * PI);
   const float v = 1.0f - ((phi + 0.5f * PI) / PI);
 
-  const float4 hdri = tex2DLod<float4>(device.sky_hdri_color_tex.handle, u, v, mip_bias + device.sky.hdri_mip_bias);
+  const float4 hdri = tex2D<float4>(device.sky_hdri_color_tex.handle, u, v);
 
   return get_color(hdri.x, hdri.y, hdri.z);
 }

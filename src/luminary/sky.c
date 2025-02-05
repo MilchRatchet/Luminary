@@ -27,15 +27,11 @@ LuminaryResult sky_get_default(Sky* sky) {
   sky->steps                  = 40;
   sky->ozone_absorption       = true;
   sky->aerial_perspective     = false;
-  sky->lut_initialized        = 0;
-  sky->hdri_initialized       = 0;
-  sky->hdri_dim               = 0;
-  sky->settings_hdri_dim      = 2048;
+  sky->hdri_dim               = 2048;
   sky->hdri_samples           = 50;
   sky->hdri_origin.x          = 0.0f;
   sky->hdri_origin.y          = 1.0f;
   sky->hdri_origin.z          = 0.0f;
-  sky->hdri_mip_bias          = 0.0f;
   sky->stars_seed             = 0;
   sky->stars_count            = 10000;
   sky->stars_intensity        = 1.0f;
@@ -51,29 +47,43 @@ LuminaryResult sky_get_default(Sky* sky) {
 #define __SKY_DIRTY(var)          \
   {                               \
     if (input->var != old->var) { \
-      *dirty = true;              \
+      *integration_dirty = true;  \
       return LUMINARY_SUCCESS;    \
     }                             \
   }
 
-#define __SKY_DIRTY_HDRI(var)                              \
-  {                                                        \
-    if (input->var != old->var) {                          \
-      *dirty      = true;                                  \
-      *hdri_dirty = input->mode == LUMINARY_SKY_MODE_HDRI; \
-      return LUMINARY_SUCCESS;                             \
-    }                                                      \
+#define __SKY_DIRTY_HDRI(var)                               \
+  {                                                         \
+    if (input->var != old->var) {                           \
+      *integration_dirty = true;                            \
+      *hdri_dirty |= input->mode == LUMINARY_SKY_MODE_HDRI; \
+      return LUMINARY_SUCCESS;                              \
+    }                                                       \
   }
 
-LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* dirty, bool* hdri_dirty) {
+#define __SKY_DIRTY_PASSIVE_HDRI(var)                          \
+  {                                                            \
+    if (input->var != old->var) {                              \
+      *passive_dirty |= input->mode == LUMINARY_SKY_MODE_HDRI; \
+    }                                                          \
+  }
+
+LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* passive_dirty, bool* integration_dirty, bool* hdri_dirty) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(dirty);
+  __CHECK_NULL_ARGUMENT(integration_dirty);
 
-  *dirty      = false;
-  *hdri_dirty = false;
+  *passive_dirty     = false;
+  *integration_dirty = false;
+  *hdri_dirty        = false;
 
   __SKY_DIRTY_HDRI(mode);
+
+  __SKY_DIRTY_PASSIVE_HDRI(hdri_dim);
+  __SKY_DIRTY_PASSIVE_HDRI(hdri_samples);
+  __SKY_DIRTY_PASSIVE_HDRI(hdri_origin.x);
+  __SKY_DIRTY_PASSIVE_HDRI(hdri_origin.y);
+  __SKY_DIRTY_PASSIVE_HDRI(hdri_origin.z);
 
   __SKY_DIRTY(ambient_sampling);
 
@@ -111,7 +121,6 @@ LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* dirty
       __SKY_DIRTY(altitude);
       __SKY_DIRTY(azimuth);
       __SKY_DIRTY(sun_strength);
-      __SKY_DIRTY(hdri_mip_bias);
       __SKY_DIRTY(aerial_perspective);
       break;
     case LUMINARY_SKY_MODE_CONSTANT_COLOR:

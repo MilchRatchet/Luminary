@@ -60,7 +60,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->dithering            = camera->dithering;
   device_camera->purkinje             = camera->purkinje;
   device_camera->use_color_correction = camera->use_color_correction;
-  device_camera->do_firefly_clamping  = camera->do_firefly_clamping;
+  device_camera->do_firefly_rejection = camera->do_firefly_rejection;
   device_camera->indirect_only        = camera->indirect_only;
 
   device_camera->pos = camera->pos;
@@ -122,7 +122,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->ozone_layer_thickness  = sky->ozone_layer_thickness;
   device_sky->multiscattering_factor = sky->multiscattering_factor;
   device_sky->hdri_origin            = sky->hdri_origin;
-  device_sky->hdri_mip_bias          = sky->hdri_mip_bias;
   device_sky->constant_color         = sky->constant_color;
 
   ////////////////////////////////////////////////////////////////////
@@ -391,24 +390,22 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
 
   device_triangle->vertex_normal = _device_vec3_to_uint(triangle->vertex_normal);
 
-  const vec3 vertex1_normal = (vec3){
-    .x = triangle->vertex_normal.x + triangle->edge1_normal.x,
-    .y = triangle->vertex_normal.y + triangle->edge1_normal.y,
-    .z = triangle->vertex_normal.z + triangle->edge1_normal.z};
+  const vec3 vertex1_normal = (vec3) {.x = triangle->vertex_normal.x + triangle->edge1_normal.x,
+                                      .y = triangle->vertex_normal.y + triangle->edge1_normal.y,
+                                      .z = triangle->vertex_normal.z + triangle->edge1_normal.z};
 
-  const vec3 vertex2_normal = (vec3){
-    .x = triangle->vertex_normal.x + triangle->edge2_normal.x,
-    .y = triangle->vertex_normal.y + triangle->edge2_normal.y,
-    .z = triangle->vertex_normal.z + triangle->edge2_normal.z};
+  const vec3 vertex2_normal = (vec3) {.x = triangle->vertex_normal.x + triangle->edge2_normal.x,
+                                      .y = triangle->vertex_normal.y + triangle->edge2_normal.y,
+                                      .z = triangle->vertex_normal.z + triangle->edge2_normal.z};
 
   device_triangle->vertex1_normal = _device_vec3_to_uint(vertex1_normal);
   device_triangle->vertex2_normal = _device_vec3_to_uint(vertex2_normal);
 
   const UV vertex1_texture =
-    (UV){.u = triangle->vertex_texture.u + triangle->edge1_texture.u, .v = triangle->vertex_texture.v + triangle->edge1_texture.v};
+    (UV) {.u = triangle->vertex_texture.u + triangle->edge1_texture.u, .v = triangle->vertex_texture.v + triangle->edge1_texture.v};
 
   const UV vertex2_texture =
-    (UV){.u = triangle->vertex_texture.u + triangle->edge2_texture.u, .v = triangle->vertex_texture.v + triangle->edge2_texture.v};
+    (UV) {.u = triangle->vertex_texture.u + triangle->edge2_texture.u, .v = triangle->vertex_texture.v + triangle->edge2_texture.v};
 
   device_triangle->vertex_texture  = _device_UV_to_uint(triangle->vertex_texture);
   device_triangle->vertex1_texture = _device_UV_to_uint(vertex1_texture);
