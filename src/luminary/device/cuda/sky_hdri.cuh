@@ -25,7 +25,7 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     const int x = id - y * args.dim;
 
     const ushort2 pixel_coords = make_ushort2(x, y);
-    const uint32_t pixel       = x + y * args.dim;
+    const uint32_t pixel       = x + y * args.ld;
 
     const float2 jitter = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
 

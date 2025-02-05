@@ -285,6 +285,7 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   args.dst_color    = DEVICE_PTR(device_hdri->color_tex->memory);
   args.dst_shadow   = DEVICE_PTR(device_hdri->shadow_tex->memory);
   args.dim          = hdri->sky.hdri_dim;
+  args.ld           = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
   args.origin       = hdri->sky.hdri_origin;
   args.sample_count = hdri->sky.hdri_samples;
 
