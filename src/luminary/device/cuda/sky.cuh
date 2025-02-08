@@ -600,12 +600,12 @@ LUMINARY_KERNEL void sky_process_tasks() {
     RGBF sky = sky_color_main(task.origin, task.ray, task.state, pixel, task.index);
     sky      = mul_color(sky, record);
 
-    uint8_t state = task.state;
-
-    if (device.state.depth == 1)
-      state = state | STATE_FLAG_DELTA_PATH;
-
-    write_beauty_buffer(sky, pixel, state);
+    if (device.state.depth <= 1) {
+      write_beauty_buffer_direct(sky, pixel);
+    }
+    else {
+      write_beauty_buffer(sky, pixel, task.state);
+    }
   }
 }
 

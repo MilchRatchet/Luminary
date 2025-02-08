@@ -48,7 +48,7 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
-  const uint32_t bucket_id       = device.state.sample_id % device.settings.num_indirect_buckets;
+  const uint32_t bucket_id       = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
   RGB_E6M20* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
@@ -80,8 +80,8 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 }
 
 __device__ uint32_t temporal_get_bucket_sample_count(const uint32_t bucket_id) {
-  const uint32_t overall_sample_count           = device.state.sample_id / device.settings.num_indirect_buckets;
-  const uint32_t buckets_with_additional_sample = device.state.sample_id - overall_sample_count * device.settings.num_indirect_buckets;
+  const uint32_t overall_sample_count           = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
+  const uint32_t buckets_with_additional_sample = device.state.sample_id - overall_sample_count * MAX_NUM_INDIRECT_BUCKETS;
 
   return overall_sample_count + ((bucket_id < buckets_with_additional_sample) ? 1 : 0);
 }
@@ -96,7 +96,7 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   const float prev_scale     = device.state.sample_id;
   const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
 
-  const uint32_t bucket_id       = device.state.sample_id % device.settings.num_indirect_buckets;
+  const uint32_t bucket_id       = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
   RGB_E6M20* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
 
   const uint32_t bucket_sample_count = temporal_get_bucket_sample_count(bucket_id);
@@ -138,181 +138,153 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   }
 }
 
-__device__ void temporal_load_buckets_0(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
-  if (device.settings.num_indirect_buckets > bucket_id && device.state.sample_id > bucket_id) {
-    const RGB_E6M20* src   = device.ptrs.frame_indirect_accumulate[bucket_id];
-    buckets[num_buckets++] = load_RGBF(src + x + y * device.settings.width);
-  }
-}
-
-__device__ void temporal_load_buckets_1(uint32_t bucket_id, uint32_t x, uint32_t y, RGBF buckets[], uint32_t& num_buckets) {
-  if (device.settings.num_indirect_buckets > bucket_id && device.state.sample_id > bucket_id) {
+__device__ void temporal_load_buckets(
+  uint32_t bucket_id, uint32_t x, uint32_t y, float red[9 * MAX_NUM_INDIRECT_BUCKETS], float green[9 * MAX_NUM_INDIRECT_BUCKETS],
+  float blue[9 * MAX_NUM_INDIRECT_BUCKETS], uint32_t& num_buckets) {
+  if (device.state.sample_id > bucket_id) {
     const RGB_E6M20* src = device.ptrs.frame_indirect_accumulate[bucket_id];
-    RGBF_load_pair(src, x, y, device.settings.width, buckets[num_buckets + 0], buckets[num_buckets + 1]);
-    RGBF_load_pair(src, x, y + 1, device.settings.width, buckets[num_buckets + 2], buckets[num_buckets + 3]);
-    num_buckets += 4;
+
+    if (y) {
+      if (x) {
+        const RGBF color00 = load_RGBF(src + (x - 1) + (y - 1) * device.settings.width);
+
+        red[num_buckets]   = color00.r;
+        green[num_buckets] = color00.g;
+        blue[num_buckets]  = color00.b;
+        num_buckets++;
+      }
+
+      const RGBF color01 = load_RGBF(src + x + (y - 1) * device.settings.width);
+
+      red[num_buckets]   = color01.r;
+      green[num_buckets] = color01.g;
+      blue[num_buckets]  = color01.b;
+      num_buckets++;
+
+      if (x + 1 != device.settings.width) {
+        const RGBF color02 = load_RGBF(src + (x + 1) + (y - 1) * device.settings.width);
+
+        red[num_buckets]   = color02.r;
+        green[num_buckets] = color02.g;
+        blue[num_buckets]  = color02.b;
+        num_buckets++;
+      }
+    }
+
+    if (x) {
+      const RGBF color10 = load_RGBF(src + (x - 1) + y * device.settings.width);
+
+      red[num_buckets]   = color10.r;
+      green[num_buckets] = color10.g;
+      blue[num_buckets]  = color10.b;
+      num_buckets++;
+    }
+
+    const RGBF color11 = load_RGBF(src + x + y * device.settings.width);
+
+    red[num_buckets]   = color11.r;
+    green[num_buckets] = color11.g;
+    blue[num_buckets]  = color11.b;
+    num_buckets++;
+
+    if (x + 1 != device.settings.width) {
+      const RGBF color12 = load_RGBF(src + (x + 1) + y * device.settings.width);
+
+      red[num_buckets]   = color12.r;
+      green[num_buckets] = color12.g;
+      blue[num_buckets]  = color12.b;
+      num_buckets++;
+    }
+
+    if (y + 1 != device.settings.height) {
+      if (x) {
+        const RGBF color20 = load_RGBF(src + (x - 1) + (y + 1) * device.settings.width);
+
+        red[num_buckets]   = color20.r;
+        green[num_buckets] = color20.g;
+        blue[num_buckets]  = color20.b;
+        num_buckets++;
+      }
+
+      const RGBF color21 = load_RGBF(src + x + (y + 1) * device.settings.width);
+
+      red[num_buckets]   = color21.r;
+      green[num_buckets] = color21.g;
+      blue[num_buckets]  = color21.b;
+      num_buckets++;
+
+      if (x + 1 != device.settings.width) {
+        const RGBF color22 = load_RGBF(src + (x + 1) + (y + 1) * device.settings.width);
+
+        red[num_buckets]   = color22.r;
+        green[num_buckets] = color22.g;
+        blue[num_buckets]  = color22.b;
+        num_buckets++;
+      }
+    }
   }
 }
 
-__device__ RGBF temporal_apply_median_of_means(RGBF buckets[], const uint32_t num_buckets) {
-  // Sort red component
+__device__ float temporal_apply_median_of_means(float buckets[], const uint32_t num_buckets) {
+  // Sort
   {
     uint32_t i = 1;
 
     while (i < num_buckets) {
-      const float x = buckets[i].r;
+      const float x = buckets[i];
       uint32_t j    = i;
-      while (j > 0 && buckets[j - 1].r > x) {
-        buckets[j].r = buckets[j - 1].r;
+      while (j > 0 && buckets[j - 1] > x) {
+        buckets[j] = buckets[j - 1];
         j--;
       }
 
-      buckets[j].r = x;
+      buckets[j] = x;
       i++;
     }
   }
 
-  // Sort green component
-  {
-    uint32_t i = 1;
-
-    while (i < num_buckets) {
-      const float x = buckets[i].g;
-      uint32_t j    = i;
-      while (j > 0 && buckets[j - 1].g > x) {
-        buckets[j].g = buckets[j - 1].g;
-        j--;
-      }
-
-      buckets[j].g = x;
-      i++;
-    }
-  }
-
-  // Sort blue component
-  {
-    uint32_t i = 1;
-
-    while (i < num_buckets) {
-      const float x = buckets[i].b;
-      uint32_t j    = i;
-      while (j > 0 && buckets[j - 1].b > x) {
-        buckets[j].b = buckets[j - 1].b;
-        j--;
-      }
-
-      buckets[j].b = x;
-      i++;
-    }
-  }
-
-  RGBF output;
+  float output;
 
 #if 1
 
   // Gini - Median of Means
 
-  // MoN Red component
-  {
-    float num   = 0.0f;
-    float denom = 0.0f;
+  float num   = 0.0f;
+  float denom = 0.0f;
 
-    for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
-      const float value = buckets[bucket_id].r;
-      num += bucket_id * value;
-      denom += value;
-    }
-
-    num *= 2.0f;
-    denom *= num_buckets;
-
-    const float G = (num / denom) - (num_buckets + 1.0f) / num_buckets;
-
-    const uint32_t k = num_buckets >> 1;
-    const uint32_t c = k - (1.0f - G) * k;
-
-    float result = 0.0f;
-
-    for (uint32_t bucket_id = c; bucket_id < num_buckets - c; bucket_id++) {
-      result += buckets[bucket_id].r;
-    }
-
-    result /= num_buckets - 2 * c;
-
-    output.r = result;
+  for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
+    const float value = buckets[bucket_id];
+    num += bucket_id * value;
+    denom += value;
   }
 
-  // MoN Green component
-  {
-    float num   = 0.0f;
-    float denom = 0.0f;
+  num *= 2.0f;
+  denom *= num_buckets;
 
-    for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
-      const float value = buckets[bucket_id].g;
-      num += bucket_id * value;
-      denom += value;
-    }
+  const float G = (num / denom) - (num_buckets + 1.0f) / num_buckets;
 
-    num *= 2.0f;
-    denom *= num_buckets;
+  const uint32_t k = num_buckets >> 1;
+  const uint32_t c = k - (1.0f - G) * k;
 
-    const float G = (num / denom) - (num_buckets + 1.0f) / num_buckets;
+  output = 0.0f;
 
-    const uint32_t k = num_buckets >> 1;
-    const uint32_t c = k - (1.0f - G) * k;
-
-    float result = 0.0f;
-
-    for (uint32_t bucket_id = c; bucket_id < num_buckets - c; bucket_id++) {
-      result += buckets[bucket_id].g;
-    }
-
-    result /= num_buckets - 2 * c;
-
-    output.g = result;
+  for (uint32_t bucket_id = c; bucket_id < num_buckets - c; bucket_id++) {
+    output += buckets[bucket_id];
   }
 
-  // MoN Blue component
-  {
-    float num   = 0.0f;
-    float denom = 0.0f;
-
-    for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
-      const float value = buckets[bucket_id].b;
-      num += bucket_id * value;
-      denom += value;
-    }
-
-    num *= 2.0f;
-    denom *= num_buckets;
-
-    const float G = (num / denom) - (num_buckets + 1.0f) / num_buckets;
-
-    const uint32_t k = num_buckets >> 1;
-    const uint32_t c = k - (1.0f - G) * k;
-
-    float result = 0.0f;
-
-    for (uint32_t bucket_id = c; bucket_id < num_buckets - c; bucket_id++) {
-      result += buckets[bucket_id].b;
-    }
-
-    result /= num_buckets - 2 * c;
-
-    output.b = result;
-  }
+  output /= num_buckets - 2 * c;
 
 #else
 
   // Median of Means
-  output = get_color(buckets[num_buckets >> 1].r, buckets[num_buckets >> 1].g, buckets[num_buckets >> 1].b);
+  output = buckets[num_buckets >> 1];
 
 #endif
 
   return output;
 }
 
-LUMINARY_KERNEL void temporal_accumulation_output_0() {
+LUMINARY_KERNEL void temporal_accumulation_output() {
   HANDLE_DEVICE_ABORT();
 
   const uint32_t width  = device.settings.width;
@@ -324,32 +296,19 @@ LUMINARY_KERNEL void temporal_accumulation_output_0() {
     const uint32_t y = offset / width;
     const uint32_t x = offset - y * width;
 
+    float red[9 * MAX_NUM_INDIRECT_BUCKETS];
+    float green[9 * MAX_NUM_INDIRECT_BUCKETS];
+    float blue[9 * MAX_NUM_INDIRECT_BUCKETS];
     uint32_t num_buckets = 0;
-    RGBF buckets[4 * 8];
 
-    temporal_load_buckets_0(0, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(1, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(2, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(3, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(4, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(5, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(6, x, y, buckets, num_buckets);
-    temporal_load_buckets_0(7, x, y, buckets, num_buckets);
+    temporal_load_buckets(0, x, y, red, green, blue, num_buckets);
+    temporal_load_buckets(1, x, y, red, green, blue, num_buckets);
+    temporal_load_buckets(2, x, y, red, green, blue, num_buckets);
 
     RGBF output;
-
-    if (device.camera.do_firefly_rejection) {
-      output = temporal_apply_median_of_means(buckets, num_buckets);
-    }
-    else {
-      output = get_color(0.0f, 0.0f, 0.0f);
-
-      for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
-        output = add_color(output, buckets[bucket_id]);
-      }
-
-      output = scale_color(output, 1.0f / num_buckets);
-    }
+    output.r = temporal_apply_median_of_means(red, num_buckets);
+    output.g = temporal_apply_median_of_means(green, num_buckets);
+    output.b = temporal_apply_median_of_means(blue, num_buckets);
 
     if (device.camera.indirect_only == false) {
       const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + x + y * device.settings.width);
@@ -361,83 +320,36 @@ LUMINARY_KERNEL void temporal_accumulation_output_0() {
   }
 }
 
-LUMINARY_KERNEL void temporal_accumulation_output_1() {
+LUMINARY_KERNEL void temporal_accumulation_output_raw() {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t width  = device.settings.width >> device.settings.supersampling;
-  const uint32_t height = device.settings.height >> device.settings.supersampling;
+  const uint32_t width  = device.settings.width;
+  const uint32_t height = device.settings.height;
 
   const uint32_t amount = width * height;
+
+  const uint32_t num_buckets = min(MAX_NUM_INDIRECT_BUCKETS, device.state.sample_id + 1);
+  const float bucket_norm    = 1.0f / num_buckets;
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / width;
     const uint32_t x = offset - y * width;
 
-    const uint32_t base_x = x << device.settings.supersampling;
-    const uint32_t base_y = y << device.settings.supersampling;
+    RGBF output = splat_color(0.0f);
 
-    uint32_t num_buckets = 0;
-    RGBF buckets[4 * 8];
-
-    temporal_load_buckets_1(0, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(1, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(2, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(3, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(4, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(5, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(6, base_x, base_y, buckets, num_buckets);
-    temporal_load_buckets_1(7, base_x, base_y, buckets, num_buckets);
-
-    RGBF output00;
-    RGBF output01;
-    RGBF output10;
-    RGBF output11;
-
-    if (device.camera.do_firefly_rejection) {
-      const RGBF indirect_output = temporal_apply_median_of_means(buckets, num_buckets);
-
-      output00 = indirect_output;
-      output01 = indirect_output;
-      output10 = indirect_output;
-      output11 = indirect_output;
+    for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
+      output = add_color(output, load_RGBF(device.ptrs.frame_indirect_accumulate[bucket_id] + x + y * device.settings.width));
     }
-    else {
-      output00 = get_color(0.0f, 0.0f, 0.0f);
-      output01 = get_color(0.0f, 0.0f, 0.0f);
-      output10 = get_color(0.0f, 0.0f, 0.0f);
-      output11 = get_color(0.0f, 0.0f, 0.0f);
 
-      for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id += 4) {
-        output00 = add_color(output00, buckets[bucket_id + 0]);
-        output01 = add_color(output01, buckets[bucket_id + 1]);
-        output10 = add_color(output10, buckets[bucket_id + 2]);
-        output11 = add_color(output11, buckets[bucket_id + 3]);
-      }
-
-      output00 = scale_color(output00, 4.0f / num_buckets);
-      output01 = scale_color(output01, 4.0f / num_buckets);
-      output10 = scale_color(output10, 4.0f / num_buckets);
-      output11 = scale_color(output11, 4.0f / num_buckets);
-    }
+    output = scale_color(output, bucket_norm);
 
     if (device.camera.indirect_only == false) {
-      RGBF direct00;
-      RGBF direct01;
-      RGBF_load_pair(device.ptrs.frame_direct_accumulate, base_x, base_y, device.settings.width, direct00, direct01);
+      const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + x + y * device.settings.width);
 
-      output00 = add_color(output00, direct00);
-      output01 = add_color(output01, direct01);
-
-      RGBF direct10;
-      RGBF direct11;
-      RGBF_load_pair(device.ptrs.frame_direct_accumulate, base_x, base_y + 1, device.settings.width, direct10, direct11);
-
-      output10 = add_color(output10, direct10);
-      output11 = add_color(output11, direct11);
+      output = add_color(output, direct);
     }
 
-    RGBF_store_pair(device.ptrs.frame_current_result, base_x, base_y, device.settings.width, output00, output01);
-    RGBF_store_pair(device.ptrs.frame_current_result, base_x, base_y + 1, device.settings.width, output10, output11);
+    store_RGBF(device.ptrs.frame_current_result, x + y * device.settings.width, output);
   }
 }
 

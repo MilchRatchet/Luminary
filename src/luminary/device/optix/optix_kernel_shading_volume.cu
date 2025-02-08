@@ -63,16 +63,13 @@ extern "C" __global__ void __raygen__optix() {
       accumulated_light,
       optix_compute_light_ray_ambient_sky(data, bounce_ray, bounce_info.weight, bounce_info.is_transparent_pass, task.index));
 
+    if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (device.ocean.triangle_light_contribution || volume_type != VOLUME_TYPE_OCEAN)) {
+      accumulated_light = add_color(accumulated_light, bridges_sample(task, volume));
+    }
+
     accumulated_light = mul_color(accumulated_light, record);
 
-    write_beauty_buffer(accumulated_light, pixel, task.state);
-
-    if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (device.ocean.triangle_light_contribution || volume_type != VOLUME_TYPE_OCEAN)) {
-      RGBF bridge_color = bridges_sample(task, volume);
-      bridge_color      = mul_color(bridge_color, record);
-
-      write_beauty_buffer_indirect(bridge_color, pixel);
-    }
+    write_beauty_buffer_indirect(accumulated_light, pixel);
 
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite

@@ -248,7 +248,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
 
 typedef DeviceLightTreeNode LightTreeNode8Packed;
 
-#define MAX_NUM_INDIRECT_BUCKETS 8
+#define MAX_NUM_INDIRECT_BUCKETS 3
 
 ////////////////////////////////////////////////////////////////////
 // Globals

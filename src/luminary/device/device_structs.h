@@ -16,9 +16,8 @@ struct DeviceRendererSettings {
 
   uint16_t width;
   uint16_t height;
-  uint16_t num_indirect_buckets;
 } typedef DeviceRendererSettings;
-LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x0Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x08u);
 
 struct DeviceCamera {
   uint32_t aperture_shape : 1;

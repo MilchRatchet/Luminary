@@ -320,13 +320,13 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
           else {
             __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE], device->stream_main));
 
-            if (device->constant_memory->settings.supersampling == 0) {
-              __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_0], device->stream_main));
-            }
-            else if (device->constant_memory->settings.supersampling == 1) {
-              __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_1], device->stream_main));
+            // TODO: This is only needed when outputting
+            if (device->constant_memory->camera.do_firefly_rejection) {
+              __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT], device->stream_main));
             }
             else {
+              __FAILURE_HANDLE(
+                kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_RAW], device->stream_main));
             }
           }
         }

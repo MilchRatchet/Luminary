@@ -559,14 +559,8 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGB_E6M20) * internal_pixel_count);
 
-  const uint32_t num_indirect_buckets = device->constant_memory->settings.num_indirect_buckets;
-
-  for (uint32_t bucket_id = 0; bucket_id < num_indirect_buckets; bucket_id++) {
+  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
     __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate[bucket_id], sizeof(RGB_E6M20) * internal_pixel_count);
-  }
-
-  for (uint32_t bucket_id = num_indirect_buckets; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __DEVICE_BUFFER_FREE(frame_indirect_accumulate[bucket_id]);
   }
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
