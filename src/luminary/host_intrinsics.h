@@ -26,17 +26,17 @@ _STATIC_ASSERT(sizeof(Vec128) == 16);
 
 inline Vec128 vec128_set_1(const float a) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_set1_ps(a)};
+  return (Vec128) {._imm = _mm_set1_ps(a)};
 #else
-  return (Vec128){.x = a, .y = a, .z = a, .w = a};
+  return (Vec128) {.x = a, .y = a, .z = a, .w = a};
 #endif
 }
 
 inline Vec128 vec128_set(const float x, const float y, const float z, const float w) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_set_ps(w, z, y, x)};
+  return (Vec128) {._imm = _mm_set_ps(w, z, y, x)};
 #else
-  return (Vec128){.x = x, .y = y, .z = z, .w = w};
+  return (Vec128) {.x = x, .y = y, .z = z, .w = w};
 #endif
 }
 
@@ -51,39 +51,47 @@ inline bool vec128_is_equal(const Vec128 a, const Vec128 b) {
 
 inline Vec128 vec128_add(const Vec128 a, const Vec128 b) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_add_ps(a._imm, b._imm)};
+  return (Vec128) {._imm = _mm_add_ps(a._imm, b._imm)};
 #else
-  return (Vec128){.x = a.x + b.x, .y = a.y + b.y, .z = a.z + b.z, .w = a.w + b.w};
+  return (Vec128) {.x = a.x + b.x, .y = a.y + b.y, .z = a.z + b.z, .w = a.w + b.w};
 #endif
 }
 
 inline Vec128 vec128_sub(const Vec128 a, const Vec128 b) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_sub_ps(a._imm, b._imm)};
+  return (Vec128) {._imm = _mm_sub_ps(a._imm, b._imm)};
 #else
-  return (Vec128){.x = a.x - b.x, .y = a.y - b.y, .z = a.z - b.z, .w = a.w - b.w};
+  return (Vec128) {.x = a.x - b.x, .y = a.y - b.y, .z = a.z - b.z, .w = a.w - b.w};
 #endif
 }
 
 inline Vec128 vec128_mul(const Vec128 a, const Vec128 b) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_mul_ps(a._imm, b._imm)};
+  return (Vec128) {._imm = _mm_mul_ps(a._imm, b._imm)};
 #else
-  return (Vec128){.x = a.x * b.x, .y = a.y * b.y, .z = a.z * b.z, .w = a.w * b.w};
+  return (Vec128) {.x = a.x * b.x, .y = a.y * b.y, .z = a.z * b.z, .w = a.w * b.w};
+#endif
+}
+
+inline Vec128 vec128_scale(const Vec128 a, const float b) {
+#ifdef LUMINARY_X86_INTRINSICS
+  return (Vec128) {._imm = _mm_mul_ps(a._imm, vec128_set_1(b)._imm)};
+#else
+  return (Vec128) {.x = a.x * b, .y = a.y * b, .z = a.z * b, .w = a.w * b};
 #endif
 }
 
 inline Vec128 vec128_fmadd(const Vec128 a, const Vec128 b, const Vec128 c) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_fmadd_ps(a._imm, b._imm, c._imm)};
+  return (Vec128) {._imm = _mm_fmadd_ps(a._imm, b._imm, c._imm)};
 #else
-  return (Vec128){.x = a.x * b.x + c.x, .y = a.y * b.y + c.y, .z = a.z * b.z + c.z, .w = a.w * b.w + c.w};
+  return (Vec128) {.x = a.x * b.x + c.x, .y = a.y * b.y + c.y, .z = a.z * b.z + c.z, .w = a.w * b.w + c.w};
 #endif
 }
 
 inline Vec128 vec128_cross(const Vec128 a, const Vec128 b) {
   // TODO: Implement this with shuffles.
-  return (Vec128){.x = a.y * b.z - a.z * b.y, .y = a.z * b.x - a.x * b.z, .z = a.x * b.y - a.y * b.x, .w = 0.0f};
+  return (Vec128) {.x = a.y * b.z - a.z * b.y, .y = a.z * b.x - a.x * b.z, .z = a.x * b.y - a.y * b.x, .w = 0.0f};
 }
 
 inline float vec128_hsum(const Vec128 a) {
@@ -100,25 +108,25 @@ inline float vec128_hsum(const Vec128 a) {
 
 inline Vec128 vec128_min(const Vec128 a, const Vec128 b) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_min_ps(a._imm, b._imm)};
+  return (Vec128) {._imm = _mm_min_ps(a._imm, b._imm)};
 #else
-  return (Vec128){.x = fminf(a.x, b.x), .y = fminf(a.y, b.y), .z = fminf(a.z, b.z), .w = fminf(a.w, b.w)};
+  return (Vec128) {.x = fminf(a.x, b.x), .y = fminf(a.y, b.y), .z = fminf(a.z, b.z), .w = fminf(a.w, b.w)};
 #endif
 }
 
 inline Vec128 vec128_max(const Vec128 a, const Vec128 b) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_max_ps(a._imm, b._imm)};
+  return (Vec128) {._imm = _mm_max_ps(a._imm, b._imm)};
 #else
-  return (Vec128){.x = fmaxf(a.x, b.x), .y = fmaxf(a.y, b.y), .z = fmaxf(a.z, b.z), .w = fmaxf(a.w, b.w)};
+  return (Vec128) {.x = fmaxf(a.x, b.x), .y = fmaxf(a.y, b.y), .z = fmaxf(a.z, b.z), .w = fmaxf(a.w, b.w)};
 #endif
 }
 
 inline Vec128 vec128_load(const float* ptr) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_loadu_ps(ptr)};
+  return (Vec128) {._imm = _mm_loadu_ps(ptr)};
 #else
-  return (Vec128){.x = ptr[0], .y = ptr[1], .z = ptr[2], .w = ptr[3]};
+  return (Vec128) {.x = ptr[0], .y = ptr[1], .z = ptr[2], .w = ptr[3]};
 #endif
 }
 
@@ -148,9 +156,9 @@ inline Vec128 vec128_set_w_to_0(const Vec128 a) {
 #ifdef LUMINARY_X86_INTRINSICS
   Vec128 zero;
   zero._imm = _mm_xor_ps(zero._imm, zero._imm);
-  return (Vec128){._imm = _mm_blend_ps(a._imm, zero._imm, 0b1000)};
+  return (Vec128) {._imm = _mm_blend_ps(a._imm, zero._imm, 0b1000)};
 #else
-  return (Vec128){.x = a.x, .y = a.y, .z = a.z, .w = 0.0f};
+  return (Vec128) {.x = a.x, .y = a.y, .z = a.z, .w = 0.0f};
 #endif
 }
 
@@ -175,12 +183,28 @@ inline float vec128_norm2(const Vec128 a) {
  */
 inline float vec128_box_area(const Vec128 a) {
 #ifdef LUMINARY_X86_INTRINSICS
-  const Vec128 b = (Vec128){._imm = _mm_shuffle_ps(a._imm, a._imm, _MM_SHUFFLE(3, 1, 0, 0))};
-  const Vec128 c = (Vec128){._imm = _mm_shuffle_ps(a._imm, a._imm, _MM_SHUFFLE(3, 2, 2, 1))};
+  const Vec128 b = (Vec128) {._imm = _mm_shuffle_ps(a._imm, a._imm, _MM_SHUFFLE(3, 1, 0, 0))};
+  const Vec128 c = (Vec128) {._imm = _mm_shuffle_ps(a._imm, a._imm, _MM_SHUFFLE(3, 2, 2, 1))};
   return vec128_hsum(vec128_mul(b, c));
 #else
   return a.x * a.y + a.x * a.z + a.y * a.z
 #endif
+}
+
+/*
+ * Rotate a 3 component vector given by a using the quaternion given by q.
+ */
+inline Vec128 vec128_rotate_quaternion(const Vec128 a, const Vec128 q) {
+  const float dot_qa = a.x * q.x + a.y * q.y + a.z * q.z;
+  const float dot_qq = q.x * q.x + q.y * q.y + q.z * q.z;
+
+  const Vec128 cross = vec128_cross(q, a);
+
+  Vec128 result = vec128_scale(q, 2.0f * dot_qa);
+  result        = vec128_add(result, vec128_scale(a, q.w * q.w - dot_qq));
+  result        = vec128_add(result, vec128_scale(cross, 2.0f * q.w));
+
+  return result;
 }
 
 #endif /* LUMINARY_HOST_INTRINSICS_H */

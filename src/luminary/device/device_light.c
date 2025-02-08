@@ -1462,6 +1462,10 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
 
   LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
 
+  const Vec128 offset   = vec128_set(instance->translation.x, instance->translation.y, instance->translation.z, 0.0f);
+  const Vec128 scale    = vec128_set(instance->scale.x, instance->scale.y, instance->scale.z, 1.0f);
+  const Vec128 rotation = vec128_set(-instance->rotation.x, -instance->rotation.y, -instance->rotation.z, instance->rotation.w);
+
   if (instance->fragments) {
     __FAILURE_HANDLE(array_destroy(&instance->fragments));
   }
@@ -1507,16 +1511,20 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
     for (uint32_t tri_id = 0; tri_id < num_material_triangles; tri_id++) {
       const LightTreeCacheTriangle* triangle = material_triangles + tri_id;
 
-      // TODO: Apply instance transformation.
+      const Vec128 vertex  = vec128_add(vec128_mul(vec128_rotate_quaternion(triangle->vertex, rotation), scale), offset);
+      const Vec128 vertex1 = vec128_add(vec128_mul(vec128_rotate_quaternion(triangle->vertex1, rotation), scale), offset);
+      const Vec128 vertex2 = vec128_add(vec128_mul(vec128_rotate_quaternion(triangle->vertex2, rotation), scale), offset);
 
-      const float area = 0.5f * vec128_norm2(triangle->cross);
+      const Vec128 cross = vec128_cross(vec128_sub(vertex1, vertex), vec128_sub(vertex2, vertex));
+
+      const float area = 0.5f * vec128_norm2(cross);
 
       if (area == 0.0f)
         continue;
 
       LightTreeFragment fragment;
-      fragment.low         = vec128_min(triangle->vertex, vec128_min(triangle->vertex1, triangle->vertex2));
-      fragment.high        = vec128_max(triangle->vertex, vec128_max(triangle->vertex1, triangle->vertex2));
+      fragment.low         = vec128_min(vertex, vec128_min(vertex1, vertex2));
+      fragment.high        = vec128_max(vertex, vec128_max(vertex1, vertex2));
       fragment.middle      = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
       fragment.power       = material->constant_emission_intensity * area;
       fragment.instance_id = instance_id;
@@ -1527,9 +1535,9 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       __FAILURE_HANDLE(array_push(&instance->fragments, &fragment));
 
       LightTreeBVHTriangle bvh_triangle;
-      bvh_triangle.vertex  = triangle->vertex;
-      bvh_triangle.vertex1 = triangle->vertex1;
-      bvh_triangle.vertex2 = triangle->vertex2;
+      bvh_triangle.vertex  = vertex;
+      bvh_triangle.vertex1 = vertex1;
+      bvh_triangle.vertex2 = vertex2;
 
       __FAILURE_HANDLE(array_push(&instance->bvh_triangles, &bvh_triangle));
     }
