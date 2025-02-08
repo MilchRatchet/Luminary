@@ -230,8 +230,6 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     build_input.triangleArray.numSbtRecords   = 1;
     build_input.triangleArray.opacityMicromap = omm->optix_build_input;
 
-    // Reminder: OptiX requires pointers to be null if there is no data for the OMM and DMM.
-
     ////////////////////////////////////////////////////////////////////
     // Building BVH
     ////////////////////////////////////////////////////////////////////
@@ -436,8 +434,6 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   build_input.triangleArray.flags         = &inputFlags;
   build_input.triangleArray.numSbtRecords = 1;
 
-  // Reminder: OptiX requires pointers to be null if there is no data for the OMM and DMM.
-
   ////////////////////////////////////////////////////////////////////
   // Building BVH
   ////////////////////////////////////////////////////////////////////
@@ -542,8 +538,6 @@ LuminaryResult optix_bvh_particles_build(OptixBVH* bvh, Device* device, const De
 
   build_input.triangleArray.flags         = &inputFlags;
   build_input.triangleArray.numSbtRecords = 1;
-
-  // Reminder: OptiX requires pointers to be null if there is no data for the OMM and DMM.
 
   ////////////////////////////////////////////////////////////////////
   // Building BVH

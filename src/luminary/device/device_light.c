@@ -974,7 +974,7 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
     bvh_triangles[id] = instance->bvh_triangles[frag.instance_cache_tri_id];
 
-    const TriangleHandle handle = (TriangleHandle){.instance_id = frag.instance_id, .tri_id = frag.tri_id};
+    const TriangleHandle handle = (TriangleHandle) {.instance_id = frag.instance_id, .tri_id = frag.tri_id};
 
     tri_handle_map[id] = handle;
   }

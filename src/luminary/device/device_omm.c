@@ -245,7 +245,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   __FAILURE_HANDLE(host_free(&triangles_per_level));
 
   ////////////////////////////////////////////////////////////////////
-  // DMM array construction
+  // OMM array construction
   ////////////////////////////////////////////////////////////////////
 
   OptixOpacityMicromapArrayBuildInput array_build_input;
