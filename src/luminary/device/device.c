@@ -552,15 +552,17 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 6 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_current_result, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGB_E6M20) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGB_E6M20) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGB_E6M20) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGBF) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGBF) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * external_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGB_E6M20) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
 
   for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate[bucket_id], sizeof(RGB_E6M20) * internal_pixel_count);
+    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_red[bucket_id], sizeof(float) * internal_pixel_count);
+    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_green[bucket_id], sizeof(float) * internal_pixel_count);
+    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_blue[bucket_id], sizeof(float) * internal_pixel_count);
   }
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
@@ -607,7 +609,9 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(abort_flag);
 
   for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __DEVICE_BUFFER_FREE(frame_indirect_accumulate[bucket_id]);
+    __DEVICE_BUFFER_FREE(frame_indirect_accumulate_red[bucket_id]);
+    __DEVICE_BUFFER_FREE(frame_indirect_accumulate_green[bucket_id]);
+    __DEVICE_BUFFER_FREE(frame_indirect_accumulate_blue[bucket_id]);
   }
 
   return LUMINARY_SUCCESS;

@@ -139,12 +139,6 @@ __device__ RGBF load_RGBF(const RGBF* ptr) {
   return *ptr;
 }
 
-__device__ RGBF load_RGBF(const RGB_E6M20* ptr) {
-  const RGB_E6M20 data = *ptr;
-
-  return color_decompress_e6m10(data);
-}
-
 #ifdef UTILS_DEBUG_MODE
 
 __device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color, const char* func, uint32_t line) {
@@ -164,25 +158,6 @@ __device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF 
   buffer[offset] = sanitized_color;
 }
 
-__device__ void store_RGBF_impl(RGB_E6M20* buffer, const uint32_t offset, const RGBF color, const char* func, uint32_t line) {
-  RGBF sanitized_color = color;
-  if (is_non_finite(luminance(color))) {
-    // Debug code to identify paths that cause NaNs and INFs
-    ushort2 pixel;
-    pixel.y = (uint16_t) (offset / device.settings.width);
-    pixel.x = (uint16_t) (offset - pixel.y * device.settings.width);
-    printf(
-      "[%s:%u] Path at (%u, %u) at depth %u on frame %u ran into a NaN or INF: (%f %f %f)\n", func, line, pixel.x, pixel.y,
-      (uint32_t) device.state.depth, (uint32_t) device.state.sample_id, color.r, color.g, color.b);
-
-    sanitized_color = UTILS_DEBUG_NAN_COLOR;
-  }
-
-  RGB_E6M20 data = color_compress_e6m10(sanitized_color);
-
-  __stwt((uint2*) (buffer + offset), data.packed);
-}
-
 #define store_RGBF(__macro_buffer, __macro_offset, __macro_color) \
   store_RGBF_impl(__macro_buffer, __macro_offset, __macro_color, __func__, __LINE__)
 
@@ -194,62 +169,15 @@ __device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF 
   buffer[offset] = sanitized_color;
 }
 
-__device__ void store_RGBF_impl(RGB_E6M20* buffer, const uint32_t offset, const RGBF color) {
-  const RGBF sanitized_color = is_non_finite(luminance(color)) ? UTILS_DEBUG_NAN_COLOR : color;
-
-  RGB_E6M20 data = color_compress_e6m10(sanitized_color);
-
-  buffer[offset] = data;
-}
-
 #define store_RGBF(__macro_buffer, __macro_offset, __macro_color) store_RGBF_impl(__macro_buffer, __macro_offset, __macro_color)
 
 #endif /* !UTILS_DEBUG_MODE */
-
-__device__ void RGBF_load_pair(const RGB_E6M20* src, const uint32_t x, const uint32_t y, const uint32_t ld, RGBF& pixel0, RGBF& pixel1) {
-  const ushort2* src_ptr = (const ushort2*) (src + x + y * ld);
-
-  const ushort2 data0 = __ldg(src_ptr + 0);
-  const ushort2 data1 = __ldg(src_ptr + 1);
-  const ushort2 data2 = __ldg(src_ptr + 2);
-  const ushort2 data3 = __ldg(src_ptr + 3);
-  const ushort2 data4 = __ldg(src_ptr + 4);
-
-  RGB_E6M20 compressed_color0;
-  compressed_color0.v0 = data0.x;
-  compressed_color0.v1 = data0.y;
-  compressed_color0.v2 = data1.x;
-  compressed_color0.v3 = data1.y;
-  compressed_color0.v4 = data2.x;
-
-  RGB_E6M20 compressed_color1;
-  compressed_color1.v0 = data2.y;
-  compressed_color1.v1 = data3.x;
-  compressed_color1.v2 = data3.y;
-  compressed_color1.v3 = data4.x;
-  compressed_color1.v4 = data4.y;
-
-  pixel0 = color_decompress_e6m10(compressed_color0);
-  pixel1 = color_decompress_e6m10(compressed_color1);
-}
-
-__device__ void RGBF_store_pair(RGBF* dst, const uint32_t x, const uint32_t y, const uint32_t ld, const RGBF pixel0, const RGBF pixel1) {
-  float2* dst_ptr = (float2*) (dst + x + y * ld);
-
-  const float2 data0 = make_float2(pixel0.r, pixel0.g);
-  const float2 data1 = make_float2(pixel0.b, pixel1.r);
-  const float2 data2 = make_float2(pixel1.g, pixel1.b);
-
-  __stwt(dst_ptr + 0, data0);
-  __stwt(dst_ptr + 1, data1);
-  __stwt(dst_ptr + 2, data2);
-}
 
 ////////////////////////////////////////////////////////////////////
 // Beauty Buffer IO
 ////////////////////////////////////////////////////////////////////
 
-__device__ void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, const bool mode_set, RGB_E6M20* buffer) {
+__device__ void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, const bool mode_set, RGBF* buffer) {
   RGBF output = beauty;
   if (!mode_set) {
     output = add_color(beauty, load_RGBF(buffer + pixel));
@@ -268,7 +196,7 @@ __device__ void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t p
 __device__ void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state, const bool mode_set = false) {
   const bool is_direct = state & STATE_FLAG_DELTA_PATH;
 
-  RGB_E6M20* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
+  RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
 
   write_beauty_buffer_impl(beauty, pixel, mode_set, buffer);
 }

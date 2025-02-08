@@ -13,7 +13,7 @@ __device__ float temporal_gather_pixel_weight(const float x, const float y) {
 }
 
 __device__ RGBF temporal_gather_pixel_load(
-  const RGB_E6M20* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
+  const RGBF* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
   const float sample_y) {
   const uint32_t index_x = (uint32_t) max(min((int32_t) sample_x, width - 1), 0);
   const uint32_t index_y = (uint32_t) max(min((int32_t) sample_y, height - 1), 0);
@@ -29,7 +29,7 @@ __device__ RGBF temporal_gather_pixel_load(
 }
 
 __device__ RGBF temporal_gather_pixel(
-  const RGB_E6M20* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
+  const RGBF* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
   const uint32_t height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
@@ -48,8 +48,11 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
-  const uint32_t bucket_id       = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
-  RGB_E6M20* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
+  const uint32_t bucket_id = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
+
+  float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
+  float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
+  float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / device.settings.width;
@@ -71,7 +74,9 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
     RGBF indirect_buffer = temporal_gather_pixel(
       device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
 
-    store_RGBF(indirect_bucket_ptr, offset, indirect_buffer);
+    __stcs(indirect_bucket_ptr_red + offset, indirect_buffer.r);
+    __stcs(indirect_bucket_ptr_green + offset, indirect_buffer.g);
+    __stcs(indirect_bucket_ptr_blue + offset, indirect_buffer.b);
 
     RGBF output = add_color(direct_buffer, indirect_buffer);
 
@@ -96,8 +101,11 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   const float prev_scale     = device.state.sample_id;
   const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
 
-  const uint32_t bucket_id       = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
-  RGB_E6M20* indirect_bucket_ptr = device.ptrs.frame_indirect_accumulate[bucket_id];
+  const uint32_t bucket_id = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
+
+  float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
+  float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
+  float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
 
   const uint32_t bucket_sample_count = temporal_get_bucket_sample_count(bucket_id);
 
@@ -128,99 +136,55 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
     // Indirect Lighting
     RGBF indirect_buffer = temporal_gather_pixel(
       device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
-    RGBF indirect_output = load_RGBF(indirect_bucket_ptr + offset);
+
+    RGBF indirect_output;
+    indirect_output.r = __ldcs(indirect_bucket_ptr_red + offset);
+    indirect_output.g = __ldcs(indirect_bucket_ptr_green + offset);
+    indirect_output.b = __ldcs(indirect_bucket_ptr_blue + offset);
 
     indirect_output = scale_color(indirect_output, prev_indirect_scale);
     indirect_output = add_color(indirect_output, indirect_buffer);
     indirect_output = scale_color(indirect_output, curr_indirect_inv_scale);
 
-    store_RGBF(indirect_bucket_ptr, offset, indirect_output);
+    __stcs(indirect_bucket_ptr_red + offset, indirect_output.r);
+    __stcs(indirect_bucket_ptr_green + offset, indirect_output.g);
+    __stcs(indirect_bucket_ptr_blue + offset, indirect_output.b);
   }
 }
 
 __device__ void temporal_load_buckets(
-  uint32_t bucket_id, uint32_t x, uint32_t y, float red[9 * MAX_NUM_INDIRECT_BUCKETS], float green[9 * MAX_NUM_INDIRECT_BUCKETS],
-  float blue[9 * MAX_NUM_INDIRECT_BUCKETS], uint32_t& num_buckets) {
-  if (device.state.sample_id > bucket_id) {
-    const RGB_E6M20* src = device.ptrs.frame_indirect_accumulate[bucket_id];
-
-    if (y) {
-      if (x) {
-        const RGBF color00 = load_RGBF(src + (x - 1) + (y - 1) * device.settings.width);
-
-        red[num_buckets]   = color00.r;
-        green[num_buckets] = color00.g;
-        blue[num_buckets]  = color00.b;
-        num_buckets++;
-      }
-
-      const RGBF color01 = load_RGBF(src + x + (y - 1) * device.settings.width);
-
-      red[num_buckets]   = color01.r;
-      green[num_buckets] = color01.g;
-      blue[num_buckets]  = color01.b;
-      num_buckets++;
-
-      if (x + 1 != device.settings.width) {
-        const RGBF color02 = load_RGBF(src + (x + 1) + (y - 1) * device.settings.width);
-
-        red[num_buckets]   = color02.r;
-        green[num_buckets] = color02.g;
-        blue[num_buckets]  = color02.b;
-        num_buckets++;
-      }
-    }
-
+  const float* src, uint32_t x, uint32_t y, float values[9 * MAX_NUM_INDIRECT_BUCKETS], uint32_t& num_buckets) {
+  if (y) {
     if (x) {
-      const RGBF color10 = load_RGBF(src + (x - 1) + y * device.settings.width);
-
-      red[num_buckets]   = color10.r;
-      green[num_buckets] = color10.g;
-      blue[num_buckets]  = color10.b;
-      num_buckets++;
+      values[num_buckets++] = __ldcs(src + (x - 1) + (y - 1) * device.settings.width);
     }
 
-    const RGBF color11 = load_RGBF(src + x + y * device.settings.width);
-
-    red[num_buckets]   = color11.r;
-    green[num_buckets] = color11.g;
-    blue[num_buckets]  = color11.b;
-    num_buckets++;
+    values[num_buckets++] = __ldcs(src + x + (y - 1) * device.settings.width);
 
     if (x + 1 != device.settings.width) {
-      const RGBF color12 = load_RGBF(src + (x + 1) + y * device.settings.width);
+      values[num_buckets++] = __ldcs(src + (x + 1) + (y - 1) * device.settings.width);
+    }
+  }
 
-      red[num_buckets]   = color12.r;
-      green[num_buckets] = color12.g;
-      blue[num_buckets]  = color12.b;
-      num_buckets++;
+  if (x) {
+    values[num_buckets++] = __ldcs(src + (x - 1) + y * device.settings.width);
+  }
+
+  values[num_buckets++] = __ldcs(src + x + y * device.settings.width);
+
+  if (x + 1 != device.settings.width) {
+    values[num_buckets++] = __ldcs(src + (x + 1) + y * device.settings.width);
+  }
+
+  if (y + 1 != device.settings.height) {
+    if (x) {
+      values[num_buckets++] = __ldcs(src + (x - 1) + (y + 1) * device.settings.width);
     }
 
-    if (y + 1 != device.settings.height) {
-      if (x) {
-        const RGBF color20 = load_RGBF(src + (x - 1) + (y + 1) * device.settings.width);
+    values[num_buckets++] = __ldcs(src + x + (y + 1) * device.settings.width);
 
-        red[num_buckets]   = color20.r;
-        green[num_buckets] = color20.g;
-        blue[num_buckets]  = color20.b;
-        num_buckets++;
-      }
-
-      const RGBF color21 = load_RGBF(src + x + (y + 1) * device.settings.width);
-
-      red[num_buckets]   = color21.r;
-      green[num_buckets] = color21.g;
-      blue[num_buckets]  = color21.b;
-      num_buckets++;
-
-      if (x + 1 != device.settings.width) {
-        const RGBF color22 = load_RGBF(src + (x + 1) + (y + 1) * device.settings.width);
-
-        red[num_buckets]   = color22.r;
-        green[num_buckets] = color22.g;
-        blue[num_buckets]  = color22.b;
-        num_buckets++;
-      }
+    if (x + 1 != device.settings.width) {
+      values[num_buckets++] = __ldcs(src + (x + 1) + (y + 1) * device.settings.width);
     }
   }
 }
@@ -292,23 +256,33 @@ LUMINARY_KERNEL void temporal_accumulation_output() {
 
   const uint32_t amount = width * height;
 
+  float values[9 * MAX_NUM_INDIRECT_BUCKETS];
+  const uint32_t num_buckets_to_load = min(MAX_NUM_INDIRECT_BUCKETS, device.state.sample_id + 1);
+
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / width;
     const uint32_t x = offset - y * width;
 
-    float red[9 * MAX_NUM_INDIRECT_BUCKETS];
-    float green[9 * MAX_NUM_INDIRECT_BUCKETS];
-    float blue[9 * MAX_NUM_INDIRECT_BUCKETS];
-    uint32_t num_buckets = 0;
-
-    temporal_load_buckets(0, x, y, red, green, blue, num_buckets);
-    temporal_load_buckets(1, x, y, red, green, blue, num_buckets);
-    temporal_load_buckets(2, x, y, red, green, blue, num_buckets);
-
     RGBF output;
-    output.r = temporal_apply_median_of_means(red, num_buckets);
-    output.g = temporal_apply_median_of_means(green, num_buckets);
-    output.b = temporal_apply_median_of_means(blue, num_buckets);
+    uint32_t num_buckets;
+
+    num_buckets = 0;
+    for (uint32_t bucket_id = 0; bucket_id < num_buckets_to_load; bucket_id++) {
+      temporal_load_buckets(device.ptrs.frame_indirect_accumulate_red[bucket_id], x, y, values, num_buckets);
+    }
+    output.r = temporal_apply_median_of_means(values, num_buckets);
+
+    num_buckets = 0;
+    for (uint32_t bucket_id = 0; bucket_id < num_buckets_to_load; bucket_id++) {
+      temporal_load_buckets(device.ptrs.frame_indirect_accumulate_green[bucket_id], x, y, values, num_buckets);
+    }
+    output.g = temporal_apply_median_of_means(values, num_buckets);
+
+    num_buckets = 0;
+    for (uint32_t bucket_id = 0; bucket_id < num_buckets_to_load; bucket_id++) {
+      temporal_load_buckets(device.ptrs.frame_indirect_accumulate_blue[bucket_id], x, y, values, num_buckets);
+    }
+    output.b = temporal_apply_median_of_means(values, num_buckets);
 
     if (device.camera.indirect_only == false) {
       const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + x + y * device.settings.width);
@@ -332,24 +306,26 @@ LUMINARY_KERNEL void temporal_accumulation_output_raw() {
   const float bucket_norm    = 1.0f / num_buckets;
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
-    const uint32_t y = offset / width;
-    const uint32_t x = offset - y * width;
-
     RGBF output = splat_color(0.0f);
 
     for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
-      output = add_color(output, load_RGBF(device.ptrs.frame_indirect_accumulate[bucket_id] + x + y * device.settings.width));
+      RGBF indirect_output;
+      indirect_output.r = __ldcs(device.ptrs.frame_indirect_accumulate_red[bucket_id] + offset);
+      indirect_output.g = __ldcs(device.ptrs.frame_indirect_accumulate_green[bucket_id] + offset);
+      indirect_output.b = __ldcs(device.ptrs.frame_indirect_accumulate_blue[bucket_id] + offset);
+
+      output = add_color(output, indirect_output);
     }
 
     output = scale_color(output, bucket_norm);
 
     if (device.camera.indirect_only == false) {
-      const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + x + y * device.settings.width);
+      const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
       output = add_color(output, direct);
     }
 
-    store_RGBF(device.ptrs.frame_current_result, x + y * device.settings.width, output);
+    store_RGBF(device.ptrs.frame_current_result, offset, output);
   }
 }
 

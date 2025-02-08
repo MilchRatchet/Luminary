@@ -827,6 +827,7 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   return result;
 }
 
+// Unused, maybe useful in the future
 __device__ float color_decompress_impl(const uint32_t value, const uint32_t exponent_bits, const uint32_t mantissa_bits) {
   const uint32_t mantissa_mask = ((1 << mantissa_bits) - 1);
 
@@ -863,40 +864,6 @@ __device__ uint32_t color_compress_impl(const float value, const uint32_t expone
   const uint32_t bits = (exponent << mantissa_bits) | (mantissa & mantissa_mask);
 
   return bits;
-}
-
-__device__ RGBF color_decompress_e6m10(const RGB_E6M20 data) {
-  const uint32_t v0 = data.v0;
-  const uint32_t v1 = data.v1;
-  const uint32_t v2 = data.v2;
-  const uint32_t v3 = data.v3;
-  const uint32_t v4 = data.v4;
-
-  const uint32_t data_r = v0 | ((v1 & 0x3FF) << 16);
-  const uint32_t data_g = (v1 >> 10) | (v2 << 6) | ((v3 & 0xF) << 22);
-  const uint32_t data_b = (v3 >> 4) | (v4 << 12);
-
-  RGBF color;
-  color.r = color_decompress_impl(data_r, 6, 20);
-  color.g = color_decompress_impl(data_g, 6, 20);
-  color.b = color_decompress_impl(data_b, 6, 20);
-
-  return color;
-}
-
-__device__ RGB_E6M20 color_compress_e6m10(const RGBF color) {
-  const uint32_t data_r = color_compress_impl(color.r, 6, 20);
-  const uint32_t data_g = color_compress_impl(color.g, 6, 20);
-  const uint32_t data_b = color_compress_impl(color.b, 6, 20);
-
-  RGB_E6M20 data;
-  data.v0 = data_r & 0xFFFF;
-  data.v1 = (data_r >> 16) | ((data_g & 0x3F) << 10);
-  data.v2 = (data_g >> 6) & 0xFFFF;
-  data.v3 = (data_g >> 22) | ((data_b & 0xFFF) << 4);
-  data.v4 = (data_b >> 12);
-
-  return data;
 }
 
 //
