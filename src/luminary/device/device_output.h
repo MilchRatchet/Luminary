@@ -28,6 +28,7 @@ struct DeviceOutput {
   ARRAY DeviceOutputRequest* output_requests;
   RGBF color_correction;
   AGXCustomParams agx_params;
+  LuminaryFilter filter;
 } typedef DeviceOutput;
 
 DEVICE_CTX_FUNC LuminaryResult device_output_create(DeviceOutput** output);
