@@ -148,15 +148,15 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
   }
 
   window->context_stack_ptr = 0;
+  memset(window->separator_context_string, 0, WINDOW_SEPARATOR_CONTEXT_IDENTIFIER_SIZE);
 
-  window->context_stack[0] = (WindowContext){
-    .fill          = 0,
-    .x             = window->x,
-    .y             = window->y,
-    .width         = window->width,
-    .height        = window->height,
-    .padding       = window->padding,
-    .is_horizontal = window->is_horizontal};
+  window->context_stack[0] = (WindowContext) {.fill          = 0,
+                                              .x             = window->x,
+                                              .y             = window->y,
+                                              .width         = window->width,
+                                              .height        = window->height,
+                                              .padding       = window->padding,
+                                              .is_horizontal = window->is_horizontal};
 
   const bool elements_received_action = window->action_func(window, display, host, mouse_state);
   const bool is_mouse_hover           = window_is_mouse_hover(window, display, mouse_state);

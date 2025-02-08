@@ -105,17 +105,17 @@ LuminaryResult cloud_check_for_dirty(const Cloud* input, const Cloud* old, bool*
     __CLOUD_DIRTY(octaves);
 
     __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->low, &old->low, dirty));
-    if (dirty) {
+    if (*dirty) {
       return LUMINARY_SUCCESS;
     }
 
     __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->mid, &old->mid, dirty));
-    if (dirty) {
+    if (*dirty) {
       return LUMINARY_SUCCESS;
     }
 
     __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->top, &old->top, dirty));
-    if (dirty) {
+    if (*dirty) {
       return LUMINARY_SUCCESS;
     }
   }

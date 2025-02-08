@@ -40,12 +40,15 @@ bool element_separator(Window* window, const MouseState* mouse_state, ElementSep
 
   const size_t text_size = strlen(args.text);
 
-  if (text_size > 256) {
+  if (text_size > SEPARATOR_TEXT_SIZE - 1) {
     crash_message("Text is too long.");
   }
 
   memcpy(data->text, args.text, text_size);
-  memset(data->text + text_size, 0, 256 - text_size);
+  memset(data->text + text_size, 0, SEPARATOR_TEXT_SIZE - text_size);
+
+  memcpy(window->separator_context_string, args.text, text_size);
+  memset(window->separator_context_string + text_size, 0, SEPARATOR_TEXT_SIZE - text_size);
 
   ElementMouseResult mouse_result;
   element_apply_context(&text, context, &args.size, mouse_state, &mouse_result);

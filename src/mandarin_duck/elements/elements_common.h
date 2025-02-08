@@ -36,6 +36,6 @@ struct ElementMouseResult {
 
 void element_apply_context(
   Element* element, WindowContext* context, ElementSize* size, const MouseState* mouse_state, ElementMouseResult* mouse_result);
-uint64_t element_compute_hash(const char* identifier);
+uint64_t element_compute_hash(const char* context_indentifier, const char* identifier);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_COMMON_H */

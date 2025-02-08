@@ -182,7 +182,7 @@ bool element_slider(
 
   slider.type        = ELEMENT_TYPE_SLIDER;
   slider.render_func = _element_slider_render_func;
-  slider.hash        = element_compute_hash(args.identifier);
+  slider.hash        = element_compute_hash(window->separator_context_string, args.identifier);
 
   ElementSliderData* data = (ElementSliderData*) &slider.data;
 

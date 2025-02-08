@@ -2,6 +2,7 @@
 
 #include "display.h"
 #include "element.h"
+#include "hash.h"
 #include "ui_renderer_utils.h"
 #include "window.h"
 
@@ -61,33 +62,12 @@ void element_apply_context(
   }
 }
 
-uint64_t element_compute_hash(const char* identifier) {
-  if (identifier == (const char*) 0)
-    return 0;
+uint64_t element_compute_hash(const char* context_indentifier, const char* identifier) {
+  Hash hash;
+  hash_init(&hash);
 
-  size_t string_length = strlen(identifier);
+  hash_string(&hash, context_indentifier);
+  hash_string(&hash, identifier);
 
-  uint64_t hash = 0;
-
-  while (string_length >= 8) {
-    hash = element_hash_accumulate(hash, *(uint64_t*) identifier);
-
-    identifier    = identifier + 8;
-    string_length = string_length - 8;
-  }
-
-  if (string_length > 0) {
-    uint64_t value = 0;
-
-    while (string_length > 0) {
-      value |= ((uint64_t) (*identifier)) << (8 * string_length);
-
-      identifier    = identifier + 1;
-      string_length = string_length - 1;
-    }
-
-    hash = element_hash_accumulate(hash, value);
-  }
-
-  return hash;
+  return hash.hash;
 }

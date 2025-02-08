@@ -14,6 +14,7 @@ struct MouseState typedef MouseState;
 #define WINDOW_ROUNDING_SIZE 32
 #define WINDOW_DATA_SECTION_SIZE 4096
 #define WINDOW_STATE_STRING_SIZE 256
+#define WINDOW_SEPARATOR_CONTEXT_IDENTIFIER_SIZE 256
 
 #define WINDOW_VISIBILITY_CAPTION_CONTROLS 0b001
 #define WINDOW_VISIBILITY_STATUS 0b010
@@ -105,6 +106,7 @@ struct Window {
   uint8_t data[WINDOW_DATA_SECTION_SIZE];
   uint32_t context_stack_ptr;
   WindowContext context_stack[WINDOW_MAX_CONTEXT_DEPTH];
+  char separator_context_string[WINDOW_SEPARATOR_CONTEXT_IDENTIFIER_SIZE];
   Element* element_queue;
   uint8_t* background_blur_buffer;
   uint32_t background_blur_buffer_ld;

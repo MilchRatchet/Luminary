@@ -29,7 +29,7 @@ bool element_dropdown(Window* window, Display* display, const MouseState* mouse_
 
   dropdown.type        = ELEMENT_TYPE_DROPDOWN;
   dropdown.render_func = _element_dropdown_render_func;
-  dropdown.hash        = element_compute_hash(args.identifier);
+  dropdown.hash        = element_compute_hash(window->separator_context_string, args.identifier);
 
   ElementDropdownData* data = (ElementDropdownData*) &dropdown.data;
 
@@ -70,11 +70,10 @@ bool element_dropdown(Window* window, Display* display, const MouseState* mouse_
       subwindow_dropdown_add_string(window->external_subwindow, args.strings[string_id]);
     }
 
-    window->state_data = (WindowInteractionStateData){
-      .state              = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED,
-      .element_hash       = dropdown.hash,
-      .subelement_index   = 0,
-      .dropdown_selection = selected_index};
+    window->state_data = (WindowInteractionStateData) {.state              = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED,
+                                                       .element_hash       = dropdown.hash,
+                                                       .subelement_index   = 0,
+                                                       .dropdown_selection = selected_index};
   }
 
   if (mouse_result.is_hovered) {

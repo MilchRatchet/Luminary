@@ -1,6 +1,7 @@
 #include "text_renderer.h"
 
 #include "display.h"
+#include "hash.h"
 
 // TODO: Let Mandarin Duck have its own embedded files.
 void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
@@ -79,21 +80,24 @@ static TTF_Text* _text_renderer_acquire_text_instance(
   TextRenderer* text_renderer, const char* text, uint32_t font_id, const bool use_cache, bool* loaded_from_cache_ptr, size_t* hash_ptr) {
   TTF_Text* text_instance = (TTF_Text*) 0;
   bool loaded_from_cache  = false;
-  size_t hash             = 0;
+
+  Hash hash;
+  hash_init(&hash);
 
   if (use_cache) {
-    hash = _text_renderer_text_hash(text);
+    hash_string(&hash, text);
 
-    uint32_t entry = hash & TEXT_RENDERER_CACHE_SIZE_MASK;
+    uint32_t entry = hash.hash & TEXT_RENDERER_CACHE_SIZE_MASK;
 
     uint32_t offset = 0;
-    for (; text_renderer->cache.entries[(entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK].hash != hash && offset < TEXT_RENDERER_CACHE_SIZE;
-         offset++) {
+    while (text_renderer->cache.entries[(entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK].hash != hash.hash
+           && offset < TEXT_RENDERER_CACHE_SIZE) {
+      offset++;
     }
 
     entry = (entry + offset) & TEXT_RENDERER_CACHE_SIZE_MASK;
 
-    if (text_renderer->cache.entries[entry].hash == hash) {
+    if (text_renderer->cache.entries[entry].hash == hash.hash) {
       text_instance     = text_renderer->cache.entries[entry].text;
       loaded_from_cache = true;
     }
@@ -104,7 +108,7 @@ static TTF_Text* _text_renderer_acquire_text_instance(
   }
 
   *loaded_from_cache_ptr = loaded_from_cache;
-  *hash_ptr              = hash;
+  *hash_ptr              = hash.hash;
 
   return text_instance;
 }
