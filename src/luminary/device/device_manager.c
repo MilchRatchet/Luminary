@@ -265,6 +265,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       Device* device = device_manager->devices[device_id];
 
       __FAILURE_HANDLE_CRITICAL(device_update_post(device, &camera));
+      __FAILURE_HANDLE_CRITICAL(device_update_output_camera_params(device, &camera));
     }
   }
 

@@ -15,6 +15,9 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   // Default size
   device_output_set_size(*output, 1920, 1080);
 
+  (*output)->color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
+  (*output)->agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
+
   return LUMINARY_SUCCESS;
 }
 
@@ -59,6 +62,17 @@ LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint
 
     __FAILURE_HANDLE(_device_output_allocate_device_buffer(output, width, height));
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camera* camera) {
+  __CHECK_NULL_ARGUMENT(output);
+  __CHECK_NULL_ARGUMENT(camera);
+
+  output->color_correction = camera->color_correction;
+  output->agx_params =
+    (AGXCustomParams) {.power = camera->agx_custom_power, .saturation = camera->agx_custom_saturation, .slope = camera->agx_custom_slope};
 
   return LUMINARY_SUCCESS;
 }
@@ -133,8 +147,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   KernelArgsGenerateFinalImage generate_final_image_args;
 
   generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_current_result);
-  generate_final_image_args.color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
-  generate_final_image_args.agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
+  generate_final_image_args.color_correction = output->color_correction;
+  generate_final_image_args.agx_params       = output->agx_params;
 
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], (void*) &generate_final_image_args, device->stream_main));

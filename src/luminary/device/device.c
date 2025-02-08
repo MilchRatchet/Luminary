@@ -1379,6 +1379,18 @@ LuminaryResult device_update_output_properties(Device* device, uint32_t width, u
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_output_set_camera_params(device->output, camera));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties) {
   __CHECK_NULL_ARGUMENT(device);
 
