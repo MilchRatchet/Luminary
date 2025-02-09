@@ -110,11 +110,11 @@ static Quaternion _mesh_rotation_to_quaternion(const vec3 rotation) {
   return q;
 }
 
-LuminaryResult mesh_instance_from_public_api_instance(MeshInstance* mesh_instance, uint32_t id, const LuminaryInstance* instance) {
+LuminaryResult mesh_instance_from_public_api_instance(MeshInstance* mesh_instance, const LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(mesh_instance);
   __CHECK_NULL_ARGUMENT(instance);
 
-  mesh_instance->id          = id;
+  mesh_instance->id          = instance->id;
   mesh_instance->mesh_id     = instance->mesh_id;
   mesh_instance->translation = instance->position;
   mesh_instance->scale       = instance->scale;
@@ -147,10 +147,13 @@ LuminaryResult mesh_instance_to_public_api_instance(LuminaryInstance* instance, 
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(mesh_instance);
 
-  instance->mesh_id  = mesh_instance->mesh_id;
-  instance->position = mesh_instance->translation;
-  instance->scale    = mesh_instance->scale;
-  instance->rotation = _mesh_rotation_to_euler_angles(mesh_instance->rotation);
+  const LuminaryInstance converted_instance = (LuminaryInstance) {.id       = mesh_instance->id,
+                                                                  .mesh_id  = mesh_instance->mesh_id,
+                                                                  .position = mesh_instance->translation,
+                                                                  .scale    = mesh_instance->scale,
+                                                                  .rotation = _mesh_rotation_to_euler_angles(mesh_instance->rotation)};
+
+  memcpy(instance, &converted_instance, sizeof(LuminaryInstance));
 
   return LUMINARY_SUCCESS;
 }

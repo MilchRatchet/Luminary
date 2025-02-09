@@ -232,18 +232,26 @@ LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity 
 
   bool is_dirty = false;
 
+  uint32_t num_object;
+  __FAILURE_HANDLE_CRITICAL(scene_get_entry_count(scene, entity, &num_object));
+
+  if (index >= num_object) {
+    __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Invalid index.");
+  }
+
   switch (entity) {
     case SCENE_ENTITY_MATERIALS: {
       uint32_t num_materials;
       __FAILURE_HANDLE(array_get_num_elements(scene->materials, &num_materials));
 
-      if (index >= num_materials) {
-        __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Invalid material ID.");
+      if (index < num_materials) {
+        const Material material = scene->materials[index];
+
+        __FAILURE_HANDLE_CRITICAL(material_check_for_dirty((Material*) object, &material, &is_dirty));
       }
-
-      Material material = scene->materials[index];
-
-      __FAILURE_HANDLE_CRITICAL(material_check_for_dirty((Material*) object, &material, &is_dirty));
+      else {
+        is_dirty = true;
+      }
 
       if (is_dirty) {
         MaterialUpdate update;
@@ -260,13 +268,14 @@ LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity 
       uint32_t num_instances;
       __FAILURE_HANDLE(array_get_num_elements(scene->instances, &num_instances));
 
-      if (index >= num_instances) {
-        __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Invalid instance ID.");
+      if (index < num_instances) {
+        const MeshInstance instance = scene->instances[index];
+
+        __FAILURE_HANDLE_CRITICAL(mesh_instance_check_for_dirty((MeshInstance*) object, &instance, &is_dirty));
       }
-
-      MeshInstance instance = scene->instances[index];
-
-      __FAILURE_HANDLE_CRITICAL(mesh_instance_check_for_dirty((MeshInstance*) object, &instance, &is_dirty));
+      else {
+        is_dirty = true;
+      }
 
       if (is_dirty) {
         MeshInstanceUpdate update;
@@ -357,12 +366,58 @@ LuminaryResult scene_get_entry(Scene* scene, void* object, SceneEntity entity, u
   __CHECK_NULL_ARGUMENT(object);
 
   switch (entity) {
-    case SCENE_ENTITY_MATERIALS:
-      memcpy(object, &scene->materials[index], sizeof(Material));
-      break;
-    case SCENE_ENTITY_INSTANCES:
-      memcpy(object, &scene->instances[index], sizeof(MeshInstance));
-      break;
+    case SCENE_ENTITY_MATERIALS: {
+      uint32_t material_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
+
+      uint32_t material_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->materials, &material_count));
+
+      bool found_in_updates = false;
+
+      for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
+        const MaterialUpdate update = scene->material_updates[material_update_id];
+
+        if (update.material_id == index) {
+          memcpy(object, &update.material, sizeof(Material));
+          found_in_updates = true;
+        }
+      }
+
+      if (found_in_updates == false) {
+        if (index >= material_count) {
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Index out of range.");
+        }
+
+        memcpy(object, &scene->materials[index], sizeof(Material));
+      }
+    } break;
+    case SCENE_ENTITY_INSTANCES: {
+      uint32_t instance_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
+
+      uint32_t instance_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instances, &instance_count));
+
+      bool found_in_updates = false;
+
+      for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
+        const MeshInstanceUpdate update = scene->instance_updates[instance_update_id];
+
+        if (update.instance_id == index) {
+          memcpy(object, &update.instance, sizeof(MeshInstance));
+          found_in_updates = true;
+        }
+      }
+
+      if (found_in_updates == false) {
+        if (index >= instance_count) {
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Index out of range.");
+        }
+
+        memcpy(object, &scene->instances[index], sizeof(MeshInstance));
+      }
+    } break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_get_entry.");
   }
@@ -477,10 +532,11 @@ LuminaryResult scene_apply_changes(Scene* scene) {
             // New element
             if (update.material_id >= material_count) {
               __FAILURE_HANDLE(array_push(&scene->materials, &update.material));
+              material_count++;
               continue;
             }
 
-            scene->materials[update.material_id] = update.material;
+            memcpy(scene->materials + update.material_id, &update.material, sizeof(Material));
           }
 
           __FAILURE_HANDLE(array_clear(scene->material_updates));
@@ -498,10 +554,11 @@ LuminaryResult scene_apply_changes(Scene* scene) {
             // New element
             if (update.instance_id >= instance_count) {
               __FAILURE_HANDLE(array_push(&scene->instances, &update.instance));
+              instance_count++;
               continue;
             }
 
-            scene->instances[update.instance_id] = update.instance;
+            memcpy(scene->instances + update.instance_id, &update.instance, sizeof(MeshInstance));
           }
 
           __FAILURE_HANDLE(array_clear(scene->instance_updates));
@@ -548,7 +605,7 @@ LuminaryResult scene_get_entry_count(const Scene* scene, SceneEntity entity, uin
       if (scene->flags[SCENE_ENTITY_TYPE_LIST] & SCENE_DIRTY_FLAG_INSTANCES) {
         // There could be more entities queued in the updates.
         uint32_t instance_updates_count;
-        __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &instance_updates_count));
+        __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
 
         for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
           const uint32_t instance_id = scene->instance_updates[instance_update_id].instance_id;

@@ -113,8 +113,8 @@ LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint1
 LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, const LuminaryMaterial* material);
 
 LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint32_t id, LuminaryInstance* instance);
-LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, uint32_t id, const LuminaryInstance* instance);
-LUMINARY_API LuminaryResult luminary_host_add_instance(LuminaryHost* host, const LuminaryInstance* instance);
+LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, const LuminaryInstance* instance);
+LUMINARY_API LuminaryResult luminary_host_new_instance(LuminaryHost* host, LuminaryInstance* instance);
 
 LUMINARY_API LuminaryResult luminary_host_get_num_meshes(LuminaryHost* host, uint32_t* num_meshes);
 LUMINARY_API LuminaryResult luminary_host_get_num_materials(LuminaryHost* host, uint32_t* num_materials);
