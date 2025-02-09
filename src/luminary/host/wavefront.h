@@ -35,6 +35,7 @@ struct WavefrontTriangle {
   int32_t vn1;
   int32_t vn2;
   int32_t vn3;
+  uint16_t material;
   uint16_t object;
 } typedef WavefrontTriangle;
 

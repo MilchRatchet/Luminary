@@ -514,41 +514,38 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
     } break;
     case 9:  // Triangle
     {
-      face1->v1     = data[0];
-      face1->vt1    = data[1];
-      face1->vn1    = data[2];
-      face1->v2     = data[3];
-      face1->vt2    = data[4];
-      face1->vn2    = data[5];
-      face1->v3     = data[6];
-      face1->vt3    = data[7];
-      face1->vn3    = data[8];
-      face1->object = 0;
-      tris          = 1;
+      face1->v1  = data[0];
+      face1->vt1 = data[1];
+      face1->vn1 = data[2];
+      face1->v2  = data[3];
+      face1->vt2 = data[4];
+      face1->vn2 = data[5];
+      face1->v3  = data[6];
+      face1->vt3 = data[7];
+      face1->vn3 = data[8];
+      tris       = 1;
     } break;
     case 12:  // Quad
     {
-      face1->v1     = data[0];
-      face1->vt1    = data[1];
-      face1->vn1    = data[2];
-      face1->v2     = data[3];
-      face1->vt2    = data[4];
-      face1->vn2    = data[5];
-      face1->v3     = data[6];
-      face1->vt3    = data[7];
-      face1->vn3    = data[8];
-      face1->object = 0;
-      face2->v1     = data[0];
-      face2->vt1    = data[1];
-      face2->vn1    = data[2];
-      face2->v2     = data[6];
-      face2->vt2    = data[7];
-      face2->vn2    = data[8];
-      face2->v3     = data[9];
-      face2->vt3    = data[10];
-      face2->vn3    = data[11];
-      face2->object = 0;
-      tris          = 2;
+      face1->v1  = data[0];
+      face1->vt1 = data[1];
+      face1->vn1 = data[2];
+      face1->v2  = data[3];
+      face1->vt2 = data[4];
+      face1->vn2 = data[5];
+      face1->v3  = data[6];
+      face1->vt3 = data[7];
+      face1->vn3 = data[8];
+      face2->v1  = data[0];
+      face2->vt1 = data[1];
+      face2->vn1 = data[2];
+      face2->v2  = data[6];
+      face2->vt2 = data[7];
+      face2->vn2 = data[8];
+      face2->v3  = data[9];
+      face2->vt3 = data[10];
+      face2->vn3 = data[11];
+      tris       = 2;
     } break;
     default: {
       error_message("A face is of unsupported format. %s\n", str);
@@ -647,7 +644,6 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
         const uint32_t returned_faces = read_face(line, &face1, &face2);
 
         if (returned_faces >= 1) {
-          face1.object = current_material;
           face1.v1 += vertices_offset;
           face1.v2 += vertices_offset;
           face1.v3 += vertices_offset;
@@ -657,13 +653,13 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
           face1.vt1 += uvs_offset;
           face1.vt2 += uvs_offset;
           face1.vt3 += uvs_offset;
-          face1.object = current_object;
+          face1.material = current_material;
+          face1.object   = current_object;
 
           __FAILURE_HANDLE(array_push(&content->triangles, &face1));
         }
 
         if (returned_faces >= 2) {
-          face2.object = current_material;
           face2.v1 += vertices_offset;
           face2.v2 += vertices_offset;
           face2.v3 += vertices_offset;
@@ -673,7 +669,8 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
           face2.vt1 += uvs_offset;
           face2.vt2 += uvs_offset;
           face2.vt3 += uvs_offset;
-          face2.object = current_object;
+          face2.material = current_material;
+          face2.object   = current_object;
 
           __FAILURE_HANDLE(array_push(&content->triangles, &face2));
         }
@@ -1059,7 +1056,7 @@ LuminaryResult wavefront_convert_content(
     triangle.edge2_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
 
-    triangle.material_id = material_offset + t.object;
+    triangle.material_id = material_offset + t.material;
 
     mesh->triangles[ptr++] = triangle;
   }
