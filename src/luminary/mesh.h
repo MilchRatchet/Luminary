@@ -18,6 +18,7 @@ struct TriangleGeomData {
 
 struct Mesh {
   uint32_t id;
+  char* name;
   TriangleGeomData data;
   Triangle* triangles;
 } typedef Mesh;
@@ -32,6 +33,7 @@ struct MeshInstance {
 } typedef MeshInstance;
 
 LuminaryResult mesh_create(Mesh** mesh);
+LuminaryResult mesh_set_name(Mesh* mesh, const char* name);
 LuminaryResult mesh_destroy(Mesh** mesh);
 
 LuminaryResult mesh_instance_get_default(MeshInstance* instance);

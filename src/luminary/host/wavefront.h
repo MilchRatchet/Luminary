@@ -85,6 +85,7 @@ struct WavefrontContent {
   ARRAY WavefrontMaterial* materials;
   ARRAY Texture** textures;
   ARRAY WavefrontTextureInstance* texture_instances;
+  ARRAY char** object_names;
 } typedef WavefrontContent;
 
 LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args);

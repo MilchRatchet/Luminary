@@ -69,6 +69,8 @@ LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments a
   __FAILURE_HANDLE(array_create(&(*content)->textures, sizeof(Texture*), 16));
   __FAILURE_HANDLE(array_create(&(*content)->texture_instances, sizeof(WavefrontTextureInstance), 16));
 
+  __FAILURE_HANDLE(array_create(&(*content)->object_names, sizeof(char*), 16));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -90,6 +92,15 @@ LuminaryResult wavefront_destroy(WavefrontContent** content) {
 
   __FAILURE_HANDLE(array_destroy(&(*content)->textures));
   __FAILURE_HANDLE(array_destroy(&(*content)->texture_instances));
+
+  uint32_t num_objects;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->object_names, &num_objects));
+
+  for (uint32_t object_id = 0; object_id < num_objects; object_id++) {
+    __FAILURE_HANDLE(host_free(&(*content)->object_names[object_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*content)->object_names));
 
   __FAILURE_HANDLE(host_free(content));
 
@@ -598,6 +609,8 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   read_buffer[READ_BUFFER_SIZE - 1]      = '\0';
   read_buffer_swap[READ_BUFFER_SIZE - 1] = '\0';
 
+  uint16_t current_object = UINT16_MAX;
+
   size_t offset = 0;
 
   while (!feof(file)) {
@@ -644,6 +657,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
           face1.vt1 += uvs_offset;
           face1.vt2 += uvs_offset;
           face1.vt3 += uvs_offset;
+          face1.object = current_object;
 
           __FAILURE_HANDLE(array_push(&content->triangles, &face1));
         }
@@ -659,9 +673,25 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
           face2.vt1 += uvs_offset;
           face2.vt2 += uvs_offset;
           face2.vt3 += uvs_offset;
+          face2.object = current_object;
 
           __FAILURE_HANDLE(array_push(&content->triangles, &face2));
         }
+      }
+      else if (line[0] == 'o') {
+        sscanf(line, "%*s %[^\n]", path);
+
+        const size_t string_len = strlen(path);
+
+        char* object_name;
+        __FAILURE_HANDLE(host_malloc(&object_name, string_len + 1));
+
+        memcpy(object_name, path, string_len);
+        object_name[string_len] = '\0';
+
+        __FAILURE_HANDLE(array_push(&content->object_names, &object_name));
+
+        current_object++;
       }
       else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
         sscanf(line, "%*s %[^\n]", path);
@@ -804,6 +834,14 @@ LuminaryResult wavefront_convert_content(
 
   content->state = WAVEFRONT_CONTENT_STATE_FINISHED;
 
+  uint32_t num_objects;
+  __FAILURE_HANDLE(array_get_num_elements(content->object_names, &num_objects));
+
+  if (num_objects == 0) {
+    warn_message("Wavefront file contained no objects.");
+    return LUMINARY_SUCCESS;
+  }
+
   uint32_t triangle_count;
   __FAILURE_HANDLE(array_get_num_elements(content->triangles, &triangle_count));
 
@@ -820,6 +858,8 @@ LuminaryResult wavefront_convert_content(
 
   Mesh* mesh;
   __FAILURE_HANDLE(mesh_create(&mesh));
+
+  __FAILURE_HANDLE(mesh_set_name(mesh, content->object_names[0]));
 
   __FAILURE_HANDLE(host_malloc(&mesh->data.index_buffer, sizeof(uint32_t) * 4 * triangle_count));
   __FAILURE_HANDLE(host_malloc(&mesh->data.vertex_buffer, sizeof(float) * 4 * vertex_count));

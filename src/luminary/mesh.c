@@ -23,10 +23,32 @@ LuminaryResult mesh_create(Mesh** mesh) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult mesh_set_name(Mesh* mesh, const char* name) {
+  __CHECK_NULL_ARGUMENT(mesh);
+  __CHECK_NULL_ARGUMENT(name);
+
+  const size_t string_length = strlen(name);
+
+  if (mesh->name) {
+    __FAILURE_HANDLE(host_free(&mesh->name));
+  }
+
+  __FAILURE_HANDLE(host_malloc(&mesh->name, string_length + 1));
+
+  memcpy(mesh->name, name, string_length);
+  mesh->name[string_length] = '\0';
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult mesh_destroy(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
 
   __FAILURE_HANDLE(host_free(&(*mesh)->triangles));
+
+  if ((*mesh)->name) {
+    __FAILURE_HANDLE(host_free(&(*mesh)->name));
+  }
 
   if ((*mesh)->data.vertex_buffer) {
     __FAILURE_HANDLE(host_free(&(*mesh)->data.vertex_buffer));
