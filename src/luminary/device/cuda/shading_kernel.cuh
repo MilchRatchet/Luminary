@@ -366,7 +366,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
 __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
   RGBF geometry_light = get_color(0.0f, 0.0f, 0.0f);
 
-  if (device.settings.light_num_rays) {
+  if (device.settings.light_num_rays && LIGHTS_ARE_PRESENT) {
     for (int j = 0; j < device.settings.light_num_rays; j++) {
       geometry_light = add_color(geometry_light, optix_compute_light_ray_geometry_single(data, index, j));
     }

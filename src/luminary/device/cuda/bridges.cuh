@@ -331,6 +331,9 @@ __device__ RGBF bridges_evaluate_bridge(
 }
 
 __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume) {
+  if (LIGHTS_ARE_PRESENT == false)
+    return splat_color(0.0f);
+
   uint32_t selected_seed         = 0xFFFFFFFF;
   TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
   Quaternion selected_rotation   = {0.0f, 0.0f, 0.0f, 1.0f};
