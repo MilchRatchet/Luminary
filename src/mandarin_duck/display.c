@@ -311,6 +311,8 @@ static void _display_query_pixel_info(Display* display, LuminaryHost* host, floa
     case DISPLAY_MOUSE_MODE_FOCUS:
       display->focus_pixel_data = result;
       break;
+    default:
+      break;
   }
 }
 

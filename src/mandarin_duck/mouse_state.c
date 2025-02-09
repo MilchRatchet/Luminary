@@ -76,6 +76,8 @@ void mouse_state_update_button(MouseState* mouse_state, SDL_MouseButtonEvent sdl
 
 void mouse_state_update_wheel(MouseState* mouse_state, SDL_MouseWheelEvent sdl_event) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
+
+  MD_UNUSED(sdl_event);
 }
 
 void mouse_state_destroy(MouseState** mouse_state) {

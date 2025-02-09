@@ -145,26 +145,6 @@ static void _device_optix_log_callback(unsigned int level, const char* tag, cons
 // Utility functions
 ////////////////////////////////////////////////////////////////////
 
-static char* _device_arch_enum_to_string(const DeviceArch arch) {
-  switch (arch) {
-    default:
-    case DEVICE_ARCH_UNKNOWN:
-      return "Unknown";
-    case DEVICE_ARCH_PASCAL:
-      return "Pascal";
-    case DEVICE_ARCH_TURING:
-      return "Turing";
-    case DEVICE_ARCH_AMPERE:
-      return "Ampere";
-    case DEVICE_ARCH_ADA:
-      return "Ada";
-    case DEVICE_ARCH_VOLTA:
-      return "Volta";
-    case DEVICE_ARCH_HOPPER:
-      return "Hopper";
-  }
-}
-
 static LuminaryResult _device_get_properties(DeviceProperties* props, Device* device) {
   __CHECK_NULL_ARGUMENT(props);
 

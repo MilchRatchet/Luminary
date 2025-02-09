@@ -178,14 +178,6 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor*
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _host_start_render_queue_work(Host* host, void* args) {
-  __CHECK_NULL_ARGUMENT(host);
-
-  LUM_UNUSED(args);
-
-  return LUMINARY_SUCCESS;
-}
-
 struct HostAddOutputRequestArgs {
   OutputRequestProperties props;
 } typedef HostAddOutputRequestArgs;

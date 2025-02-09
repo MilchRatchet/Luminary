@@ -14,6 +14,8 @@ LuminaryResult sample_time_create(SampleTime** sample_time) {
 LuminaryResult sample_time_set_time(SampleTime* sample_time, uint32_t device_id, double time) {
   __CHECK_NULL_ARGUMENT(sample_time);
 
+  LUM_UNUSED(device_id);
+
   // TODO: Implement proper time keeping based on devices
   sample_time->time = time;
 

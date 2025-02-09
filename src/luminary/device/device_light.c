@@ -1115,13 +1115,6 @@ static void _light_tree_debug_output(LightTreeWork* work) {
 }
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
-// TODO: Remove if no longer needed
-static float _uint16_t_to_float(const uint16_t v) {
-  const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
-
-  return *(float*) (&i) - 1.0f;
-}
-
 ////////////////////////////////////////////////////////////////////
 // Constructor
 ////////////////////////////////////////////////////////////////////
@@ -1648,6 +1641,8 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
 
 LuminaryResult light_tree_build(LightTree* tree, Device* device) {
   __CHECK_NULL_ARGUMENT(tree);
+
+  LUM_UNUSED(device);
 
   // Only build if the cache is dirty.
   if (!tree->cache.is_dirty)

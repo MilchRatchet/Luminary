@@ -19,16 +19,17 @@
 #include "optix_kernel.h"
 #include "texture.h"
 
-// Set of architectures supported by Luminary
+// Architectures that were already legacy when Luminary was created are omitted.
 enum DeviceArch {
-  DEVICE_ARCH_UNKNOWN   = 0,
-  DEVICE_ARCH_PASCAL    = 1,
-  DEVICE_ARCH_VOLTA     = 2,
-  DEVICE_ARCH_TURING    = 3,
-  DEVICE_ARCH_AMPERE    = 4,
-  DEVICE_ARCH_ADA       = 5,
-  DEVICE_ARCH_HOPPER    = 6,
-  DEVICE_ARCH_BLACKWELL = 7
+  DEVICE_ARCH_UNKNOWN,
+  DEVICE_ARCH_PASCAL,
+  DEVICE_ARCH_VOLTA,
+  DEVICE_ARCH_TURING,
+  DEVICE_ARCH_AMPERE,
+  DEVICE_ARCH_ADA,
+  DEVICE_ARCH_HOPPER,
+  DEVICE_ARCH_BLACKWELL,
+  DEVICE_ARCH_COUNT
 } typedef DeviceArch;
 
 struct DeviceProperties {

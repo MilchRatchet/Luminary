@@ -130,6 +130,8 @@ static void _element_slider_render_func(Element* slider, Display* display) {
 }
 
 static uint32_t _element_slider_get_subelement_index(Window* window, const MouseState* mouse_state, Element* slider) {
+  MD_UNUSED(window);
+
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
   if ((data->type != ELEMENT_SLIDER_DATA_TYPE_VECTOR) && (data->type != ELEMENT_SLIDER_DATA_TYPE_RGB)) {

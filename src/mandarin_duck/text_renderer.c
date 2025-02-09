@@ -36,22 +36,6 @@ static TTF_Font* _text_renderer_load_font(const char* font_location, const float
   return TTF_OpenFontWithProperties(sdl_properties);
 }
 
-#define FNV_PRIME (0x01000193u)
-#define FNV_OFFSET_BASIS (0x811c9dc5u)
-
-static size_t _text_renderer_text_hash(const char* string) {
-  const size_t string_length = strlen(string);
-
-  uint32_t hash = FNV_OFFSET_BASIS;
-
-  for (size_t offset = 0; offset < string_length; offset++) {
-    hash ^= (size_t) string[offset];
-    hash *= FNV_PRIME;
-  }
-
-  return hash;
-}
-
 void text_renderer_create(TextRenderer** text_renderer) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
 

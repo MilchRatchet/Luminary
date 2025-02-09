@@ -231,8 +231,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
   SceneDirtyFlags flags;
   __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(scene, &flags));
 
-  bool update_device_data_asynchronously = true;
-
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
     // We will override rendering related data, we need to do this synchronously so the stale
     // render kernels don't read crap and crash.
@@ -242,8 +240,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
       __FAILURE_HANDLE_CRITICAL(device_set_abort(device));
     }
-
-    update_device_data_asynchronously = false;
   }
 
   uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;

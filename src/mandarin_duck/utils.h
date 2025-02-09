@@ -18,6 +18,8 @@
     crash_message("%s is NULL.", #arg); \
   }
 
+#define MD_UNUSED(__macro_x) ((void) (__macro_x))
+
 #define MD_COLOR_WHITE 0xFFFBF4DB
 #define MD_COLOR_GRAY 0xFFFDE7BB
 #define MD_COLOR_ACCENT_1 0xFFEB5B00
