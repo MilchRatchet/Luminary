@@ -109,7 +109,7 @@ extern "C" __global__ void __raygen__optix() {
     // The compiler reloads these values at some point for some reason and if we overwrite
     // the values we will get garbage. I am not sure if this is a compiler bug or some undefined
     // behaviour on my side.
-    if (task_russian_roulette(bounce_task, bounce_record)) {
+    if (task_russian_roulette(bounce_task, task.state, bounce_record)) {
       task_store(bounce_task, get_task_address(trace_count++));
       store_RGBF(device.ptrs.records, pixel, bounce_record);
     }
