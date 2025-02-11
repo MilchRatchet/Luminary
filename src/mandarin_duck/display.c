@@ -505,7 +505,7 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
 
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
-    LUM_FAILURE_HANDLE(luminary_host_save_png(host, output_image, image_path));
+    LUM_FAILURE_HANDLE(luminary_host_save_png(host, output_handle, image_path));
 
     LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
 

@@ -120,7 +120,7 @@ LUMINARY_API LuminaryResult luminary_host_get_num_meshes(LuminaryHost* host, uin
 LUMINARY_API LuminaryResult luminary_host_get_num_materials(LuminaryHost* host, uint32_t* num_materials);
 LUMINARY_API LuminaryResult luminary_host_get_num_instances(LuminaryHost* host, uint32_t* num_instances);
 
-LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryImage image, LuminaryPath* path);
+LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle handle, LuminaryPath* path);
 
 /*
  * Calling this function will cause a rebuild of the sky HDRI and a restart of integration.

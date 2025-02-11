@@ -83,7 +83,7 @@ LuminaryResult output_handler_add_request(OutputHandler* output, OutputRequestPr
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t* handle) {
+LuminaryResult output_handler_acquire_recurring(OutputHandler* output, uint32_t* handle) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(handle);
 
@@ -121,6 +121,36 @@ LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t* handle) {
   }
 
   *handle = latest_handle;
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(output->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t handle) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  if (handle == OUTPUT_HANDLE_INVALID)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(output->mutex));
+
+  uint32_t num_outputs;
+  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(output->objects, &num_outputs));
+
+  if (handle >= num_outputs) {
+    __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Invalid output handle %u cannot be released.", handle);
+  }
+
+  if (output->objects[handle].reference_count == 0) {
+    __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Output handle %u was already completely released.", handle);
+  }
+
+  output->objects[handle].reference_count++;
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

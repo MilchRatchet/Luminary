@@ -29,7 +29,8 @@ struct OutputHandler {
 LuminaryResult output_handler_create(OutputHandler** output);
 LuminaryResult output_handler_set_properties(OutputHandler* output, OutputProperties properties);
 LuminaryResult output_handler_add_request(OutputHandler* output, OutputRequestProperties properties, uint32_t* promise_handle);
-LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t* handle);
+LuminaryResult output_handler_acquire_recurring(OutputHandler* output, uint32_t* handle);
+LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t handle);
 LuminaryResult output_handler_release(OutputHandler* output, uint32_t handle);
 LuminaryResult output_handler_acquire_from_promise(OutputHandler* output, uint32_t promise_handle, uint32_t* handle);
 LuminaryResult output_handler_acquire_new(OutputHandler* output, OutputDescriptor descriptor, uint32_t* handle);
