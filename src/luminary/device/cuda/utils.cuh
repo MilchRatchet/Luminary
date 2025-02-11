@@ -74,6 +74,11 @@ enum StateFlag {
   STATE_FLAG_OCEAN_SCATTERED  = 0b00000100u
 } typedef StateFlag;
 
+struct OptixRaytraceResult {
+  TriangleHandle handle;
+  float depth;
+} typedef OptixRaytraceResult;
+
 //===========================================================================================
 // Device Variables
 //===========================================================================================

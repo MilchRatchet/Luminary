@@ -112,8 +112,7 @@ function(compile_optixir kernel_name)
   add_dependencies(Luminary ${kernel_name})
 endfunction()
 
-compile_optixir(optix_kernel_raytrace_geometry)
-compile_optixir(optix_kernel_raytrace_particles)
+compile_optixir(optix_kernel_raytrace)
 compile_optixir(optix_kernel_shading_geometry)
 compile_optixir(optix_kernel_shading_volume)
 compile_optixir(optix_kernel_shading_particles)
@@ -129,8 +128,7 @@ ceb_embed_files(
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
   ${CMAKE_BINARY_DIR}/cubin/cuda_kernels.cubin
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_raytrace_geometry.optixir
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_raytrace_particles.optixir
+  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_raytrace.optixir
   ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_geometry.optixir
   ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_volume.optixir
   ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_particles.optixir
