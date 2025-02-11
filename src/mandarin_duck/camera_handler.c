@@ -116,8 +116,7 @@ static void _camera_handler_update_fly(
   LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
 }
 
-static void _camera_handler_update_orbit(
-  CameraHandler* camera_handler, LuminaryHost* host, MouseState* mouse_state, const float time_step) {
+static void _camera_handler_update_orbit(CameraHandler* camera_handler, LuminaryHost* host, MouseState* mouse_state) {
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
@@ -126,8 +125,8 @@ static void _camera_handler_update_orbit(
   q0.y          = -q0.y;
   q0.z          = -q0.z;
 
-  camera.rotation.x -= mouse_state->y_motion * 0.5f * time_step;
-  camera.rotation.y -= mouse_state->x_motion * 0.5f * time_step;
+  camera.rotation.x -= mouse_state->y_motion * 0.005f;
+  camera.rotation.y -= mouse_state->x_motion * 0.005f;
 
   Quaternion q1 = _camera_handler_rotation_to_quaternion(camera.rotation);
 
@@ -149,7 +148,7 @@ static void _camera_handler_update_orbit(
   LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
 }
 
-static void _camera_handler_update_zoom(CameraHandler* camera_handler, LuminaryHost* host, MouseState* mouse_state, const float time_step) {
+static void _camera_handler_update_zoom(CameraHandler* camera_handler, LuminaryHost* host, MouseState* mouse_state) {
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
@@ -158,7 +157,7 @@ static void _camera_handler_update_zoom(CameraHandler* camera_handler, LuminaryH
   const float scale     = sqrtf(ref_pos.x * ref_pos.x + ref_pos.y * ref_pos.y + ref_pos.z * ref_pos.z);
   const float inv_scale = 1.0f / fmaxf(1.0f, scale);
 
-  const float movement_scale = camera_handler->dist * inv_scale * (mouse_state->x_motion - mouse_state->y_motion) * 0.25f * time_step;
+  const float movement_scale = camera_handler->dist * inv_scale * (mouse_state->x_motion - mouse_state->y_motion) * 0.0025f;
 
   const LuminaryVec3 movement =
     (LuminaryVec3) {.x = ref_pos.x * movement_scale, .y = ref_pos.y * movement_scale, .z = ref_pos.z * movement_scale};
@@ -186,10 +185,10 @@ void camera_handler_update(
       _camera_handler_update_fly(camera_handler, host, keyboard_state, mouse_state, time_step);
       break;
     case CAMERA_MODE_ORBIT:
-      _camera_handler_update_orbit(camera_handler, host, mouse_state, time_step);
+      _camera_handler_update_orbit(camera_handler, host, mouse_state);
       break;
     case CAMERA_MODE_ZOOM:
-      _camera_handler_update_zoom(camera_handler, host, mouse_state, time_step);
+      _camera_handler_update_zoom(camera_handler, host, mouse_state);
       break;
     default:
       break;
