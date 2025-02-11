@@ -4,15 +4,8 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-__device__ vec3 particle_transform_relative(vec3 p) {
-  return sub_vector(p, device.camera.pos);
-}
-
 __device__ GBufferData particle_generate_g_buffer(const DeviceTask task, const uint32_t instance_id, const int pixel) {
-  Quad q   = load_quad(device.ptrs.particle_quads, instance_id & HIT_TYPE_PARTICLE_MASK);
-  q.vertex = particle_transform_relative(q.vertex);
-  q.edge1  = particle_transform_relative(q.edge1);
-  q.edge2  = particle_transform_relative(q.edge2);
+  const Quad q = load_quad(device.ptrs.particle_quads, instance_id & HIT_TYPE_PARTICLE_MASK);
 
   const vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
 

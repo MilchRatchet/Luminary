@@ -1261,7 +1261,7 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
   __FAILURE_HANDLE(device_particles_handle_generate(device->particles_handle, particles, device));
 
   if (particles->active) {
-    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, device->particles_handle->bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
+    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, device->particles_handle->instance_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, DEVICE_PTR(device->particles_handle->quad_buffer));
   }
 

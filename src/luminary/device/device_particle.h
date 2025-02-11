@@ -11,7 +11,10 @@ struct DeviceParticlesHandle {
   uint32_t count;
   DEVICE float* vertex_buffer;
   DEVICE Quad* quad_buffer;
-  OptixBVH* bvh;
+  DEVICE OptixInstance* optix_instances;
+  uint32_t num_instances;
+  OptixBVH* geometry_bvh;
+  OptixBVH* instance_bvh;
 } typedef DeviceParticlesHandle;
 
 DEVICE_CTX_FUNC LuminaryResult device_particles_handle_create(DeviceParticlesHandle** particles_handle);
