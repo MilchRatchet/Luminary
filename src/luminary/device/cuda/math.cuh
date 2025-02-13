@@ -1416,4 +1416,32 @@ __device__ RGBF hsv_to_rgb(RGBF hsv) {
   return scale_color(add_color(scale_color(get_color(1.0f, 1.0f, 1.0f), 1.0f - s), scale_color(hue, s)), v);
 }
 
+__device__ vec3 direction_project(const vec3 a, const vec3 b) {
+  return scale_vector(b, dot_product(a, b));
+}
+
+__device__ vec3 normal_adaptation_apply(const vec3 V, vec3 shading_normal, const vec3 geometry_normal) {
+  // TODO: Fine tune this, this is so far only so that we actually have something to work with
+
+  // Make sure that shading and geometry normal are on the same side
+  if (dot_product(shading_normal, geometry_normal) < 0.0f) {
+    shading_normal = scale_vector(shading_normal, -1.0f);
+  }
+
+  if (dot_product(V, shading_normal) < 0.0f) {
+#if 0
+    // Rotate the geometry normal to lie on the same plane as V and the shading normal and use that one
+    const vec3 cross               = cross_product(V, shading_normal);
+    const vec3 proj_geometry_cross = direction_project(geometry_normal, cross);
+    return normalize_vector(sub_vector(geometry_normal, proj_geometry_cross));
+#else
+    // Rotate the shading normal so that V and shading normal are orthogonal and then rotate just a little bit more
+    const vec3 proj_shading_V = direction_project(shading_normal, V);
+    return normalize_vector(sub_vector(shading_normal, scale_vector(proj_shading_V, 1.1f)));
+#endif
+  }
+
+  return shading_normal;
+}
+
 #endif /* CU_MATH_H */

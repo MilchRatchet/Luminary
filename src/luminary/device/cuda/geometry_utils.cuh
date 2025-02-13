@@ -14,6 +14,11 @@ __device__ vec3 geometry_compute_normal(
   vec3 normal      = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
   is_inside        = dot_product(face_normal, ray) > 0.0f;
 
+  // TODO: Why do I not have a neg_vector function?
+  // Convention is for the face normal to look towards the origin
+  if (is_inside)
+    face_normal = scale_vector(face_normal, -1.0f);
+
   if (normal_tex != TEXTURE_NONE) {
     const float4 normal_f = texture_load(load_texture_object(normal_tex), tex_coords);
 
@@ -25,34 +30,9 @@ __device__ vec3 geometry_compute_normal(
     Mat3x3 tangent_space = cotangent_frame(normal, e1, e2, e1_tex, e2_tex);
 
     normal = normalize_vector(transform_vec3(tangent_space, map_normal));
-
-    if (dot_product(normal, ray) > 0.0f) {
-      normal = scale_vector(normal, -1.0f);
-    }
-  }
-  else {
-    if (dot_product(face_normal, normal) < 0.0f) {
-      normal = scale_vector(normal, -1.0f);
-    }
-
-    if (dot_product(face_normal, ray) > 0.0f) {
-      face_normal = scale_vector(face_normal, -1.0f);
-      normal      = scale_vector(normal, -1.0f);
-    }
-
-    /*
-     * I came up with this quickly, problem is that we need to rotate the normal
-     * towards the face normal with our ray is "behind" the shading normal
-     */
-    if (dot_product(normal, ray) > 0.0f) {
-      const float a = sqrtf(1.0f - dot_product(face_normal, ray));
-      const float b = dot_product(face_normal, normal);
-      const float t = a / (a + b + eps);
-      normal        = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(normal, 1.0f - t)));
-    }
   }
 
-  return normal;
+  return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
 __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel) {

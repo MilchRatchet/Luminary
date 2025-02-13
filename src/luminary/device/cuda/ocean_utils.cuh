@@ -432,11 +432,14 @@ __device__ float ocean_reflection_coefficient(
 __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint32_t pixel) {
   vec3 normal = ocean_get_normal(task.origin);
 
-  const bool inside_water = dot_product(task.ray, normal) > 0.0f;
+  vec3 geometry_normal = ocean_get_normal(task.origin);
 
-  if (inside_water) {
-    normal = scale_vector(normal, -1.0f);
-  }
+  const bool inside_water = dot_product(task.ray, geometry_normal) > 0.0f;
+
+  if (inside_water)
+    geometry_normal = scale_vector(geometry_normal, -1.0f);
+
+  normal = normal_adaptation_apply(scale_vector(task.ray, -1.0f), normal, geometry_normal);
 
   uint32_t flags = G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
 
