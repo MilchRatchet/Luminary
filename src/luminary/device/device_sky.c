@@ -336,6 +336,8 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
         __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->pitch * sizeof(float) * hdri->shadow_tex->height));
       }
 
+      __FAILURE_HANDLE(device_sync_constant_memory(device));
+
       __FAILURE_HANDLE(_sky_hdri_compute(hdri, device));
     }
 
