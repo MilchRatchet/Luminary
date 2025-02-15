@@ -47,7 +47,6 @@ include_directories(${CEB_INCLUDE_DIR})
 function(compile_cubin kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
   # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
-  # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
       "${CMAKE_BINARY_DIR}/cubin/${kernel_name}.cubin"
@@ -78,33 +77,33 @@ endfunction()
 compile_cubin(cuda_kernels)
 
 #=============================================================
-# Create OptiX-IR files
+# Create PTX files
 #=============================================================
 
-function(compile_optixir kernel_name)
+function(compile_ptx kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
   # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
   # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
-      "${CMAKE_BINARY_DIR}/optixir/${kernel_name}.optixir"
+      "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
-      -arch=native --optix-ir --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
-      -o "${CMAKE_BINARY_DIR}/optixir/${kernel_name}.optixir"
+      -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -o "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
       "${luminary_gpu_header_files}"
       "${luminary_cpu_header_files}"
     COMMENT
-      "Compiling ${kernel_name}.optixir"
+      "Compiling ${kernel_name}.ptx"
   )
 
   add_custom_target(
     ${kernel_name}
     DEPENDS
-      "${CMAKE_BINARY_DIR}/optixir/${kernel_name}.optixir"
+      "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
     COMMENT
       "Target for compiled OptiX kernel."
   )
@@ -112,10 +111,10 @@ function(compile_optixir kernel_name)
   add_dependencies(Luminary ${kernel_name})
 endfunction()
 
-compile_optixir(optix_kernel_raytrace)
-compile_optixir(optix_kernel_shading_geometry)
-compile_optixir(optix_kernel_shading_volume)
-compile_optixir(optix_kernel_shading_particles)
+compile_ptx(optix_kernel_raytrace)
+compile_ptx(optix_kernel_shading_geometry)
+compile_ptx(optix_kernel_shading_volume)
+compile_ptx(optix_kernel_shading_particles)
 
 #=============================================================
 # Embed files
@@ -128,10 +127,10 @@ ceb_embed_files(
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
   ${CMAKE_BINARY_DIR}/cubin/cuda_kernels.cubin
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_raytrace.optixir
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_geometry.optixir
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_volume.optixir
-  ${CMAKE_BINARY_DIR}/optixir/optix_kernel_shading_particles.optixir
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_raytrace.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_geometry.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_volume.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_particles.ptx
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_SOURCE_DIR}/data/LuminaryFontBold.ttf
   ${CMAKE_SOURCE_DIR}/data/MaterialSymbols.ttf
