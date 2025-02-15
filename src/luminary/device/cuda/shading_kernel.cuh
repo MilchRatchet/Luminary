@@ -384,20 +384,27 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
 __device__ RGBF optix_compute_light_ray_ambient_sky(
   const GBufferData data, const vec3 ray, const RGBF sample_weight, const bool is_refraction, const ushort2 index) {
-  if (device.state.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling)
-    return get_color(0.0f, 0.0f, 0.0f);
+  RGBF sky_light   = sample_weight;
+  float trace_dist = FLT_MAX;
+
+  if (device.state.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling) {
+    trace_dist = OPTIX_TRACE_ABORT;
+  }
 
   // We don't support compute based sky due to register/performance reasons and because
   // we would have to include clouds then aswell.
-  if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT) {
+    trace_dist = OPTIX_TRACE_ABORT;
+  }
 
   const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);
 
-  RGBF sky_light = sample_weight;
+  sky_light = mul_color(sky_light, optix_sun_shadowing(position, ray, trace_dist));
+
+  if (trace_dist == OPTIX_TRACE_ABORT)
+    return splat_color(0.0f);
 
   sky_light = mul_color(sky_light, sky_color_no_compute(ray));
-  sky_light = mul_color(sky_light, optix_sun_shadowing(position, ray, FLT_MAX));
   sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
 
   UTILS_CHECK_NANS(index, sky_light);
