@@ -362,7 +362,7 @@ static bool _window_entity_properties_ocean_action(Window* window, Display* disp
     update_data |=
       _window_entity_properties_add_slider(data, "Height", &ocean.height, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
     update_data |=
-      _window_entity_properties_add_slider(data, "Amplitude", &ocean.amplitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      _window_entity_properties_add_slider(data, "Amplitude", &ocean.amplitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 0.5f, 1.0f);
     update_data |=
       _window_entity_properties_add_slider(data, "Frequency", &ocean.frequency, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |=
