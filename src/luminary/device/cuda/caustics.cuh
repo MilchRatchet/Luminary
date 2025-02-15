@@ -7,6 +7,7 @@
 #include "utils.cuh"
 
 struct CausticsSamplingDomain {
+  bool valid;
   vec3 base;
   vec3 edge1;
   vec3 edge2;
@@ -16,26 +17,24 @@ struct CausticsSamplingDomain {
   bool fast_path;
 } typedef CausticsSamplingDomain;
 
-__device__ float caustics_get_plane_height(const bool is_underwater) {
-  return (is_underwater) ? OCEAN_MAX_HEIGHT : OCEAN_MIN_HEIGHT;
-}
-
 // Assuming a flat plane with a normal of (0,1,0), find the unique solution.
-__device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, const bool is_underwater, const float dx, const float dz) {
+__device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, const bool is_underwater, bool& valid) {
   // Get view vector
-  vec3 V;
+  vec3 ray;
   if (is_underwater) {
     bool total_reflection;
-    V = refract_vector(L, get_vector(0.0f, 1.0f, 0.0f), 1.0f / device.ocean.refractive_index, total_reflection);
+    ray = refract_vector(L, get_vector(0.0f, 1.0f, 0.0f), 1.0f / device.ocean.refractive_index, total_reflection);
+    ray = scale_vector(ray, -1.0f);
   }
   else {
-    V = get_vector(-L.x, L.y, -L.z);
+    ray = get_vector(L.x, -L.y, L.z);
   }
 
-  // Get intersection distance from position to ocean plane along V
-  const float dist = fabsf((data.position.y - caustics_get_plane_height(is_underwater)) / V.y);
+  const float dist = ocean_intersection_distance(data.position, ray, FLT_MAX);
 
-  return sub_vector(data.position, scale_vector(V, dist));
+  valid = dist != FLT_MAX;
+
+  return add_vector(data.position, scale_vector(ray, dist));
 }
 
 __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
@@ -49,7 +48,8 @@ __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool i
 }
 
 __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, const vec3 L, const bool is_underwater) {
-  const vec3 center = caustics_solve_for_normal(data, L, is_underwater, 0.0f, 0.0f);
+  bool is_valid;
+  const vec3 center = caustics_solve_for_normal(data, L, is_underwater, is_valid);
 
 #ifdef PHASE_KERNEL
   const bool fast_path = true;
@@ -61,6 +61,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   if (fast_path) {
     CausticsSamplingDomain domain;
 
+    domain.valid = is_valid;
     domain.base  = center;
     domain.edge1 = get_vector(0.0f, 0.0f, 0.0f);
     domain.edge2 = get_vector(0.0f, 0.0f, 0.0f);
@@ -81,7 +82,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   direction_to_angles(center_dir, azimuth, altitude);
 
   const float angle        = 0.3f * device.ocean.caustics_domain_scale;
-  const float plane_height = caustics_get_plane_height(is_underwater);
+  const float plane_height = center.y;
 
   const vec3 v0_dir = angles_to_direction(altitude - angle, azimuth - angle);
   const vec3 v1_dir = angles_to_direction(altitude - angle, azimuth + angle);
@@ -97,6 +98,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
 
   CausticsSamplingDomain domain;
 
+  domain.valid = is_valid;
   domain.base  = v0;
   domain.edge1 = sub_vector(v1, v0);
   domain.edge2 = sub_vector(v2, v0);

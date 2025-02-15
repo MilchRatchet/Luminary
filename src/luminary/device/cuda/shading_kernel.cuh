@@ -132,6 +132,9 @@ __device__ RGBF
   const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
 
+  if (sampling_domain.valid == false)
+    return splat_color(0.0f);
+
   vec3 connection_point;
   float sum_connection_weight = 0.0f;
   float connection_weight;
@@ -146,7 +149,7 @@ __device__ RGBF
     connection_weight     = sample_weight;
   }
   else {
-    const uint32_t num_samples = device.ocean.caustics_ris_sample_count;
+    const uint32_t num_samples = device.ocean.caustics_ris_sample_count + 1;
 
     float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
 

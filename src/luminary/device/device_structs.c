@@ -82,7 +82,7 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
   device_ocean->active                      = ocean->active;
   device_ocean->water_type                  = ocean->water_type;
   device_ocean->caustics_active             = ocean->caustics_active;
-  device_ocean->caustics_ris_sample_count   = ocean->caustics_ris_sample_count;
+  device_ocean->caustics_ris_sample_count   = max(ocean->caustics_ris_sample_count, 1) - 1;
   device_ocean->multiscattering             = ocean->multiscattering;
   device_ocean->triangle_light_contribution = ocean->triangle_light_contribution;
 

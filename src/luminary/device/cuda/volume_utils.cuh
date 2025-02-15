@@ -41,7 +41,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.absorption = ocean_jerlov_absorption_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.scattering = ocean_jerlov_scattering_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.dist       = 10000.0f;
-  volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
+  volume.max_height = OCEAN_MAX_HEIGHT;
   volume.min_height = -65535.0f;
 
   volume.max_scattering = color_importance(volume.scattering);

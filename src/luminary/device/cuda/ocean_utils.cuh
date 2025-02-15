@@ -105,7 +105,7 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
 }
 
 __device__ float ocean_get_relative_height(const vec3 p, const int steps) {
-  return (p.y - device.ocean.height) - ocean_get_height(p, steps);
+  return p.y - (device.ocean.height + ocean_get_height(p, steps));
 }
 
 __device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {

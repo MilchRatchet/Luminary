@@ -376,7 +376,7 @@ static bool _window_entity_properties_ocean_action(Window* window, Display* disp
 
     if (ocean.caustics_active) {
       update_data |= _window_entity_properties_add_slider(
-        data, "Caustics RIS Samples", &ocean.caustics_ris_sample_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+        data, "Caustics RIS Samples", &ocean.caustics_ris_sample_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 128.0f, 1.0f);
       update_data |= _window_entity_properties_add_slider(
         data, "Caustics Domain Scale", &ocean.caustics_domain_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     }
