@@ -194,9 +194,15 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
 
   const float target_residual = (1.0f + fabsf(device.ocean.height) + start / 10.0f) * 0.5f * eps;
 
+  float min = start;
+  float max = limit;
+
+  float residual_at_max;
+  float residual_at_min;
+
   float t                       = start;
   float last_residual           = 0.0f;
-  float slope_confidence_factor = 6.0f / (OCEAN_LIPSCHITZ + fabsf(ray.y));
+  float slope_confidence_factor = 8.0f / OCEAN_LIPSCHITZ;
 
   for (int i = 0; i < 200; i++) {
     const vec3 p = add_vector(origin, scale_vector(ray, t));
@@ -208,22 +214,42 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
       return t;
 
     if (last_residual * residual_at_t < 0.0f) {
-      slope_confidence_factor *= -0.5f;
+      max             = t;
+      residual_at_max = residual_at_t;
+      break;
     }
 
     last_residual = residual_at_t;
 
-    const float step_size = fminf(0.1f * (limit - start), res_abs * fabsf(slope_confidence_factor));
+    min             = t;
+    residual_at_min = residual_at_t;
 
-    t += copysignf(step_size, slope_confidence_factor);
+    t += res_abs * slope_confidence_factor;
 
-    // Sometimes we may overstep beyond the limit and then require to backtrack, hence we abort
-    // only if we are far beyond the limit.
-    if (t >= limit + 0.2f * (limit - start)) {
+    if (t >= limit || t <= start) {
+      residual_at_max = ocean_get_relative_height(add_vector(origin, scale_vector(ray, limit)), OCEAN_ITERATIONS_INTERSECTION);
       break;
     }
-    else if (t <= start - 0.2f * (limit - start)) {
-      break;
+  }
+
+  for (int i = 0; i < 20; i++) {
+    const float step = residual_at_min / (residual_at_min - residual_at_max);
+    const float mid  = lerp(min, max, fminf(0.95f, fmaxf(0.05f, step)));
+    const vec3 p     = add_vector(origin, scale_vector(ray, mid));
+
+    const float residual_at_mid = ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION);
+
+    if (fabsf(residual_at_mid) < target_residual) {
+      return (mid >= start) ? mid : FLT_MAX;
+    }
+
+    if (residual_at_mid * residual_at_min < 0.0f) {
+      max             = mid;
+      residual_at_max = residual_at_mid;
+    }
+    else {
+      min             = mid;
+      residual_at_min = residual_at_mid;
     }
   }
 
