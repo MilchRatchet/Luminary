@@ -36,7 +36,8 @@ __device__ TriangleHandle ris_sample_light(
   selected_is_refraction = false;
 
   // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
-  const int reservoir_size = device.settings.light_num_ris_samples;
+  // No RIS on the ocean surface.
+  const int reservoir_size = (data.instance_id != HIT_TYPE_OCEAN) ? device.settings.light_num_ris_samples : 0;
 
   // Don't allow triangles to sample themselves.
   const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
