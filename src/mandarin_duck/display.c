@@ -127,6 +127,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   user_interface_create(&display->ui);
   ui_renderer_create(&display->ui_renderer);
   text_renderer_create(&display->text_renderer);
+  render_region_create(&display->region);
 
   display->selected_cursor = SDL_SYSTEM_CURSOR_DEFAULT;
   for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
@@ -421,6 +422,10 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
     }
 
+    if (display->keyboard_state->keys[SDL_SCANCODE_4].down) {
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_RENDER_REGION);
+    }
+
     if (!ui_handled_mouse) {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
@@ -459,6 +464,9 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
           if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
             _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
           }
+          break;
+        case DISPLAY_MOUSE_MODE_RENDER_REGION:
+          render_region_handle_inputs(display->region, display, host, display->mouse_state);
           break;
       }
     }
@@ -577,6 +585,7 @@ void display_destroy(Display** display) {
   user_interface_destroy(&(*display)->ui);
   ui_renderer_destroy(&(*display)->ui_renderer);
   text_renderer_destroy(&(*display)->text_renderer);
+  render_region_destroy(&(*display)->region);
 
   LUM_FAILURE_HANDLE(host_free(display));
 

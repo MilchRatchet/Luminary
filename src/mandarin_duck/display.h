@@ -7,6 +7,7 @@
 #include "camera_handler.h"
 #include "keyboard_state.h"
 #include "mouse_state.h"
+#include "render_region.h"
 #include "text_renderer.h"
 #include "ui_renderer.h"
 #include "user_interface.h"
@@ -16,6 +17,7 @@ enum DisplayMouseMode {
   DISPLAY_MOUSE_MODE_DEFAULT,
   DISPLAY_MOUSE_MODE_SELECT,
   DISPLAY_MOUSE_MODE_FOCUS,
+  DISPLAY_MOUSE_MODE_RENDER_REGION,
   DISPLAY_MOUSE_MODE_COUNT
 } typedef DisplayMouseMode;
 
@@ -57,6 +59,7 @@ struct Display {
   uint32_t reference_y;
   RenderMetaData current_render_meta_data;
   LuminaryOutputPromiseHandle output_promise_handle;
+  RenderRegion* region;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);

@@ -72,6 +72,12 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     if (undersampling_x >= device.settings.width || undersampling_y >= device.settings.height)
       continue;
 
+    if (undersampling_x < device.settings.window_x || undersampling_x >= device.settings.window_x + device.settings.window_width)
+      continue;
+
+    if (undersampling_y < device.settings.window_y || undersampling_y >= device.settings.window_y + device.settings.window_height)
+      continue;
+
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
     task.index.x = undersampling_x;

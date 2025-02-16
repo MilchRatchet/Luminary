@@ -48,14 +48,13 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
 
     if (element_button(
           window, display, mouse_state,
-          (ElementButtonArgs){
-            .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-            .image        = _window_entity_properties_type_button_images[entity_properties_id],
-            .size         = (ElementSize){.width = 32, .height = 32},
-            .color        = (is_visible) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_GRAY,
-            .hover_color  = MD_COLOR_WHITE,
-            .press_color  = MD_COLOR_WHITE,
-            .tooltip_text = _window_entity_properties_type_tooltip_string[entity_properties_id]})) {
+          (ElementButtonArgs) {.shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+                               .image        = _window_entity_properties_type_button_images[entity_properties_id],
+                               .size         = (ElementSize) {.width = 32, .height = 32},
+                               .color        = (is_visible) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_GRAY,
+                               .hover_color  = MD_COLOR_WHITE,
+                               .press_color  = MD_COLOR_WHITE,
+                               .tooltip_text = _window_entity_properties_type_tooltip_string[entity_properties_id]})) {
       user_interface_set_window_visible(display->ui, data->window_ids[entity_properties_id], !is_visible);
     }
   }
@@ -63,13 +62,17 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
   return false;
 }
 
-static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] =
-  {[DISPLAY_MOUSE_MODE_DEFAULT] = "Move", [DISPLAY_MOUSE_MODE_SELECT] = "Select", [DISPLAY_MOUSE_MODE_FOCUS] = "Focus Camera"};
+static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] = {
+  [DISPLAY_MOUSE_MODE_DEFAULT]       = "Move",
+  [DISPLAY_MOUSE_MODE_SELECT]        = "Select",
+  [DISPLAY_MOUSE_MODE_FOCUS]         = "Focus Camera",
+  [DISPLAY_MOUSE_MODE_RENDER_REGION] = "Render Region"};
 
 static const ElementButtonImage _window_mouse_modes_button_images[DISPLAY_MOUSE_MODE_COUNT] = {
-  [DISPLAY_MOUSE_MODE_DEFAULT] = ELEMENT_BUTTON_IMAGE_MOVE,
-  [DISPLAY_MOUSE_MODE_SELECT]  = ELEMENT_BUTTON_IMAGE_SELECT,
-  [DISPLAY_MOUSE_MODE_FOCUS]   = ELEMENT_BUTTON_IMAGE_FOCUS};
+  [DISPLAY_MOUSE_MODE_DEFAULT]       = ELEMENT_BUTTON_IMAGE_MOVE,
+  [DISPLAY_MOUSE_MODE_SELECT]        = ELEMENT_BUTTON_IMAGE_SELECT,
+  [DISPLAY_MOUSE_MODE_FOCUS]         = ELEMENT_BUTTON_IMAGE_FOCUS,
+  [DISPLAY_MOUSE_MODE_RENDER_REGION] = ELEMENT_BUTTON_IMAGE_REGION};
 
 static bool _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
@@ -83,14 +86,13 @@ static bool _window_sidebar_mouse_modes_action(Window* window, Display* display,
 
     if (element_button(
           window, display, mouse_state,
-          (ElementButtonArgs){
-            .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-            .image        = _window_mouse_modes_button_images[mouse_mode],
-            .size         = (ElementSize){.width = 32, .height = 32},
-            .color        = (display->mouse_mode == (DisplayMouseMode) mouse_mode) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_GRAY,
-            .hover_color  = MD_COLOR_WHITE,
-            .press_color  = MD_COLOR_WHITE,
-            .tooltip_text = _window_mouse_modes_tooltip_string[mouse_mode]})) {
+          (ElementButtonArgs) {.shape = ELEMENT_BUTTON_SHAPE_IMAGE,
+                               .image = _window_mouse_modes_button_images[mouse_mode],
+                               .size  = (ElementSize) {.width = 32, .height = 32},
+                               .color = (display->mouse_mode == (DisplayMouseMode) mouse_mode) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_GRAY,
+                               .hover_color  = MD_COLOR_WHITE,
+                               .press_color  = MD_COLOR_WHITE,
+                               .tooltip_text = _window_mouse_modes_tooltip_string[mouse_mode]})) {
       display_set_mouse_mode(display, mouse_mode);
     }
   }
@@ -121,12 +123,12 @@ void window_sidebar_create(Window** window, WindowSidebarType type) {
 
   switch (type) {
     case WINDOW_SIDEBAR_TYPE_ENTITY_PROPERTIES:
-      (*window)->margins = (WindowMargins){
+      (*window)->margins = (WindowMargins) {
         .margin_top = 128, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
       (*window)->action_func = _window_sidebar_entity_properties_action;
       break;
     case WINDOW_SIDEBAR_TYPE_MOUSE_MODES:
-      (*window)->margins = (WindowMargins){
+      (*window)->margins = (WindowMargins) {
         .margin_top = 128, .margin_right = 32, .margin_left = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
       (*window)->action_func = _window_sidebar_mouse_modes_action;
       break;
