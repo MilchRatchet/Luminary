@@ -1416,6 +1416,9 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  __FAILURE_HANDLE(_device_update_undersampling(device));
+  __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
+
   bool generate_output = false;
 
   // The first sample output is always queued directly, don't queue again.
@@ -1425,9 +1428,6 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
     __FAILURE_HANDLE(device_post_apply(device->post, device));
     __FAILURE_HANDLE(device_output_generate_output(device->output, device, callback_data->render_event_id));
   }
-
-  __FAILURE_HANDLE(_device_update_undersampling(device));
-  __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
 
   // Output if last sample in slice or if first slice (I will probably have to update the slice beforehand so this will be first sample in
   // slice etc)

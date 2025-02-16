@@ -11,6 +11,18 @@
 
 #define UNUSED_ARG(X) (void) X
 
+static void _argument_parser_arg_func_benchmark(
+  ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(parser);
+  UNUSED_ARG(host);
+  UNUSED_ARG(num_arguments);
+  UNUSED_ARG(arguments);
+
+  if (num_arguments > 0) {
+    parser->results.num_benchmark_outputs = atoll(arguments[0]);
+  }
+}
+
 static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
   UNUSED_ARG(host);
   UNUSED_ARG(num_arguments);
@@ -40,7 +52,7 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
     printf("\n\t\t%s\n", argument->description);
   }
 
-  parser->dry_run_requested = true;
+  parser->results.dry_run_requested = true;
 }
 
 static void _argument_parser_arg_func_output(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
@@ -50,7 +62,7 @@ static void _argument_parser_arg_func_output(ArgumentParser* parser, LuminaryHos
   UNUSED_ARG(arguments);
 
   if (num_arguments > 0) {
-    parser->output_directory = arguments[0];
+    parser->results.output_directory = arguments[0];
   }
 }
 
@@ -64,7 +76,7 @@ static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHo
   printf("Luminary %s (Branch: %s)\n", LUMINARY_VERSION_DATE, LUMINARY_BRANCH_NAME);
   printf("(%s, %s, CUDA %s, OptiX %s)\n", LUMINARY_COMPILER, LUMINARY_OS, LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
 
-  parser->dry_run_requested = true;
+  parser->results.dry_run_requested = true;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -138,6 +150,16 @@ void argument_parser_create(ArgumentParser** parser) {
   ArgumentDescriptor descriptor;
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
+  descriptor.long_name         = "benchmark";
+  descriptor.short_name        = "b";
+  descriptor.description       = "Run the benchmark";
+  descriptor.subargument_count = 1;
+  descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_benchmark;
+  descriptor.pre_execute       = false;
+
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "help";
   descriptor.short_name        = "h";
   descriptor.description       = "Print available commandline arguments";
@@ -204,7 +226,7 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
         result.matched_argument->handler_func(parser, (LuminaryHost*) 0, 0, (const char**) 0);
 
         // Encountered argument that prevents Mandarin Duck from actually executing.
-        parser->dry_run_requested = true;
+        parser->results.dry_run_requested = true;
         break;
       }
 

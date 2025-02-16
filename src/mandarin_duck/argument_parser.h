@@ -27,12 +27,17 @@ struct ParsedArgument {
   char* subarguments[MAX_NUM_SUBARGUMENTS];
 } typedef ParsedArgument;
 
+struct ArgumentParserResults {
+  bool dry_run_requested;
+  const char* output_directory;
+  uint32_t num_benchmark_outputs;
+} typedef ArgumentParserResults;
+
 struct ArgumentParser {
   ArgumentDescriptor* descriptors;
   char** inputs;
   ParsedArgument* parsed_arguments;
-  bool dry_run_requested;
-  const char* output_directory;
+  ArgumentParserResults results;
 };
 
 void argument_parser_create(ArgumentParser** parser);

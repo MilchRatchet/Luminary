@@ -4,15 +4,21 @@
 #include "display.h"
 #include "utils.h"
 
+enum MandarinDuckMode { MANDARIN_DUCK_MODE_DEFAULT, MANDARIN_DUCK_MODE_BENCHMARK, MANDARIN_DUCK_MODE_COUNT } typedef MandarinDuckMode;
+
 struct MandarinDuckCreateArgs {
   LuminaryHost* host;
   const char* output_directory;
+  MandarinDuckMode mode;
+  uint32_t num_benchmark_outputs;
 } typedef MandarinDuckCreateArgs;
 
 struct MandarinDuck {
+  MandarinDuckMode mode;
   LuminaryHost* host;
   Display* display;
   const char* output_directory;
+  LuminaryOutputPromiseHandle* benchmark_output_promises;
 } typedef MandarinDuck;
 
 void mandarin_duck_create(MandarinDuck** duck, MandarinDuckCreateArgs args);

@@ -1,5 +1,8 @@
 #include "mandarin_duck.h"
 
+#include <stdio.h>
+#include <string.h>
+
 static void _mandarin_duck_update_host_output_props(LuminaryHost* host, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(host);
 
@@ -53,20 +56,45 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
   LUM_FAILURE_HANDLE(host_malloc(&duck, sizeof(MandarinDuck)));
   memset(duck, 0, sizeof(MandarinDuck));
 
+  duck->mode             = args.mode;
   duck->host             = args.host;
   duck->output_directory = args.output_directory;
 
-  LuminaryRendererSettings renderer_settings;
-  LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
+  switch (duck->mode) {
+    case MANDARIN_DUCK_MODE_DEFAULT: {
+      LuminaryRendererSettings renderer_settings;
+      LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
 
-  display_create(&duck->display, renderer_settings.width, renderer_settings.height);
+      display_create(&duck->display, renderer_settings.width, renderer_settings.height);
 
-  _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
+      _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
+    } break;
+    case MANDARIN_DUCK_MODE_BENCHMARK: {
+      LuminaryRendererSettings renderer_settings;
+      LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
+
+      LUM_FAILURE_HANDLE(array_create(&duck->benchmark_output_promises, sizeof(LuminaryOutputPromiseHandle), args.num_benchmark_outputs));
+
+      for (uint32_t output_id = 0; output_id < args.num_benchmark_outputs; output_id++) {
+        LuminaryOutputRequestProperties properties;
+        properties.sample_count = 1 << output_id;
+        properties.width        = renderer_settings.width;
+        properties.height       = renderer_settings.height;
+
+        LuminaryOutputPromiseHandle handle;
+        LUM_FAILURE_HANDLE(luminary_host_request_output(duck->host, properties, &handle));
+
+        LUM_FAILURE_HANDLE(array_push(&duck->benchmark_output_promises, &handle));
+      }
+    } break;
+    default:
+      break;
+  }
 
   *_duck = duck;
 }
 
-void mandarin_duck_run(MandarinDuck* duck) {
+static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
   bool exit_requested = false;
 
   LuminaryWallTime* md_timer;
@@ -108,10 +136,70 @@ void mandarin_duck_run(MandarinDuck* duck) {
   LUM_FAILURE_HANDLE(wall_time_destroy(&md_timer));
 }
 
+void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
+  uint32_t num_benchmark_outputs;
+  LUM_FAILURE_HANDLE(array_get_num_elements(duck->benchmark_output_promises, &num_benchmark_outputs));
+
+  uint32_t obtained_outputs = 0;
+
+  while (obtained_outputs != num_benchmark_outputs) {
+    for (uint32_t output_id = 0; output_id < num_benchmark_outputs; output_id++) {
+      LuminaryOutputPromiseHandle promise_handle = duck->benchmark_output_promises[output_id];
+
+      if (promise_handle == LUMINARY_OUTPUT_HANDLE_INVALID)
+        continue;
+
+      LuminaryOutputHandle output_handle;
+      luminary_host_try_await_output(duck->host, promise_handle, &output_handle);
+
+      if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID)
+        continue;
+
+      LuminaryImage output_image;
+      LUM_FAILURE_HANDLE(luminary_host_get_image(duck->host, output_handle, &output_image))
+
+      info_message("[%07.1fs] %05u Samples", output_image.meta_data.time, output_image.meta_data.sample_count);
+      obtained_outputs++;
+
+      LuminaryPath* image_path;
+      LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
+
+      char string[4096];
+      sprintf(
+        string, "%s/Bench-%05u-%07.1fs.png", duck->output_directory, output_image.meta_data.sample_count, output_image.meta_data.time);
+
+      LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
+
+      LUM_FAILURE_HANDLE(luminary_host_save_png(duck->host, output_handle, image_path));
+
+      LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
+
+      LUM_FAILURE_HANDLE(luminary_host_release_output(duck->host, output_handle));
+
+      duck->benchmark_output_promises[output_id] = LUMINARY_OUTPUT_HANDLE_INVALID;
+    }
+  }
+}
+
+void mandarin_duck_run(MandarinDuck* duck) {
+  switch (duck->mode) {
+    case MANDARIN_DUCK_MODE_DEFAULT:
+      _mandarin_duck_run_mode_default(duck);
+      break;
+    case MANDARIN_DUCK_MODE_BENCHMARK:
+      _mandarin_duck_run_mode_benchmark(duck);
+      break;
+    default:
+      break;
+  }
+}
+
 void mandarin_duck_destroy(MandarinDuck** duck) {
   MD_CHECK_NULL_ARGUMENT(duck);
 
-  display_destroy(&(*duck)->display);
+  if ((*duck)->display) {
+    display_destroy(&(*duck)->display);
+  }
 
   LUM_FAILURE_HANDLE(host_free(duck));
 }

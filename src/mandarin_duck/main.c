@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
   argument_parser_create(&argument_parser);
   argument_parser_parse(argument_parser, argc, (const char**) argv);
 
-  const bool execute = !argument_parser->dry_run_requested;
+  const bool execute = !argument_parser->results.dry_run_requested;
 
   LuminaryHost* host;
   MandarinDuckCreateArgs args;
@@ -19,8 +19,10 @@ int main(int argc, char* argv[]) {
 
     argument_parser_execute(argument_parser, host);
 
-    args.host             = host;
-    args.output_directory = argument_parser->output_directory;
+    args.mode = (argument_parser->results.num_benchmark_outputs == 0) ? MANDARIN_DUCK_MODE_DEFAULT : MANDARIN_DUCK_MODE_BENCHMARK;
+    args.host = host;
+    args.output_directory      = argument_parser->results.output_directory;
+    args.num_benchmark_outputs = argument_parser->results.num_benchmark_outputs;
   }
 
   argument_parser_destroy(&argument_parser);
