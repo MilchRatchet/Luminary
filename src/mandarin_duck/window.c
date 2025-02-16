@@ -192,7 +192,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
     }
   }
 
-  if (is_mouse_hover && mouse_state->down) {
+  if ((is_mouse_hover && mouse_state->down) || elements_received_action) {
     window_set_focus(window);
   }
 
