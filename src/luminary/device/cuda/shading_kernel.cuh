@@ -88,35 +88,33 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
 
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
-  float dist = FLT_MAX;
+  OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
 
   if (target_pdf == 0.0f) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   // Transparent pass through rays are not allowed.
   if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
+  }
+
+  if (color_importance(light_color) == 0.0f) {
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   ////////////////////////////////////////////////////////////////////
   // Compute Visibility
   ////////////////////////////////////////////////////////////////////
 
-  if (color_importance(light_color) == 0.0f) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-  }
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
-  ////////////////////////////////////////////////////////////////////
-  // Compute visibility term
-  ////////////////////////////////////////////////////////////////////
+  RGBF visibility = optix_sun_shadowing(position, dir, FLT_MAX, trace_status);
 
-  RGBF visibility = optix_sun_shadowing(position, dir, dist);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
+  if (trace_status == OPTIX_TRACE_STATUS_ABORT)
+    return splat_color(0.0f);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(position, dir, FLT_MAX));
 
   return mul_color(light_color, visibility);
 }
@@ -191,18 +189,17 @@ __device__ RGBF
   // Evaluate sampled connection vertex
   ////////////////////////////////////////////////////////////////////
 
+  OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+
   vec3 pos_to_ocean = sub_vector(connection_point, data.position);
 
-  float dist     = get_length(pos_to_ocean);
-  float sun_dist = FLT_MAX;
-  const vec3 dir = normalize_vector(pos_to_ocean);
+  const float dist = get_length(pos_to_ocean);
+  const vec3 dir   = normalize_vector(pos_to_ocean);
 
   RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
 
   if (sum_connection_weight == 0.0f) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-    sun_dist    = 0.0f;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   bool is_refraction;
@@ -222,16 +219,12 @@ __device__ RGBF
   light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
   if (color_importance(light_color) == 0.0f) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-    sun_dist    = 0.0f;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   // Transparent pass through rays are not allowed.
   if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-    sun_dist    = 0.0f;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
@@ -242,9 +235,13 @@ __device__ RGBF
 
   const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle);
-  visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, handle));
-  visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, sun_dist));
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, trace_status);
+  visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, FLT_MAX, handle, trace_status));
+
+  if (trace_status == OPTIX_TRACE_STATUS_ABORT)
+    return splat_color(0.0f);
+
+  visibility = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, FLT_MAX));
 
   if (is_underwater) {
     visibility = mul_color(visibility, volume_integrate_transmittance_ocean(position, dir, dist, true));
@@ -318,14 +315,14 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
   // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
-  const float light_search_dist = (bsdf_sample_is_valid) ? FLT_MAX : -1.0f;
+  const OptixTraceStatus light_trace_status = (bsdf_sample_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
 
   OptixKernelFunctionLightBSDFTracePayload payload;
   payload.triangle_id = HIT_TYPE_LIGHT_BSDF_HINT;
 
   optixKernelFunctionLightBSDFTrace(
-    device.optix_bvh_light, position, bsdf_dir, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-    payload);
+    device.optix_bvh_light, position, bsdf_dir, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+    light_trace_status, payload);
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
@@ -338,15 +335,15 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   const TriangleHandle light_handle = ris_sample_light(
     data, index, light_ray_index, payload.triangle_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
+  OptixTraceStatus shadow_trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+
   if (color_importance(light_color) == 0.0f || light_handle.instance_id == LIGHT_ID_NONE) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
+    shadow_trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   // Transparent pass through rays are not allowed.
   if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
+    shadow_trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -355,8 +352,12 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
 
   position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, light_handle);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, light_handle, shadow_trace_status);
+
+  if (shadow_trace_status == OPTIX_TRACE_STATUS_ABORT)
+    return splat_color(0.0f);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   light_color = mul_color(light_color, visibility);
 
@@ -384,24 +385,24 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
 __device__ RGBF optix_compute_light_ray_ambient_sky(
   const GBufferData data, const vec3 ray, const RGBF sample_weight, const bool is_refraction, const ushort2 index) {
-  RGBF sky_light   = sample_weight;
-  float trace_dist = FLT_MAX;
+  RGBF sky_light                = sample_weight;
+  OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
 
   if (device.state.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling) {
-    trace_dist = OPTIX_TRACE_ABORT;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   // We don't support compute based sky due to register/performance reasons and because
   // we would have to include clouds then aswell.
   if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT) {
-    trace_dist = OPTIX_TRACE_ABORT;
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);
 
-  sky_light = mul_color(sky_light, optix_sun_shadowing(position, ray, trace_dist));
+  sky_light = mul_color(sky_light, optix_sun_shadowing(position, ray, FLT_MAX, trace_status));
 
-  if (trace_dist == OPTIX_TRACE_ABORT)
+  if (trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
 
   sky_light = mul_color(sky_light, sky_color_no_compute(ray));

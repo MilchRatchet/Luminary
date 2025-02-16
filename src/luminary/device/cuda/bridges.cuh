@@ -245,13 +245,18 @@ __device__ RGBF bridges_sample_bridge(
 __device__ RGBF bridges_evaluate_bridge(
   const DeviceTask task, const VolumeDescriptor volume, const TriangleHandle light_handle, const uint32_t seed, const Quaternion rotation,
   const float scale) {
+  bool bridge_is_valid = true;
+  bridge_is_valid &= light_handle.instance_id != LIGHT_ID_NONE;
+  bridge_is_valid &= seed != 0xFFFFFFFF;
+
   ////////////////////////////////////////////////////////////////////
   // Get light sample
   ////////////////////////////////////////////////////////////////////
 
+  OptixTraceStatus trace_status = (bridge_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
   RGBF light_color;
   vec3 light_vector;
-  if (light_handle.instance_id != LIGHT_ID_NONE) {
+  if (bridge_is_valid) {
     const DeviceTransform light_transform = load_transform(light_handle.instance_id);
 
     uint3 light_packed_uv;
@@ -276,7 +281,7 @@ __device__ RGBF bridges_evaluate_bridge(
   ////////////////////////////////////////////////////////////////////
 
   uint32_t vertex_count;
-  if (light_handle.instance_id != LIGHT_ID_NONE) {
+  if (bridge_is_valid) {
     float vertex_count_pdf;
     vertex_count = bridges_sample_vertex_count(volume, get_length(light_vector), seed, task.index, vertex_count_pdf);
   }
@@ -303,7 +308,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
   float dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, task.index)) * scale;
 
-  light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle));
+  light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, trace_status));
 
   sum_dist += dist;
 
@@ -318,7 +323,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, task.index)) * scale;
 
-    light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle));
+    light_color = mul_color(light_color, optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, trace_status));
 
     sum_dist += dist;
   }
@@ -453,12 +458,9 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
   // Evaluate sampled path
   ////////////////////////////////////////////////////////////////////
 
-  if (selected_seed == 0xFFFFFFFF)
-    return get_color(0.0f, 0.0f, 0.0f);
-
   RGBF bridge_color = bridges_evaluate_bridge(task, volume, selected_handle, selected_seed, selected_rotation, selected_scale);
 
-  bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : get_color(0.0f, 0.0f, 0.0f);
+  bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : splat_color(0.0f);
 
   UTILS_CHECK_NANS(task.index, bridge_color);
 

@@ -63,7 +63,8 @@ __device__ bool particle_opacity_cutout(const float2 coord) {
 }
 
 #ifdef SHADING_KERNEL
-__device__ RGBF optix_geometry_shadowing(const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light) {
+__device__ RGBF optix_geometry_shadowing(
+  const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const OptixTraceStatus status) {
   // For triangle lights, we cannot rely on fully opaque OMMs because if we first hit the target light and then execute the closest hit for
   // that, then we will never know if there is an occluder. Similarly, skipping anyhit for fully opaque needs to still terminate the ray so
   // I enforce anyhit.
@@ -72,7 +73,7 @@ __device__ RGBF optix_geometry_shadowing(const vec3 position, const vec3 dir, co
   payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowTrace(
-    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, payload);
+    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, status, payload);
 
   if (payload.handle.instance_id == HIT_TYPE_REJECT) {
     payload.throughput = get_color(0.0f, 0.0f, 0.0f);
@@ -81,12 +82,13 @@ __device__ RGBF optix_geometry_shadowing(const vec3 position, const vec3 dir, co
   return payload.throughput;
 }
 
-__device__ RGBF optix_sun_shadowing(const vec3 position, const vec3 dir, const float dist) {
+__device__ RGBF optix_sun_shadowing(const vec3 position, const vec3 dir, const float dist, const OptixTraceStatus status) {
   OptixKernelFunctionShadowSunTracePayload payload;
   payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowSunTrace(
-    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, payload);
+    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, status,
+    payload);
 
   return payload.throughput;
 }

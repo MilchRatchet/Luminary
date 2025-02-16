@@ -90,16 +90,20 @@ __device__ void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResu
   payload.handle = result.handle;
 
   optixKernelFunctionGeometryTrace(
-    device.optix_bvh, task.origin, task.ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, payload);
+    device.optix_bvh, task.origin, task.ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE,
+    OPTIX_TRACE_STATUS_EXECUTE, payload);
 
   result.depth  = payload.depth;
   result.handle = payload.handle;
 }
 
 __device__ void optix_raytrace_particles(const DeviceTask task, OptixRaytraceResult& result) {
+  OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+
   // Particles can not be hit by non delta path due to their negligible contribution
-  if ((task.state & STATE_FLAG_DELTA_PATH) == 0 || !device.particles.active)
-    return;
+  if ((task.state & STATE_FLAG_DELTA_PATH) == 0 || !device.particles.active) {
+    trace_status = OPTIX_TRACE_STATUS_ABORT;
+  }
 
   const float time         = quasirandom_sequence_1D_base_float(QUASI_RANDOM_TARGET_CAMERA_TIME, task.index, device.state.sample_id, 0);
   const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
@@ -118,7 +122,8 @@ __device__ void optix_raytrace_particles(const DeviceTask task, OptixRaytraceRes
   payload.instance_id = HIT_TYPE_REJECT;
 
   optixKernelFunctionParticleTrace(
-    device.optix_bvh_particles, pos, scaled_ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, payload);
+    device.optix_bvh_particles, pos, scaled_ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, trace_status,
+    payload);
 
   if (payload.instance_id != HIT_TYPE_REJECT) {
     // Hit ID contains the triangle ID but we only store the actual particle / quad ID
