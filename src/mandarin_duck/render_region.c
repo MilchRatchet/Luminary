@@ -43,7 +43,21 @@ void render_region_handle_inputs(RenderRegion* region, Display* display, Luminar
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
   if (mouse_state->down == false) {
+    // Update the render region only if we had just modified it and now let go of the mouse button.
+    if (region->state != RENDER_REGION_STATE_DEFAULT) {
+      LuminaryRendererSettings settings;
+      LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+      settings.region_x      = region->x;
+      settings.region_y      = region->y;
+      settings.region_width  = region->width;
+      settings.region_height = region->height;
+
+      LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
+    }
+
     region->state = RENDER_REGION_STATE_DEFAULT;
+
     return;
   }
 
@@ -138,16 +152,6 @@ void render_region_handle_inputs(RenderRegion* region, Display* display, Luminar
     default:
       break;
   }
-
-  LuminaryRendererSettings settings;
-  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-  settings.region_x      = region->x;
-  settings.region_y      = region->y;
-  settings.region_width  = region->width;
-  settings.region_height = region->height;
-
-  LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
 }
 
 #define RENDER_REGION_BORDER_LENGTH 32
