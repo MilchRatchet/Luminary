@@ -49,7 +49,7 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const uint32_t amount = width * height;
 
-  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+  const float2 jitter = camera_get_jitter();
 
   const uint32_t bucket_id = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
 
@@ -104,7 +104,7 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
 
   const uint32_t amount = width * height;
 
-  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+  const float2 jitter = camera_get_jitter();
 
   const float prev_scale     = device.state.sample_id;
   const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
@@ -352,7 +352,7 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
 
   const uint32_t amount = width * height;
 
-  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+  const float2 jitter = camera_get_jitter();
 
   const float prev_scale     = device.state.sample_id;
   const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
