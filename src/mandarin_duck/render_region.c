@@ -126,23 +126,24 @@ void render_region_handle_inputs(RenderRegion* region, Display* display, Luminar
           region->y += move_y;
           region->width += move_x;
           region->height -= move_y;
-          region->width = fminf(1.0f - region->x, fmaxf(0.0f, region->width));
           break;
         case RENDER_REGION_VERTEX_BOTTOM_LEFT:
           region->x += move_x;
           region->width -= move_x;
           region->height += move_y;
-          region->height = fminf(1.0f - region->y, fmaxf(0.0f, region->height));
           break;
         case RENDER_REGION_VERTEX_BOTTOM_RIGHT:
           region->width += move_x;
           region->height += move_y;
-          region->width  = fminf(1.0f - region->x, fmaxf(0.0f, region->width));
-          region->height = fminf(1.0f - region->y, fmaxf(0.0f, region->height));
           break;
         default:
           break;
       }
+
+      region->x      = fminf(1.0f, fmaxf(0.0f, region->x));
+      region->y      = fminf(1.0f, fmaxf(0.0f, region->y));
+      region->width  = fminf(1.0f, fmaxf(0.0f, region->width));
+      region->height = fminf(1.0f, fmaxf(0.0f, region->height));
 
       region->x      = fminf(1.0f - region->width, fmaxf(0.0f, region->x));
       region->y      = fminf(1.0f - region->height, fmaxf(0.0f, region->y));

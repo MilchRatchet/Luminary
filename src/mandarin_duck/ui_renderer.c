@@ -170,6 +170,14 @@ void ui_renderer_render_rounded_box(
   if (y >= display->height)
     return;
 
+  if (x >= display->width) {
+    x = display->width - 1;
+  }
+
+  if (x + width >= display->width) {
+    width = display->width - x;
+  }
+
   const uint32_t height_clip = (y + height > display->height) ? display->height - y : height;
 
   _ui_renderer_render_rounded_box(
