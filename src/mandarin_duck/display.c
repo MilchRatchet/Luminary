@@ -426,7 +426,19 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_RENDER_REGION);
     }
 
-    if (!ui_handled_mouse) {
+    if (ui_handled_mouse) {
+      switch (display->mouse_mode) {
+        case DISPLAY_MOUSE_MODE_DEFAULT:
+        case DISPLAY_MOUSE_MODE_SELECT:
+        case DISPLAY_MOUSE_MODE_FOCUS:
+        default:
+          break;
+        case DISPLAY_MOUSE_MODE_RENDER_REGION:
+          render_region_remove_focus(display->region, host);
+          break;
+      }
+    }
+    else {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
         default:

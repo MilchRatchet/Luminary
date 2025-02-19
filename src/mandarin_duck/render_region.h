@@ -33,6 +33,7 @@ struct RenderRegion {
 
 void render_region_create(RenderRegion** region);
 void render_region_handle_inputs(RenderRegion* region, Display* display, LuminaryHost* host, MouseState* mouse_state);
+void render_region_remove_focus(RenderRegion* region, LuminaryHost* host);
 void render_region_render(RenderRegion* region, Display* display, UIRenderer* renderer);
 void render_region_destroy(RenderRegion** region);
 
