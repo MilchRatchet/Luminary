@@ -74,12 +74,15 @@ bool element_dropdown(Window* window, Display* display, const MouseState* mouse_
                                                        .element_hash       = dropdown.hash,
                                                        .subelement_index   = 0,
                                                        .dropdown_selection = selected_index};
+
+    window->status.received_mouse_action |= true;
   }
 
   if (mouse_result.is_hovered) {
     window->element_has_hover = true;
 
     display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+    window->status.received_hover |= true;
   }
 
   window_push_element(window, &dropdown);

@@ -6,7 +6,7 @@
 #include "display.h"
 #include "elements/text.h"
 
-static bool _window_renderer_status_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_renderer_status_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -21,29 +21,27 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs){
-          .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
-          .text         = "Host:",
-          .center_x     = false,
-          .center_y     = true,
-          .highlighting = false,
-          .cache_text   = true,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
+                           .text         = "Host:",
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = true,
+                           .auto_size    = false,
+                           .is_clickable = false});
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs){
-          .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
-          .text         = string,
-          .center_x     = false,
-          .center_y     = true,
-          .highlighting = false,
-          .cache_text   = false,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
+                           .text         = string,
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = false,
+                           .auto_size    = false,
+                           .is_clickable = false});
 
       char text[256];
 
@@ -54,16 +52,15 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs){
-          .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
-          .text         = text,
-          .center_x     = false,
-          .center_y     = true,
-          .highlighting = false,
-          .cache_text   = false,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+                           .text         = text,
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = false,
+                           .auto_size    = false,
+                           .is_clickable = false});
     }
     window_pop_section(window);
   }
@@ -77,29 +74,27 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs){
-          .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
-          .text         = "Device:",
-          .center_x     = false,
-          .center_y     = true,
-          .highlighting = false,
-          .cache_text   = true,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
+                           .text         = "Device:",
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = true,
+                           .auto_size    = false,
+                           .is_clickable = false});
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs){
-          .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
-          .text         = string,
-          .center_x     = false,
-          .center_y     = true,
-          .highlighting = false,
-          .cache_text   = false,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
+                           .text         = string,
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = false,
+                           .auto_size    = false,
+                           .is_clickable = false});
 
       char text[256];
 
@@ -110,21 +105,18 @@ static bool _window_renderer_status_action(Window* window, Display* display, Lum
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs){
-          .color        = 0xFFFFFFFF,
-          .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
-          .text         = text,
-          .center_x     = false,
-          .center_y     = true,
-          .highlighting = false,
-          .cache_text   = false,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+                           .text         = text,
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = false,
+                           .auto_size    = false,
+                           .is_clickable = false});
     }
     window_pop_section(window);
   }
-
-  return false;
 }
 
 void window_renderer_status_create(Window** window) {
@@ -146,7 +138,7 @@ void window_renderer_status_create(Window** window) {
   (*window)->auto_size       = true;
   (*window)->auto_align      = true;
   (*window)->margins =
-    (WindowMargins){.margin_bottom = 32, .margin_right = 32, .margin_left = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
+    (WindowMargins) {.margin_bottom = 32, .margin_right = 32, .margin_left = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_renderer_status_action;
   (*window)->fixed_depth = true;
 

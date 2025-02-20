@@ -287,62 +287,76 @@ bool element_slider(
     else {
       if (keyboard_state->keys[SDL_SCANCODE_1].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '1';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_2].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '2';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_3].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '3';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_4].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '4';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_5].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '5';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_6].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '6';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_7].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '7';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_8].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '8';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_9].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '9';
+        window->status.received_keyboard_action |= true;
       }
 
       if (keyboard_state->keys[SDL_SCANCODE_0].phase == KEY_PHASE_PRESSED) {
         window->state_data.string[window->state_data.num_characters++] = '0';
+        window->status.received_keyboard_action |= true;
       }
 
       if (args.type != ELEMENT_SLIDER_DATA_TYPE_UINT) {
         if (keyboard_state->keys[SDL_SCANCODE_MINUS].phase == KEY_PHASE_PRESSED) {
           window->state_data.string[window->state_data.num_characters++] = '-';
+          window->status.received_keyboard_action |= true;
         }
 
         // German Layout
         if (keyboard_state->keys[SDL_SCANCODE_SLASH].phase == KEY_PHASE_PRESSED) {
           window->state_data.string[window->state_data.num_characters++] = '-';
+          window->status.received_keyboard_action |= true;
         }
       }
 
       if (is_integer_type == false) {
         if (keyboard_state->keys[SDL_SCANCODE_PERIOD].phase == KEY_PHASE_PRESSED) {
           window->state_data.string[window->state_data.num_characters++] = '.';
+          window->status.received_keyboard_action |= true;
         }
 
         if (keyboard_state->keys[SDL_SCANCODE_COMMA].phase == KEY_PHASE_PRESSED) {
           window->state_data.string[window->state_data.num_characters++] = '.';
+          window->status.received_keyboard_action |= true;
         }
       }
 
@@ -351,12 +365,15 @@ bool element_slider(
           window->state_data.string[window->state_data.num_characters - 1] = '\0';
           window->state_data.num_characters--;
         }
+
+        window->status.received_keyboard_action |= true;
       }
     }
   }
 
   if (mouse_result.is_hovered) {
     window->element_has_hover = true;
+    window->status.received_hover |= true;
 
     if (keyboard_state->keys[SDL_SCANCODE_LALT].down || is_integer_type) {
       display_set_cursor(display, SDL_SYSTEM_CURSOR_TEXT);
@@ -371,6 +388,8 @@ bool element_slider(
   if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
     window->state_data.element_hash     = slider.hash;
     window->state_data.subelement_index = data->hover_component_index;
+
+    window->status.received_mouse_action |= true;
 
     if (keyboard_state->keys[SDL_SCANCODE_LALT].down || is_integer_type) {
       window->state_data.state = WINDOW_INTERACTION_STATE_STRING;

@@ -15,36 +15,30 @@ struct SubwindowDropdownData {
 } typedef SubwindowDropdownData;
 static_assert(sizeof(SubwindowDropdownData) <= WINDOW_DATA_SECTION_SIZE, "Window data exceeds allocated size.");
 
-static bool _subwindow_dropdown_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _subwindow_dropdown_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
   SubwindowDropdownData* data = (SubwindowDropdownData*) window->data;
 
-  bool received_click = false;
-
   for (uint32_t string_id = 0; string_id < data->num_strings; string_id++) {
     window_margin(window, 4);
     if (element_text(
           window, display, mouse_state,
-          (ElementTextArgs){
-            .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-            .color        = 0xFFFFFFFF,
-            .text         = data->strings[string_id],
-            .center_x     = true,
-            .center_y     = true,
-            .highlighting = true,
-            .cache_text   = true,
-            .auto_size    = false,
-            .is_clickable = false})) {
+          (ElementTextArgs) {.size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                             .color        = 0xFFFFFFFF,
+                             .text         = data->strings[string_id],
+                             .center_x     = true,
+                             .center_y     = true,
+                             .highlighting = true,
+                             .cache_text   = true,
+                             .auto_size    = false,
+                             .is_clickable = false})) {
       data->selected_index = string_id;
-      received_click       = true;
     }
     window_margin(window, 4);
   }
-
-  return received_click;
 }
 
 void subwindow_dropdown_add_string(Window* window, const char* string) {

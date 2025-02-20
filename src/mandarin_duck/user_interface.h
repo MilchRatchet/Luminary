@@ -2,7 +2,21 @@
 #define MANDARIN_DUCK_USER_INTERFACE_H
 
 #include "utils.h"
-#include "window.h"
+
+struct Display typedef Display;
+struct Window typedef Window;
+struct MouseState typedef MouseState;
+
+typedef uint32_t WindowVisibilityMask;
+
+struct UserInterfaceStatus {
+  bool received_hover;
+  bool received_mouse_action;
+  bool received_keyboard_action;
+} typedef UserInterfaceStatus;
+
+UserInterfaceStatus user_interface_status_default();
+UserInterfaceStatus user_interface_status_merge(UserInterfaceStatus a, UserInterfaceStatus b);
 
 struct UserInterface {
   Window** windows;
@@ -13,7 +27,8 @@ struct UserInterface {
 
 void user_interface_create(UserInterface** ui);
 void user_interface_mouse_hovers_background(UserInterface* ui, Display* display, bool* mouse_hovers_background);
-bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host, WindowVisibilityMask visibility_mask);
+UserInterfaceStatus user_interface_handle_inputs(
+  UserInterface* ui, Display* display, LuminaryHost* host, WindowVisibilityMask visibility_mask);
 void user_interface_render(UserInterface* ui, Display* display, WindowVisibilityMask visibility_mask);
 void user_interface_destroy(UserInterface** ui);
 

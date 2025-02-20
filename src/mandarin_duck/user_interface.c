@@ -1,6 +1,7 @@
 #include "user_interface.h"
 
 #include "display.h"
+#include "window.h"
 #include "windows/about.h"
 #include "windows/caption_controls.h"
 #include "windows/entity_properties.h"
@@ -97,6 +98,21 @@ static void _user_interface_sort_windows_by_depth(UserInterface* ui) {
 // API functions
 ////////////////////////////////////////////////////////////////////
 
+UserInterfaceStatus user_interface_status_default() {
+  UserInterfaceStatus status = {.received_hover = false, .received_keyboard_action = false, .received_mouse_action = false};
+
+  return status;
+}
+
+UserInterfaceStatus user_interface_status_merge(UserInterfaceStatus a, UserInterfaceStatus b) {
+  UserInterfaceStatus status = {
+    .received_hover           = a.received_hover || b.received_hover,
+    .received_keyboard_action = a.received_keyboard_action || b.received_keyboard_action,
+    .received_mouse_action    = a.received_mouse_action || b.received_mouse_action};
+
+  return status;
+}
+
 void user_interface_create(UserInterface** ui) {
   MD_CHECK_NULL_ARGUMENT(ui);
 
@@ -134,7 +150,8 @@ void user_interface_mouse_hovers_background(UserInterface* ui, Display* display,
   *mouse_hovers_background = !window_handled_mouse;
 }
 
-bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryHost* host, WindowVisibilityMask visibility_mask) {
+UserInterfaceStatus user_interface_handle_inputs(
+  UserInterface* ui, Display* display, LuminaryHost* host, WindowVisibilityMask visibility_mask) {
   MD_CHECK_NULL_ARGUMENT(ui);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -155,7 +172,7 @@ bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
     mouse_state_invalidate_position(ui->mouse_state);
   }
 
-  bool window_handled_mouse = false;
+  UserInterfaceStatus status = user_interface_status_default();
 
   for (uint32_t window_id = 0; window_id < num_windows; window_id++) {
     Window* window = ui->windows[ui->window_ids_sorted[window_id]];
@@ -163,12 +180,14 @@ bool user_interface_handle_inputs(UserInterface* ui, Display* display, LuminaryH
     if (window->is_visible == false || ((window->visibility_mask & visibility_mask) == 0))
       continue;
 
-    window_handled_mouse |= window_handle_input(window, display, host, ui->mouse_state);
+    UserInterfaceStatus window_status = window_handle_input(window, display, host, ui->mouse_state);
+
+    status = user_interface_status_merge(status, window_status);
   }
 
   _user_interface_sort_windows_by_depth(ui);
 
-  return window_handled_mouse;
+  return status;
 }
 
 void user_interface_render(UserInterface* ui, Display* display, WindowVisibilityMask visibility_mask) {

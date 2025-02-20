@@ -11,7 +11,7 @@ struct SubwindowTooltipData {
 } typedef SubwindowTooltipData;
 static_assert(sizeof(SubwindowTooltipData) <= WINDOW_DATA_SECTION_SIZE, "Window data exceeds allocated size.");
 
-static bool _subwindow_tooltip_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _subwindow_tooltip_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -20,18 +20,15 @@ static bool _subwindow_tooltip_action(Window* window, Display* display, Luminary
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs){
-      .size         = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
-      .color        = 0xFFFFFFFF,
-      .text         = data->string,
-      .center_x     = true,
-      .center_y     = true,
-      .highlighting = true,
-      .cache_text   = true,
-      .auto_size    = true,
-      .is_clickable = false});
-
-  return false;
+    (ElementTextArgs) {.size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .color        = 0xFFFFFFFF,
+                       .text         = data->string,
+                       .center_x     = true,
+                       .center_y     = true,
+                       .highlighting = true,
+                       .cache_text   = true,
+                       .auto_size    = true,
+                       .is_clickable = false});
 }
 
 static void _subwindow_tooltip_propagate_parent(Window* window, Window* parent) {

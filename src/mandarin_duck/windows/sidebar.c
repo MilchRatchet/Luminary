@@ -31,7 +31,7 @@ static const ElementButtonImage _window_entity_properties_type_button_images[WIN
   [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = ELEMENT_BUTTON_IMAGE_MATERIAL,
   [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]  = ELEMENT_BUTTON_IMAGE_INSTANCE};
 
-static bool _window_sidebar_entity_properties_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_sidebar_entity_properties_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -58,8 +58,6 @@ static bool _window_sidebar_entity_properties_action(Window* window, Display* di
       user_interface_set_window_visible(display->ui, data->window_ids[entity_properties_id], !is_visible);
     }
   }
-
-  return false;
 }
 
 static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] = {
@@ -74,7 +72,7 @@ static const ElementButtonImage _window_mouse_modes_button_images[DISPLAY_MOUSE_
   [DISPLAY_MOUSE_MODE_FOCUS]         = ELEMENT_BUTTON_IMAGE_FOCUS,
   [DISPLAY_MOUSE_MODE_RENDER_REGION] = ELEMENT_BUTTON_IMAGE_REGION};
 
-static bool _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -96,8 +94,6 @@ static bool _window_sidebar_mouse_modes_action(Window* window, Display* display,
       display_set_mouse_mode(display, mouse_mode);
     }
   }
-
-  return false;
 }
 
 void window_sidebar_create(Window** window, WindowSidebarType type) {

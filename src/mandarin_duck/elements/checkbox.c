@@ -46,12 +46,15 @@ bool element_checkbox(Window* window, Display* display, const MouseState* mouse_
   if (mouse_result.is_clicked) {
     data->data                 = !data->data;
     *(bool*) args.data_binding = data->data;
+
+    window->status.received_mouse_action |= true;
   }
 
   if (mouse_result.is_hovered) {
     window->element_has_hover = true;
 
     display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+    window->status.received_hover |= true;
   }
 
   window_push_element(window, &checkbox);

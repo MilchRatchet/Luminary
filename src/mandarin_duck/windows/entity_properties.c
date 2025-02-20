@@ -180,7 +180,7 @@ static bool _window_entity_properties_add_dropdown(
   return update_data;
 }
 
-static bool _window_entity_properties_renderer_settings_action(
+static void _window_entity_properties_renderer_settings_action(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -226,11 +226,9 @@ static bool _window_entity_properties_renderer_settings_action(
 
     LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
   }
-
-  return update_data;
 }
 
-static bool _window_entity_properties_camera_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_camera_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -333,11 +331,9 @@ static bool _window_entity_properties_camera_action(Window* window, Display* dis
 
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }
-
-  return update_data;
 }
 
-static bool _window_entity_properties_ocean_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_ocean_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -390,11 +386,9 @@ static bool _window_entity_properties_ocean_action(Window* window, Display* disp
 
     LUM_FAILURE_HANDLE(luminary_host_set_ocean(host, &ocean));
   }
-
-  return update_data;
 }
 
-static bool _window_entity_properties_sky_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_sky_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -506,8 +500,6 @@ static bool _window_entity_properties_sky_action(Window* window, Display* displa
 
     LUM_FAILURE_HANDLE(luminary_host_set_sky(host, &sky));
   }
-
-  return update_data;
 }
 
 static bool _window_entity_properties_cloud_layer_action(
@@ -545,7 +537,7 @@ static bool _window_entity_properties_cloud_layer_action(
   return update_data;
 }
 
-static bool _window_entity_properties_cloud_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_cloud_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -603,11 +595,9 @@ static bool _window_entity_properties_cloud_action(Window* window, Display* disp
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_cloud(host, &cloud));
   }
-
-  return update_data;
 }
 
-static bool _window_entity_properties_fog_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_fog_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -638,11 +628,9 @@ static bool _window_entity_properties_fog_action(Window* window, Display* displa
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_fog(host, &fog));
   }
-
-  return update_data;
 }
 
-static bool _window_entity_properties_particles_action(
+static void _window_entity_properties_particles_action(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -686,11 +674,9 @@ static bool _window_entity_properties_particles_action(
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_particles(host, &particles));
   }
-
-  return update_data;
 }
 
-static bool _window_entity_properties_material_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_material_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -717,7 +703,7 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
                          .auto_size    = false,
                          .is_clickable = false});
 
-    return false;
+    return;
   }
 
   LuminaryMaterial material;
@@ -776,10 +762,10 @@ static bool _window_entity_properties_material_action(Window* window, Display* d
     LUM_FAILURE_HANDLE(luminary_host_set_material(host, display->select_pixel_data.material_id, &material));
   }
 
-  return update_data;
+  return;
 }
 
-static bool _window_entity_properties_instance_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_instance_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -806,7 +792,7 @@ static bool _window_entity_properties_instance_action(Window* window, Display* d
                          .auto_size    = false,
                          .is_clickable = false});
 
-    return false;
+    return;
   }
 
   LuminaryInstance instance;
@@ -825,10 +811,10 @@ static bool _window_entity_properties_instance_action(Window* window, Display* d
     LUM_FAILURE_HANDLE(luminary_host_set_instance(host, &instance));
   }
 
-  return update_data;
+  return;
 }
 
-static bool (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
+static void (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) = {
   [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]  = _window_entity_properties_renderer_settings_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA]    = _window_entity_properties_camera_action,

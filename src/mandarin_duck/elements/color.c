@@ -26,6 +26,9 @@ bool element_color(Window* window, const MouseState* mouse_state, ElementColorAr
 
   data->color = args.color;
 
+  window->status.received_hover |= mouse_result.is_hovered;
+  window->status.received_mouse_action |= mouse_result.is_clicked;
+
   window_push_element(window, &color);
 
   return mouse_result.is_clicked;

@@ -53,6 +53,9 @@ bool element_separator(Window* window, const MouseState* mouse_state, ElementSep
   ElementMouseResult mouse_result;
   element_apply_context(&text, context, &args.size, mouse_state, &mouse_result);
 
+  window->status.received_hover |= mouse_result.is_hovered;
+  window->status.received_mouse_action |= mouse_result.is_clicked;
+
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &text));
 
   return mouse_result.is_clicked;

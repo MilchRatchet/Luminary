@@ -5,20 +5,19 @@
 
 #define CAPTION_CONTROL_BUTTON_SIZE 16
 
-static bool _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
   if (element_button(
         window, display, mouse_state,
-        (ElementButtonArgs){
-          .size         = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color        = 0xFFFF5F57,
-          .hover_color  = 0xFFFF1411,
-          .press_color  = 0xFF720000,
-          .tooltip_text = (const char*) 0})) {
+        (ElementButtonArgs) {.size         = (ElementSize) {.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+                             .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
+                             .color        = 0xFFFF5F57,
+                             .hover_color  = 0xFFFF1411,
+                             .press_color  = 0xFF720000,
+                             .tooltip_text = (const char*) 0})) {
     display->exit_requested = true;
   }
 
@@ -26,13 +25,12 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
 
   if (element_button(
         window, display, mouse_state,
-        (ElementButtonArgs){
-          .size         = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color        = 0xFFFFBB2F,
-          .hover_color  = 0xFFFFD51A,
-          .press_color  = 0xFF975600,
-          .tooltip_text = (const char*) 0})) {
+        (ElementButtonArgs) {.size         = (ElementSize) {.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+                             .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
+                             .color        = 0xFFFFBB2F,
+                             .hover_color  = 0xFFFFD51A,
+                             .press_color  = 0xFF975600,
+                             .tooltip_text = (const char*) 0})) {
     SDL_MinimizeWindow(display->sdl_window);
   }
 
@@ -40,16 +38,13 @@ static bool _window_caption_controls_action(Window* window, Display* display, Lu
 
   if (element_button(
         window, display, mouse_state,
-        (ElementButtonArgs){
-          .size         = (ElementSize){.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color        = 0xFF26C942,
-          .hover_color  = 0xFF13FF21,
-          .press_color  = 0xFF026200,
-          .tooltip_text = (const char*) 0})) {
+        (ElementButtonArgs) {.size         = (ElementSize) {.width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+                             .shape        = ELEMENT_BUTTON_SHAPE_CIRCLE,
+                             .color        = 0xFF26C942,
+                             .hover_color  = 0xFF13FF21,
+                             .press_color  = 0xFF026200,
+                             .tooltip_text = (const char*) 0})) {
   }
-
-  return false;
 }
 
 void window_caption_controls_create(Window** window) {
@@ -71,7 +66,7 @@ void window_caption_controls_create(Window** window) {
   (*window)->auto_size       = false;
   (*window)->auto_align      = true;
   (*window)->margins =
-    (WindowMargins){.margin_top = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
+    (WindowMargins) {.margin_top = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_caption_controls_action;
   (*window)->fixed_depth = true;
 

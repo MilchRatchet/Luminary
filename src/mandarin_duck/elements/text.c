@@ -64,9 +64,12 @@ bool element_text(Window* window, Display* display, const MouseState* mouse_stat
     window->element_has_hover = true;
 
     display_set_cursor(display, SDL_SYSTEM_CURSOR_POINTER);
+    window->status.received_hover |= true;
   }
+
+  window->status.received_mouse_action |= args.is_clickable && mouse_result.is_clicked;
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &text));
 
-  return mouse_result.is_clicked;
+  return args.is_clickable && mouse_result.is_clicked;
 }

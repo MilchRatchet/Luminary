@@ -4,6 +4,7 @@
 
 #include "display.h"
 #include "ui_renderer_blur.h"
+#include "user_interface.h"
 
 static uint64_t __window_depth_counter = 1;
 
@@ -17,6 +18,8 @@ void window_create(Window** window) {
 
   (*window)->depth        = __window_depth_counter++;
   (*window)->is_subwindow = false;
+
+  (*window)->status = user_interface_status_default();
 }
 
 void window_create_subwindow(Window* window) {
@@ -76,7 +79,7 @@ static void _window_reset_state(Window* window) {
   }
 }
 
-bool window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state) {
+UserInterfaceStatus window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -102,6 +105,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
   }
 
   window->element_has_hover = false;
+  window->status            = user_interface_status_default();
 
   switch (window->state_data.state) {
     case WINDOW_INTERACTION_STATE_NONE:
@@ -133,10 +137,12 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
         display_set_mouse_visible(display, true);
       }
       break;
-    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED:
-      window_handle_input(window->external_subwindow, display, host, mouse_state);
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED: {
+      UserInterfaceStatus external_status = window_handle_input(window->external_subwindow, display, host, mouse_state);
       window->external_subwindow->propagate_parent_func(window->external_subwindow, window);
-      break;
+
+      window->status = user_interface_status_merge(window->status, external_status);
+    } break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
       _window_reset_state(window);
       break;
@@ -158,8 +164,9 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
                                               .padding       = window->padding,
                                               .is_horizontal = window->is_horizontal};
 
-  const bool elements_received_action = window->action_func(window, display, host, mouse_state);
-  const bool is_mouse_hover           = window_is_mouse_hover(window, display, mouse_state);
+  window->action_func(window, display, host, mouse_state);
+
+  window->status.received_hover |= window_is_mouse_hover(window, display, mouse_state);
 
   switch (window->state_data.state) {
     case WINDOW_INTERACTION_STATE_NONE:
@@ -186,21 +193,23 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host, M
       break;
   }
 
-  if (is_mouse_hover && !window->element_has_hover && window->is_movable && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
-    if (mouse_state->down && !elements_received_action) {
+  if (
+    window->status.received_hover && !window->element_has_hover && window->is_movable
+    && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
+    if (mouse_state->down && !window->status.received_mouse_action) {
       window->state_data.state = WINDOW_INTERACTION_STATE_DRAG;
     }
   }
 
-  if ((is_mouse_hover && mouse_state->down) || elements_received_action) {
+  if ((window->status.received_hover && mouse_state->down) || window->status.received_mouse_action) {
     window_set_focus(window);
   }
 
-  if (is_mouse_hover && !window->is_subwindow) {
+  if (window->status.received_hover && !window->is_subwindow) {
     mouse_state_invalidate(mouse_state);
   }
 
-  return is_mouse_hover || elements_received_action;
+  return window->status;
 }
 
 void window_set_focus(Window* window) {

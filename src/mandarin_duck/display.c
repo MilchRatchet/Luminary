@@ -407,26 +407,28 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   _display_set_default_cursor(display);
 
   WindowVisibilityMask visibility_mask = _display_get_window_visibility_mask(display);
-  const bool ui_handled_mouse          = user_interface_handle_inputs(display->ui, display, host, visibility_mask);
+  UserInterfaceStatus ui_status        = user_interface_handle_inputs(display->ui, display, host, visibility_mask);
 
   if (display->show_ui) {
-    if (display->keyboard_state->keys[SDL_SCANCODE_1].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
+    if (ui_status.received_keyboard_action == false) {
+      if (display->keyboard_state->keys[SDL_SCANCODE_1].phase == KEY_PHASE_PRESSED) {
+        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
+      }
+
+      if (display->keyboard_state->keys[SDL_SCANCODE_2].phase == KEY_PHASE_PRESSED) {
+        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT);
+      }
+
+      if (display->keyboard_state->keys[SDL_SCANCODE_3].phase == KEY_PHASE_PRESSED) {
+        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
+      }
+
+      if (display->keyboard_state->keys[SDL_SCANCODE_4].phase == KEY_PHASE_PRESSED) {
+        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_RENDER_REGION);
+      }
     }
 
-    if (display->keyboard_state->keys[SDL_SCANCODE_2].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT);
-    }
-
-    if (display->keyboard_state->keys[SDL_SCANCODE_3].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
-    }
-
-    if (display->keyboard_state->keys[SDL_SCANCODE_4].down) {
-      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_RENDER_REGION);
-    }
-
-    if (ui_handled_mouse) {
+    if (ui_status.received_hover || ui_status.received_mouse_action) {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
         case DISPLAY_MOUSE_MODE_SELECT:

@@ -7,7 +7,7 @@
 #include "display.h"
 #include "elements/text.h"
 
-static bool _window_frametime_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_frametime_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -18,9 +18,9 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs){
+      (ElementTextArgs) {
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = "Luminary:",
         .center_x = false,
         .center_y = true,
@@ -38,9 +38,9 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs){
+      (ElementTextArgs) {
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
         .center_y = true,
@@ -53,9 +53,9 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs){
+      (ElementTextArgs) {
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
         .center_y = true,
@@ -72,9 +72,9 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs){
+      (ElementTextArgs) {
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = "Mandarin Duck:",
         .center_x = false,
         .center_y = true,
@@ -89,9 +89,9 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs){
+      (ElementTextArgs) {
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
         .center_y = true,
@@ -104,9 +104,9 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs){
+      (ElementTextArgs) {
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
+        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
         .text     = text,
         .center_x = false,
         .center_y = true,
@@ -116,8 +116,6 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
         .is_clickable = false});
   }
   window_pop_section(window);
-
-  return false;
 }
 
 void window_frametime_create(Window** window) {
@@ -139,7 +137,7 @@ void window_frametime_create(Window** window) {
   (*window)->auto_size       = false;
   (*window)->auto_align      = true;
   (*window)->margins =
-    (WindowMargins){.margin_bottom = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
+    (WindowMargins) {.margin_bottom = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
   (*window)->action_func = _window_frametime_action;
   (*window)->fixed_depth = true;
 

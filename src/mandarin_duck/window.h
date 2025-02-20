@@ -2,6 +2,7 @@
 #define MANDARIN_DUCK_WINDOW_H
 
 #include "element.h"
+#include "user_interface.h"
 #include "utils.h"
 
 struct Display typedef Display;
@@ -23,8 +24,6 @@ struct MouseState typedef MouseState;
 #define WINDOW_VISIBILITY_MASK_ALL (WINDOW_VISIBILITY_CAPTION_CONTROLS | WINDOW_VISIBILITY_STATUS | WINDOW_VISIBILITY_UTILITIES)
 #define WINDOW_VISIBILITY_MASK_MOVEMENT (WINDOW_VISIBILITY_CAPTION_CONTROLS | WINDOW_VISIBILITY_STATUS)
 #define WINDOW_VISIBILITY_NONE 0
-
-typedef uint32_t WindowVisibilityMask;
 
 enum WindowType {
   WINDOW_TYPE_CAPTION_CONTROLS,
@@ -97,7 +96,7 @@ struct Window {
   bool auto_size;
   bool fixed_depth;
   bool is_subwindow;
-  bool (*action_func)(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state);
+  void (*action_func)(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state);
   void (*propagate_parent_func)(Window* window, Window* parent);
   WindowInteractionStateData state_data;
   uint64_t depth;
@@ -113,6 +112,7 @@ struct Window {
   size_t background_blur_buffer_size;
   bool element_has_hover;
   Window* external_subwindow;
+  UserInterfaceStatus status;
 } typedef Window;
 
 void window_create(Window** window);
@@ -120,7 +120,7 @@ void window_create_subwindow(Window* window);
 void window_allocate_memory(Window* window);
 
 bool window_is_mouse_hover(Window* window, Display* display, const MouseState* mouse_state);
-bool window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state);
+UserInterfaceStatus window_handle_input(Window* window, Display* display, LuminaryHost* host, MouseState* mouse_state);
 
 void window_set_focus(Window* window);
 

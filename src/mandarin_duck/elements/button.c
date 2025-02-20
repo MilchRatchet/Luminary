@@ -119,7 +119,11 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
       window->state_data =
         (WindowInteractionStateData) {.state = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER, .element_hash = button.hash};
     }
+
+    window->status.received_hover |= true;
   }
+
+  window->status.received_mouse_action |= mouse_result.is_clicked;
 
   window_push_element(window, &button);
 
