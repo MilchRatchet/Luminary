@@ -137,6 +137,10 @@ __device__ CloudRenderResult
   float hit_dist       = start;
   bool hit             = false;
 
+  const float2 ambient_r        = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CLOUD_DIR, pixel);
+  const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
+  const float ambient_cos_angle = dot_product(ray, ambient_ray);
+
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
@@ -162,14 +166,9 @@ __device__ CloudRenderResult
     if (density > 0.0f) {
       hit = true;
 
-      float2 ambient_r = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CLOUD_DIR + i, pixel);
-      ambient_r.x      = 2.0f * ambient_r.x - 1.0f;
+      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, pixel);
 
-      const vec3 ambient_ray = sample_ray_sphere(ambient_r.x, ambient_r.y);
-      RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, pixel);
-
-      float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);
-      const float ambient_cos_angle = dot_product(ray, ambient_ray);
+      float ambient_extinction = cloud_extinction(pos, ambient_ray, layer);
 
       RGBF sun_color;
       float sun_extinction;
