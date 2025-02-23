@@ -5,6 +5,7 @@
 #include "utils.h"
 
 #define LUM_IDENTIFIER_MAX_LENGTH 256
+#define LUM_LITERAL_STRING_MAX_LENGTH 256
 
 ////////////////////////////////////////////////////////////////////
 // Lum Token Types
@@ -34,6 +35,7 @@ enum LumLiteralType {
   LUM_LITERAL_TYPE_UINT,
   LUM_LITERAL_TYPE_BOOL,
   LUM_LITERAL_TYPE_ENUM,
+  LUM_LITERAL_TYPE_STRING,
   LUM_LITERAL_TYPE_COUNT_VERSION_1,
 
   LUM_LITERAL_TYPE_COUNT = LUM_LITERAL_TYPE_COUNT_VERSION_1
@@ -49,10 +51,12 @@ enum LumOperatorType {
 
 enum LumSeparatorType {
   // Version 1
-  LUM_SEPARATOR_TYPE_EOL,         // ;
-  LUM_SEPARATOR_TYPE_FUNC_BEGIN,  // [
-  LUM_SEPARATOR_TYPE_FUNC_END,    // ]
-  LUM_SEPARATOR_TYPE_MEMBER,      // .
+  LUM_SEPARATOR_TYPE_EOL,           // ;
+  LUM_SEPARATOR_TYPE_FUNC_BEGIN,    // [
+  LUM_SEPARATOR_TYPE_FUNC_END,      // ]
+  LUM_SEPARATOR_TYPE_MEMBER,        // .
+  LUM_SEPARATOR_TYPE_VECTOR_BEGIN,  // (
+  LUM_SEPARATOR_TYPE_VECTOR_END,    // )
   LUM_SEPARATOR_COUNT_VERSION_1,
 
   LUM_SEPARATOR_COUNT = LUM_SEPARATOR_COUNT_VERSION_1
@@ -80,6 +84,7 @@ struct LumTokenLiteral {
     uint32_t val_uint;
     bool val_bool;
     uint32_t val_enum;
+    char val_string[LUM_LITERAL_STRING_MAX_LENGTH];
   };
 } typedef LumTokenLiteral;
 
