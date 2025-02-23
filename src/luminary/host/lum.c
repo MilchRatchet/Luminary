@@ -77,7 +77,7 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
   fgets(line, LINE_SIZE, file);
 
   if (line[0] == 'v' || line[0] == 'V') {
-    sscanf(line, "%*c %u\n", version);
+    sscanf(line, "%*s %u\n", version);
   }
   else {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has no version information.");

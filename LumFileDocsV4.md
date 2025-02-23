@@ -1,5 +1,7 @@
 # Scene Description Format
 
+>📝 This document describes the legacy Luminary scene description format.
+
 A scene is decribed by a `*.lum` file. An example can be found in `Example.lum`.
 
 ## General Settings
