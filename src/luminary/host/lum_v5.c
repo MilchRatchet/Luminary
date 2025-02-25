@@ -2,7 +2,9 @@
 
 #include "internal_error.h"
 #include "lum.h"
+#include "lum/lum_binary.h"
 #include "lum/lum_parser.h"
+#include "lum/lum_virtual_machine.h"
 
 LuminaryResult lum_parse_file_v5(FILE* file, LumFileContent* content) {
   __CHECK_NULL_ARGUMENT(file);
@@ -30,7 +32,13 @@ LuminaryResult lum_parse_file_v5(FILE* file, LumFileContent* content) {
   LumParser* parser;
   __FAILURE_HANDLE(lum_parser_create(&parser));
 
-  __FAILURE_HANDLE(lum_parser_execute(parser, code));
+  LumBinary* binary;
+  __FAILURE_HANDLE(lum_binary_create(&binary));
+
+  __FAILURE_HANDLE(lum_parser_execute(parser, code, binary));
+
+  // TODO: Pass binary to caller, LuminaryHost then stores the binary and queues it for execution
+  __FAILURE_HANDLE(lum_binary_destroy(&binary));
 
   __FAILURE_HANDLE(lum_parser_destroy(&parser));
 
