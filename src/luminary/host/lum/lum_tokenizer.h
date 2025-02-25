@@ -109,6 +109,9 @@ struct LumToken {
     LumTokenOperator operator;
     LumTokenSeparator separator;
   };
+
+  uint32_t line;
+  uint32_t col;
 } typedef LumToken;
 
 struct LumTokenizer {

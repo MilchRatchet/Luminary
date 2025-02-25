@@ -204,9 +204,27 @@ LuminaryResult lum_tokenizer_execute(LumTokenizer* tokenizer, const char* code) 
   __CHECK_NULL_ARGUMENT(tokenizer);
   __CHECK_NULL_ARGUMENT(code);
 
+  uint32_t line = 1;
+  uint32_t col  = 0;
+
   while (code[0] != '\0') {
-    // Skip whitespace
-    if (code[0] == ' ' || code[0] == '\n' || code[0] == '\r') {
+    // Whitespace
+    if (code[0] == ' ') {
+      col++;
+      code++;
+      continue;
+    }
+
+    // Carriage return
+    if (code[0] == '\r') {
+      code++;
+      continue;
+    }
+
+    // Newline
+    if (code[0] == '\n') {
+      line++;
+      col = 0;
       code++;
       continue;
     }
@@ -223,31 +241,46 @@ LuminaryResult lum_tokenizer_execute(LumTokenizer* tokenizer, const char* code) 
     uint32_t consumed_chars = 0;
 
     if (_lum_tokenizer_is_operator(&token, code, &consumed_chars)) {
+      token.line = line;
+      token.col  = col;
       __FAILURE_HANDLE(array_push(&tokenizer->tokens, &token));
+      col += consumed_chars;
       code += consumed_chars;
       continue;
     }
 
     if (_lum_tokenizer_is_separator(&token, code, &consumed_chars)) {
+      token.line = line;
+      token.col  = col;
       __FAILURE_HANDLE(array_push(&tokenizer->tokens, &token));
+      col += consumed_chars;
       code += consumed_chars;
       continue;
     }
 
     if (_lum_tokenizer_is_keyword(&token, code, &consumed_chars)) {
+      token.line = line;
+      token.col  = col;
       __FAILURE_HANDLE(array_push(&tokenizer->tokens, &token));
+      col += consumed_chars;
       code += consumed_chars;
       continue;
     }
 
     if (_lum_tokenizer_is_literal(&token, code, &consumed_chars)) {
+      token.line = line;
+      token.col  = col;
       __FAILURE_HANDLE(array_push(&tokenizer->tokens, &token));
+      col += consumed_chars;
       code += consumed_chars;
       continue;
     }
 
     if (_lum_tokenizer_is_identifier(&token, code, &consumed_chars)) {
+      token.line = line;
+      token.col  = col;
       __FAILURE_HANDLE(array_push(&tokenizer->tokens, &token));
+      col += consumed_chars;
       code += consumed_chars;
       continue;
     }
@@ -270,74 +303,74 @@ LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer) {
     switch (token.type) {
       case LUM_TOKEN_TYPE_IDENTIFIER:
         info_message(
-          "[IDENTIFIER] %s (%u)", token.identifier.name,
+          "[%04u:%04u][IDENTIFIER] %s (%u)", token.line, token.col, token.identifier.name,
           (token.identifier.is_builtin_type) ? (uint32_t) token.identifier.builtin_type : 0xFFFFFFFF);
         break;
       case LUM_TOKEN_TYPE_KEYWORD:
-        info_message("[KEYWORD]");
+        info_message("[%04u:%04u][KEYWORD]", token.line, token.col);
         break;
       case LUM_TOKEN_TYPE_LITERAL:
         switch (token.literal.type) {
           case LUM_LITERAL_TYPE_FLOAT:
-            info_message("[LITERAL] Float %ff", token.literal.val_float);
+            info_message("[%04u:%04u][LITERAL] Float %ff", token.line, token.col, token.literal.val_float);
             break;
           case LUM_LITERAL_TYPE_DOUBLE:
-            info_message("[LITERAL] Double %f", token.literal.val_double);
+            info_message("[%04u:%04u][LITERAL] Double %f", token.line, token.col, token.literal.val_double);
             break;
           case LUM_LITERAL_TYPE_UINT:
-            info_message("[LITERAL] Uint %u", token.literal.val_uint);
+            info_message("[%04u:%04u][LITERAL] Uint %u", token.line, token.col, token.literal.val_uint);
             break;
           case LUM_LITERAL_TYPE_BOOL:
-            info_message("[LITERAL] Bool %s", token.literal.val_bool ? "True" : "False");
+            info_message("[%04u:%04u][LITERAL] Bool %s", token.line, token.col, token.literal.val_bool ? "True" : "False");
             break;
           case LUM_LITERAL_TYPE_ENUM:
-            info_message("[LITERAL] Enum %u", token.literal.val_enum);
+            info_message("[%04u:%04u][LITERAL] Enum %u", token.line, token.col, token.literal.val_enum);
             break;
           case LUM_LITERAL_TYPE_STRING:
-            info_message("[LITERAL] String \"%s\"", token.literal.val_string);
+            info_message("[%04u:%04u][LITERAL] String \"%s\"", token.line, token.col, token.literal.val_string);
             break;
           default:
-            info_message("[LITERAL] Unknown");
+            info_message("[%04u:%04u][LITERAL] Unknown", token.line, token.col);
             break;
         }
         break;
       case LUM_TOKEN_TYPE_OPERATOR:
         switch (token.operator.type) {
           case LUM_OPERATOR_TYPE_ASSIGNMENT:
-            info_message("[OPERATOR] =");
+            info_message("[%04u:%04u][OPERATOR] =", token.line, token.col);
             break;
           default:
-            info_message("[OPERATOR] Unknown");
+            info_message("[%04u:%04u][OPERATOR] Unknown", token.line, token.col);
             break;
         }
         break;
       case LUM_TOKEN_TYPE_SEPARATOR:
         switch (token.separator.type) {
           case LUM_SEPARATOR_TYPE_EOL:
-            info_message("[SEPARATOR] EOL");
+            info_message("[%04u:%04u][SEPARATOR] EOL", token.line, token.col);
             break;
           case LUM_SEPARATOR_TYPE_FUNC_BEGIN:
-            info_message("[SEPARATOR] Func Begin");
+            info_message("[%04u:%04u][SEPARATOR] Func Begin", token.line, token.col);
             break;
           case LUM_SEPARATOR_TYPE_FUNC_END:
-            info_message("[SEPARATOR] Func End");
+            info_message("[%04u:%04u][SEPARATOR] Func End", token.line, token.col);
             break;
           case LUM_SEPARATOR_TYPE_MEMBER:
-            info_message("[SEPARATOR] Member");
+            info_message("[%04u:%04u][SEPARATOR] Member", token.line, token.col);
             break;
           case LUM_SEPARATOR_TYPE_VECTOR_BEGIN:
-            info_message("[SEPARATOR] Vector Begin");
+            info_message("[%04u:%04u][SEPARATOR] Vector Begin", token.line, token.col);
             break;
           case LUM_SEPARATOR_TYPE_VECTOR_END:
-            info_message("[SEPARATOR] Vector End");
+            info_message("[%04u:%04u][SEPARATOR] Vector End", token.line, token.col);
             break;
           default:
-            info_message("[SEPARATOR] Unknown");
+            info_message("[%04u:%04u][SEPARATOR] Unknown", token.line, token.col);
             break;
         }
         break;
       default:
-        info_message("[UNKNOWN]");
+        info_message("[%04u:%04u][UNKNOWN]", token.line, token.col);
         break;
     }
   }
