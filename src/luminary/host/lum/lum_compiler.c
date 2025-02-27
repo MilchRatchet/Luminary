@@ -13,6 +13,13 @@ LuminaryResult lum_compiler_create(LumCompiler** compiler) {
   return LUMINARY_SUCCESS;
 }
 
+#define LUM_VARIABLE_REGISTER_NOT_ASSIGNED 0xFFFFFFFF
+
+struct LumVariable {
+  size_t offset;
+  uint32_t current_register_map;
+} typedef LumVariable;
+
 LuminaryResult lum_compiler_compile(LumCompiler* compiler, ARRAY const LumToken* tokens, LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(compiler);
   __CHECK_NULL_ARGUMENT(tokens);

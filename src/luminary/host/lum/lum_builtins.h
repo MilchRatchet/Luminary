@@ -39,4 +39,6 @@ struct LumBuiltinEnumValuePair {
 
 extern const LumBuiltinEnumValuePair lum_builtin_enums[LUM_BUILTIN_ENUM_COUNT];
 
+enum LumDataType { LUM_DATA_TYPE_NULL, LUM_DATA_TYPE_VOID, LUM_DATA_TYPE_FLOAT, LUM_DATA_TYPE_UINT32 } typedef LumDataType;
+
 #endif /* LUMINARY_LUM_BUILTINS_H */
