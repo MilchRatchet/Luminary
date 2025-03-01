@@ -34,7 +34,7 @@ static void _subwindow_dropdown_action(Window* window, Display* display, Luminar
                              .highlighting = true,
                              .cache_text   = true,
                              .auto_size    = false,
-                             .is_clickable = false})) {
+                             .is_clickable = true})) {
       data->selected_index = string_id;
     }
     window_margin(window, 4);
