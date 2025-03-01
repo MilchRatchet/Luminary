@@ -238,6 +238,7 @@ static LuminaryResult _host_update_scene(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
   entry.name              = "Updating scene";
   entry.function          = (QueueEntryFunction) _host_propagate_scene_changes_queue_work;
@@ -416,12 +417,12 @@ static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, Wavefron
   args->wavefront_args = wavefront_args;
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Loading Obj";
-  entry.function          = (QueueEntryFunction) _host_load_obj_file;
-  entry.clear_func        = (QueueEntryFunction) 0;
-  entry.args              = args;
-  entry.remove_duplicates = false;
+  entry.name       = "Loading Obj";
+  entry.function   = (QueueEntryFunction) _host_load_obj_file;
+  entry.clear_func = (QueueEntryFunction) 0;
+  entry.args       = args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
@@ -788,12 +789,12 @@ LuminaryResult luminary_host_request_output(Host* host, LuminaryOutputRequestPro
   args->props = properties;
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Add Output Request";
-  entry.function          = (QueueEntryFunction) _host_add_output_request_queue_work;
-  entry.clear_func        = (QueueEntryFunction) _host_add_output_request_clear_work;
-  entry.args              = (void*) args;
-  entry.remove_duplicates = false;
+  entry.name       = "Add Output Request";
+  entry.function   = (QueueEntryFunction) _host_add_output_request_queue_work;
+  entry.clear_func = (QueueEntryFunction) _host_add_output_request_clear_work;
+  entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
@@ -879,12 +880,12 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   memcpy(args, &descriptor, sizeof(OutputDescriptor));
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Copy Output";
-  entry.function          = (QueueEntryFunction) _host_copy_output_queue_work;
-  entry.clear_func        = (QueueEntryFunction) 0;
-  entry.args              = (void*) args;
-  entry.remove_duplicates = false;
+  entry.name       = "Copy Output";
+  entry.function   = (QueueEntryFunction) _host_copy_output_queue_work;
+  entry.clear_func = (QueueEntryFunction) 0;
+  entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
@@ -917,12 +918,12 @@ LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle h
   args->path[path_length] = '\0';
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Save PNG";
-  entry.function          = (QueueEntryFunction) _host_save_png_queue_work;
-  entry.clear_func        = (QueueEntryFunction) _host_save_png_clear_work;
-  entry.args              = (void*) args;
-  entry.remove_duplicates = false;
+  entry.name       = "Save PNG";
+  entry.function   = (QueueEntryFunction) _host_save_png_queue_work;
+  entry.clear_func = (QueueEntryFunction) _host_save_png_clear_work;
+  entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 

@@ -159,13 +159,18 @@ static LuminaryResult _device_manager_clear_handle_device_render(DeviceManager* 
 }
 
 static void _device_manager_render_callback(DeviceRenderCallbackData* data) {
-  QueueEntry entry;
+  // Ignore callbacks if we are shutting down.
+  if (data->common.device_manager->is_shutdown)
+    return;
 
-  entry.name              = "Handle Device Render";
-  entry.function          = (QueueEntryFunction) _device_manager_handle_device_render;
-  entry.clear_func        = (QueueEntryFunction) _device_manager_clear_handle_device_render;
-  entry.args              = (void*) data;
-  entry.remove_duplicates = false;
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name                  = "Handle Device Render";
+  entry.function              = (QueueEntryFunction) _device_manager_handle_device_render;
+  entry.clear_func            = (QueueEntryFunction) _device_manager_clear_handle_device_render;
+  entry.args                  = (void*) data;
+  entry.queuer_cannot_execute = true;
 
   LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
 
@@ -188,17 +193,22 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
 }
 
 static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
+  // Ignore callbacks if we are shutting down.
+  if (data->common.device_manager->is_shutdown)
+    return;
+
   // Don't output aborted outputs unless it is the first output.
   if (data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output)
     return;
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Handle Device Output";
-  entry.function          = (QueueEntryFunction) _device_manager_handle_device_output;
-  entry.clear_func        = (QueueEntryFunction) 0;
-  entry.args              = (void*) data;
-  entry.remove_duplicates = false;
+  entry.name                  = "Handle Device Output";
+  entry.function              = (QueueEntryFunction) _device_manager_handle_device_output;
+  entry.clear_func            = (QueueEntryFunction) 0;
+  entry.args                  = (void*) data;
+  entry.queuer_cannot_execute = true;
 
   LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
 
@@ -699,20 +709,19 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   ////////////////////////////////////////////////////////////////////
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Kernel compilation";
-  entry.function          = (QueueEntryFunction) _device_manager_compile_kernels;
-  entry.clear_func        = (QueueEntryFunction) 0;
-  entry.args              = (void*) 0;
-  entry.remove_duplicates = false;
+  entry.name       = "Kernel compilation";
+  entry.function   = (QueueEntryFunction) _device_manager_compile_kernels;
+  entry.clear_func = (QueueEntryFunction) 0;
+  entry.args       = (void*) 0;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
-  entry.name              = "Device initialization";
-  entry.function          = (QueueEntryFunction) _device_manager_initialize_devices;
-  entry.clear_func        = (QueueEntryFunction) 0;
-  entry.args              = (void*) 0;
-  entry.remove_duplicates = false;
+  entry.name       = "Device initialization";
+  entry.function   = (QueueEntryFunction) _device_manager_initialize_devices;
+  entry.clear_func = (QueueEntryFunction) 0;
+  entry.args       = (void*) 0;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -744,7 +753,12 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(entry);
 
-  if (device_manager->is_shutdown) {
+  bool device_thread_is_running;
+  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+
+  const bool skip_work = device_manager->is_shutdown || ((device_thread_is_running == false) && (entry->queuer_cannot_execute == true));
+
+  if (skip_work) {
     if (entry->clear_func) {
       __FAILURE_HANDLE(entry->clear_func(device_manager, entry->args));
     }
@@ -769,11 +783,8 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
     __FAILURE_HANDLE(queue_push(device_manager->work_queue, entry));
   }
 
-  bool device_thread_is_running;
-  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
-
   // If the device thread is not running, execute on current thread.
-  if (!device_thread_is_running) {
+  if (device_thread_is_running == false) {
     __FAILURE_HANDLE(_device_manager_queue_worker(device_manager));
   }
 
@@ -805,6 +816,7 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   __FAILURE_HANDLE(scene_propagate_changes(device_manager->scene_device, device_manager->host->scene_host));
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
   entry.name              = "Update device scene";
   entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
@@ -827,12 +839,12 @@ LuminaryResult device_manager_set_output_properties(DeviceManager* device_manage
   args->height = height;
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Set Output Properties";
-  entry.function          = (QueueEntryFunction) _device_manager_set_output_properties_queue_work;
-  entry.clear_func        = (QueueEntryFunction) _device_manager_set_output_properties_clear_work;
-  entry.args              = args;
-  entry.remove_duplicates = false;
+  entry.name       = "Set Output Properties";
+  entry.function   = (QueueEntryFunction) _device_manager_set_output_properties_queue_work;
+  entry.clear_func = (QueueEntryFunction) _device_manager_set_output_properties_clear_work;
+  entry.args       = args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -848,12 +860,12 @@ LuminaryResult device_manager_add_output_request(DeviceManager* device_manager, 
   args->props = properties;
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Add output request";
-  entry.function          = (QueueEntryFunction) _device_manager_add_output_request_clear_work;
-  entry.clear_func        = (QueueEntryFunction) _device_manager_add_output_request_queue_work;
-  entry.args              = args;
-  entry.remove_duplicates = false;
+  entry.name       = "Add output request";
+  entry.function   = (QueueEntryFunction) _device_manager_add_output_request_clear_work;
+  entry.clear_func = (QueueEntryFunction) _device_manager_add_output_request_queue_work;
+  entry.args       = args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -874,12 +886,12 @@ LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Me
   memcpy(args->meshes, meshes, sizeof(Mesh*) * num_meshes);
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Add meshes";
-  entry.function          = (QueueEntryFunction) _device_manager_add_meshes;
-  entry.clear_func        = (QueueEntryFunction) _device_manager_add_meshes_clear;
-  entry.args              = args;
-  entry.remove_duplicates = false;
+  entry.name       = "Add meshes";
+  entry.function   = (QueueEntryFunction) _device_manager_add_meshes;
+  entry.clear_func = (QueueEntryFunction) _device_manager_add_meshes_clear;
+  entry.args       = args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -904,12 +916,12 @@ LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const 
   args->num_textures = num_textures;
 
   QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name              = "Add textures";
-  entry.function          = (QueueEntryFunction) _device_manager_add_textures;
-  entry.clear_func        = (QueueEntryFunction) _device_manager_add_textures_clear;
-  entry.args              = (void*) args;
-  entry.remove_duplicates = false;
+  entry.name       = "Add textures";
+  entry.function   = (QueueEntryFunction) _device_manager_add_textures;
+  entry.clear_func = (QueueEntryFunction) _device_manager_add_textures_clear;
+  entry.args       = (void*) args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 

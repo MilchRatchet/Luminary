@@ -54,6 +54,7 @@ struct QueueEntry {
   LuminaryResult (*clear_func)(void* worker, void* args);
   void* args;
   bool remove_duplicates;
+  bool queuer_cannot_execute;  // Used to avoid self execution on CUDA callback threads.
 } typedef QueueEntry;
 
 struct Quaternion {
