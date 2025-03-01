@@ -7,7 +7,8 @@
 
 static const char _lum_separator_chars[LUM_SEPARATOR_COUNT] = {
   [LUM_SEPARATOR_TYPE_EOL] = ';',    [LUM_SEPARATOR_TYPE_FUNC_BEGIN] = '[',   [LUM_SEPARATOR_TYPE_FUNC_END] = ']',
-  [LUM_SEPARATOR_TYPE_MEMBER] = '.', [LUM_SEPARATOR_TYPE_VECTOR_BEGIN] = '(', [LUM_SEPARATOR_TYPE_VECTOR_END] = ')'};
+  [LUM_SEPARATOR_TYPE_MEMBER] = '.', [LUM_SEPARATOR_TYPE_VECTOR_BEGIN] = '(', [LUM_SEPARATOR_TYPE_VECTOR_END] = ')',
+  [LUM_SEPARATOR_TYPE_LIST] = ','};
 
 LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer) {
   __CHECK_NULL_ARGUMENT(tokenizer);
@@ -204,7 +205,7 @@ LuminaryResult lum_tokenizer_execute(LumTokenizer* tokenizer, const char* code) 
   __CHECK_NULL_ARGUMENT(tokenizer);
   __CHECK_NULL_ARGUMENT(code);
 
-  uint32_t line = 1;
+  uint32_t line = 3;
   uint32_t col  = 0;
 
   while (code[0] != '\0') {
@@ -363,6 +364,9 @@ LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer) {
             break;
           case LUM_SEPARATOR_TYPE_VECTOR_END:
             info_message("[%04u:%04u][SEPARATOR] Vector End", token.line, token.col);
+            break;
+          case LUM_SEPARATOR_TYPE_LIST:
+            info_message("[%04u:%04u][SEPARATOR] List", token.line, token.col);
             break;
           default:
             info_message("[%04u:%04u][SEPARATOR] Unknown", token.line, token.col);

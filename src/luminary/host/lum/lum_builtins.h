@@ -27,6 +27,7 @@ enum LumBuiltinType {
 } typedef LumBuiltinType;
 
 extern const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT];
+extern const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT];
 
 #define LUM_BUILTIN_ENUM_COUNT                                                                            \
   (LUMINARY_SHADING_MODE_COUNT + LUMINARY_FILTER_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_APERTURE_COUNT \

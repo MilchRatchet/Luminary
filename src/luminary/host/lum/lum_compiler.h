@@ -7,7 +7,7 @@
 
 struct LumCompiler {
   bool build_asynchronous_part;
-  bool extra_warnings;
+  uint32_t log_level;  // 0 = Only errors, 1 = Errors and Warnings, 2 = Everything
 } typedef LumCompiler;
 
 LuminaryResult lum_compiler_create(LumCompiler** compiler);

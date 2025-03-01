@@ -10,6 +10,24 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_FOG] = "Fog",           [LUM_BUILTIN_TYPE_PARTICLES] = "Particles",
   [LUM_BUILTIN_TYPE_MATERIAL] = "Material", [LUM_BUILTIN_TYPE_INSTANCE] = "Instance"};
 
+const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
+  [LUM_BUILTIN_TYPE_RGBF]      = sizeof(LuminaryRGBF),
+  [LUM_BUILTIN_TYPE_VEC3]      = sizeof(LuminaryVec3),
+  [LUM_BUILTIN_TYPE_UINT16]    = sizeof(uint16_t),
+  [LUM_BUILTIN_TYPE_UINT32]    = sizeof(uint32_t),
+  [LUM_BUILTIN_TYPE_BOOL]      = sizeof(bool),
+  [LUM_BUILTIN_TYPE_FLOAT]     = sizeof(float),
+  [LUM_BUILTIN_TYPE_ENUM]      = sizeof(uint32_t),
+  [LUM_BUILTIN_TYPE_SETTINGS]  = sizeof(LuminaryRendererSettings),
+  [LUM_BUILTIN_TYPE_CAMERA]    = sizeof(LuminaryCamera),
+  [LUM_BUILTIN_TYPE_OCEAN]     = sizeof(LuminaryOcean),
+  [LUM_BUILTIN_TYPE_SKY]       = sizeof(LuminarySky),
+  [LUM_BUILTIN_TYPE_CLOUD]     = sizeof(LuminaryCloud),
+  [LUM_BUILTIN_TYPE_FOG]       = sizeof(LuminaryFog),
+  [LUM_BUILTIN_TYPE_PARTICLES] = sizeof(LuminaryParticles),
+  [LUM_BUILTIN_TYPE_MATERIAL]  = sizeof(LuminaryMaterial),
+  [LUM_BUILTIN_TYPE_INSTANCE]  = sizeof(LuminaryInstance)};
+
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum) {.string = #__internal_macro_enum, .value = __internal_macro_enum}
 
 const LumBuiltinEnumValuePair lum_builtin_enums[] = {
