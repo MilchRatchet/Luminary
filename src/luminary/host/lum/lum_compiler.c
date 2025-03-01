@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "internal_error.h"
+#include "lum_function_tables.h"
 
 LuminaryResult lum_compiler_create(LumCompiler** compiler) {
   __CHECK_NULL_ARGUMENT(compiler);
@@ -15,9 +16,11 @@ LuminaryResult lum_compiler_create(LumCompiler** compiler) {
 }
 
 #define LUM_VARIABLE_REGISTER_NOT_ASSIGNED 0xFFFFFFFF
+#define LUM_VARIABLE_NOT_FOUND 0xFFFFFFFF
 #define LUM_COMPILER_MAX_MESSAGE_LENGTH 1024
 #define LUM_COMPILER_CONTEXT_STACK_SIZE 16
 #define LUM_COMPILER_CONTEXT_STACK_EMPTY 0xFFFFFFFF
+#define LUM_FUNCTION_MAX_ARGUMENTS 4
 
 enum LumCompilerMessageType {
   LUM_COMPILER_MESSAGE_TYPE_INFO,
@@ -33,6 +36,7 @@ struct LumCompilerMessage {
 struct LumVariable {
   size_t offset;
   uint32_t current_register_map;
+  LumBuiltinType type;
   bool is_named;
   char* name;
 } typedef LumVariable;
@@ -48,8 +52,11 @@ enum LumCompilerContextType {
 
 struct LumFunctionContext {
   uint32_t parsed_identifiers;
+  uint32_t caller_variable_id;
   LumBuiltinType class;
   uint32_t function_id;
+  uint32_t expected_arguments;
+  uint32_t argument_variable_ids[LUM_FUNCTION_MAX_ARGUMENTS];
 } typedef LumFunctionContext;
 
 struct LumDeclarationContext {
@@ -125,12 +132,13 @@ static LuminaryResult _lum_compiler_null_binary(LumBinary* binary) {
 // Variables
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_compiler_allocate_variable(LumCompilerState* state, size_t size, const char* name, uint32_t* id) {
+static LuminaryResult _lum_compiler_allocate_variable(LumCompilerState* state, LumBuiltinType type, const char* name, uint32_t* id) {
   __CHECK_NULL_ARGUMENT(state);
 
   LumVariable new_variable;
   new_variable.offset               = state->used_stack_size;
   new_variable.current_register_map = LUM_VARIABLE_REGISTER_NOT_ASSIGNED;
+  new_variable.type                 = type;
 
   new_variable.is_named = (name != (const char*) 0);
 
@@ -148,7 +156,33 @@ static LuminaryResult _lum_compiler_allocate_variable(LumCompilerState* state, s
 
   __FAILURE_HANDLE(array_push(&state->variables, &new_variable));
 
-  state->used_stack_size += size;
+  state->used_stack_size += lum_builtin_types_sizes[type];
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_compiler_find_variable(LumCompilerState* state, const char* name, uint32_t* id) {
+  __CHECK_NULL_ARGUMENT(state);
+  __CHECK_NULL_ARGUMENT(name);
+
+  uint32_t variable_count;
+  __FAILURE_HANDLE(array_get_num_elements(state->variables, &variable_count));
+
+  uint32_t found_id = LUM_VARIABLE_NOT_FOUND;
+
+  for (uint32_t variable_id = 0; variable_id < variable_count; variable_id++) {
+    const LumVariable* variable = state->variables + variable_id;
+
+    if (variable->is_named == false)
+      continue;
+
+    if (strcmp(name, variable->name) == 0) {
+      found_id = variable_id;
+      break;
+    }
+  }
+
+  *id = found_id;
 
   return LUMINARY_SUCCESS;
 }
@@ -174,6 +208,16 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
 
   switch (context->type) {
     case LUM_COMPILER_CONTEXT_TYPE_FUNCTION: {
+      if (context->function.expected_arguments + 2 > context->function.parsed_identifiers) {
+        LumCompilerMessage message;
+        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+        sprintf(message.message, "error: too few arguments to function call");
+        __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+        state->error_occurred = true;
+        return LUMINARY_SUCCESS;
+      }
+
       LumInstruction instruction;
       instruction.type = LUM_INSTRUCTION_TYPE_CALL;
 
@@ -182,8 +226,8 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
       state->returned_variable_id = instruction.dst_operand;
     } break;
     case LUM_COMPILER_CONTEXT_TYPE_DECLARATION:
-      __FAILURE_HANDLE(_lum_compiler_allocate_variable(
-        state, lum_builtin_types_sizes[context->declaration.type], context->declaration.name, &state->returned_variable_id));
+      __FAILURE_HANDLE(
+        _lum_compiler_allocate_variable(state, context->declaration.type, context->declaration.name, &state->returned_variable_id));
       break;
     case LUM_COMPILER_CONTEXT_TYPE_OPERATOR: {
       LumInstruction instruction;
@@ -191,7 +235,7 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
 
       __FAILURE_HANDLE(array_push(&state->binary->instructions, &instruction));
 
-      state->returned_variable_id = 0xFFFFFFFF;
+      state->returned_variable_id = LUM_VARIABLE_NOT_FOUND;
     } break;
     default:
       break;
@@ -218,24 +262,10 @@ static LuminaryResult _lum_compiler_handle_identifier_null_context(LumCompilerSt
     state->context_stack[++state->stack_ptr] = context;
   }
   else {
-    uint32_t variable_count;
-    __FAILURE_HANDLE(array_get_num_elements(state->variables, &variable_count));
+    uint32_t corresponding_variable;
+    __FAILURE_HANDLE(_lum_compiler_find_variable(state, token->identifier.name, &corresponding_variable));
 
-    uint32_t corresponding_variable = 0xFFFFFFFF;
-
-    for (uint32_t variable_id = 0; variable_id < variable_count; variable_id++) {
-      const LumVariable* variable = state->variables + variable_id;
-
-      if (variable->is_named == false)
-        continue;
-
-      if (strcmp(token->identifier.name, variable->name) == 0) {
-        corresponding_variable = variable_id;
-        break;
-      }
-    }
-
-    if (corresponding_variable == 0xFFFFFFFF) {
+    if (corresponding_variable == LUM_VARIABLE_NOT_FOUND) {
       LumCompilerMessage message;
       message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
       sprintf(message.message, "<source>:%u:%u: error: use of undeclared identifier `%s`", token->line, token->col, token->identifier.name);
@@ -254,6 +284,146 @@ static LuminaryResult _lum_compiler_handle_identifier_null_context(LumCompilerSt
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _lum_compiler_handle_identifier_function_context(LumCompilerState* state, const LumToken* token) {
+  __CHECK_NULL_ARGUMENT(state);
+  __CHECK_NULL_ARGUMENT(token);
+
+  const uint32_t identifier_id = state->context_stack[state->stack_ptr].function.parsed_identifiers;
+
+  switch (identifier_id) {
+    case 0:
+      if (token->identifier.is_builtin_type) {
+        state->context_stack[state->stack_ptr].function.class              = token->identifier.builtin_type;
+        state->context_stack[state->stack_ptr].function.caller_variable_id = LUM_VARIABLE_NOT_FOUND;
+        state->context_stack[state->stack_ptr].function.parsed_identifiers++;
+      }
+      else {
+        uint32_t corresponding_variable;
+        __FAILURE_HANDLE(_lum_compiler_find_variable(state, token->identifier.name, &corresponding_variable));
+
+        if (corresponding_variable == LUM_VARIABLE_NOT_FOUND) {
+          LumCompilerMessage message;
+          message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+          sprintf(message.message, "<source>:%u:%u: error: `%s` was not declared", token->line, token->col, token->identifier.name);
+          __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+          state->error_occurred = true;
+          return LUMINARY_SUCCESS;
+        }
+
+        const LumVariable* variable = state->variables + corresponding_variable;
+
+        state->context_stack[state->stack_ptr].function.class              = variable->type;
+        state->context_stack[state->stack_ptr].function.caller_variable_id = corresponding_variable;
+        state->context_stack[state->stack_ptr].function.parsed_identifiers++;
+      }
+      break;
+    case 1:
+      if (token->identifier.is_builtin_type) {
+        LumCompilerMessage message;
+        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+        sprintf(message.message, "<source>:%u:%u: error: `%s` does not name a function", token->line, token->col, token->identifier.name);
+        __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+        state->error_occurred = true;
+        return LUMINARY_SUCCESS;
+      }
+      else {
+        const LumBuiltinType type = state->context_stack[state->stack_ptr].function.class;
+
+        const LumFunctionEntry* functions = lum_function_tables[type];
+        const uint32_t num_functions      = lum_function_tables_count[type];
+
+        uint32_t corresponding_function = 0xFFFFFFFF;
+
+        for (uint32_t function_id = 0; function_id < num_functions; function_id++) {
+          const LumFunctionEntry* function = functions + function_id;
+
+          if (strcmp(function->name, token->identifier.name) == 0) {
+            corresponding_function = function_id;
+            break;
+          }
+        }
+
+        if (corresponding_function == 0xFFFFFFFF) {
+          LumCompilerMessage message;
+          message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+          sprintf(message.message, "<source>:%u:%u: error: `%s` does not name a function", token->line, token->col, token->identifier.name);
+          __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+          state->error_occurred = true;
+          return LUMINARY_SUCCESS;
+        }
+
+        const LumFunctionEntry* function = functions + corresponding_function;
+
+        const bool caller_is_variable = state->context_stack[state->stack_ptr].function.caller_variable_id != LUM_VARIABLE_NOT_FOUND;
+
+        if (caller_is_variable == function->is_static) {
+          LumCompilerMessage message;
+          message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+
+          if (function->is_static) {
+            sprintf(
+              message.message, "<source>:%u:%u: error: cannot call static function `%s` with object", token->line, token->col,
+              token->identifier.name);
+          }
+          else {
+            sprintf(
+              message.message, "<source>:%u:%u: error: cannot call member function `%s` without object", token->line, token->col,
+              token->identifier.name);
+          }
+
+          __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+          state->error_occurred = true;
+          return LUMINARY_SUCCESS;
+        }
+
+        uint32_t expected_arguments = 0;
+        expected_arguments += (function->signature.src_a != LUM_DATA_TYPE_NULL) ? 1 : 0;
+        expected_arguments += (function->signature.src_b != LUM_DATA_TYPE_NULL) ? 1 : 0;
+        expected_arguments += (function->signature.src_c != LUM_DATA_TYPE_NULL) ? 1 : 0;
+
+        state->context_stack[state->stack_ptr].function.function_id        = corresponding_function;
+        state->context_stack[state->stack_ptr].function.expected_arguments = expected_arguments;
+        state->context_stack[state->stack_ptr].function.parsed_identifiers++;
+      }
+      break;
+    default: {
+      const uint32_t expected_arguments = state->context_stack[state->stack_ptr].function.expected_arguments;
+      if (identifier_id >= 2 + expected_arguments) {
+        LumCompilerMessage message;
+        message.type = LUM_COMPILER_MESSAGE_TYPE_WARNING;
+        sprintf(message.message, "<source>:%u:%u: warning: too many arguments in function call", token->line, token->col);
+        __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+        state->error_occurred = true;
+        return LUMINARY_SUCCESS;
+      }
+
+      uint32_t corresponding_variable;
+      __FAILURE_HANDLE(_lum_compiler_find_variable(state, token->identifier.name, &corresponding_variable));
+
+      if (corresponding_variable == LUM_VARIABLE_NOT_FOUND) {
+        LumCompilerMessage message;
+        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+        sprintf(
+          message.message, "<source>:%u:%u: error: use of undeclared identifier `%s`", token->line, token->col, token->identifier.name);
+        __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+        state->error_occurred = true;
+        return LUMINARY_SUCCESS;
+      }
+
+      state->context_stack[state->stack_ptr].function.argument_variable_ids[identifier_id - 2] = corresponding_variable;
+      state->context_stack[state->stack_ptr].function.parsed_identifiers++;
+    } break;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_compiler_handle_identifier_declaration_context(LumCompilerState* state, const LumToken* token) {
   __CHECK_NULL_ARGUMENT(state);
   __CHECK_NULL_ARGUMENT(token);
@@ -267,24 +437,10 @@ static LuminaryResult _lum_compiler_handle_identifier_declaration_context(LumCom
     state->error_occurred = true;
   }
   else {
-    uint32_t variable_count;
-    __FAILURE_HANDLE(array_get_num_elements(state->variables, &variable_count));
+    uint32_t corresponding_variable;
+    __FAILURE_HANDLE(_lum_compiler_find_variable(state, token->identifier.name, &corresponding_variable));
 
-    uint32_t corresponding_variable = 0xFFFFFFFF;
-
-    for (uint32_t variable_id = 0; variable_id < variable_count; variable_id++) {
-      const LumVariable* variable = state->variables + variable_id;
-
-      if (variable->is_named == false)
-        continue;
-
-      if (strcmp(token->identifier.name, variable->name) == 0) {
-        corresponding_variable = variable_id;
-        break;
-      }
-    }
-
-    if (corresponding_variable != 0xFFFFFFFF) {
+    if (corresponding_variable != LUM_VARIABLE_NOT_FOUND) {
       LumCompilerMessage message;
       message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
       sprintf(message.message, "<source>:%u:%u: error: redefinition of `%s`", token->line, token->col, token->identifier.name);
@@ -312,6 +468,9 @@ static LuminaryResult _lum_compiler_handle_identifier(LumCompilerState* state, c
   switch (type) {
     case LUM_COMPILER_CONTEXT_TYPE_NULL:
       __FAILURE_HANDLE(_lum_compiler_handle_identifier_null_context(state, token));
+      break;
+    case LUM_COMPILER_CONTEXT_TYPE_FUNCTION:
+      __FAILURE_HANDLE(_lum_compiler_handle_identifier_function_context(state, token));
       break;
     case LUM_COMPILER_CONTEXT_TYPE_DECLARATION:
       __FAILURE_HANDLE(_lum_compiler_handle_identifier_declaration_context(state, token));
@@ -547,8 +706,10 @@ static LuminaryResult _lum_compiler_handle_separator(LumCompilerState* state, co
 
   switch (type) {
     case LUM_COMPILER_CONTEXT_TYPE_NULL:
-    case LUM_COMPILER_CONTEXT_TYPE_OPERATOR:
       __FAILURE_HANDLE(_lum_compiler_handle_separator_null_context(state, token));
+      break;
+    case LUM_COMPILER_CONTEXT_TYPE_OPERATOR:
+      __FAILURE_HANDLE(_lum_compiler_handle_separator_operator_context(state, token));
       break;
     case LUM_COMPILER_CONTEXT_TYPE_FUNCTION:
       __FAILURE_HANDLE(_lum_compiler_handle_separator_function_context(state, token));
