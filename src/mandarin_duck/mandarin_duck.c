@@ -201,5 +201,9 @@ void mandarin_duck_destroy(MandarinDuck** duck) {
     display_destroy(&(*duck)->display);
   }
 
+  if ((*duck)->benchmark_output_promises) {
+    LUM_FAILURE_HANDLE(array_destroy(&(*duck)->benchmark_output_promises));
+  }
+
   LUM_FAILURE_HANDLE(host_free(duck));
 }
