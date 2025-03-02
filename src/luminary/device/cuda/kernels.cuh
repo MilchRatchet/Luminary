@@ -211,10 +211,10 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   const uint32_t task_count    = device.ptrs.trace_counts[THREAD_ID];
   uint16_t geometry_task_count = 0;
-  uint16_t particle_task_count = 0;
-  uint16_t sky_task_count      = 0;
   uint16_t ocean_task_count    = 0;
   uint16_t volume_task_count   = 0;
+  uint16_t particle_task_count = 0;
+  uint16_t sky_task_count      = 0;
 
   // count data
   for (uint32_t i = 0; i < task_count; i++) {
@@ -246,10 +246,10 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   uint32_t rejects_offset  = sky_offset + sky_task_count;
   uint32_t k               = 0;
 
-  device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_offset;
-  device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]   = volume_offset;
-  device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE] = particle_offset;
-  device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY]      = sky_offset;
+  device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_offset;
+  device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_VOLUME]   = volume_offset;
+  device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_PARTICLE] = particle_offset;
+  device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_SKY]      = sky_offset;
 
   const uint32_t num_tasks               = rejects_offset;
   const uint32_t initial_geometry_offset = 0;
@@ -320,11 +320,11 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   const uint16_t geometry_kernel_task_count = geometry_task_count + ocean_task_count;
 
-  device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY]   = geometry_kernel_task_count;
-  device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]     = volume_task_count;
-  device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE]   = particle_task_count;
-  device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY]        = sky_task_count;
-  device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT] = num_tasks;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_kernel_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME]   = volume_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE] = particle_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY]      = sky_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_TOTAL]    = num_tasks;
 
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }

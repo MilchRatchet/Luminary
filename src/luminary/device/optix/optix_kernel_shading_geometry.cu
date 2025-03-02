@@ -15,8 +15,8 @@
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {

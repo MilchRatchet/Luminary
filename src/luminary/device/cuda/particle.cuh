@@ -8,8 +8,8 @@
 LUMINARY_KERNEL void particle_process_tasks_debug() {
   HANDLE_DEVICE_ABORT();
 
-  const uint16_t task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const uint16_t task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const uint16_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE];
+  const uint16_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_PARTICLE];
 
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset       = get_task_address(task_offset + i);

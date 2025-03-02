@@ -9,7 +9,7 @@
 LUMINARY_KERNEL void geometry_process_tasks_debug() {
   HANDLE_DEVICE_ABORT();
 
-  const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset          = get_task_address(i);
