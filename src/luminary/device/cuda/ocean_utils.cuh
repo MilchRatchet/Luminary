@@ -473,11 +473,8 @@ __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint
     (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(device.ocean.refractive_index, pixel, ior_stack_method);
 
-  // We clamp the roughness to avoid caustics which would never clean up.
-  float roughness = 0.045f;
-  if (task.state & STATE_FLAG_DELTA_PATH) {
-    flags |= G_BUFFER_FLAG_USE_LIGHT_RAYS;
-  }
+  // We clamp the roughness to avoid caustics that would never clean up.
+  const float roughness = 0.045f;
 
   GBufferData data;
   data.instance_id = HIT_TYPE_OCEAN;

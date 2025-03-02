@@ -28,13 +28,7 @@ extern "C" __global__ void __raygen__optix() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    GBufferData data;
-    if (triangle_handle.instance_id == HIT_TYPE_OCEAN) {
-      data = ocean_generate_g_buffer(task, pixel);
-    }
-    else {
-      data = geometry_generate_g_buffer(task, triangle_handle, pixel);
-    }
+    GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
@@ -63,11 +57,8 @@ extern "C" __global__ void __raygen__optix() {
     ////////////////////////////////////////////////////////////////////
 
     RGBF accumulated_light = data.emission;
-
-    if (data.flags & G_BUFFER_FLAG_USE_LIGHT_RAYS) {
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
-    }
+    accumulated_light      = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+    accumulated_light      = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
 
     accumulated_light = add_color(
       accumulated_light,
@@ -94,7 +85,7 @@ extern "C" __global__ void __raygen__optix() {
     }
 
     if (!is_pass_through) {
-      new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+      new_state &= ~(STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
     }
 
     DeviceTask bounce_task;

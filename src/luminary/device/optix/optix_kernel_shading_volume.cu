@@ -41,7 +41,7 @@ extern "C" __global__ void __raygen__optix() {
     BSDFSampleInfo bounce_info;
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
-    uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
+    uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
 
     if (volume_type == VOLUME_TYPE_OCEAN) {
       new_state &= ~STATE_FLAG_OCEAN_SCATTERED;

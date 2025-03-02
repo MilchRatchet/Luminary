@@ -52,6 +52,7 @@ struct DeviceRendererQueueArgs {
   bool render_particles;
   bool render_volumes;
   bool render_clouds;
+  bool render_ocean;
   bool render_inscattering;
   bool render_lights;
   bool render_procedural_sky;

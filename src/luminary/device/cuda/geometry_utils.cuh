@@ -86,7 +86,8 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
     albedo.a              = albedo_f.w;
   }
 
-  const bool include_emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & STATE_FLAG_CAMERA_DIRECTION);
+  const bool include_emission =
+    (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
 
   RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
   if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
@@ -108,7 +109,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
-  uint32_t flags = G_BUFFER_FLAG_USE_LIGHT_RAYS | (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
+  uint32_t flags = (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
 
   if (mat.metallic_tex != TEXTURE_NONE) {
     // TODO: Stochastic filtering of metallic texture.

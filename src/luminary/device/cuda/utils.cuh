@@ -41,6 +41,7 @@ enum HitType : uint32_t {
 
 enum ShadingTaskIndex {
   SHADING_TASK_INDEX_GEOMETRY,
+  SHADING_TASK_INDEX_OCEAN,
   SHADING_TASK_INDEX_VOLUME,
   SHADING_TASK_INDEX_PARTICLE,
   SHADING_TASK_INDEX_SKY,
@@ -50,6 +51,7 @@ enum ShadingTaskIndex {
 #define TASK_ADDRESS_OFFSET_IMPL(__internal_macro_shading_task_index) (NUM_THREADS * __internal_macro_shading_task_index + THREAD_ID)
 
 #define TASK_ADDRESS_OFFSET_GEOMETRY TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_GEOMETRY)
+#define TASK_ADDRESS_OFFSET_OCEAN TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_OCEAN)
 #define TASK_ADDRESS_OFFSET_VOLUME TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_VOLUME)
 #define TASK_ADDRESS_OFFSET_PARTICLE TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_PARTICLE)
 #define TASK_ADDRESS_OFFSET_SKY TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_SKY)
@@ -73,10 +75,14 @@ enum ShadingTaskIndex {
 // STATE_FLAG_OCEAN_SCATTERED: This flag is set for paths that have at least one vertex that is a ocean volume scattering event.
 //                             This flag is used to limit ocean volumes to single scattering for performance reasons.
 //
+// STATE_FLAG_ALLOW_EMISSION: This flag is set for rays that are allowed to include emission in bounce rays.
+//                            This flag is used on the ocean surface because there is no DL on it.
+//
 enum StateFlag {
   STATE_FLAG_DELTA_PATH       = 0b00000001u,
   STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
-  STATE_FLAG_OCEAN_SCATTERED  = 0b00000100u
+  STATE_FLAG_OCEAN_SCATTERED  = 0b00000100u,
+  STATE_FLAG_ALLOW_EMISSION   = 0b00001000u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {

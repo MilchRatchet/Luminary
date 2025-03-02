@@ -43,7 +43,7 @@ extern "C" __global__ void __raygen__optix() {
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
     DeviceTask bounce_task;
-    bounce_task.state  = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
+    bounce_task.state  = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;

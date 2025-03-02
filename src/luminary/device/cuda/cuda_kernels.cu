@@ -8,6 +8,7 @@
 #include "kernels.cuh"
 #include "light.cuh"
 #include "micromap.cuh"
+#include "ocean.cuh"
 #include "particle.cuh"
 #include "sky.cuh"
 #include "sky_hdri.cuh"

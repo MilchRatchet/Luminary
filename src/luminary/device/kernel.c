@@ -18,6 +18,8 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_GLOSSY_LUT] = {.name = "bsdf_generate_glossy_lut", .param_size = sizeof(KernelArgsBSDFGenerateGlossyLUT)},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_DIELECTRIC_LUT] =
     {.name = "bsdf_generate_dielectric_lut", .param_size = sizeof(KernelArgsBSDFGenerateDielectricLUT)},
+  [CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS]             = {.name = "ocean_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS_DEBUG]       = {.name = "ocean_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS]               = {.name = "sky_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG]         = {.name = "sky_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS] = {.name = "sky_process_inscattering_events", .param_size = 0},

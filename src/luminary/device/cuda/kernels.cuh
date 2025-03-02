@@ -79,7 +79,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       continue;
 
     DeviceTask task;
-    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
+    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION;
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
 
@@ -247,6 +247,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   uint32_t k               = 0;
 
   device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_offset;
+  device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_OCEAN]    = ocean_offset;
   device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_VOLUME]   = volume_offset;
   device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_PARTICLE] = particle_offset;
   device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_SKY]      = sky_offset;
@@ -318,9 +319,8 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     }
   }
 
-  const uint16_t geometry_kernel_task_count = geometry_task_count + ocean_task_count;
-
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_kernel_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN]    = ocean_task_count;
   device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME]   = volume_task_count;
   device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE] = particle_task_count;
   device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY]      = sky_task_count;
