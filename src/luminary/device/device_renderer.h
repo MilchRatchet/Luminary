@@ -5,6 +5,7 @@
 #include "device_utils.h"
 #include "kernel.h"
 #include "optix_kernel.h"
+#include "spinlock.h"
 
 struct Device typedef Device;
 
@@ -45,6 +46,7 @@ struct DeviceRenderer {
   CUevent time_end[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float total_render_time[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float last_time;
+  SpinLockCounter callbacks_active_counter;
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {

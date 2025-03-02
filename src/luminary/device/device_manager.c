@@ -160,8 +160,10 @@ static LuminaryResult _device_manager_clear_handle_device_render(DeviceManager* 
 
 static void _device_manager_render_callback(DeviceRenderCallbackData* data) {
   // Ignore callbacks if we are shutting down.
-  if (data->common.device_manager->is_shutdown)
+  if (data->common.device_manager->is_shutdown) {
+    _device_manager_clear_handle_device_render(data->common.device_manager, data);
     return;
+  }
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
