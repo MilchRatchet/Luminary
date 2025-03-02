@@ -22,7 +22,7 @@
 
 #define OCEAN_ITERATIONS_INTERSECTION 8
 #define OCEAN_ITERATIONS_NORMAL 8
-#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 3
+#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 8
 
 __device__ float ocean_hash(const float2 p) {
   const float x = p.x + p.y * (311.7f / 127.1f);
