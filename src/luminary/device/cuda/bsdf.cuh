@@ -1,8 +1,6 @@
 #ifndef CU_BSDF_H
 #define CU_BSDF_H
 
-#if defined(SHADING_KERNEL)
-
 #include "bsdf_utils.cuh"
 #include "ocean_utils.cuh"
 #include "random.cuh"
@@ -417,7 +415,5 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
   }
 #endif  // !PHASE_KERNEL
 }
-
-#endif /* SHADING_KERNEL */
 
 #endif /* CU_BSDF_H */

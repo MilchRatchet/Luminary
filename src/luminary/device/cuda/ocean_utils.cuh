@@ -145,7 +145,6 @@ __device__ vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = 
   return normalize_vector(normal);
 }
 
-// FLT_MAX signals no hit.
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
   if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
@@ -158,15 +157,16 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
   const float d1 = OCEAN_MIN_HEIGHT - origin.y;
   const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
-  const float s1 = d1 / ray.y;
-  const float s2 = d2 / ray.y;
+  const float inv_ray = 1.0f / ray.y;
+
+  const float s1 = d1 * inv_ray;
+  const float s2 = d2 * inv_ray;
 
   const float s = fmaxf(s1, s2);
 
   return (s >= eps) ? s : FLT_MAX;
 }
 
-// FLT_MAX signals no hit.
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
@@ -179,8 +179,10 @@ __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   const float d1 = OCEAN_MIN_HEIGHT - origin.y;
   const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
-  const float s1 = d1 / ray.y;
-  const float s2 = d2 / ray.y;
+  const float inv_ray = 1.0f / ray.y;
+
+  const float s1 = d1 * inv_ray;
+  const float s2 = d2 * inv_ray;
 
   if (s1 < 0.0f && s2 < 0.0f)
     return FLT_MAX;
@@ -192,26 +194,22 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
   if (start >= limit)
     return FLT_MAX;
 
-  const float target_residual = (1.0f + fabsf(device.ocean.height) + start / 10.0f) * 0.5f * eps;
+  const float target_residual = 1e-4f;
 
   float min = start;
   float max = limit;
 
-  float residual_at_max;
+  float residual_at_max = FLT_MAX;
   float residual_at_min;
 
   float t                       = start;
   float last_residual           = 0.0f;
-  float slope_confidence_factor = 8.0f / OCEAN_LIPSCHITZ;
+  float slope_confidence_factor = fminf(8.0f / OCEAN_LIPSCHITZ, (limit - start) * (1.0f / 8.0f));
 
-  for (int i = 0; i < 200; i++) {
+  for (int i = 0; i < 8; i++) {
     const vec3 p = add_vector(origin, scale_vector(ray, t));
 
     const float residual_at_t = ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION);
-    const float res_abs       = fabsf(residual_at_t);
-
-    if (res_abs < target_residual)
-      return t;
 
     if (last_residual * residual_at_t < 0.0f) {
       max             = t;
@@ -224,15 +222,14 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
     min             = t;
     residual_at_min = residual_at_t;
 
-    t += res_abs * slope_confidence_factor;
-
-    if (t >= limit || t <= start) {
-      residual_at_max = ocean_get_relative_height(add_vector(origin, scale_vector(ray, limit)), OCEAN_ITERATIONS_INTERSECTION);
-      break;
-    }
+    t += fabsf(residual_at_t) * slope_confidence_factor;
   }
 
-  for (int i = 0; i < 20; i++) {
+  if (residual_at_max == FLT_MAX) {
+    residual_at_max = ocean_get_relative_height(add_vector(origin, scale_vector(ray, limit)), OCEAN_ITERATIONS_INTERSECTION);
+  }
+
+  for (int i = 0; i < 8; i++) {
     const float step = residual_at_min / (residual_at_min - residual_at_max);
     const float mid  = lerp(min, max, fminf(0.95f, fmaxf(0.05f, step)));
     const vec3 p     = add_vector(origin, scale_vector(ray, mid));
@@ -251,6 +248,10 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
       min             = mid;
       residual_at_min = residual_at_mid;
     }
+  }
+
+  if (residual_at_max * residual_at_min < 0.0f) {
+    return 0.5f * (min + max);
   }
 
   return FLT_MAX;

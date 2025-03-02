@@ -59,20 +59,12 @@ LUMINARY_KERNEL void volume_process_events() {
     }
 
     if (device.ocean.active) {
-      bool ocean_intersection_possible = true;
-      if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
-        const float short_distance  = ocean_short_distance(task.origin, task.ray);
-        ocean_intersection_possible = (short_distance != FLT_MAX) && (short_distance <= depth);
-      }
+      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
-      if (ocean_intersection_possible) {
-        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
-
-        if (ocean_depth < depth) {
-          depth              = ocean_depth;
-          handle.instance_id = HIT_TYPE_OCEAN;
-          handle.tri_id      = 0;
-        }
+      if (ocean_depth < depth) {
+        depth              = ocean_depth;
+        handle.instance_id = HIT_TYPE_OCEAN;
+        handle.tri_id      = 0;
       }
 
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();

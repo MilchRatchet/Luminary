@@ -17,7 +17,7 @@ __device__ uint16_t optix_float_to_bfloat16(const float val) {
   return __float_as_uint(val) >> 16;
 }
 
-__device__ void optix_write_out_gbuffer_meta(const DeviceTask task, const float depth, const TriangleHandle handle) {
+__device__ void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
   if (device.state.sample_id != 0 || device.state.depth != 0)
     return;
 
@@ -31,24 +31,35 @@ __device__ void optix_write_out_gbuffer_meta(const DeviceTask task, const float 
   const uint16_t y  = task.index.y >> shift;
   const uint32_t ld = device.settings.width >> shift;
 
+  if (device.ocean.active) {
+    if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
+      const float short_distance = ocean_short_distance(task.origin, task.ray);
+
+      if (short_distance < result.depth) {
+        result.handle.instance_id = HIT_TYPE_REJECT;
+        result.depth              = short_distance;
+      }
+    }
+  }
+
   uint16_t material_id = MATERIAL_ID_INVALID;
   uint32_t instance_id = HIT_TYPE_INVALID;
 
-  if (handle.instance_id < HIT_TYPE_TRIANGLE_ID_LIMIT) {
-    const uint32_t mesh_id = mesh_id_load(handle.instance_id);
+  if (result.handle.instance_id < HIT_TYPE_TRIANGLE_ID_LIMIT) {
+    const uint32_t mesh_id = mesh_id_load(result.handle.instance_id);
 
-    material_id = material_id_load(mesh_id, handle.tri_id);
-    instance_id = handle.instance_id;
+    material_id = material_id_load(mesh_id, result.handle.tri_id);
+    instance_id = result.handle.instance_id;
   }
 
   vec3 rel_hit_pos = get_vector(0.0f, 0.0f, 0.0f);
-  if (depth < FLT_MAX) {
-    rel_hit_pos = scale_vector(task.ray, depth);
+  if (result.depth < FLT_MAX) {
+    rel_hit_pos = scale_vector(task.ray, result.depth);
   }
 
   GBufferMetaData meta_data;
 
-  meta_data.depth              = depth;
+  meta_data.depth              = result.depth;
   meta_data.instance_id        = instance_id;
   meta_data.material_id        = material_id;
   meta_data.rel_hit_x_bfloat16 = optix_float_to_bfloat16(rel_hit_pos.x);
@@ -67,22 +78,6 @@ __device__ void optix_write_out_gbuffer_meta(const DeviceTask task, const float 
 ////////////////////////////////////////////////////////////////////
 // Raytracing passes
 ////////////////////////////////////////////////////////////////////
-
-__device__ void optix_raytrace_preprocess(const DeviceTask task, OptixRaytraceResult& result) {
-  result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
-  result.depth  = FLT_MAX;
-
-  if (device.ocean.active) {
-    if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
-      const float far_distance = ocean_far_distance(task.origin, task.ray);
-
-      if (far_distance < result.depth) {
-        result.handle.instance_id = HIT_TYPE_REJECT;
-        result.depth              = far_distance;
-      }
-    }
-  }
-}
 
 __device__ void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResult& result) {
   OptixKernelFunctionGeometryTracePayload payload;
@@ -144,13 +139,15 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTask task = task_load(offset);
 
     OptixRaytraceResult result;
-    optix_raytrace_preprocess(task, result);
+    result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
+    result.depth  = FLT_MAX;
+
     optix_raytrace_geometry(task, result);
     optix_raytrace_particles(task, result);
 
-    optix_write_out_gbuffer_meta(task, result.depth, result.handle);
-
     triangle_handle_store(result.handle, offset);
     trace_depth_store(result.depth, offset);
+
+    optix_write_out_gbuffer_meta(task, result);
   }
 }
