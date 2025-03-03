@@ -45,7 +45,10 @@ enum ShadingTaskIndex {
   SHADING_TASK_INDEX_VOLUME,
   SHADING_TASK_INDEX_PARTICLE,
   SHADING_TASK_INDEX_SKY,
-  SHADING_TASK_INDEX_TOTAL
+  SHADING_TASK_INDEX_TOTAL,
+  SHADING_TASK_INDEX_INVALID = SHADING_TASK_INDEX_TOTAL,
+  SHADING_TASK_INDEX_TOTAL_WITH_INVALID
+
 } typedef ShadingTaskIndex;
 
 #define TASK_ADDRESS_OFFSET_IMPL(__internal_macro_shading_task_index) (NUM_THREADS * __internal_macro_shading_task_index + THREAD_ID)
@@ -160,6 +163,27 @@ __device__ bool is_non_finite(const float a) {
   if (__ldcv(device.ptrs.abort_flag) != 0 && ((device.state.undersampling & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0)) { \
     return;                                                                                                           \
   }
+
+__device__ ShadingTaskIndex shading_task_index_from_instance_id(const uint32_t instance_id) {
+  if (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+    return SHADING_TASK_INDEX_GEOMETRY;
+  }
+  else if (instance_id == HIT_TYPE_OCEAN) {
+    return SHADING_TASK_INDEX_OCEAN;
+  }
+  else if (VOLUME_HIT_CHECK(instance_id)) {
+    return SHADING_TASK_INDEX_VOLUME;
+  }
+  else if (instance_id <= HIT_TYPE_PARTICLE_MAX) {
+    return SHADING_TASK_INDEX_PARTICLE;
+  }
+  else if (instance_id == HIT_TYPE_SKY) {
+    return SHADING_TASK_INDEX_SKY;
+  }
+  else {
+    return SHADING_TASK_INDEX_INVALID;
+  }
+}
 
 //===========================================================================================
 // Debug utils
