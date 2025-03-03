@@ -29,6 +29,12 @@
 #define UNDERSAMPLING_STAGE_SHIFT 2
 #define UNDERSAMPLING_ITERATION_MASK 0x03
 
+#ifdef __cplusplus
+#define LUM_RESTRICT __restrict__
+#else
+#define LUM_RESTRICT restrict
+#endif
+
 ////////////////////////////////////////////////////////////////////
 // Failure handles
 ////////////////////////////////////////////////////////////////////
@@ -245,39 +251,40 @@ typedef DeviceLightTreeNode LightTreeNode8Packed;
 ////////////////////////////////////////////////////////////////////
 
 struct DevicePointers {
-  DEVICE DeviceTask* tasks;
-  DEVICE TriangleHandle* triangle_handles;
-  DEVICE float* trace_depths;
-  DEVICE uint16_t* trace_counts;  // TODO: Remove and reuse inside task_counts
-  DEVICE uint16_t* task_counts;
-  DEVICE uint16_t* task_offsets;
-  DEVICE uint32_t* ior_stack;
-  DEVICE RGBF* frame_current_result;
-  DEVICE RGBF* frame_direct_buffer;
-  DEVICE RGBF* frame_direct_accumulate;
-  DEVICE RGBF* frame_indirect_buffer;
-  DEVICE float* frame_indirect_accumulate_red[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE float* frame_indirect_accumulate_green[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE float* frame_indirect_accumulate_blue[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE RGBF* frame_final;
-  DEVICE GBufferMetaData* gbuffer_meta;
-  DEVICE RGBF* records;
-  DEVICE const DeviceTextureObject* textures;
-  DEVICE const uint16_t* bluenoise_1D;
-  DEVICE const uint32_t* bluenoise_2D;
-  DEVICE const float* bridge_lut;
-  DEVICE const DeviceMaterialCompressed* materials;
-  DEVICE INTERLEAVED_STORAGE const DeviceTriangle** triangles;
-  DEVICE const uint32_t* triangle_counts;
-  DEVICE const DeviceTransform* instance_transforms;
-  DEVICE const uint32_t* instance_mesh_id;
-  DEVICE const LightTreeNode8Packed* light_tree_nodes;
-  DEVICE const uint2* light_tree_paths;
-  DEVICE const TriangleHandle* light_tree_tri_handle_map;
-  DEVICE const Quad* particle_quads;
-  DEVICE const Star* stars;
-  DEVICE const uint32_t* stars_offsets;
-  DEVICE uint32_t* abort_flag;  // Could be used for general execution flags in the future
+  DEVICE float4* LUM_RESTRICT tasks0;
+  DEVICE float4* LUM_RESTRICT tasks1;
+  DEVICE TriangleHandle* LUM_RESTRICT triangle_handles;
+  DEVICE float* LUM_RESTRICT trace_depths;
+  DEVICE uint16_t* LUM_RESTRICT trace_counts;  // TODO: Remove and reuse inside task_counts
+  DEVICE uint16_t* LUM_RESTRICT task_counts;
+  DEVICE uint16_t* LUM_RESTRICT task_offsets;
+  DEVICE uint32_t* LUM_RESTRICT ior_stack;
+  DEVICE RGBF* LUM_RESTRICT frame_current_result;
+  DEVICE RGBF* LUM_RESTRICT frame_direct_buffer;
+  DEVICE RGBF* LUM_RESTRICT frame_direct_accumulate;
+  DEVICE RGBF* LUM_RESTRICT frame_indirect_buffer;
+  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_red[MAX_NUM_INDIRECT_BUCKETS];
+  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_green[MAX_NUM_INDIRECT_BUCKETS];
+  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_blue[MAX_NUM_INDIRECT_BUCKETS];
+  DEVICE RGBF* LUM_RESTRICT frame_final;
+  DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
+  DEVICE RGBF* LUM_RESTRICT records;
+  DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
+  DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
+  DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
+  DEVICE const float* LUM_RESTRICT bridge_lut;
+  DEVICE const DeviceMaterialCompressed* LUM_RESTRICT materials;
+  DEVICE INTERLEAVED_STORAGE const DeviceTriangle** LUM_RESTRICT triangles;
+  DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
+  DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
+  DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
+  DEVICE const LightTreeNode8Packed* LUM_RESTRICT light_tree_nodes;
+  DEVICE const uint2* LUM_RESTRICT light_tree_paths;
+  DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
+  DEVICE const Quad* LUM_RESTRICT particle_quads;
+  DEVICE const Star* LUM_RESTRICT stars;
+  DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
+  DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
 struct DeviceExecutionState {

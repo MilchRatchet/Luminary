@@ -42,28 +42,26 @@ __device__ void stream_float4(const float4* source, float4* target) {
 __device__ void swap_trace_data(const uint32_t index0, const uint32_t index1) {
   const uint32_t offset0 = get_task_address(index0);
 
-  const float4 data0 = __ldcs((float4*) (device.ptrs.tasks + offset0));
-  const float4 data1 = __ldcs((float4*) (device.ptrs.tasks + offset0) + 1);
+  const float4 data0 = __ldcs(device.ptrs.tasks0 + offset0);
+  const float4 data1 = __ldcs(device.ptrs.tasks1 + offset0);
   const float depth  = __ldcs((float*) (device.ptrs.trace_depths + offset0));
   const uint2 handle = __ldcs((uint2*) (device.ptrs.triangle_handles + offset0));
 
   const uint32_t offset1 = get_task_address(index1);
-  stream_float4((float4*) (device.ptrs.tasks + offset1), (float4*) (device.ptrs.tasks + offset0));
-  stream_float4((float4*) (device.ptrs.tasks + offset1) + 1, (float4*) (device.ptrs.tasks + offset0) + 1);
+  stream_float4(device.ptrs.tasks0 + offset1, device.ptrs.tasks0 + offset0);
+  stream_float4(device.ptrs.tasks1 + offset1, device.ptrs.tasks1 + offset0);
   stream_float((float*) (device.ptrs.trace_depths + offset1), (float*) (device.ptrs.trace_depths + offset0));
   stream_uint2((uint2*) (device.ptrs.triangle_handles + offset1), (uint2*) (device.ptrs.triangle_handles + offset0));
 
-  __stcs((float4*) (device.ptrs.tasks + offset1), data0);
-  __stcs((float4*) (device.ptrs.tasks + offset1) + 1, data1);
+  __stcs(device.ptrs.tasks0 + offset1, data0);
+  __stcs(device.ptrs.tasks1 + offset1, data1);
   __stcs((float*) (device.ptrs.trace_depths + offset1), depth);
   __stcs((uint2*) (device.ptrs.triangle_handles + offset1), handle);
 }
 
 __device__ DeviceTask task_load(const uint32_t offset) {
-  const float4* data_ptr = (const float4*) (device.ptrs.tasks + offset);
-
-  const float4 data0 = __ldcs(data_ptr + 0);
-  const float4 data1 = __ldcs(data_ptr + 1);
+  const float4 data0 = __ldcs(device.ptrs.tasks0 + offset);
+  const float4 data1 = __ldcs(device.ptrs.tasks1 + offset);
 
   DeviceTask task;
   task.state    = __float_as_uint(data0.x) & 0xFFFF;
@@ -82,7 +80,6 @@ __device__ DeviceTask task_load(const uint32_t offset) {
 }
 
 __device__ void task_store(const DeviceTask task, const uint32_t offset) {
-  float4* ptr = (float4*) (device.ptrs.tasks + offset);
   float4 data0;
   float4 data1;
 
@@ -91,14 +88,14 @@ __device__ void task_store(const DeviceTask task, const uint32_t offset) {
   data0.z = task.origin.x;
   data0.w = task.origin.y;
 
-  __stcs(ptr, data0);
+  __stcs(device.ptrs.tasks0 + offset, data0);
 
   data1.x = task.origin.z;
   data1.y = task.ray.x;
   data1.z = task.ray.y;
   data1.w = task.ray.z;
 
-  __stcs(ptr + 1, data1);
+  __stcs(device.ptrs.tasks1 + offset, data1);
 }
 
 __device__ TriangleHandle triangle_handle_load(const uint32_t offset) {

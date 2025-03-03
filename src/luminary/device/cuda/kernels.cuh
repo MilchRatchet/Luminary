@@ -150,17 +150,12 @@ LUMINARY_KERNEL void balance_trace_tasks() {
       const uint32_t block_id       = warp >> 2;
 
       for (uint32_t j = 0; j < swaps; j++) {
-        // TODO: Write a function for this
-        DeviceTask* source_ptr = device.ptrs.tasks + get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
-        DeviceTask* sink_ptr   = device.ptrs.tasks + get_task_address_of_thread(thread_id_base + i, block_id, count);
+        const uint32_t source_offset = get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
+        const uint32_t sink_offset   = get_task_address_of_thread(thread_id_base + i, block_id, count);
 
-        __stwb((float4*) sink_ptr, __ldca((float4*) source_ptr));
-        __stwb((float4*) (sink_ptr) + 1, __ldca((float4*) (source_ptr) + 1));
+        task_store(task_load(source_offset), sink_offset);
 
-        sink_ptr++;
         count++;
-
-        source_ptr--;
         source_count--;
       }
       counts[threadIdx.x + i * THREADS_PER_BLOCK]            = count;
