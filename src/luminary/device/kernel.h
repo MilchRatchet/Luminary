@@ -49,6 +49,7 @@ enum CUDAKernelType {
 } typedef CUDAKernelType;
 
 struct CUDAKernel {
+  CUDAKernelType type;
   CUkernel cuda_kernel;
   uint32_t shared_memory_size;
   size_t param_size;
@@ -60,6 +61,7 @@ DEVICE_CTX_FUNC LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void
 DEVICE_CTX_FUNC LuminaryResult kernel_execute_custom(
   CUDAKernel* kernel, uint32_t block_dim_x, uint32_t block_dim_y, uint32_t block_dim_z, uint32_t grid_dim_x, uint32_t grid_dim_y,
   uint32_t grid_dim_z, void* arg_struct, CUstream stream);
+LuminaryResult kernel_get_name(CUDAKernel* kernel, const char** name);
 DEVICE_CTX_FUNC LuminaryResult kernel_destroy(CUDAKernel** kernel);
 
 #endif /* LUMINARY_KERNEL_H */

@@ -69,6 +69,9 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
   __CHECK_NULL_ARGUMENT(library);
 
   __FAILURE_HANDLE(host_malloc(kernel, sizeof(CUDAKernel)));
+  memset(*kernel, 0, sizeof(CUDAKernel));
+
+  (*kernel)->type = type;
 
   const CUDAKernelConfig* config = cuda_kernel_configs + type;
 
@@ -150,6 +153,17 @@ LuminaryResult kernel_execute_custom(
   launch_config.numAttrs       = 0;
 
   CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, &arg_struct, (void**) 0));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult kernel_get_name(CUDAKernel* kernel, const char** name) {
+  __CHECK_NULL_ARGUMENT(kernel);
+  __CHECK_NULL_ARGUMENT(name);
+
+  const CUDAKernelConfig* config = cuda_kernel_configs + kernel->type;
+
+  *name = config->name;
 
   return LUMINARY_SUCCESS;
 }

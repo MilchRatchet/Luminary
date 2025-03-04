@@ -7,6 +7,8 @@
 #include "optix_kernel.h"
 #include "spinlock.h"
 
+// #define DEVICE_RENDERER_DO_PER_KERNEL_TIMING
+
 struct Device typedef Device;
 
 enum DeviceRendererQueueActionType {
@@ -31,6 +33,23 @@ struct DeviceRendererQueueAction {
   };
 } typedef DeviceRendererQueueAction;
 
+#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
+
+#define DEVICE_RENDERER_MAX_TIMED_KERNELS 256
+
+struct DeviceRendererKernelTimer {
+  const char* name;
+  CUevent time_start;
+  CUevent time_end;
+} typedef DeviceRendererKernelTimer;
+
+struct DeviceRendererPerKernelTimings {
+  ARRAY DeviceRendererKernelTimer* kernels;
+  uint32_t num_kernel_launches;
+} typedef DeviceRendererPerKernelTimings;
+
+#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
+
 #define DEVICE_RENDERER_TIMING_EVENTS_COUNT 128
 #define DEVICE_RENDERER_TIMING_EVENTS_MASK (DEVICE_RENDERER_TIMING_EVENTS_COUNT - 1)
 
@@ -47,6 +66,10 @@ struct DeviceRenderer {
   CUevent time_end[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float total_render_time[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float last_time;
+
+#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
+  DeviceRendererPerKernelTimings kernel_times[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
+#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {
