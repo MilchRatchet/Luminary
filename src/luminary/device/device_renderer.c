@@ -11,8 +11,6 @@ LuminaryResult device_renderer_create(DeviceRenderer** renderer) {
 
   __FAILURE_HANDLE(array_create(&(*renderer)->queue, sizeof(DeviceRendererQueueAction), 16));
 
-  __FAILURE_HANDLE(ringbuffer_create(&(*renderer)->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData) * 64));
-
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_start[event_id], 0));
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_end[event_id], 0));
@@ -208,23 +206,16 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, DeviceCommonCallbackData callback_data) {
+LuminaryResult device_renderer_register_callback(
+  DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(callback_func);
+  __CHECK_NULL_ARGUMENT(callback_continue_func);
+  __CHECK_NULL_ARGUMENT(callback_finished_func);
 
-  renderer->registered_callback_func = callback_func;
+  renderer->registered_callback_continue_func = callback_continue_func;
+  renderer->registered_callback_finished_func = callback_finished_func;
 
-  renderer->callback_data = callback_data;
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult device_renderer_clear_callback_data(DeviceRenderer* renderer) {
-  __CHECK_NULL_ARGUMENT(renderer);
-
-  __FAILURE_HANDLE(ringbuffer_release_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData)));
-
-  spinlock_counter_pop(&renderer->callbacks_active_counter);
+  renderer->common_callback_data = callback_data;
 
   return LUMINARY_SUCCESS;
 }
@@ -253,17 +244,12 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
 
   uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
 
-  if (renderer->event_id >= DEVICE_RENDERER_TIMING_EVENTS_COUNT) {
-    float event_time;
-    CUDA_FAILURE_HANDLE(cuEventElapsedTime(&event_time, renderer->time_start[event_id], renderer->time_end[event_id]));
+  // Same callback data is used for continue and finished callbacks
+  DeviceRenderCallbackData* shared_callback_data = renderer->callback_data + event_id;
 
-    // Convert from milliseconds to seconds.
-    event_time *= 0.001;
-
-    renderer->total_render_time[event_id] = renderer->total_render_time[(event_id - 1) & DEVICE_RENDERER_TIMING_EVENTS_MASK] + event_time;
-
-    renderer->last_time = event_time;
-  }
+  shared_callback_data->common          = renderer->common_callback_data;
+  shared_callback_data->render_id       = renderer->render_id;
+  shared_callback_data->render_event_id = renderer->event_id;
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
 
@@ -301,19 +287,9 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         }
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
-        DeviceRenderCallbackData* callback_data;
-        __FAILURE_HANDLE(
-          ringbuffer_allocate_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData), (void**) &callback_data));
-
-        callback_data->common          = renderer->callback_data;
-        callback_data->render_id       = renderer->render_id;
-        callback_data->render_event_id = renderer->event_id;
-
         CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, device->stream_main));
         CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
-        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, callback_data));
-
-        spinlock_counter_push(&renderer->callbacks_active_counter);
+        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, shared_callback_data));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
         if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
@@ -343,6 +319,9 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         }
 
         CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], device->stream_main));
+        CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[event_id], CU_EVENT_WAIT_DEFAULT));
+        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_finished_func, shared_callback_data));
+
         renderer->event_id++;
 
         if (is_gbuffer_meta_query) {
@@ -356,8 +335,40 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t event_id) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  if (event_id >= renderer->event_id) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Renderer tried to update time for event %u when the next event is %u", event_id, renderer->event_id);
+  }
+
+  event_id = event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
+
+  float event_time;
+  CUDA_FAILURE_HANDLE(cuEventElapsedTime(&event_time, renderer->time_start[event_id], renderer->time_end[event_id]));
+
+  // Convert from milliseconds to seconds.
+  event_time *= 0.001;
+
+  renderer->total_render_time[event_id] = renderer->total_render_time[(event_id - 1) & DEVICE_RENDERER_TIMING_EVENTS_MASK] + event_time;
+
+  renderer->last_time = event_time;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time) {
   __CHECK_NULL_ARGUMENT(renderer);
+
+  if (event_id >= renderer->event_id) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Renderer tried to update time for event %u when the next event is %u", event_id, renderer->event_id);
+  }
+
+  if (event_id + DEVICE_RENDERER_TIMING_EVENTS_MASK < renderer->event_id) {
+    warn_message("Returned render time is stale.");
+  }
 
   *time = renderer->total_render_time[event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK];
 
@@ -368,10 +379,7 @@ LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(*renderer);
 
-  spinlock_count_wait_zero(&(*renderer)->callbacks_active_counter);
-
   __FAILURE_HANDLE(array_destroy(&(*renderer)->queue));
-  __FAILURE_HANDLE(ringbuffer_destroy(&(*renderer)->callback_data_ringbuffer));
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventDestroy((*renderer)->time_start[event_id]));

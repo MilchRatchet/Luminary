@@ -111,6 +111,12 @@ struct Device {
   DeviceParticlesHandle* particles_handle;
 } typedef Device;
 
+struct DeviceRegisterCallbackFuncs {
+  CUhostFn render_continue_callback_func;
+  CUhostFn render_finished_callback_func;
+  CUhostFn output_callback_func;
+} typedef DeviceRegisterCallbackFuncs;
+
 void _device_init(void);
 void _device_shutdown(void);
 
@@ -144,13 +150,13 @@ LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
-LuminaryResult device_register_callbacks(
-  Device* device, CUhostFn render_callback_func, CUhostFn output_callback_func, DeviceCommonCallbackData callback_data);
+LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height);
 LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera);
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
 LuminaryResult device_query_gbuffer_meta(Device* device);

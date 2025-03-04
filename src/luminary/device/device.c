@@ -1335,14 +1335,14 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_register_callbacks(
-  Device* device, CUhostFn render_callback_func, CUhostFn output_callback_func, DeviceCommonCallbackData callback_data) {
+LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(device_output_register_callback(device->output, output_callback_func, callback_data));
-  __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, render_callback_func, callback_data));
+  __FAILURE_HANDLE(device_output_register_callback(device->output, funcs.output_callback_func, callback_data));
+  __FAILURE_HANDLE(device_renderer_register_callback(
+    device->renderer, funcs.render_continue_callback_func, funcs.render_finished_callback_func, callback_data));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1439,6 +1439,19 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
   // Signal Device Manager to propagate output to host output handler
 
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(callback_data);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_renderer_update_render_time(device->renderer, callback_data->render_event_id));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

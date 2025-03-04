@@ -135,42 +135,28 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_handle_device_render(DeviceManager* device_manager, DeviceRenderCallbackData* data) {
+static LuminaryResult _device_manager_handle_device_render_continue(DeviceManager* device_manager, DeviceRenderCallbackData* data) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
   Device* device = device_manager->devices[data->common.device_index];
 
-  __FAILURE_HANDLE(sample_time_set_time(device_manager->sample_time, data->common.device_index, device->renderer->last_time));
   __FAILURE_HANDLE(device_continue_render(device, &device_manager->sample_count, data));
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_clear_handle_device_render(DeviceManager* device_manager, DeviceRenderCallbackData* data) {
-  __CHECK_NULL_ARGUMENT(device_manager);
-  __CHECK_NULL_ARGUMENT(data);
-
-  Device* device = device_manager->devices[data->common.device_index];
-
-  __FAILURE_HANDLE(device_renderer_clear_callback_data(device->renderer));
-
-  return LUMINARY_SUCCESS;
-}
-
-static void _device_manager_render_callback(DeviceRenderCallbackData* data) {
+static void _device_manager_render_continue_callback(DeviceRenderCallbackData* data) {
   // Ignore callbacks if we are shutting down.
-  if (data->common.device_manager->is_shutdown) {
-    _device_manager_clear_handle_device_render(data->common.device_manager, data);
+  if (data->common.device_manager->is_shutdown)
     return;
-  }
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name                  = "Handle Device Render";
-  entry.function              = (QueueEntryFunction) _device_manager_handle_device_render;
-  entry.clear_func            = (QueueEntryFunction) _device_manager_clear_handle_device_render;
+  entry.name                  = "Handle Device Render Continue";
+  entry.function              = (QueueEntryFunction) _device_manager_handle_device_render_continue;
+  entry.clear_func            = (QueueEntryFunction) 0;
   entry.args                  = (void*) data;
   entry.queuer_cannot_execute = true;
 
@@ -178,7 +164,41 @@ static void _device_manager_render_callback(DeviceRenderCallbackData* data) {
 
   if (result) {
     // TODO: Do proper handling.
-    error_message("Failed to queue _device_manager_handle_device_render.");
+    error_message("Failed to queue _device_manager_handle_device_render_continue.");
+  }
+}
+
+static LuminaryResult _device_manager_handle_device_render_finished(DeviceManager* device_manager, DeviceRenderCallbackData* data) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(data);
+
+  Device* device = device_manager->devices[data->common.device_index];
+
+  __FAILURE_HANDLE(device_update_render_time(device, data));
+  __FAILURE_HANDLE(sample_time_set_time(device_manager->sample_time, data->common.device_index, device->renderer->last_time));
+
+  return LUMINARY_SUCCESS;
+}
+
+static void _device_manager_render_finished_callback(DeviceRenderCallbackData* data) {
+  // Ignore callbacks if we are shutting down.
+  if (data->common.device_manager->is_shutdown)
+    return;
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name                  = "Handle Device Render Finished";
+  entry.function              = (QueueEntryFunction) _device_manager_handle_device_render_finished;
+  entry.clear_func            = (QueueEntryFunction) 0;
+  entry.args                  = (void*) data;
+  entry.queuer_cannot_execute = true;
+
+  LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
+
+  if (result) {
+    // TODO: Do proper handling.
+    error_message("Failed to queue _device_manager_handle_device_render_finished.");
   }
 }
 
@@ -618,8 +638,12 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
     callback_data.device_manager = device_manager;
     callback_data.device_index   = device_id;
 
-    __FAILURE_HANDLE(device_register_callbacks(
-      device, (CUhostFn) _device_manager_render_callback, (CUhostFn) _device_manager_output_callback, callback_data));
+    DeviceRegisterCallbackFuncs callback_funcs;
+    callback_funcs.output_callback_func          = (CUhostFn) _device_manager_output_callback;
+    callback_funcs.render_continue_callback_func = (CUhostFn) _device_manager_render_continue_callback;
+    callback_funcs.render_finished_callback_func = (CUhostFn) _device_manager_render_finished_callback;
+
+    __FAILURE_HANDLE(device_register_callbacks(device, callback_funcs, callback_data));
   }
 
   __FAILURE_HANDLE(_device_manager_generate_bsdf_luts(device_manager));
