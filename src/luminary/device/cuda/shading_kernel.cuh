@@ -29,14 +29,14 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
   const vec3 dir_bsdf =
     bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_SUN_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
-  RGBF light_bsdf = sky_get_sun_color(sky_pos, dir_bsdf);
 
-  bool is_refraction_bsdf;
-  const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
-  light_bsdf            = mul_color(light_bsdf, value_bsdf);
+  RGBF light_bsdf         = get_color(0.0f, 0.0f, 0.0f);
+  bool is_refraction_bsdf = false;
+  if (sphere_ray_hit(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
+    light_bsdf = sky_get_sun_color(sky_pos, dir_bsdf);
 
-  if (!sphere_ray_hit(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
-    light_bsdf = get_color(0.0f, 0.0f, 0.0f);
+    const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
+    light_bsdf            = mul_color(light_bsdf, value_bsdf);
   }
 
   ////////////////////////////////////////////////////////////////////
