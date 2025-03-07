@@ -575,7 +575,8 @@ static LuminaryResult parse_ocean_settings(Ocean* ocean, char* line) {
       break;
     /* CHOPPY__ */
     case 6872309757870295107u:
-      sscanf(value, "%f\n", &ocean->choppyness);
+      // Removed
+      // sscanf(value, "%f\n", &ocean->choppyness);
       break;
     /* REFRACT_ */
     case 6869189279479121234u:

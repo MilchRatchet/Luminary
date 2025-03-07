@@ -102,7 +102,6 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
   device_ocean->height                = ocean->height;
   device_ocean->amplitude             = ocean->amplitude;
   device_ocean->frequency             = ocean->frequency;
-  device_ocean->choppyness            = ocean->choppyness;
   device_ocean->refractive_index      = ocean->refractive_index;
   device_ocean->caustics_domain_scale = ocean->caustics_domain_scale;
 

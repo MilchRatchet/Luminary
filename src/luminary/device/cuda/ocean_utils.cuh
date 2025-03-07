@@ -16,9 +16,9 @@
 // The water is handled by the volume implementation.
 //
 
-#define OCEAN_MAX_HEIGHT (device.ocean.height + 2.66f * device.ocean.amplitude)
+#define OCEAN_MAX_HEIGHT (device.ocean.height + 1.33f * device.ocean.amplitude)
 #define OCEAN_MIN_HEIGHT (device.ocean.height)
-#define OCEAN_LIPSCHITZ (device.ocean.amplitude * 4.0f)
+#define OCEAN_LIPSCHITZ (device.ocean.amplitude * 2.0f)
 
 #define OCEAN_ITERATIONS_INTERSECTION 8
 #define OCEAN_ITERATIONS_NORMAL 8
@@ -26,7 +26,7 @@
 
 __device__ float ocean_hash(const float2 p) {
   const float x = p.x + p.y * (311.7f / 127.1f);
-  return fractf(sinf(x) * 43758.5453123f);
+  return (__float_as_uint(x) * 2654435769u) * (1.0f / 0xFFFFFFFFu);
 }
 
 __device__ float ocean_noise(const float2 p) {
@@ -53,7 +53,7 @@ __device__ float ocean_noise(const float2 p) {
   return -1.0f + 2.0f * lerp(a, b, fractional.y);
 }
 
-__device__ float ocean_octave(float2 p, const float choppyness) {
+__device__ float ocean_octave(float2 p) {
   const float offset = ocean_noise(p);
   p.x += offset;
   p.y += offset;
@@ -73,21 +73,23 @@ __device__ float ocean_octave(float2 p, const float choppyness) {
   wave1.x = lerp(wave1.x, wave2.x, wave1.x);
   wave1.y = lerp(wave1.y, wave2.y, wave1.y);
 
-  return powf(1.0f - sqrtf(wave1.x * wave1.y), choppyness);
+  float octave = 1.0f - sqrtf(wave1.x * wave1.y);
+  octave *= octave;
+
+  return octave;
 }
 
 __device__ float ocean_get_height(const vec3 p, const int steps) {
-  float amplitude  = 1.0f;
-  float choppyness = device.ocean.choppyness;
-  float frequency  = device.ocean.frequency;
+  float amplitude = 1.0f;
+  float frequency = device.ocean.frequency;
 
   float2 q = make_float2(p.x * 0.75f, p.z);
 
   float h = 0.0f;
 
   for (int i = 0; i < steps; i++) {
-    float2 a = make_float2(q.x * frequency, q.y * frequency);
-    h += ocean_octave(a, choppyness) * amplitude;
+    const float2 a = make_float2(q.x * frequency, q.y * frequency);
+    h += ocean_octave(a) * amplitude;
 
     const float u = q.x;
     const float v = q.y;
@@ -96,10 +98,9 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
 
     frequency *= 1.9f;
     amplitude *= 0.22f;
-    choppyness = lerp(choppyness, 1.0f, 0.2f);
   }
 
-  h *= 2.0f * device.ocean.amplitude;
+  h *= device.ocean.amplitude;
 
   return h;
 }
@@ -202,11 +203,13 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
   float residual_at_max = FLT_MAX;
   float residual_at_min;
 
+  const int32_t step_count = remap(device.ocean.amplitude * device.ocean.amplitude, 0.0f, 1.0f, 4.0f, 16.0f);
+
   float t                       = start;
   float last_residual           = 0.0f;
-  float slope_confidence_factor = fminf(8.0f / OCEAN_LIPSCHITZ, (limit - start) * (1.0f / 8.0f));
+  float slope_confidence_factor = fminf(8.0f / OCEAN_LIPSCHITZ, (limit - start) * (1.0f / step_count));
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < step_count; i++) {
     const vec3 p = add_vector(origin, scale_vector(ray, t));
 
     const float residual_at_t = ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION);
@@ -229,7 +232,7 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
     residual_at_max = ocean_get_relative_height(add_vector(origin, scale_vector(ray, limit)), OCEAN_ITERATIONS_INTERSECTION);
   }
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < step_count; i++) {
     const float step = residual_at_min / (residual_at_min - residual_at_max);
     const float mid  = lerp(min, max, fminf(0.95f, fmaxf(0.05f, step)));
     const vec3 p     = add_vector(origin, scale_vector(ray, mid));

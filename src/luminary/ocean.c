@@ -9,7 +9,6 @@ LuminaryResult ocean_get_default(Ocean* ocean) {
   ocean->height                      = 0.0f;
   ocean->amplitude                   = 0.2f;
   ocean->frequency                   = 0.12f;
-  ocean->choppyness                  = 4.0f;
   ocean->refractive_index            = 1.333f;
   ocean->water_type                  = LUMINARY_JERLOV_WATER_TYPE_IB;
   ocean->caustics_active             = false;
@@ -41,7 +40,6 @@ LuminaryResult ocean_check_for_dirty(const Ocean* input, const Ocean* old, bool*
     __OCEAN_DIRTY(height);
     __OCEAN_DIRTY(amplitude);
     __OCEAN_DIRTY(frequency);
-    __OCEAN_DIRTY(choppyness);
     __OCEAN_DIRTY(refractive_index);
     __OCEAN_DIRTY(water_type);
     __OCEAN_DIRTY(caustics_active);

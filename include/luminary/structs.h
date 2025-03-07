@@ -189,7 +189,6 @@ LUMINARY_API struct LuminaryOcean {
   float height;
   float amplitude;
   float frequency;
-  float choppyness;
   float refractive_index;
   LuminaryJerlovWaterType water_type;
   bool caustics_active;

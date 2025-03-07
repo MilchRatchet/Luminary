@@ -57,11 +57,10 @@ struct DeviceOcean {
   float height;
   float amplitude;
   float frequency;
-  float choppyness;
   float refractive_index;
   float caustics_domain_scale;
 } typedef DeviceOcean;
-LUM_STATIC_SIZE_ASSERT(DeviceOcean, 0x1Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceOcean, 0x18u);
 
 struct DeviceSky {
   uint32_t ozone_absorption : 1;
