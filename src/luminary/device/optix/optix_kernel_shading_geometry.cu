@@ -37,8 +37,8 @@ extern "C" __global__ void __raygen__optix() {
     ////////////////////////////////////////////////////////////////////
 
     RGBF accumulated_light = splat_color(0.0f);
-    accumulated_light      = add_color(accumulated_light, direct_lighting_sun(data, task.index));
     accumulated_light      = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
+    accumulated_light      = add_color(accumulated_light, direct_lighting_sun(data, task.index));
     accumulated_light      = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
