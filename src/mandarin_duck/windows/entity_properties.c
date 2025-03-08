@@ -753,6 +753,7 @@ static void _window_entity_properties_material_action(Window* window, Display* d
   }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Colored Transparency", &material.colored_transparency);
+  update_data |= _window_entity_properties_add_checkbox(data, "Roughness as Smoothness", &material.roughness_as_smoothness);
 
   if (update_data) {
     material.base_substrate = (LuminaryMaterialBaseSubstrate) base_substrate;

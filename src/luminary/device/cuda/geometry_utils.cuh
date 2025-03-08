@@ -122,6 +122,10 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
     flags |= G_BUFFER_FLAG_COLORED_TRANSPARENCY;
   }
 
+  if (mat.flags & DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS) {
+    roughness = 1.0f - roughness;
+  }
+
   if (is_inside) {
     flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
   }

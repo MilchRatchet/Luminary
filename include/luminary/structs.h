@@ -332,6 +332,7 @@ LUMINARY_API struct LuminaryMaterial {
   bool thin_walled;
   bool metallic;
   bool colored_transparency;
+  bool roughness_as_smoothness;
   uint16_t albedo_tex;
   uint16_t luminance_tex;
   uint16_t roughness_tex;

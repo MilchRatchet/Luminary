@@ -275,6 +275,7 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->flags |= material->thin_walled ? DEVICE_MATERIAL_FLAG_THIN_WALLED : 0;
   device_material->flags |= material->metallic ? DEVICE_MATERIAL_FLAG_METALLIC : 0;
   device_material->flags |= material->colored_transparency ? DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY : 0;
+  device_material->flags |= material->roughness_as_smoothness ? DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS : 0;
 
   switch (material->base_substrate) {
     case LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE:
