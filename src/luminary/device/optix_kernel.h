@@ -22,6 +22,7 @@ struct OptixKernel {
   OptixPipeline pipeline;
   DEVICE char* records;
   OptixShaderBindingTable shaders;
+  bool use_new_scheduler;
 } typedef OptixKernel;
 
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type);
