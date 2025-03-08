@@ -80,7 +80,7 @@ compile_cubin(cuda_kernels)
 # Create PTX files
 #=============================================================
 
-function(compile_ptx kernel_name)
+function(compile_ptx cuda_file_name kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
   # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
   # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
@@ -88,12 +88,13 @@ function(compile_ptx kernel_name)
     OUTPUT
       "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
     COMMAND
-      ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
+      ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${cuda_file_name}.cu"
       -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -D${kernel_name}
       -o "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
-      "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
+      "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${cuda_file_name}.cu"
       "${luminary_gpu_header_files}"
       "${luminary_cpu_header_files}"
     COMMENT
@@ -111,10 +112,11 @@ function(compile_ptx kernel_name)
   add_dependencies(Luminary ${kernel_name})
 endfunction()
 
-compile_ptx(optix_kernel_raytrace)
-compile_ptx(optix_kernel_shading_geometry)
-compile_ptx(optix_kernel_shading_volume)
-compile_ptx(optix_kernel_shading_particles)
+compile_ptx(optix_kernel_raytrace optix_kernel_raytrace)
+compile_ptx(optix_kernel_shading_geometry optix_kernel_shading_geometry_geo)
+compile_ptx(optix_kernel_shading_geometry optix_kernel_shading_geometry_sky)
+compile_ptx(optix_kernel_shading_volume optix_kernel_shading_volume)
+compile_ptx(optix_kernel_shading_particles optix_kernel_shading_particles)
 
 #=============================================================
 # Embed files
@@ -128,7 +130,8 @@ ceb_embed_files(
   INPUT
   ${CMAKE_BINARY_DIR}/cubin/cuda_kernels.cubin
   ${CMAKE_BINARY_DIR}/ptx/optix_kernel_raytrace.ptx
-  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_geometry.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_geometry_geo.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_geometry_sky.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_volume.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_particles.ptx
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf

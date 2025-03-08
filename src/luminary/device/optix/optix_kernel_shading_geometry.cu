@@ -1,7 +1,6 @@
-// Functions work differently when executed from this kernel
-// This emulates the old device.iteration_type == TYPE_LIGHT checks.
-#define SHADING_KERNEL
-#define OPTIX_KERNEL
+// OptiX translation unit setup
+#include "optix_compile_defines.cuh"
+//
 
 #include "bsdf.cuh"
 #include "direct_lighting.cuh"
@@ -40,9 +39,15 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   RGBF accumulated_light = splat_color(0.0f);
-  accumulated_light      = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
-  accumulated_light      = add_color(accumulated_light, direct_lighting_sun(data, task.index));
-  accumulated_light      = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
+
+#ifdef OPTIX_ENABLE_GEOMETRY_DL
+  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
+#endif
+
+#ifdef OPTIX_ENABLE_SKY_DL
+  accumulated_light = add_color(accumulated_light, direct_lighting_sun(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
+#endif
 
   const RGBF record = load_RGBF(device.ptrs.records + pixel);
 

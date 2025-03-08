@@ -1,4 +1,6 @@
-#define OPTIX_KERNEL
+// OptiX translation unit setup
+#include "optix_compile_defines.cuh"
+//
 
 #include "math.cuh"
 #include "memory.cuh"

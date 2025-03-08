@@ -1,9 +1,6 @@
-// Functions work differently when executed from this kernel
-// This emulates the old device.iteration_type == TYPE_LIGHT checks.
-#define SHADING_KERNEL
-#define OPTIX_KERNEL
-#define PHASE_KERNEL
-#define VOLUME_KERNEL
+// OptiX translation unit setup
+#include "optix_compile_defines.cuh"
+//
 
 #include "bsdf.cuh"
 #include "directives.cuh"
