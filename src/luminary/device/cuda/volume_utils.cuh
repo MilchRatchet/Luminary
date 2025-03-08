@@ -266,8 +266,6 @@ __device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray
   return scale_color(ocean_transmittance, fog_transmittance);
 }
 
-#ifdef VOLUME_KERNEL
-
 __device__ GBufferData
   volume_generate_g_buffer(const DeviceTask task, const uint32_t instance_id, const int pixel, const VolumeDescriptor volume) {
   const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
@@ -292,6 +290,5 @@ __device__ GBufferData
 
   return data;
 }
-#endif /* VOLUME_KERNEL */
 
 #endif /* CU_VOLUME_UTILS_H */

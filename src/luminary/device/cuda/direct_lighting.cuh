@@ -323,6 +323,7 @@ __device__ RGBF direct_lighting_sun_caustic(
 // Geometry
 ////////////////////////////////////////////////////////////////////
 
+#ifndef VOLUME_KERNEL
 __device__ RGBF direct_lighting_geometry_single(
   GBufferData data, const ushort2 index, const uint32_t id, const DirectLightingBSDFSample bsdf_sample, DirectLightingShadowTask& task) {
   if (LIGHTS_ARE_PRESENT == false) {
@@ -364,6 +365,7 @@ __device__ RGBF direct_lighting_geometry_single(
 
   return light_color;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////
 // Ambient
@@ -389,15 +391,23 @@ __device__ RGBF direct_lighting_ambient_sample(GBufferData data, const ushort2 i
   // Sample ray
   ////////////////////////////////////////////////////////////////////
 
+#ifndef PHASE_KERNEL
   BSDFSampleInfo bounce_info;
   const vec3 ray = bsdf_sample(data, index, bounce_info);
 
   RGBF light_color = bounce_info.weight;
 
+  const vec3 task_origin = shift_origin_vector(data.position, data.V, ray, bounce_info.is_transparent_pass);
+
   if (color_importance(light_color) == 0.0f) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
+#else
+  const vec3 ray         = bsdf_sample_volume(data, index);
+  const vec3 task_origin = data.position;
+  RGBF light_color       = splat_color(1.0f);
+#endif
 
   light_color = mul_color(light_color, sky_color_no_compute(ray));
 
@@ -411,7 +421,7 @@ __device__ RGBF direct_lighting_ambient_sample(GBufferData data, const ushort2 i
   ////////////////////////////////////////////////////////////////////
 
   task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task.origin       = shift_origin_vector(data.position, data.V, ray, bounce_info.is_transparent_pass);
+  task.origin       = task_origin;
   task.ray          = ray;
   task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
   task.limit        = FLT_MAX;
@@ -478,6 +488,10 @@ __device__ RGBF direct_lighting_sun(const GBufferData data, const ushort2 index)
 }
 
 __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
+#ifdef VOLUME_KERNEL
+  // TODO: Bridges
+  return splat_color(0.0f);
+#else
   RGBF sum_light = splat_color(0.0f);
 
   for (uint32_t j = 0; j < device.settings.light_num_rays; j++) {
@@ -492,6 +506,7 @@ __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 i
   }
 
   return scale_color(sum_light, 1.0f / device.settings.light_num_rays);
+#endif
 }
 
 __device__ RGBF direct_lighting_ambient(const GBufferData data, const ushort2 index) {

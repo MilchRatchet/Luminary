@@ -8,7 +8,6 @@
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "shading_kernel.cuh"
 #include "utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {

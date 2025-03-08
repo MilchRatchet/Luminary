@@ -115,8 +115,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   return context;
 }
 
-__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-#ifdef PHASE_KERNEL
+__device__ vec3 bsdf_sample_volume(const GBufferData data, const ushort2 pixel) {
   const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE, pixel);
   const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_VOLUME, pixel);
 
@@ -126,11 +125,10 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
                              ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
                              : ocean_phase_sampling(ray, random_dir, random_choice);
 
-  info.weight = get_color(1.0f, 1.0f, 1.0f);
-
   return scatter_ray;
-#else
+}
 
+__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
   if (data.albedo.a < 1.0f) {
     const float transparency_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_OPACITY, pixel);
 
@@ -279,7 +277,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   UTILS_CHECK_NANS(pixel, info.weight);
 
   return normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), ray_local));
-#endif
 }
 
 __device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {

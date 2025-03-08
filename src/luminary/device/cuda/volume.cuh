@@ -102,4 +102,45 @@ LUMINARY_KERNEL void volume_process_events() {
   }
 }
 
+LUMINARY_KERNEL void volume_process_tasks() {
+  HANDLE_DEVICE_ABORT();
+
+  const int task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_VOLUME];
+  int trace_count       = device.ptrs.trace_counts[THREAD_ID];
+
+  for (int i = 0; i < task_count; i++) {
+    const uint32_t offset       = get_task_address(task_offset + i);
+    DeviceTask task             = task_load(offset);
+    const TriangleHandle handle = triangle_handle_load(offset);
+    const float depth           = trace_depth_load(offset);
+    const uint32_t pixel        = get_pixel_id(task.index);
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+
+    const VolumeType volume_type  = VOLUME_HIT_TYPE(handle.instance_id);
+    const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
+
+    GBufferData data = volume_generate_g_buffer(task, handle.instance_id, pixel, volume);
+
+    const vec3 bounce_ray = bsdf_sample_volume(data, task.index);
+
+    uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+
+    if (volume_type == VOLUME_TYPE_OCEAN) {
+      new_state &= ~STATE_FLAG_OCEAN_SCATTERED;
+    }
+
+    DeviceTask bounce_task;
+    bounce_task.state  = new_state;
+    bounce_task.origin = data.position;
+    bounce_task.ray    = bounce_ray;
+    bounce_task.index  = task.index;
+
+    task_store(bounce_task, get_task_address(trace_count++));
+  }
+
+  device.ptrs.trace_counts[THREAD_ID] = trace_count;
+}
+
 #endif /* CU_VOLUME_H */

@@ -17,20 +17,15 @@ struct OptixKernelConfig {
   const char* name;
   uint32_t register_count;
   bool allow_gas;
-  bool new_scheduler;
 } typedef OptixKernelConfig;
 
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE] = {.name = "optix_kernel_raytrace.ptx", .register_count = 40, .allow_gas = false, .new_scheduler = true},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_GEO] =
-    {.name = "optix_kernel_shading_geometry_geo.ptx", .register_count = 40, .allow_gas = true, .new_scheduler = true},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_SKY] =
-    {.name = "optix_kernel_shading_geometry_sky.ptx", .register_count = 40, .allow_gas = false, .new_scheduler = true},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME] =
-    {.name = "optix_kernel_shading_volume.ptx", .register_count = 40, .allow_gas = false, .new_scheduler = false},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES] =
-    {.name = "optix_kernel_shading_particles.ptx", .register_count = 40, .allow_gas = true, .new_scheduler = false}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE]             = {.name = "optix_kernel_raytrace.ptx", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_GEO] = {.name = "optix_kernel_shading_geometry_geo.ptx", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_SKY] = {.name = "optix_kernel_shading_geometry_sky.ptx", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]       = {.name = "optix_kernel_shading_volume.ptx", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]    = {.name = "optix_kernel_shading_particles.ptx", .register_count = 40, .allow_gas = true}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__light_bsdf_trace", "__anyhit__shadow_trace",
@@ -103,8 +98,6 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
 
   __FAILURE_HANDLE(host_malloc(kernel, sizeof(OptixKernel)));
   memset(*kernel, 0, sizeof(OptixKernel));
-
-  (*kernel)->use_new_scheduler = optix_kernel_configs[type].new_scheduler;
 
   ////////////////////////////////////////////////////////////////////
   // Get PTX
@@ -242,7 +235,7 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
 
-  const uint32_t thread_internal_task_id = (kernel->use_new_scheduler) ? device->constant_memory->pixels_per_thread : 1;
+  const uint32_t thread_internal_task_id = device->constant_memory->pixels_per_thread;
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
     kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,

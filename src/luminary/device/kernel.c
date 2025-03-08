@@ -37,6 +37,8 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "cloud_compute_weather_noise", .param_size = sizeof(KernelArgsCloudComputeWeatherNoise)},
   [CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS]                = {.name = "cloud_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS]              = {.name = "volume_process_events", .param_size = 0},
+  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS]               = {.name = "volume_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS]             = {.name = "particle_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG]       = {.name = "particle_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]                  = {.name = "particle_generate", .param_size = 0},
   [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_POWER]                = {.name = "light_compute_power", .param_size = 0},
