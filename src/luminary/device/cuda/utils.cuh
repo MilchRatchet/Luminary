@@ -14,6 +14,10 @@
 #define THREAD_ID (optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
 #endif
 
+#ifdef OPTIX_KERNEL
+#define TASK_ID optixGetLaunchIndex().z
+#endif
+
 #define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(THREADS_PER_BLOCK)
 #define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 

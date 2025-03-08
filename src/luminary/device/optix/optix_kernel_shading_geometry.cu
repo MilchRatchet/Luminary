@@ -16,7 +16,7 @@ extern "C" __global__ void __raygen__optix() {
 
   const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
   const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
-  const uint32_t task_id     = optixGetLaunchIndex().z;
+  const uint32_t task_id     = TASK_ID;
 
   if (task_id >= task_count)
     return;

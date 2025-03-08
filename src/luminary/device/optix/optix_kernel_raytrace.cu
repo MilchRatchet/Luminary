@@ -135,21 +135,23 @@ extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
   const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
+  const uint16_t task_id          = TASK_ID;
 
-  for (int32_t i = 0; i < trace_task_count; i++) {
-    const uint32_t offset = get_task_address(i);
-    const DeviceTask task = task_load(offset);
+  if (task_id >= trace_task_count)
+    return;
 
-    OptixRaytraceResult result;
-    result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
-    result.depth  = FLT_MAX;
+  const uint32_t offset = get_task_address(task_id);
+  const DeviceTask task = task_load(offset);
 
-    optix_raytrace_geometry(task, result);
-    optix_raytrace_particles(task, result);
+  OptixRaytraceResult result;
+  result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
+  result.depth  = FLT_MAX;
 
-    triangle_handle_store(result.handle, offset);
-    trace_depth_store(result.depth, offset);
+  optix_raytrace_geometry(task, result);
+  optix_raytrace_particles(task, result);
 
-    optix_write_out_gbuffer_meta(task, result);
-  }
+  triangle_handle_store(result.handle, offset);
+  trace_depth_store(result.depth, offset);
+
+  optix_write_out_gbuffer_meta(task, result);
 }

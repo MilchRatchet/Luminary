@@ -22,7 +22,7 @@ struct OptixKernelConfig {
 
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE] = {.name = "optix_kernel_raytrace.ptx", .register_count = 40, .allow_gas = false, .new_scheduler = false},
+  [OPTIX_KERNEL_TYPE_RAYTRACE] = {.name = "optix_kernel_raytrace.ptx", .register_count = 40, .allow_gas = false, .new_scheduler = true},
   [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_GEO] =
     {.name = "optix_kernel_shading_geometry_geo.ptx", .register_count = 40, .allow_gas = true, .new_scheduler = true},
   [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_SKY] =
