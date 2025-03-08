@@ -87,7 +87,7 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   }
 
   const bool include_emission =
-    (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+    (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION));
 
   RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
   if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {

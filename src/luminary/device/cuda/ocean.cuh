@@ -41,7 +41,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
 
-    uint16_t new_state = task.state | STATE_FLAG_ALLOW_EMISSION;
+    uint16_t new_state = task.state;
 
     if (!is_pass_through) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
