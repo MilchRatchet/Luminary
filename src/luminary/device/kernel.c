@@ -13,6 +13,7 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS]         = {.name = "generate_trace_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS]          = {.name = "balance_trace_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS]      = {.name = "postprocess_trace_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]       = {.name = "geometry_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG] = {.name = "geometry_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT]         = {.name = "bsdf_generate_ss_lut", .param_size = sizeof(KernelArgsBSDFGenerateSSLUT)},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_GLOSSY_LUT] = {.name = "bsdf_generate_glossy_lut", .param_size = sizeof(KernelArgsBSDFGenerateGlossyLUT)},
