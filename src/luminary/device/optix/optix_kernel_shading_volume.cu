@@ -59,9 +59,7 @@ extern "C" __global__ void __raygen__optix() {
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-    accumulated_light = add_color(
-      accumulated_light,
-      optix_compute_light_ray_ambient_sky(data, bounce_ray, bounce_info.weight, bounce_info.is_transparent_pass, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_ambient_sky(data, task.index));
 
     if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (device.ocean.triangle_light_contribution || volume_type != VOLUME_TYPE_OCEAN)) {
       accumulated_light = add_color(accumulated_light, bridges_sample(task, volume));

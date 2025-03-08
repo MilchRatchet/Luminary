@@ -1,0 +1,334 @@
+#ifndef CU_LUMINARY_DIRECT_LIGHTING_H
+#define CU_LUMINARY_DIRECT_LIGHTING_H
+
+#ifdef OPTIX_KERNEL
+
+#include "bsdf.cuh"
+#include "math.cuh"
+#include "memory.cuh"
+#include "optix_include.cuh"
+#include "random.cuh"
+#include "ris.cuh"
+#include "sky.cuh"
+#include "utils.cuh"
+
+struct DirectLightingShadowTask {
+  OptixTraceStatus trace_status;
+  vec3 origin;
+  vec3 ray;
+  float limit;
+  TriangleHandle target_light;
+} typedef DirectLightingShadowTask;
+
+struct DirectLightingBSDFSample {
+  uint32_t light_id;
+  vec3 ray;
+  bool is_refraction;
+} typedef DirectLightingBSDFSample;
+
+////////////////////////////////////////////////////////////////////
+// BSDF Sampling
+////////////////////////////////////////////////////////////////////
+
+__device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(GBufferData data, const ushort2 index, const uint32_t id) {
+  bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
+  const QuasiRandomTarget bsdf_target = (QuasiRandomTarget) (QUASI_RANDOM_TARGET_LIGHT_BSDF + 2 * id);
+  const vec3 bsdf_dir                 = bsdf_sample_for_light(data, index, bsdf_target, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+
+  vec3 position;
+  float shift;
+
+  shift    = bsdf_sample_is_refraction ? -eps : eps;
+  position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
+  const OptixTraceStatus light_trace_status = (bsdf_sample_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+
+  OptixKernelFunctionLightBSDFTracePayload payload;
+  payload.triangle_id = HIT_TYPE_LIGHT_BSDF_HINT;
+
+  optixKernelFunctionLightBSDFTrace(
+    device.optix_bvh_light, position, bsdf_dir, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+    light_trace_status, payload);
+
+  DirectLightingBSDFSample sample;
+  sample.light_id      = payload.triangle_id;
+  sample.ray           = bsdf_dir;
+  sample.is_refraction = bsdf_sample_is_refraction;
+
+  return sample;
+}
+
+////////////////////////////////////////////////////////////////////
+// Shadowing
+////////////////////////////////////////////////////////////////////
+
+__device__ RGBF direct_lighting_sun_shadowing(const DirectLightingShadowTask task) {
+  RGBF visibility = optix_sun_shadowing(task.origin, task.ray, task.limit, task.trace_status);
+
+  if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
+    return splat_color(0.0f);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(task.origin, task.ray, task.limit));
+
+  return visibility;
+}
+
+__device__ RGBF direct_lighting_shadowing(const DirectLightingShadowTask task) {
+  RGBF visibility = optix_geometry_shadowing(task.origin, task.ray, task.limit, task.target_light, task.trace_status);
+
+  if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
+    return splat_color(0.0f);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(task.origin, task.ray, task.limit));
+
+  return visibility;
+}
+
+////////////////////////////////////////////////////////////////////
+// Sun
+////////////////////////////////////////////////////////////////////
+
+__device__ RGBF direct_lighting_sun_direct(GBufferData data, const ushort2 index, const vec3 sky_pos, DirectLightingShadowTask& task) {
+  ////////////////////////////////////////////////////////////////////
+  // Sample a direction using BSDF importance sampling
+  ////////////////////////////////////////////////////////////////////
+
+  bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
+  const vec3 dir_bsdf =
+    bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_SUN_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+
+  RGBF light_bsdf         = get_color(0.0f, 0.0f, 0.0f);
+  bool is_refraction_bsdf = false;
+  if (sphere_ray_hit(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
+    light_bsdf = sky_get_sun_color(sky_pos, dir_bsdf);
+
+    const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
+    light_bsdf            = mul_color(light_bsdf, value_bsdf);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample a direction in the sun's solid angle
+  ////////////////////////////////////////////////////////////////////
+
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_SUN_RAY, index);
+
+  float solid_angle;
+  const vec3 dir_solid_angle = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+  RGBF light_solid_angle     = sky_get_sun_color(sky_pos, dir_solid_angle);
+
+  bool is_refraction_solid_angle;
+  const RGBF value_solid_angle = bsdf_evaluate(data, dir_solid_angle, BSDF_SAMPLING_GENERAL, is_refraction_solid_angle, 1.0f);
+  light_solid_angle            = mul_color(light_solid_angle, value_solid_angle);
+
+  ////////////////////////////////////////////////////////////////////
+  // Resampled Importance Sampling
+  ////////////////////////////////////////////////////////////////////
+
+  const float target_pdf_bsdf        = color_importance(light_bsdf);
+  const float target_pdf_solid_angle = color_importance(light_solid_angle);
+
+  // MIS weight multiplied with PDF
+  const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
+  const float mis_weight_solid_angle = solid_angle / (bsdf_sample_for_light_pdf(data, dir_solid_angle) * solid_angle + 1.0f);
+
+  const float weight_bsdf        = target_pdf_bsdf * mis_weight_bsdf;
+  const float weight_solid_angle = target_pdf_solid_angle * mis_weight_solid_angle;
+
+  const float sum_weights = weight_bsdf + weight_solid_angle;
+
+  if (sum_weights == 0.0f) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  float target_pdf;
+  vec3 dir;
+  RGBF light_color;
+  bool is_refraction;
+  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_SUN_RIS_RESAMPLING, index) * sum_weights < weight_bsdf) {
+    dir           = dir_bsdf;
+    target_pdf    = target_pdf_bsdf;
+    light_color   = light_bsdf;
+    is_refraction = is_refraction_bsdf;
+  }
+  else {
+    dir           = dir_solid_angle;
+    target_pdf    = target_pdf_solid_angle;
+    light_color   = light_solid_angle;
+    is_refraction = is_refraction_solid_angle;
+  }
+
+  light_color = scale_color(light_color, sum_weights / target_pdf);
+
+  if (target_pdf == 0.0f) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  // Transparent pass through rays are not allowed.
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  if (color_importance(light_color) == 0.0f) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Create shadow task
+  ////////////////////////////////////////////////////////////////////
+
+  task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+  task.origin       = shift_origin_vector(data.position, data.V, dir, is_refraction);
+  task.ray          = dir;
+  task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
+  task.limit        = FLT_MAX;
+
+  return light_color;
+}
+
+////////////////////////////////////////////////////////////////////
+// Geometry
+////////////////////////////////////////////////////////////////////
+
+__device__ RGBF direct_lighting_geometry_single(
+  GBufferData data, const ushort2 index, const uint32_t id, const DirectLightingBSDFSample bsdf_sample, DirectLightingShadowTask& task) {
+  if (LIGHTS_ARE_PRESENT == false) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Resample the BSDF direction with NEE based directions
+  ////////////////////////////////////////////////////////////////////
+
+  vec3 dir;
+  RGBF light_color;
+  float dist;
+  bool is_refraction;
+  const TriangleHandle light_handle = ris_sample_light(
+    data, index, id, bsdf_sample.light_id, bsdf_sample.ray, bsdf_sample.is_refraction, dir, light_color, dist, is_refraction);
+
+  if (color_importance(light_color) == 0.0f || light_handle.instance_id == LIGHT_ID_NONE) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  // Transparent pass through rays are not allowed.
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Create shadow task
+  ////////////////////////////////////////////////////////////////////
+
+  task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+  task.origin       = shift_origin_vector(data.position, data.V, dir, is_refraction);
+  task.ray          = dir;
+  task.target_light = light_handle;
+  task.limit        = dist;
+
+  return light_color;
+}
+
+////////////////////////////////////////////////////////////////////
+// Ambient
+////////////////////////////////////////////////////////////////////
+
+__device__ RGBF direct_lighting_ambient_sample(GBufferData data, const ushort2 index, DirectLightingShadowTask& task) {
+  ////////////////////////////////////////////////////////////////////
+  // Early exit
+  ////////////////////////////////////////////////////////////////////
+  if (device.state.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  // We don't support compute based sky due to register/performance reasons and because
+  // we would have to include clouds then aswell.
+  if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample ray
+  ////////////////////////////////////////////////////////////////////
+
+  BSDFSampleInfo bounce_info;
+  const vec3 ray = bsdf_sample(data, index, bounce_info);
+
+  RGBF light_color = bounce_info.weight;
+
+  if (color_importance(light_color) == 0.0f) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  light_color = mul_color(light_color, sky_color_no_compute(ray));
+
+  if (color_importance(light_color) == 0.0f) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Create shadow task
+  ////////////////////////////////////////////////////////////////////
+
+  task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+  task.origin       = shift_origin_vector(data.position, data.V, ray, bounce_info.is_transparent_pass);
+  task.ray          = ray;
+  task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
+  task.limit        = FLT_MAX;
+
+  return light_color;
+}
+
+////////////////////////////////////////////////////////////////////
+// Main function
+////////////////////////////////////////////////////////////////////
+
+__device__ RGBF direct_lighting_sun(const GBufferData data, const ushort2 index) {
+  DirectLightingShadowTask task;
+  RGBF light = direct_lighting_sun_direct(data, index, world_to_sky_transform(data.position), task);
+
+  light = mul_color(light, direct_lighting_sun_shadowing(task));
+
+  return light;
+}
+
+__device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
+  RGBF sum_light = splat_color(0.0f);
+
+  for (uint32_t j = 0; j < device.settings.light_num_rays; j++) {
+    const DirectLightingBSDFSample bsdf_sample = direct_lighting_get_bsdf_sample(data, index, j);
+
+    DirectLightingShadowTask task;
+    RGBF light = direct_lighting_geometry_single(data, index, j, bsdf_sample, task);
+
+    light = mul_color(light, direct_lighting_shadowing(task));
+
+    sum_light = add_color(sum_light, light);
+  }
+
+  return scale_color(sum_light, 1.0f / device.settings.light_num_rays);
+}
+
+__device__ RGBF direct_lighting_ambient(const GBufferData data, const ushort2 index) {
+  DirectLightingShadowTask task;
+  RGBF light = direct_lighting_ambient_sample(data, index, task);
+
+  light = mul_color(light, direct_lighting_sun_shadowing(task));
+
+  return light;
+}
+
+#endif /* OPTIX_KERNEL */
+
+#endif /* CU_LUMINARY_DIRECT_LIGHTING_H */

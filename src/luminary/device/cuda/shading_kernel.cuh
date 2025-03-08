@@ -383,9 +383,7 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
 #endif /* !VOLUME_KERNEL */
 
-__device__ RGBF optix_compute_light_ray_ambient_sky(
-  const GBufferData data, const vec3 ray, const RGBF sample_weight, const bool is_refraction, const ushort2 index) {
-  RGBF sky_light                = sample_weight;
+__device__ RGBF optix_compute_light_ray_ambient_sky(const GBufferData data, const ushort2 index) {
   OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
 
   if (device.state.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling) {
@@ -398,13 +396,17 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
     trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
-  const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);
+  BSDFSampleInfo bounce_info;
+  vec3 ray = bsdf_sample(data, index, bounce_info);
 
-  sky_light = mul_color(sky_light, optix_sun_shadowing(position, ray, FLT_MAX, trace_status));
+  const vec3 position = shift_origin_vector(data.position, data.V, ray, bounce_info.is_transparent_pass);
+
+  RGBF sky_light = optix_sun_shadowing(position, ray, FLT_MAX, trace_status);
 
   if (trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
 
+  sky_light = mul_color(sky_light, bounce_info.weight);
   sky_light = mul_color(sky_light, sky_color_no_compute(ray));
   sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
 

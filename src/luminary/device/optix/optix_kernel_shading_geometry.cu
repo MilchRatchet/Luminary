@@ -4,6 +4,7 @@
 #define OPTIX_KERNEL
 
 #include "bsdf.cuh"
+#include "direct_lighting.cuh"
 #include "geometry_utils.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"
@@ -28,24 +29,17 @@ extern "C" __global__ void __raygen__optix() {
 
     GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
 
-    ////////////////////////////////////////////////////////////////////
-    // Bounce Ray Sampling
-    ////////////////////////////////////////////////////////////////////
-
-    BSDFSampleInfo bounce_info;
-    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+    // We have to clamp due to numerical precision issues in the microfacet models.
+    data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
 
     ////////////////////////////////////////////////////////////////////
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    RGBF accumulated_light = data.emission;
-    accumulated_light      = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-    accumulated_light      = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
-
-    accumulated_light = add_color(
-      accumulated_light,
-      optix_compute_light_ray_ambient_sky(data, bounce_ray, bounce_info.weight, bounce_info.is_transparent_pass, task.index));
+    RGBF accumulated_light = splat_color(0.0f);
+    accumulated_light      = add_color(accumulated_light, direct_lighting_sun(data, task.index));
+    accumulated_light      = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
+    accumulated_light      = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
