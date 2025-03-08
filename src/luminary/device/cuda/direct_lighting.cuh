@@ -4,6 +4,7 @@
 #ifdef OPTIX_KERNEL
 
 #include "bsdf.cuh"
+#include "caustics.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "optix_include.cuh"
@@ -190,6 +191,134 @@ __device__ RGBF direct_lighting_sun_direct(GBufferData data, const ushort2 index
   return light_color;
 }
 
+__device__ RGBF direct_lighting_sun_caustic(
+  GBufferData data, const ushort2 index, const vec3 sky_pos, const bool is_underwater, DirectLightingShadowTask& task0,
+  DirectLightingShadowTask& task1) {
+  ////////////////////////////////////////////////////////////////////
+  // Sample a caustic connection vertex using RIS
+  ////////////////////////////////////////////////////////////////////
+
+  float solid_angle;
+  const float2 sun_dir_random                  = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_SUN_DIR, index);
+  const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
+  const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
+
+  if (sampling_domain.valid == false)
+    return splat_color(0.0f);
+
+  vec3 connection_point;
+  float sum_connection_weight = 0.0f;
+  float connection_weight;
+
+  if (sampling_domain.fast_path) {
+    vec3 sample_point;
+    float sample_weight;
+    caustics_find_connection_point(data, index, sampling_domain, is_underwater, 0, sample_point, sample_weight);
+
+    sum_connection_weight = sample_weight;
+    connection_point      = sample_point;
+    connection_weight     = sample_weight;
+  }
+  else {
+    const uint32_t num_samples = device.ocean.caustics_ris_sample_count + 1;
+
+    float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
+
+    // RIS with target weight being the Dirac delta of if the connection point is valid or not.
+    for (uint32_t i = 0; i < num_samples; i++) {
+      vec3 sample_point;
+      float sample_weight;
+      if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
+        sum_connection_weight += sample_weight;
+
+        const float resampling_probability = sample_weight / sum_connection_weight;
+        if (resampling_random < resampling_probability) {
+          connection_point = sample_point;
+
+          resampling_random = resampling_random / resampling_probability;
+        }
+        else {
+          resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
+        }
+      }
+    }
+
+    connection_weight = (1.0f / num_samples) * sum_connection_weight;
+
+    // Make no mistake. I do in fact have no idea what I am doing. So I just empirically gathered that these
+    // weights are correct (they are very unlikely to be correct). I will look into fixing this the moment
+    // I start caring.
+
+    // Inspired by the famous factor required for refraction when sampling importance. Note that one of the IOR is 1.0f.
+    connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index;
+
+    if (is_underwater) {
+      // ... and why not apply it again, we are just sampling some extra importance clearly. And a 2.0f for good measure.
+      connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index * 2.0f;
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Evaluate sampled connection vertex
+  ////////////////////////////////////////////////////////////////////
+
+  vec3 pos_to_ocean = sub_vector(connection_point, data.position);
+
+  const float dist = get_length(pos_to_ocean);
+  const vec3 dir   = normalize_vector(pos_to_ocean);
+
+  RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
+
+  if (sum_connection_weight == 0.0f) {
+    return splat_color(0.0f);
+  }
+
+  bool is_refraction;
+  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
+  light_color           = mul_color(light_color, bsdf_value);
+
+  const vec3 ocean_normal =
+    (sampling_domain.fast_path) ? get_vector(0.0f, 1.0f, 0.0f) : ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
+  const vec3 normal = scale_vector(ocean_normal, (is_underwater) ? -1.0f : 1.0f);
+
+  bool total_reflection;
+  const vec3 refraction_dir =
+    refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior_in / sampling_domain.ior_out, total_reflection);
+  const float reflection_coefficient =
+    ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior_in, sampling_domain.ior_out);
+
+  light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
+
+  if (color_importance(light_color) == 0.0f) {
+    return splat_color(0.0f);
+  }
+
+  // Transparent pass through rays are not allowed.
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    return splat_color(0.0f);
+  }
+
+  const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
+
+  ////////////////////////////////////////////////////////////////////
+  // Create shadow task
+  ////////////////////////////////////////////////////////////////////
+
+  task0.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+  task0.origin       = shift_origin_vector(data.position, data.V, dir, is_refraction);
+  task0.ray          = dir;
+  task0.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
+  task0.limit        = dist;
+
+  task1.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+  task1.origin       = connection_point;
+  task1.ray          = sun_dir;
+  task1.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
+  task1.limit        = FLT_MAX;
+
+  return light_color;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Geometry
 ////////////////////////////////////////////////////////////////////
@@ -295,12 +424,57 @@ __device__ RGBF direct_lighting_ambient_sample(GBufferData data, const ushort2 i
 ////////////////////////////////////////////////////////////////////
 
 __device__ RGBF direct_lighting_sun(const GBufferData data, const ushort2 index) {
-  DirectLightingShadowTask task;
-  RGBF light = direct_lighting_sun_direct(data, index, world_to_sky_transform(data.position), task);
+  ////////////////////////////////////////////////////////////////////
+  // Decide on method
+  ////////////////////////////////////////////////////////////////////
 
-  light = mul_color(light, direct_lighting_sun_shadowing(task));
+  const vec3 sky_pos     = world_to_sky_transform(data.position);
+  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
-  return light;
+  bool sample_direct  = true;
+  bool sample_caustic = false;
+  bool is_underwater  = false;
+
+  if (device.ocean.active && data.instance_id != HIT_TYPE_OCEAN) {
+    is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
+    sample_direct  = !is_underwater;
+    sample_caustic = device.ocean.caustics_active || is_underwater;
+  }
+
+  // Sun is not present
+  if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR || !sun_visible) {
+    sample_direct  = false;
+    sample_caustic = false;
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Execute sun lighting
+  ////////////////////////////////////////////////////////////////////
+
+  DirectLightingShadowTask task_caustic0;
+  task_caustic0.trace_status = OPTIX_TRACE_STATUS_ABORT;
+  DirectLightingShadowTask task_caustic1;
+  task_caustic1.trace_status = OPTIX_TRACE_STATUS_ABORT;
+  RGBF light_caustic         = splat_color(0.0f);
+
+  if (sample_caustic) {
+    light_caustic = direct_lighting_sun_caustic(data, index, sky_pos, is_underwater, task_caustic0, task_caustic1);
+  }
+
+  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(task_caustic0));
+  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(task_caustic1));
+
+  DirectLightingShadowTask task_direct;
+  task_direct.trace_status = OPTIX_TRACE_STATUS_ABORT;
+  RGBF light_direct        = splat_color(0.0f);
+
+  if (sample_direct) {
+    light_direct = direct_lighting_sun_direct(data, index, sky_pos, task_direct);
+  }
+
+  light_direct = mul_color(light_direct, direct_lighting_sun_shadowing(task_direct));
+
+  return add_color(light_caustic, light_direct);
 }
 
 __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
