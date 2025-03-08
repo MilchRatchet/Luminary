@@ -23,7 +23,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
 
   if (settings->region_width == 1.0f && settings->region_height == 1.0f) {
     device_settings->window_x      = 0;
-    device_settings->window_x      = 0;
+    device_settings->window_y      = 0;
     device_settings->window_width  = device_settings->width;
     device_settings->window_height = device_settings->height;
   }
