@@ -180,14 +180,15 @@ static LuminaryResult _device_struct_cloud_layer_convert(const CloudLayer* cloud
   __CHECK_NULL_ARGUMENT(cloud_layer);
   __CHECK_NULL_ARGUMENT(device_cloud_layer);
 
-  device_cloud_layer->height_max   = cloud_layer->height_max;
-  device_cloud_layer->height_min   = cloud_layer->height_min;
-  device_cloud_layer->coverage     = cloud_layer->coverage;
-  device_cloud_layer->coverage_min = cloud_layer->coverage_min;
-  device_cloud_layer->type         = cloud_layer->type;
-  device_cloud_layer->type_min     = cloud_layer->type_min;
-  device_cloud_layer->wind_speed   = cloud_layer->wind_speed;
-  device_cloud_layer->wind_angle   = cloud_layer->wind_angle;
+  device_cloud_layer->height_max     = cloud_layer->height_max;
+  device_cloud_layer->height_min     = cloud_layer->height_min;
+  device_cloud_layer->coverage       = cloud_layer->coverage;
+  device_cloud_layer->coverage_min   = cloud_layer->coverage_min;
+  device_cloud_layer->type           = cloud_layer->type;
+  device_cloud_layer->type_min       = cloud_layer->type_min;
+  device_cloud_layer->wind_speed     = cloud_layer->wind_speed;
+  device_cloud_layer->wind_angle_cos = cosf(cloud_layer->wind_angle);
+  device_cloud_layer->wind_angle_sin = sinf(cloud_layer->wind_angle);
 
   return LUMINARY_SUCCESS;
 }

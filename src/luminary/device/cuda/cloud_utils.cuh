@@ -78,8 +78,8 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
     default:
     case CLOUD_LAYER_LOW: {
       vec3 weather_pos = pos;
-      weather_pos.x    = weather_pos.x + device.cloud.low.wind_speed * height * cosf(device.cloud.low.wind_angle);
-      weather_pos.z    = weather_pos.z + device.cloud.low.wind_speed * height * sinf(device.cloud.low.wind_angle);
+      weather_pos.x    = weather_pos.x + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_cos;
+      weather_pos.z    = weather_pos.z + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_sin;
       weather_pos      = scale_vector(weather_pos, 0.012f * device.cloud.noise_weather_scale);
 
       float4 tex = tex2D<float4>(device.cloud_noise_weather_tex.handle, weather_pos.x, weather_pos.z);
@@ -92,8 +92,8 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
     }
     case CLOUD_LAYER_MID: {
       vec3 weather_pos = pos;
-      weather_pos.x    = weather_pos.x + device.cloud.mid.wind_speed * height * cosf(device.cloud.mid.wind_angle);
-      weather_pos.z    = weather_pos.z + device.cloud.mid.wind_speed * height * sinf(device.cloud.mid.wind_angle);
+      weather_pos.x    = weather_pos.x + device.cloud.mid.wind_speed * height * device.cloud.mid.wind_angle_cos;
+      weather_pos.z    = weather_pos.z + device.cloud.mid.wind_speed * height * device.cloud.mid.wind_angle_sin;
       weather_pos      = scale_vector(weather_pos, 0.01f * device.cloud.noise_weather_scale);
 
       float4 tex = tex2D<float4>(device.cloud_noise_weather_tex.handle, weather_pos.x, weather_pos.z);
@@ -106,8 +106,8 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
     }
     case CLOUD_LAYER_TOP: {
       vec3 weather_pos = pos;
-      weather_pos.x    = weather_pos.x + device.cloud.top.wind_speed * height * cosf(device.cloud.top.wind_angle);
-      weather_pos.z    = weather_pos.z + device.cloud.top.wind_speed * height * sinf(device.cloud.top.wind_angle);
+      weather_pos.x    = weather_pos.x + device.cloud.top.wind_speed * height * device.cloud.top.wind_angle_cos;
+      weather_pos.z    = weather_pos.z + device.cloud.top.wind_speed * height * device.cloud.top.wind_angle_sin;
       weather_pos      = scale_vector(weather_pos, 0.004f * device.cloud.noise_weather_scale);
 
       float4 tex = tex2D<float4>(device.cloud_noise_weather_tex.handle, weather_pos.x, weather_pos.z);
@@ -274,8 +274,8 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
   mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
 
   vec3 shape_pos = pos;
-  shape_pos.x    = shape_pos.x + device.cloud.mid.wind_speed * height * cosf(device.cloud.mid.wind_angle) * 0.33f;
-  shape_pos.z    = shape_pos.z + device.cloud.mid.wind_speed * height * sinf(device.cloud.mid.wind_angle) * 0.33f;
+  shape_pos.x    = shape_pos.x + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_cos * 0.33f;
+  shape_pos.z    = shape_pos.z + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_sin * 0.33f;
   shape_pos      = scale_vector(shape_pos, 0.4f * device.cloud.noise_shape_scale);
 
   const float4 shape = tex3DLod<float4>(device.cloud_noise_shape_tex.handle, shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);

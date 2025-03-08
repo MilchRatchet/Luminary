@@ -98,9 +98,10 @@ struct DeviceCloudLayer {
   float type;
   float type_min;
   float wind_speed;
-  float wind_angle;
+  float wind_angle_cos;
+  float wind_angle_sin;
 } typedef DeviceCloudLayer;
-LUM_STATIC_SIZE_ASSERT(DeviceCloudLayer, 0x20u);
+LUM_STATIC_SIZE_ASSERT(DeviceCloudLayer, 0x24u);
 
 struct DeviceCloud {
   uint32_t active : 1;
@@ -124,7 +125,7 @@ struct DeviceCloud {
   DeviceCloudLayer mid;
   DeviceCloudLayer top;
 } typedef DeviceCloud;
-LUM_STATIC_SIZE_ASSERT(DeviceCloud, 0x84u);
+LUM_STATIC_SIZE_ASSERT(DeviceCloud, 0x90u);
 
 struct DeviceFog {
   uint32_t active : 1;
