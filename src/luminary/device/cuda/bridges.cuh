@@ -254,8 +254,9 @@ __device__ RGBF bridges_evaluate_bridge(
   ////////////////////////////////////////////////////////////////////
 
   OptixTraceStatus trace_status = (bridge_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  RGBF light_color;
-  vec3 light_vector;
+  RGBF light_color              = splat_color(0.0f);
+  vec3 light_vector             = get_vector(0.0f, 0.0f, 1.0f);
+
   if (bridge_is_valid) {
     const DeviceTransform light_transform = load_transform(light_handle.instance_id);
 
@@ -270,10 +271,6 @@ __device__ RGBF bridges_evaluate_bridge(
 
     light_color  = light_get_color(light);
     light_vector = scale_vector(light_dir, light_dist);
-  }
-  else {
-    light_color  = get_color(0.0f, 0.0f, 0.0f);
-    light_vector = get_vector(0.0f, 0.0f, 1.0f);
   }
 
   ////////////////////////////////////////////////////////////////////

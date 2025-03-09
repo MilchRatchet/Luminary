@@ -188,7 +188,8 @@ __device__ void light_load_sample_finalize_bridges(
 }
 
 __device__ RGBF light_get_color(const TriangleLight triangle) {
-  RGBF color;
+  RGBF color = splat_color(0.0f);
+
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
   if (mat.luminance_tex != TEXTURE_NONE) {

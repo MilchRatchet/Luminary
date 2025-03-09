@@ -3,6 +3,7 @@
 
 #ifdef OPTIX_KERNEL
 
+#include "bridges.cuh"
 #include "bsdf.cuh"
 #include "caustics.cuh"
 #include "math.cuh"
@@ -70,6 +71,9 @@ __device__ RGBF direct_lighting_sun_shadowing(const DirectLightingShadowTask tas
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
 
+  if (task.trace_status == OPTIX_TRACE_STATUS_OPTIONAL_UNUSED)
+    return splat_color(1.0f);
+
   visibility = mul_color(visibility, volume_integrate_transmittance(task.origin, task.ray, task.limit));
 
   return visibility;
@@ -80,6 +84,9 @@ __device__ RGBF direct_lighting_shadowing(const DirectLightingShadowTask task) {
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
+
+  if (task.trace_status == OPTIX_TRACE_STATUS_OPTIONAL_UNUSED)
+    return splat_color(1.0f);
 
   visibility = mul_color(visibility, volume_integrate_transmittance(task.origin, task.ray, task.limit));
 
@@ -487,11 +494,58 @@ __device__ RGBF direct_lighting_sun(const GBufferData data, const ushort2 index)
   return add_color(light_caustic, light_direct);
 }
 
+#ifdef PHASE_KERNEL
+__device__ RGBF direct_lighting_sun_phase(const GBufferData data, const ushort2 index) {
+  ////////////////////////////////////////////////////////////////////
+  // Decide on method
+  ////////////////////////////////////////////////////////////////////
+
+  const vec3 sky_pos     = world_to_sky_transform(data.position);
+  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+
+  bool sample_direct  = true;
+  bool sample_caustic = false;
+  bool is_underwater  = false;
+
+  if (device.ocean.active && data.instance_id != HIT_TYPE_OCEAN) {
+    is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
+    sample_direct  = !is_underwater;
+    sample_caustic = is_underwater;
+  }
+
+  // Sun is not present
+  if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR || !sun_visible) {
+    sample_direct  = false;
+    sample_caustic = false;
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Execute sun lighting
+  ////////////////////////////////////////////////////////////////////
+
+  DirectLightingShadowTask task0;
+  task0.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
+  DirectLightingShadowTask task1;
+  task1.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
+  RGBF light         = splat_color(0.0f);
+
+  if (sample_caustic) {
+    light = direct_lighting_sun_caustic(data, index, sky_pos, is_underwater, task0, task1);
+  }
+
+  if (sample_direct) {
+    light = direct_lighting_sun_direct(data, index, sky_pos, task0);
+  }
+
+  light = mul_color(light, direct_lighting_sun_shadowing(task0));
+  light = mul_color(light, direct_lighting_sun_shadowing(task1));
+
+  return light;
+}
+#endif
+
+#ifndef VOLUME_KERNEL
 __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
-#ifdef VOLUME_KERNEL
-  // TODO: Bridges
-  return splat_color(0.0f);
-#else
   RGBF sum_light = splat_color(0.0f);
 
   for (uint32_t j = 0; j < device.settings.light_num_rays; j++) {
@@ -506,7 +560,20 @@ __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 i
   }
 
   return scale_color(sum_light, 1.0f / device.settings.light_num_rays);
+}
+
 #endif
+
+__device__ RGBF direct_lighting_geometry_bridges(const DeviceTask task, const VolumeType volume_type, const VolumeDescriptor volume) {
+  RGBF light = splat_color(0.0f);
+
+#ifdef VOLUME_KERNEL
+  if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (device.ocean.triangle_light_contribution || volume_type != VOLUME_TYPE_OCEAN)) {
+    light = bridges_sample(task, volume);
+  }
+#endif
+
+  return light;
 }
 
 __device__ RGBF direct_lighting_ambient(const GBufferData data, const ushort2 index) {

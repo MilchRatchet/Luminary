@@ -36,14 +36,9 @@ extern "C" __global__ void __raygen__optix() {
 
   RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
-  accumulated_light = add_color(accumulated_light, direct_lighting_sun(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_geometry_bridges(task, volume_type, volume));
+  accumulated_light = add_color(accumulated_light, direct_lighting_sun_phase(data, task.index));
   accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
-
-#if 0
-  if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (device.ocean.triangle_light_contribution || volume_type != VOLUME_TYPE_OCEAN)) {
-    accumulated_light = add_color(accumulated_light, bridges_sample(task, volume));
-  }
-#endif
 
   const RGBF record = load_RGBF(device.ptrs.records + pixel);
 

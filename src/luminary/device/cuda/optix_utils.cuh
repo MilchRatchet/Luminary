@@ -6,7 +6,7 @@
 
 #ifdef OPTIX_KERNEL
 
-enum OptixTraceStatus { OPTIX_TRACE_STATUS_EXECUTE, OPTIX_TRACE_STATUS_ABORT } typedef OptixTraceStatus;
+enum OptixTraceStatus { OPTIX_TRACE_STATUS_EXECUTE, OPTIX_TRACE_STATUS_ABORT, OPTIX_TRACE_STATUS_OPTIONAL_UNUSED } typedef OptixTraceStatus;
 
 ////////////////////////////////////////////////////////////////////
 // Payload Type bitmasks
