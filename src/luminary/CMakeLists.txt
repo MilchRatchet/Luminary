@@ -115,8 +115,10 @@ endfunction()
 compile_ptx(optix_kernel_raytrace optix_kernel_raytrace)
 compile_ptx(optix_kernel_shading_geometry optix_kernel_shading_geometry_geo)
 compile_ptx(optix_kernel_shading_geometry optix_kernel_shading_geometry_sky)
-compile_ptx(optix_kernel_shading_volume optix_kernel_shading_volume)
-compile_ptx(optix_kernel_shading_particles optix_kernel_shading_particles)
+compile_ptx(optix_kernel_shading_volume optix_kernel_shading_volume_geo)
+compile_ptx(optix_kernel_shading_volume optix_kernel_shading_volume_sky)
+compile_ptx(optix_kernel_shading_particles optix_kernel_shading_particles_geo)
+compile_ptx(optix_kernel_shading_particles optix_kernel_shading_particles_sky)
 
 #=============================================================
 # Embed files
@@ -132,8 +134,10 @@ ceb_embed_files(
   ${CMAKE_BINARY_DIR}/ptx/optix_kernel_raytrace.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_geometry_geo.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_geometry_sky.ptx
-  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_volume.ptx
-  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_particles.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_volume_geo.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_volume_sky.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_particles_geo.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernel_shading_particles_sky.ptx
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_SOURCE_DIR}/data/LuminaryFontBold.ttf
   ${CMAKE_SOURCE_DIR}/data/MaterialSymbols.ttf

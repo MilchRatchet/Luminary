@@ -13,6 +13,11 @@
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
+#ifdef OPTIX_ENABLE_GEOMETRY_DL
+  if (LIGHTS_ARE_PRESENT == false)
+    return;
+#endif
+
   const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
   const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
   const uint32_t task_id     = TASK_ID;
@@ -24,7 +29,13 @@ extern "C" __global__ void __raygen__optix() {
   DeviceTask task                      = task_load(offset);
   const TriangleHandle triangle_handle = triangle_handle_load(offset);
   const float depth                    = trace_depth_load(offset);
-  const uint32_t pixel                 = get_pixel_id(task.index);
+
+#ifdef OPTIX_ENABLE_GEOMETRY_DL
+  if (direct_lighting_geometry_is_valid(task) == false)
+    return;
+#endif
+
+  const uint32_t pixel = get_pixel_id(task.index);
 
   task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 

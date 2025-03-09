@@ -111,7 +111,11 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
 
     if (args->render_volumes) {
       action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_GEO;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_SKY;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
@@ -123,7 +127,11 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
 
     if (args->render_particles) {
       action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_PARTICLES;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_PARTICLES_GEO;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_PARTICLES_SKY;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 

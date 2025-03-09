@@ -15,6 +15,11 @@
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
+#ifdef OPTIX_ENABLE_GEOMETRY_DL
+  if (LIGHTS_ARE_PRESENT == false)
+    return;
+#endif
+
   const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE];
   const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_PARTICLE];
   const uint32_t task_id     = TASK_ID;
@@ -26,7 +31,13 @@ extern "C" __global__ void __raygen__optix() {
   DeviceTask task             = task_load(offset);
   const TriangleHandle handle = triangle_handle_load(offset);
   const float depth           = trace_depth_load(offset);
-  const uint32_t pixel        = get_pixel_id(task.index);
+
+#ifdef OPTIX_ENABLE_GEOMETRY_DL
+  if (direct_lighting_geometry_is_valid(task) == false)
+    return;
+#endif
+
+  const uint32_t pixel = get_pixel_id(task.index);
 
   task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
@@ -39,9 +50,14 @@ extern "C" __global__ void __raygen__optix() {
 
   RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
+#ifdef OPTIX_ENABLE_GEOMETRY_DL
   accumulated_light = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
+#endif
+
+#ifdef OPTIX_ENABLE_SKY_DL
   accumulated_light = add_color(accumulated_light, direct_lighting_sun_phase(data, task.index));
   accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
+#endif
 
   accumulated_light = mul_color(accumulated_light, record);
 

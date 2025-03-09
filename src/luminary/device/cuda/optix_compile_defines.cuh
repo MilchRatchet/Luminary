@@ -25,20 +25,42 @@
 #define OPTIX_COMPILATION_DEFINITION_FOUND true
 #endif
 
-#ifdef optix_kernel_shading_volume
+#ifdef optix_kernel_shading_volume_geo
 #define OPTIX_KERNEL
 #define SHADING_KERNEL
 #define PHASE_KERNEL
 #define VOLUME_KERNEL
+#define OPTIX_ENABLE_GEOMETRY_DL
 #undef OPTIX_COMPILATION_DEFINITION_FOUND
 #define OPTIX_COMPILATION_DEFINITION_FOUND true
 #endif
 
-#ifdef optix_kernel_shading_particles
+#ifdef optix_kernel_shading_volume_sky
+#define OPTIX_KERNEL
+#define SHADING_KERNEL
+#define PHASE_KERNEL
+#define VOLUME_KERNEL
+#define OPTIX_ENABLE_SKY_DL
+#undef OPTIX_COMPILATION_DEFINITION_FOUND
+#define OPTIX_COMPILATION_DEFINITION_FOUND true
+#endif
+
+#ifdef optix_kernel_shading_particles_geo
 #define OPTIX_KERNEL
 #define SHADING_KERNEL
 #define PHASE_KERNEL
 #define PARTICLE_KERNEL
+#define OPTIX_ENABLE_GEOMETRY_DL
+#undef OPTIX_COMPILATION_DEFINITION_FOUND
+#define OPTIX_COMPILATION_DEFINITION_FOUND true
+#endif
+
+#ifdef optix_kernel_shading_particles_sky
+#define OPTIX_KERNEL
+#define SHADING_KERNEL
+#define PHASE_KERNEL
+#define PARTICLE_KERNEL
+#define OPTIX_ENABLE_SKY_DL
 #undef OPTIX_COMPILATION_DEFINITION_FOUND
 #define OPTIX_COMPILATION_DEFINITION_FOUND true
 #endif
