@@ -7,8 +7,8 @@ LuminaryResult material_get_default(Material* material) {
 
   material->id                   = 0;
   material->base_substrate       = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
-  material->albedo               = (RGBAF){.r = 0.9f, .g = 0.9f, .b = 0.9f, .a = 0.9f};
-  material->emission             = (RGBF){.r = 0.0f, .g = 0.0f, .b = 0.0f};
+  material->albedo               = (RGBAF) {.r = 0.9f, .g = 0.9f, .b = 0.9f, .a = 0.9f};
+  material->emission             = (RGBF) {.r = 0.0f, .g = 0.0f, .b = 0.0f};
   material->emission_scale       = 1.0f;
   material->roughness            = 0.7f;
   material->roughness_clamp      = 0.25f;
@@ -90,6 +90,7 @@ LuminaryResult material_check_for_dirty(const Material* input, const Material* o
   __MATERIAL_DIRTY(roughness_clamp);
   __MATERIAL_DIRTY(emission_active);
   __MATERIAL_DIRTY(colored_transparency);
+  __MATERIAL_DIRTY(roughness_as_smoothness);
 
   return LUMINARY_SUCCESS;
 }
