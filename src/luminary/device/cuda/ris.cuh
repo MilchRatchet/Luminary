@@ -23,9 +23,8 @@
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
 __device__ TriangleHandle ris_sample_light(
-  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const uint32_t bsdf_sample_light_key,
-  const vec3 bsdf_sample_ray, const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
-  bool& selected_is_refraction) {
+  const GBufferData data, const ushort2 pixel, const uint32_t bsdf_sample_light_key, const vec3 bsdf_sample_ray,
+  const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
   TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
 
   float sum_weight = 0.0f;
@@ -98,12 +97,10 @@ __device__ TriangleHandle ris_sample_light(
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
-  float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index, pixel);
+  float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
 
   for (int i = 0; i < reservoir_size; i++) {
-    const uint32_t random_offset = light_ray_index * reservoir_size + i;
-
-    const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + random_offset, pixel);
+    const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + i, pixel);
 
     float light_tree_pdf;
     DeviceTransform trans;
@@ -115,7 +112,7 @@ __device__ TriangleHandle ris_sample_light(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
 
-    const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + light_ray_index * reservoir_size + i, pixel);
+    const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + i, pixel);
 
     vec3 ray;
     float dist, solid_angle;

@@ -14,7 +14,6 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->shading_mode            = settings->shading_mode;
   device_settings->bridge_max_num_vertices = settings->bridge_max_num_vertices;
   device_settings->bridge_num_ris_samples  = settings->bridge_num_ris_samples;
-  device_settings->light_num_rays          = settings->light_num_rays;
   device_settings->light_num_ris_samples   = settings->light_num_ris_samples;
   device_settings->supersampling           = settings->supersampling;
 

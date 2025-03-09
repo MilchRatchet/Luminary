@@ -40,11 +40,10 @@ __device__ bool direct_lighting_geometry_is_valid(const DeviceTask task) {
 // BSDF Sampling
 ////////////////////////////////////////////////////////////////////
 
-__device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(const GBufferData data, const ushort2 index, const uint32_t id) {
-  bool bsdf_sample_is_refraction      = false;
-  bool bsdf_sample_is_valid           = false;
-  const QuasiRandomTarget bsdf_target = (QuasiRandomTarget) (QUASI_RANDOM_TARGET_LIGHT_BSDF + 2 * id);
-  const vec3 bsdf_dir                 = bsdf_sample_for_light(data, index, bsdf_target, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+__device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(const GBufferData data, const ushort2 index) {
+  bool bsdf_sample_is_refraction = false;
+  bool bsdf_sample_is_valid      = false;
+  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
 
   float shift   = bsdf_sample_is_refraction ? -eps : eps;
   vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
@@ -337,8 +336,8 @@ __device__ RGBF direct_lighting_sun_caustic(
 ////////////////////////////////////////////////////////////////////
 
 #ifndef VOLUME_KERNEL
-__device__ RGBF direct_lighting_geometry_single(
-  GBufferData data, const ushort2 index, const uint32_t id, const DirectLightingBSDFSample bsdf_sample, DirectLightingShadowTask& task) {
+__device__ RGBF direct_lighting_geometry_sample(
+  GBufferData data, const ushort2 index, const DirectLightingBSDFSample bsdf_sample, DirectLightingShadowTask& task) {
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
   ////////////////////////////////////////////////////////////////////
@@ -347,8 +346,8 @@ __device__ RGBF direct_lighting_geometry_single(
   RGBF light_color;
   float dist;
   bool is_refraction;
-  const TriangleHandle light_handle = ris_sample_light(
-    data, index, id, bsdf_sample.light_id, bsdf_sample.ray, bsdf_sample.is_refraction, dir, light_color, dist, is_refraction);
+  const TriangleHandle light_handle =
+    ris_sample_light(data, index, bsdf_sample.light_id, bsdf_sample.ray, bsdf_sample.is_refraction, dir, light_color, dist, is_refraction);
 
   if (color_importance(light_color) == 0.0f || light_handle.instance_id == LIGHT_ID_NONE) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
@@ -547,20 +546,14 @@ __device__ RGBF direct_lighting_sun_phase(const GBufferData data, const ushort2 
 
 #ifndef VOLUME_KERNEL
 __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
-  RGBF sum_light = splat_color(0.0f);
+  const DirectLightingBSDFSample bsdf_sample = direct_lighting_get_bsdf_sample(data, index);
 
-  for (uint32_t j = 0; j < device.settings.light_num_rays; j++) {
-    const DirectLightingBSDFSample bsdf_sample = direct_lighting_get_bsdf_sample(data, index, j);
+  DirectLightingShadowTask task;
+  RGBF light = direct_lighting_geometry_sample(data, index, bsdf_sample, task);
 
-    DirectLightingShadowTask task;
-    RGBF light = direct_lighting_geometry_single(data, index, j, bsdf_sample, task);
+  light = mul_color(light, direct_lighting_shadowing(task));
 
-    light = mul_color(light, direct_lighting_shadowing(task));
-
-    sum_light = add_color(sum_light, light);
-  }
-
-  return scale_color(sum_light, 1.0f / device.settings.light_num_rays);
+  return light;
 }
 
 #endif

@@ -58,7 +58,8 @@ static LuminaryResult parse_general_settings(
 #endif
     /* NUMLIGHT */
     case 6073182477647435086u:
-      sscanf(value, "%u\n", &settings->light_num_rays);
+      // Legacy
+      // sscanf(value, "%u\n", &settings->light_num_rays);
       break;
 #if 0
     /* OUTPUTFN */
