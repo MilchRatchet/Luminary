@@ -29,19 +29,33 @@ struct DirectLightingBSDFSample {
 } typedef DirectLightingBSDFSample;
 
 ////////////////////////////////////////////////////////////////////
+// Utils
+////////////////////////////////////////////////////////////////////
+
+__device__ bool direct_lighting_geometry_is_valid(const GBufferData data) {
+  return ((data.flags & G_BUFFER_FLAG_VOLUME_SCATTERED) == 0);
+}
+
+////////////////////////////////////////////////////////////////////
 // BSDF Sampling
 ////////////////////////////////////////////////////////////////////
 
-__device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(GBufferData data, const ushort2 index, const uint32_t id) {
-  bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
-  const QuasiRandomTarget bsdf_target = (QuasiRandomTarget) (QUASI_RANDOM_TARGET_LIGHT_BSDF + 2 * id);
-  const vec3 bsdf_dir                 = bsdf_sample_for_light(data, index, bsdf_target, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+__device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(const GBufferData data, const ushort2 index, const uint32_t id) {
+  const bool is_valid = direct_lighting_geometry_is_valid(data);
 
+  bool bsdf_sample_is_refraction = false;
+  bool bsdf_sample_is_valid      = false;
   vec3 position;
-  float shift;
+  vec3 bsdf_dir;
 
-  shift    = bsdf_sample_is_refraction ? -eps : eps;
-  position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  if (is_valid) {
+    const QuasiRandomTarget bsdf_target = (QuasiRandomTarget) (QUASI_RANDOM_TARGET_LIGHT_BSDF + 2 * id);
+
+    bsdf_dir = bsdf_sample_for_light(data, index, bsdf_target, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+
+    float shift = bsdf_sample_is_refraction ? -eps : eps;
+    position    = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  }
 
   // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
   const OptixTraceStatus light_trace_status = (bsdf_sample_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
@@ -334,6 +348,11 @@ __device__ RGBF direct_lighting_sun_caustic(
 __device__ RGBF direct_lighting_geometry_single(
   GBufferData data, const ushort2 index, const uint32_t id, const DirectLightingBSDFSample bsdf_sample, DirectLightingShadowTask& task) {
   if (LIGHTS_ARE_PRESENT == false) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  if (direct_lighting_geometry_is_valid(data) == false) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }

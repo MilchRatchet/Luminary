@@ -17,6 +17,12 @@ __device__ GBufferData particle_generate_g_buffer(const DeviceTask task, const u
 
   const float ray_ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
 
+  uint32_t flags = 0;
+
+  if (task.state & STATE_FLAG_VOLUME_SCATTERED) {
+    flags |= G_BUFFER_FLAG_VOLUME_SCATTERED;
+  }
+
   // Particles BSDF is emulated using volume BSDFs
   GBufferData data;
   data.instance_id = instance_id;
@@ -28,7 +34,7 @@ __device__ GBufferData particle_generate_g_buffer(const DeviceTask task, const u
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = device.particles.phase_diameter;
   data.state       = task.state;
-  data.flags       = 0;
+  data.flags       = flags;
   data.ior_in      = ray_ior;
   data.ior_out     = ray_ior;
 

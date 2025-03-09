@@ -126,6 +126,10 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
     roughness = 1.0f - roughness;
   }
 
+  if (task.state & STATE_FLAG_VOLUME_SCATTERED) {
+    flags |= G_BUFFER_FLAG_VOLUME_SCATTERED;
+  }
+
   if (is_inside) {
     flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
   }

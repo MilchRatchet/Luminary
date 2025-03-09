@@ -79,7 +79,7 @@ LUMINARY_KERNEL void volume_process_events() {
       if (path.x >= 0.0f) {
         float integration_depth = path.y;
 
-        const bool allow_ocean_volume_hit = device.ocean.multiscattering || !(task.state & STATE_FLAG_OCEAN_SCATTERED);
+        const bool allow_ocean_volume_hit = device.ocean.multiscattering || !(task.state & STATE_FLAG_VOLUME_SCATTERED);
 
         if (allow_ocean_volume_hit) {
           const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
@@ -159,9 +159,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
 
-    if (volume_type == VOLUME_TYPE_OCEAN) {
-      new_state &= ~STATE_FLAG_OCEAN_SCATTERED;
-    }
+    new_state |= STATE_FLAG_VOLUME_SCATTERED;
 
     DeviceTask bounce_task;
     bounce_task.state  = new_state;

@@ -77,8 +77,9 @@ enum ShadingTaskIndex {
 //                              This flag is used to allow light to be gathered through non-refractive transparencies when coming directly
 //                              from the camera where no DL is executed.
 //
-// STATE_FLAG_OCEAN_SCATTERED: This flag is set for paths that have at least one vertex that is a ocean volume scattering event.
-//                             This flag is used to limit ocean volumes to single scattering for performance reasons.
+// STATE_FLAG_VOLUME_SCATTERED: This flag is set for paths that have at least one vertex that is a volume scattering event.
+//                              This flag is used to limit ocean volumes to single scattering for performance reasons.
+//                              This flag is used to limit DL after volume scattering for convergence reasons.
 //
 // STATE_FLAG_ALLOW_EMISSION: This flag is set for rays that are allowed to include emission in bounce rays.
 //                            This flag is used on the ocean surface because there is no DL on it.
@@ -86,7 +87,7 @@ enum ShadingTaskIndex {
 enum StateFlag {
   STATE_FLAG_DELTA_PATH       = 0b00000001u,
   STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
-  STATE_FLAG_OCEAN_SCATTERED  = 0b00000100u,
+  STATE_FLAG_VOLUME_SCATTERED = 0b00000100u,
   STATE_FLAG_ALLOW_EMISSION   = 0b00001000u
 } typedef StateFlag;
 

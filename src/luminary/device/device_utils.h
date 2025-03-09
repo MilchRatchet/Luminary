@@ -177,14 +177,15 @@ struct TriangleHandle {
   uint32_t tri_id;
 } typedef TriangleHandle;
 
-enum GBufferFlags {
+enum GBufferFlag {
   G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE      = 0,
   G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT = 1,
   G_BUFFER_FLAG_BASE_SUBSTRATE_MASK        = 1,
   G_BUFFER_FLAG_REFRACTION_IS_INSIDE       = 0b10,
   G_BUFFER_FLAG_METALLIC                   = 0b100,
-  G_BUFFER_FLAG_COLORED_TRANSPARENCY       = 0b1000
-} typedef GBufferFlags;
+  G_BUFFER_FLAG_COLORED_TRANSPARENCY       = 0b1000,
+  G_BUFFER_FLAG_VOLUME_SCATTERED           = 0b10000
+} typedef GBufferFlag;
 
 struct GBufferData {
   uint32_t instance_id;
