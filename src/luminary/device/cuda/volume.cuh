@@ -31,6 +31,12 @@ LUMINARY_KERNEL void volume_process_events() {
 
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
+  uint16_t geometry_task_count = 0;
+  uint16_t ocean_task_count    = 0;
+  uint16_t volume_task_count   = 0;
+  uint16_t particle_task_count = 0;
+  uint16_t sky_task_count      = 0;
+
   for (int i = 0; i < task_count; i++) {
     const int offset      = get_task_address(i);
     DeviceTask task       = task_load(offset);
@@ -99,7 +105,33 @@ LUMINARY_KERNEL void volume_process_events() {
     trace_depth_store(depth, offset);
     triangle_handle_store(handle, offset);
     store_RGBF(device.ptrs.records, pixel, record);
+
+    ////////////////////////////////////////////////////////////////////
+    // Increment counts
+    ////////////////////////////////////////////////////////////////////
+
+    if (handle.instance_id == HIT_TYPE_SKY) {
+      sky_task_count++;
+    }
+    else if (handle.instance_id == HIT_TYPE_OCEAN) {
+      ocean_task_count++;
+    }
+    else if (VOLUME_HIT_CHECK(handle.instance_id)) {
+      volume_task_count++;
+    }
+    else if (handle.instance_id <= HIT_TYPE_PARTICLE_MAX && handle.instance_id >= HIT_TYPE_PARTICLE_MIN) {
+      particle_task_count++;
+    }
+    else if (handle.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+      geometry_task_count++;
+    }
   }
+
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN]    = ocean_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME]   = volume_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE] = particle_task_count;
+  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY]      = sky_task_count;
 }
 
 LUMINARY_KERNEL void volume_process_tasks() {

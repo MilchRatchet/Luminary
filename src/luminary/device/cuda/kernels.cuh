@@ -244,34 +244,11 @@ __device__ void tasks_swap(const ShadingTaskIndex target, uint16_t offsets[], co
 LUMINARY_KERNEL void postprocess_trace_tasks() {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t task_count    = device.ptrs.trace_counts[THREAD_ID];
-  uint16_t geometry_task_count = 0;
-  uint16_t ocean_task_count    = 0;
-  uint16_t volume_task_count   = 0;
-  uint16_t particle_task_count = 0;
-  uint16_t sky_task_count      = 0;
-
-  // count data
-  for (uint32_t i = 0; i < task_count; i++) {
-    const uint32_t offset      = get_task_address(i);
-    const uint32_t instance_id = triangle_handle_load(offset).instance_id;
-
-    if (instance_id == HIT_TYPE_SKY) {
-      sky_task_count++;
-    }
-    else if (instance_id == HIT_TYPE_OCEAN) {
-      ocean_task_count++;
-    }
-    else if (VOLUME_HIT_CHECK(instance_id)) {
-      volume_task_count++;
-    }
-    else if (instance_id <= HIT_TYPE_PARTICLE_MAX && instance_id >= HIT_TYPE_PARTICLE_MIN) {
-      particle_task_count++;
-    }
-    else if (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-      geometry_task_count++;
-    }
-  }
+  const uint16_t geometry_task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
+  const uint16_t ocean_task_count    = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN];
+  const uint16_t volume_task_count   = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
+  const uint16_t particle_task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE];
+  const uint16_t sky_task_count      = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY];
 
   const uint32_t initial_geometry_offset = 0;
   const uint32_t initial_ocean_offset    = initial_geometry_offset + geometry_task_count;
@@ -302,15 +279,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   tasks_swap(SHADING_TASK_INDEX_VOLUME, offsets, initial_particle_offset);
   tasks_swap(SHADING_TASK_INDEX_PARTICLE, offsets, initial_sky_offset);
   tasks_swap(SHADING_TASK_INDEX_SKY, offsets, initial_rejects_offset);
-
-  const uint32_t num_tasks = initial_rejects_offset;
-
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_task_count;
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN]    = ocean_task_count;
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME]   = volume_task_count;
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE] = particle_task_count;
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY]      = sky_task_count;
-  device.ptrs.task_counts[TASK_ADDRESS_OFFSET_TOTAL]    = num_tasks;
 
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }

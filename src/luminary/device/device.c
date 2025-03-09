@@ -529,7 +529,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(triangle_handles, sizeof(TriangleHandle) * max_task_count);
   __DEVICE_BUFFER_ALLOCATE(trace_depths, sizeof(float) * max_task_count);
   __DEVICE_BUFFER_ALLOCATE(trace_counts, sizeof(uint16_t) * thread_count);
-  __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 6 * thread_count);
+  __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_current_result, sizeof(RGBF) * internal_pixel_count);
