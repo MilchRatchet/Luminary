@@ -26,3 +26,6 @@ const LumFunction lum_function_material_init = 0;
 
 //  LUM_BUILTIN_TYPE_INSTANCE
 const LumFunction lum_function_instance_init = 0;
+
+//  LUM_BUILTIN_TYPE_METADATA
+const LumFunction lum_function_metadata_setminorversion = 0;

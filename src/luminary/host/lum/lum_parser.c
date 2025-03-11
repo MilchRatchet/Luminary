@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "internal_error.h"
-#include "lum_compiler.c"
+#include "lum_compiler.h"
 #include "lum_tokenizer.h"
 
 LuminaryResult lum_parser_create(LumParser** parser) {

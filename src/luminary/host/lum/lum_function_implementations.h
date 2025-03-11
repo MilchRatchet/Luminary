@@ -31,4 +31,7 @@ extern const LumFunction lum_function_material_init;
 //  LUM_BUILTIN_TYPE_INSTANCE
 extern const LumFunction lum_function_instance_init;
 
+//  LUM_BUILTIN_TYPE_METADATA
+extern const LumFunction lum_function_metadata_setminorversion;
+
 #endif /* LUMINARY_LUM_FUNCTION_IMPLEMENTATIONS_H */

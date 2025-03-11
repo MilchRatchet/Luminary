@@ -1,5 +1,7 @@
 #include "lum_builtins.h"
 
+#include "lum_tokenizer.h"
+
 const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_RGBF] = "RGBF",         [LUM_BUILTIN_TYPE_VEC3] = "vec3",
   [LUM_BUILTIN_TYPE_UINT16] = "uint16_t",   [LUM_BUILTIN_TYPE_UINT32] = "uint32_t",
@@ -8,7 +10,8 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CAMERA] = "Camera",     [LUM_BUILTIN_TYPE_OCEAN] = "Ocean",
   [LUM_BUILTIN_TYPE_SKY] = "Sky",           [LUM_BUILTIN_TYPE_CLOUD] = "Cloud",
   [LUM_BUILTIN_TYPE_FOG] = "Fog",           [LUM_BUILTIN_TYPE_PARTICLES] = "Particles",
-  [LUM_BUILTIN_TYPE_MATERIAL] = "Material", [LUM_BUILTIN_TYPE_INSTANCE] = "Instance"};
+  [LUM_BUILTIN_TYPE_MATERIAL] = "Material", [LUM_BUILTIN_TYPE_INSTANCE] = "Instance",
+  [LUM_BUILTIN_TYPE_METADATA] = "MetaData", [LUM_BUILTIN_TYPE_STRING] = "String"};
 
 const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_RGBF]      = sizeof(LuminaryRGBF),
@@ -26,7 +29,9 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_FOG]       = sizeof(LuminaryFog),
   [LUM_BUILTIN_TYPE_PARTICLES] = sizeof(LuminaryParticles),
   [LUM_BUILTIN_TYPE_MATERIAL]  = sizeof(LuminaryMaterial),
-  [LUM_BUILTIN_TYPE_INSTANCE]  = sizeof(LuminaryInstance)};
+  [LUM_BUILTIN_TYPE_INSTANCE]  = sizeof(LuminaryInstance),
+  [LUM_BUILTIN_TYPE_METADATA]  = 0,  // Static
+  [LUM_BUILTIN_TYPE_STRING]    = LUM_LITERAL_STRING_MAX_LENGTH};
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum) {.string = #__internal_macro_enum, .value = __internal_macro_enum}
 
