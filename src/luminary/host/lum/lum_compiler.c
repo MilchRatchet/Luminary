@@ -186,7 +186,7 @@ static LuminaryResult _lum_compiler_emit_return(LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
-  instruction.type = LUM_INSTRUCTION_TYPE_RET;
+  __FAILURE_HANDLE(lum_instruction_encode_ret(&instruction));
 
   __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
 
@@ -197,7 +197,7 @@ static LuminaryResult _lum_compiler_emit_call(LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
-  instruction.type = LUM_INSTRUCTION_TYPE_CALL;
+  __FAILURE_HANDLE(lum_instruction_encode_call(&instruction));
 
   __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
 
@@ -208,18 +208,18 @@ static LuminaryResult _lum_compiler_emit_move(LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
-  instruction.type = LUM_INSTRUCTION_TYPE_MOV;
+  __FAILURE_HANDLE(lum_instruction_encode_mov(&instruction));
 
   __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_compiler_emit_regmap(LumBinary* binary) {
+static LuminaryResult _lum_compiler_emit_regmap(LumBinary* binary, uint8_t reg, bool is_data_section, uint32_t offset) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
-  instruction.type = LUM_INSTRUCTION_TYPE_REGMAP;
+  __FAILURE_HANDLE(lum_instruction_encode_regmap(&instruction, reg, is_data_section, offset));
 
   __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
 
@@ -230,8 +230,6 @@ static LuminaryResult _lum_compiler_null_binary(LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(binary);
 
   __FAILURE_HANDLE(array_clear(binary->instructions));
-
-  __FAILURE_HANDLE(_lum_compiler_emit_return(binary));
 
   for (uint32_t entrypoint_id = 0; entrypoint_id < LUM_BINARY_ENTRY_POINT_COUNT; entrypoint_id++) {
     binary->entry_points[entrypoint_id] = 0;
@@ -305,8 +303,8 @@ static LuminaryResult _lum_compiler_allocate_literal(LumCompilerState* state, co
 
   __FAILURE_HANDLE(_lum_compiler_allocate_variable(state, type, (const char*) 0, id));
 
-  // TODO: Map the variable into the corresponding part of the data section
-  __FAILURE_HANDLE(_lum_compiler_emit_regmap(state->binary));
+  // TODO: Compute register to use for this variable
+  __FAILURE_HANDLE(_lum_compiler_emit_regmap(state->binary, 0, true, data_section_offset));
 
   return LUMINARY_SUCCESS;
 }
@@ -630,6 +628,29 @@ static LuminaryResult _lum_compiler_handle_identifier(LumCompilerState* state, c
 // Literal
 ////////////////////////////////////////////////////////////////////
 
+static LuminaryResult _lum_compiler_handle_literal_function_context(LumCompilerState* state, const LumToken* token) {
+  __CHECK_NULL_ARGUMENT(state);
+  __CHECK_NULL_ARGUMENT(token);
+
+  const uint32_t identifier_id = state->context_stack[state->stack_ptr].function.parsed_identifiers;
+
+  if (identifier_id < 2) {
+    LumCompilerMessage message;
+    __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_ERROR, token));
+    sprintf(message.message, "<source>:%u:%u: error: unexpected literal", token->line, token->col);
+    __FAILURE_HANDLE(array_push(&state->messages, &message));
+    return LUMINARY_SUCCESS;
+  }
+
+  uint32_t literal_variable;
+  __FAILURE_HANDLE(_lum_compiler_allocate_literal(state, token, &literal_variable));
+
+  state->context_stack[state->stack_ptr].function.argument_variable_ids[identifier_id - 2] = literal_variable;
+  state->context_stack[state->stack_ptr].function.parsed_identifiers++;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_compiler_handle_literal(LumCompilerState* state, const LumToken* token) {
   __CHECK_NULL_ARGUMENT(state);
 
@@ -643,7 +664,9 @@ static LuminaryResult _lum_compiler_handle_literal(LumCompilerState* state, cons
       __FAILURE_HANDLE(array_push(&state->messages, &message));
       return LUMINARY_SUCCESS;
     } break;
-
+    case LUM_COMPILER_CONTEXT_TYPE_FUNCTION:
+      __FAILURE_HANDLE(_lum_compiler_handle_literal_function_context(state, token));
+      break;
     default:
       break;
   }
@@ -935,6 +958,8 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, ARRAY const LumToken*
 
     token_id++;
   }
+
+  __FAILURE_HANDLE(_lum_compiler_emit_return(binary));
 
   uint32_t message_count;
   __FAILURE_HANDLE(array_get_num_elements(state->messages, &message_count));
