@@ -25,7 +25,7 @@ def GatherData(ref, testPath):
       sampleCounts.append(int(values[0]))
       times.append(float(values[1]))
 
-  return files, sampleCounts, times
+  return errors, sampleCounts, times
 
 
 if __name__ == '__main__':
@@ -56,8 +56,8 @@ if __name__ == '__main__':
 
   plt.figure()
 
-  plt.plot(sampleCountsA, errorsA, color='green')
-  plt.plot(sampleCountsB, errorsB, color='orange')
+  plt.plot(timesA, errorsA, color='green')
+  plt.plot(timesB, errorsB, color='orange')
 
   plt.title('Convergence (Execution Time)')
   plt.ylabel('Mean Error')
