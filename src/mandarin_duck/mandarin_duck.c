@@ -139,6 +139,11 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
 }
 
 void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
+  char render_times_file_path[4096];
+  sprintf(render_times_file_path, "%s/LuminaryBenchmarkResults.txt", duck->output_directory);
+
+  FILE* render_times_file = fopen(render_times_file_path, "wb");
+
   uint32_t num_benchmark_outputs;
   LUM_FAILURE_HANDLE(array_get_num_elements(duck->benchmark_output_promises, &num_benchmark_outputs));
 
@@ -167,9 +172,9 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
       LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
 
       char string[4096];
-      sprintf(
-        string, "%s/Bench-%05u-%s-%07.1fs.png", duck->output_directory, output_image.meta_data.sample_count, duck->benchmark_name,
-        output_image.meta_data.time);
+      sprintf(string, "%s/Bench-%05u-%s.png", duck->output_directory, output_image.meta_data.sample_count, duck->benchmark_name);
+
+      fprintf(render_times_file, "%u, %f\n", output_image.meta_data.sample_count, output_image.meta_data.time);
 
       LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
@@ -182,6 +187,8 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
       duck->benchmark_output_promises[output_id] = LUMINARY_OUTPUT_HANDLE_INVALID;
     }
   }
+
+  fclose(render_times_file);
 }
 
 void mandarin_duck_run(MandarinDuck* duck) {
