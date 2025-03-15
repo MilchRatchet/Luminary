@@ -11,6 +11,7 @@ struct MandarinDuckCreateArgs {
   const char* output_directory;
   MandarinDuckMode mode;
   uint32_t num_benchmark_outputs;
+  const char* benchmark_name;
 } typedef MandarinDuckCreateArgs;
 
 struct MandarinDuck {
@@ -19,6 +20,7 @@ struct MandarinDuck {
   Display* display;
   const char* output_directory;
   LuminaryOutputPromiseHandle* benchmark_output_promises;
+  const char* benchmark_name;
 } typedef MandarinDuck;
 
 void mandarin_duck_create(MandarinDuck** duck, MandarinDuckCreateArgs args);

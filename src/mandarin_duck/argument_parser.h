@@ -31,6 +31,7 @@ struct ArgumentParserResults {
   bool dry_run_requested;
   const char* output_directory;
   uint32_t num_benchmark_outputs;
+  const char* benchmark_name;
 } typedef ArgumentParserResults;
 
 struct ArgumentParser {

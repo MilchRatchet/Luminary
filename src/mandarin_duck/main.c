@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
     args.host = host;
     args.output_directory      = argument_parser->results.output_directory;
     args.num_benchmark_outputs = argument_parser->results.num_benchmark_outputs;
+    args.benchmark_name        = argument_parser->results.benchmark_name;
   }
 
   argument_parser_destroy(&argument_parser);

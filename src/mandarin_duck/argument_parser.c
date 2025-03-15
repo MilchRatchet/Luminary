@@ -18,8 +18,9 @@ static void _argument_parser_arg_func_benchmark(
   UNUSED_ARG(num_arguments);
   UNUSED_ARG(arguments);
 
-  if (num_arguments > 0) {
+  if (num_arguments > 1) {
     parser->results.num_benchmark_outputs = atoll(arguments[0]);
+    parser->results.benchmark_name        = arguments[1];
   }
 }
 
@@ -153,7 +154,7 @@ void argument_parser_create(ArgumentParser** parser) {
   descriptor.long_name         = "benchmark";
   descriptor.short_name        = "b";
   descriptor.description       = "Run the benchmark";
-  descriptor.subargument_count = 1;
+  descriptor.subargument_count = 2;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_benchmark;
   descriptor.pre_execute       = false;
 

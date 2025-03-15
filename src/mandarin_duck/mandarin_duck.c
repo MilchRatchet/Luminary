@@ -73,9 +73,11 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
       LuminaryRendererSettings renderer_settings;
       LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
 
+      duck->benchmark_name = args.benchmark_name;
+
       LUM_FAILURE_HANDLE(array_create(&duck->benchmark_output_promises, sizeof(LuminaryOutputPromiseHandle), args.num_benchmark_outputs));
 
-      for (uint32_t output_id = 0; output_id < args.num_benchmark_outputs; output_id++) {
+      for (uint32_t output_id = 0; output_id <= args.num_benchmark_outputs; output_id++) {
         LuminaryOutputRequestProperties properties;
         properties.sample_count = 1 << output_id;
         properties.width        = renderer_settings.width;
@@ -166,7 +168,8 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
 
       char string[4096];
       sprintf(
-        string, "%s/Bench-%05u-%07.1fs.png", duck->output_directory, output_image.meta_data.sample_count, output_image.meta_data.time);
+        string, "%s/Bench-%05u-%s-%07.1fs.png", duck->output_directory, output_image.meta_data.sample_count, duck->benchmark_name,
+        output_image.meta_data.time);
 
       LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
