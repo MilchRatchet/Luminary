@@ -12,6 +12,9 @@ LuminaryResult device_output_create(DeviceOutput** output) {
 
   __FAILURE_HANDLE(array_create(&(*output)->output_requests, sizeof(DeviceOutputRequest), 16));
 
+  CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_ready, CU_EVENT_DISABLE_TIMING));
+  CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_finished, CU_EVENT_DISABLE_TIMING));
+
   // Default size
   device_output_set_size(*output, 1920, 1080);
 
@@ -125,11 +128,11 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   args.filter = output->filter;
 
   __FAILURE_HANDLE(
-    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8], (void*) &args, device->stream_main));
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8], (void*) &args, device->stream_output));
 
-  __FAILURE_HANDLE(device_download(dst_buffer, output->device_buffer, 0, width * height * sizeof(ARGB8), device->stream_main));
+  __FAILURE_HANDLE(device_download(dst_buffer, output->device_buffer, 0, width * height * sizeof(ARGB8), device->stream_output));
 
-  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_output, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_output, device->stream_output));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_output, CU_EVENT_WAIT_DEFAULT));
   CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, output->registered_callback_func, (void*) callback_data));
 
@@ -146,6 +149,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device output is set to a size of 0.");
   }
 
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
+
   KernelArgsGenerateFinalImage generate_final_image_args;
 
   generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_current_result);
@@ -154,6 +159,9 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], (void*) &generate_final_image_args, device->stream_main));
+
+  CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_ready, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_output, output->event_output_ready, CU_EVENT_WAIT_DEFAULT));
 
   DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
@@ -199,6 +207,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     output_request->queued = true;
   }
 
+  CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_finished, device->stream_output));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -221,6 +231,9 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
     __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id].buffer));
   }
+
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*output)->event_output_ready));
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*output)->event_output_finished));
 
   __FAILURE_HANDLE(array_destroy(&(*output)->output_requests));
 

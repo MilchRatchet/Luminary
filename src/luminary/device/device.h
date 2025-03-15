@@ -77,7 +77,8 @@ struct Device {
   OptixDeviceContext optix_ctx;
   OptixKernel* optix_kernels[OPTIX_KERNEL_TYPE_COUNT];
   CUstream stream_main;
-  CUstream stream_secondary;
+  CUstream stream_output;
+  CUstream stream_abort;
   CUstream stream_callbacks;
   CUevent event_queue_render;
   CUevent event_queue_output;

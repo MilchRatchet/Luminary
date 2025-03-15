@@ -19,6 +19,8 @@ struct DeviceOutputRequest {
 struct DeviceOutput {
   uint32_t width;
   uint32_t height;
+  CUevent event_output_ready;
+  CUevent event_output_finished;
   STAGING void* buffers[DEVICE_OUTPUT_BUFFER_COUNT];
   uint32_t buffer_index;
   DEVICE ARGB8* device_buffer;

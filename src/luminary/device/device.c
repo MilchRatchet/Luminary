@@ -657,7 +657,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   ////////////////////////////////////////////////////////////////////
 
   CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_main, CU_STREAM_NON_BLOCKING, 2));
-  CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_secondary, CU_STREAM_NON_BLOCKING, 0));
+  CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_output, CU_STREAM_NON_BLOCKING, 3));
+  CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_abort, CU_STREAM_NON_BLOCKING, 0));
   CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_callbacks, CU_STREAM_NON_BLOCKING, 1));
 
   ////////////////////////////////////////////////////////////////////
@@ -1464,11 +1465,11 @@ LuminaryResult device_set_abort(Device* device) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   *device->abort_flags = 0xFFFFFFFF;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_secondary));
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_abort));
 
   // We have to wait for the upload to finish, otherwise it is in theory possible that the unset abort upload happens before the set abort
   // upload.
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_secondary));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_abort));
 
   device->state_abort = true;
 
@@ -1614,7 +1615,8 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));
 
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_main));
-  CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_secondary));
+  CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_output));
+  CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_abort));
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_callbacks));
 
   CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_render));
