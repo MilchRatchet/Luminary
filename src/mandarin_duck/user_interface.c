@@ -214,7 +214,8 @@ void user_interface_render(UserInterface* ui, Display* display, WindowVisibility
     window_render(window, display);
   }
 
-  ui_renderer_render_display_corners(display->ui_renderer, display);
+  // TODO: Turn into option
+  // ui_renderer_render_display_corners(display->ui_renderer, display);
 }
 
 void user_interface_destroy(UserInterface** ui) {

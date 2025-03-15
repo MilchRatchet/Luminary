@@ -5,6 +5,8 @@
 #include <string.h>
 #include <time.h>
 
+#define DISPLAY_MIN_FRAME_TIME_NS 16666666  // Nanoseconds frametime at 60 FPS
+
 static uint32_t __num_displays = 0;
 
 static void _display_handle_resize(Display* display) {
@@ -107,7 +109,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, rect.w);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, rect.h);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
-  SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, true);
+  SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, false);
 
   display->sdl_window = SDL_CreateWindowWithProperties(sdl_properties);
 
@@ -575,6 +577,14 @@ void display_render(Display* display, LuminaryHost* host) {
 
 void display_update(Display* display) {
   MD_CHECK_NULL_ARGUMENT(display);
+
+  uint64_t ticks_current;
+
+  do {
+    ticks_current = SDL_GetTicksNS();
+  } while (ticks_current - display->ticks_last_frame < DISPLAY_MIN_FRAME_TIME_NS && ticks_current > display->ticks_last_frame);
+
+  display->ticks_last_frame = ticks_current;
 
   SDL_SetCursor(display->sdl_cursors[display->selected_cursor]);
 

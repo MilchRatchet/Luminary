@@ -31,6 +31,7 @@ struct DisplayFileDrop {
 } typedef DisplayFileDrop;
 
 struct Display {
+  uint64_t ticks_last_frame;
   SDL_Window* sdl_window;
   SDL_Surface* sdl_surface;
   uint32_t width;
