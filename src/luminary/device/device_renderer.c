@@ -443,49 +443,54 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t event_id) {
+LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id) {
   __CHECK_NULL_ARGUMENT(renderer);
 
-  if (event_id >= renderer->event_id) {
+  if (target_event_id >= renderer->event_id) {
     __RETURN_ERROR(
-      LUMINARY_ERROR_API_EXCEPTION, "Renderer tried to update time for event %u when the next event is %u", event_id, renderer->event_id);
+      LUMINARY_ERROR_API_EXCEPTION, "Renderer tried to update time for event %u when the next event is %u", target_event_id,
+      renderer->event_id);
   }
 
-  event_id = event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
+  while (target_event_id >= renderer->timing_event_id) {
+    uint32_t event_id = renderer->timing_event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
 
-  float event_time;
-  CUDA_FAILURE_HANDLE(cuEventElapsedTime(&event_time, renderer->time_start[event_id], renderer->time_end[event_id]));
+    float event_time;
+    CUDA_FAILURE_HANDLE(cuEventElapsedTime(&event_time, renderer->time_start[event_id], renderer->time_end[event_id]));
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
 
-  const uint32_t num_kernel_launches = renderer->kernel_times[event_id].num_kernel_launches;
+    const uint32_t num_kernel_launches = renderer->kernel_times[event_id].num_kernel_launches;
 
-  info_message("[EventIdx: %05u] ------- Kernel Times -------", event_id);
+    info_message("[EventIdx: %05u] ------- Kernel Times -------", event_id);
 
-  float total_kernel_time = 0.0f;
+    float total_kernel_time = 0.0f;
 
-  for (uint32_t launch_id = 0; launch_id < num_kernel_launches; launch_id++) {
-    float kernel_time;
-    CUDA_FAILURE_HANDLE(cuEventElapsedTime(
-      &kernel_time, renderer->kernel_times[event_id].kernels[launch_id].time_start,
-      renderer->kernel_times[event_id].kernels[launch_id].time_end));
+    for (uint32_t launch_id = 0; launch_id < num_kernel_launches; launch_id++) {
+      float kernel_time;
+      CUDA_FAILURE_HANDLE(cuEventElapsedTime(
+        &kernel_time, renderer->kernel_times[event_id].kernels[launch_id].time_start,
+        renderer->kernel_times[event_id].kernels[launch_id].time_end));
 
-    info_message(
-      "[LaunchIdx: %03u] %32s | %07.2fms (%05.2f%%)", launch_id, renderer->kernel_times[event_id].kernels[launch_id].name, kernel_time,
-      100.0f * kernel_time / event_time);
+      info_message(
+        "[LaunchIdx: %03u] %32s | %07.2fms (%05.2f%%)", launch_id, renderer->kernel_times[event_id].kernels[launch_id].name, kernel_time,
+        100.0f * kernel_time / event_time);
 
-    total_kernel_time += kernel_time;
-  }
+      total_kernel_time += kernel_time;
+    }
 
-  info_message("Total Time spent in Kernels: %07.2fms (%05.2f%%)", total_kernel_time, 100.0f * total_kernel_time / event_time);
+    info_message("Total Time spent in Kernels: %07.2fms (%05.2f%%)", total_kernel_time, 100.0f * total_kernel_time / event_time);
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
-  // Convert from milliseconds to seconds.
-  event_time *= 0.001f;
+    // Convert from milliseconds to seconds.
+    event_time *= 0.001f;
 
-  renderer->total_render_time[event_id] = renderer->total_render_time[(event_id - 1) & DEVICE_RENDERER_TIMING_EVENTS_MASK] + event_time;
+    renderer->total_render_time[event_id] = renderer->total_render_time[(event_id - 1) & DEVICE_RENDERER_TIMING_EVENTS_MASK] + event_time;
 
-  renderer->last_time = event_time;
+    renderer->last_time = event_time;
+
+    renderer->timing_event_id++;
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -497,6 +502,8 @@ LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_
     __RETURN_ERROR(
       LUMINARY_ERROR_API_EXCEPTION, "Renderer tried to update time for event %u when the next event is %u", event_id, renderer->event_id);
   }
+
+  __FAILURE_HANDLE(device_renderer_update_render_time(renderer, event_id));
 
   if (event_id + DEVICE_RENDERER_TIMING_EVENTS_MASK < renderer->event_id) {
     warn_message("Returned render time is stale.");

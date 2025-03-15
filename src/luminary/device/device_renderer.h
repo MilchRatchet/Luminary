@@ -62,6 +62,7 @@ struct DeviceRenderer {
   uint64_t render_id;
   DeviceRenderCallbackData callback_data[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   uint32_t event_id;
+  uint32_t timing_event_id;
   CUevent time_start[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   CUevent time_end[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float total_render_time[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
@@ -91,7 +92,7 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(
   DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t event_id);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 

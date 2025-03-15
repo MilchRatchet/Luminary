@@ -184,6 +184,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     data = output->callback_data + output->callback_index;
 
+    data->render_event_id                      = render_event_id;
     data->descriptor.is_recurring_output       = false;
     data->descriptor.meta_data.width           = output_request->props.width;
     data->descriptor.meta_data.height          = output_request->props.height;
