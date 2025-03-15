@@ -29,18 +29,19 @@
 #define BSDF_ROUGHNESS_CLAMP (0.025f)
 
 enum HitType : uint32_t {
-  HIT_TYPE_INVALID           = 0xFFFFFFFFu,  // TODO: Shift all values so that invalid is all bits set
-  HIT_TYPE_SKY               = 0xffffffffu,
-  HIT_TYPE_OCEAN             = 0xfffffffeu,
-  HIT_TYPE_PARTICLE          = 0xfffffffdu,
-  HIT_TYPE_VOLUME_OCEAN      = 0xfffffff3u,
-  HIT_TYPE_VOLUME_FOG        = 0xfffffff2u,
-  HIT_TYPE_REJECT            = 0xfffffff0u,
-  HIT_TYPE_LIGHT_BSDF_HINT   = 0xffffffefu,
-  HIT_TYPE_PARTICLE_MAX      = 0xefffffffu,
+  HIT_TYPE_INVALID           = 0xFFFFFFFFu,
+  HIT_TYPE_SKY               = 0xFFFFFFFEu,
+  HIT_TYPE_OCEAN             = 0xFFFFFFFDu,
+  HIT_TYPE_PARTICLE          = 0xFFFFFFFCu,
+  HIT_TYPE_LIGHT_BSDF_HINT   = 0xFFFFFFFBu,
+  HIT_TYPE_VOLUME_OCEAN      = 0xFFFFFFF3u,
+  HIT_TYPE_VOLUME_FOG        = 0xFFFFFFF2u,
+  HIT_TYPE_REJECT            = 0xFFFFFFF0u,
+  HIT_TYPE_PARTICLE_MAX      = 0xeFFFFFFFu,
   HIT_TYPE_PARTICLE_MIN      = 0x80000000u,
-  HIT_TYPE_PARTICLE_MASK     = 0x7fffffffu,
-  HIT_TYPE_TRIANGLE_ID_LIMIT = 0x7fffffffu
+  HIT_TYPE_PARTICLE_MASK     = 0x7FFFFFFFu,
+  HIT_TYPE_TRIANGLE_ID_LIMIT = 0x7FFFFFFFu
+
 } typedef HitType;
 
 enum ShadingTaskIndex {
@@ -51,7 +52,6 @@ enum ShadingTaskIndex {
   SHADING_TASK_INDEX_SKY,
   SHADING_TASK_INDEX_INVALID,
   SHADING_TASK_INDEX_TOTAL_WITH_INVALID
-
 } typedef ShadingTaskIndex;
 
 #define TASK_ADDRESS_OFFSET_IMPL(__internal_macro_shading_task_index) (NUM_THREADS * __internal_macro_shading_task_index + THREAD_ID)
