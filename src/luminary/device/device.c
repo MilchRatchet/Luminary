@@ -437,12 +437,12 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_update_undersampling(Device* device) {
+static LuminaryResult _device_update_get_next_undersampling_state(Device* device, uint32_t* new_undersampling_state) {
   __CHECK_NULL_ARGUMENT(device);
 
-  if (device->undersampling_state) {
-    uint32_t undersampling_state = device->undersampling_state;
+  uint32_t undersampling_state = device->undersampling_state;
 
+  if (undersampling_state) {
     // Remove first sample flag
     undersampling_state &= ~UNDERSAMPLING_FIRST_SAMPLE_MASK;
 
@@ -460,15 +460,9 @@ static LuminaryResult _device_update_undersampling(Device* device) {
         undersampling_state = (undersampling_state & ~UNDERSAMPLING_ITERATION_MASK) | (iteration & UNDERSAMPLING_ITERATION_MASK);
       }
     }
-
-    // If undersampling state is now 0, we thus have now exactly one sample per pixel, we must increment sample id, else
-    // we would recompute this sample now.
-    if (undersampling_state == 0) {
-      device->sample_count.current_sample_count++;
-    }
-
-    device->undersampling_state = undersampling_state;
   }
+
+  *new_undersampling_state = undersampling_state;
 
   return LUMINARY_SUCCESS;
 }
@@ -1350,6 +1344,14 @@ LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackF
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_set_output_dirty(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(device_output_set_output_dirty(device->output));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -1419,25 +1421,29 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(_device_update_undersampling(device));
-  __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
+  uint32_t new_undersampling_state;
+  __FAILURE_HANDLE(_device_update_get_next_undersampling_state(device, &new_undersampling_state));
 
-  bool generate_output = false;
-
-  // The first sample output is always queued directly, don't queue again.
-  generate_output |= (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0;
-
-  if (generate_output) {
-    __FAILURE_HANDLE(device_post_apply(device->post, device));
-    __FAILURE_HANDLE(device_output_generate_output(device->output, device, callback_data->render_event_id));
+  // If undersampling state is now 0, we thus have now exactly one sample per pixel, we must increment sample id, else
+  // we would recompute this sample now.
+  if (new_undersampling_state == 0 && device->undersampling_state != 0) {
+    device->sample_count.current_sample_count++;
   }
 
-  // Output if last sample in slice or if first slice (I will probably have to update the slice beforehand so this will be first sample in
-  // slice etc)
-  // Queue Post (including async download) (This queueing must have a lock in case the current target output was not yet propagated)
-  // Queue next sample
-  // Host wait on Post done
-  // Signal Device Manager to propagate output to host output handler
+  __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
+
+  // The first sample output is always queued directly, don't queue again.
+  if ((device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0) {
+    bool does_output;
+    __FAILURE_HANDLE(device_output_will_output(device->output, device, &does_output));
+
+    if (does_output) {
+      __FAILURE_HANDLE(device_post_apply(device->post, device));
+      __FAILURE_HANDLE(device_output_generate_output(device->output, device, callback_data->render_event_id));
+    }
+  }
+
+  device->undersampling_state = new_undersampling_state;
 
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
 

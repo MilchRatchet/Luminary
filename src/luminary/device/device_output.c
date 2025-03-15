@@ -25,6 +25,14 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_output_set_output_dirty(DeviceOutput* output) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  output->output_is_dirty = true;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_output_allocate_device_buffer(DeviceOutput* output, uint32_t width, uint32_t height) {
   __CHECK_NULL_ARGUMENT(output);
 
@@ -141,6 +149,63 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   return LUMINARY_SUCCESS;
 }
 
+static bool _device_output_recurring_needs_queueing(const uint32_t current_sample_count) {
+  const uint32_t base_threshold = 4;
+
+  if (current_sample_count < (1 << base_threshold))
+    return true;
+
+#if defined(__x86_64__) || defined(_M_X64)
+  uint32_t sample_count_log2;
+  __asm__ volatile("\tbsr %1, %0\n" : "=r"(sample_count_log2) : "r"(current_sample_count));
+
+  sample_count_log2 = sample_count_log2 - base_threshold;
+
+  if ((current_sample_count & ((1 << sample_count_log2) - 1)) == 0)
+    return true;
+
+  return false;
+#else
+  // No log2 on non x86 atm.
+  return true;
+#endif
+}
+
+static bool _device_output_request_needs_queueing(DeviceOutputRequest* request, const uint32_t current_sample_count) {
+  if (request->queued)
+    return false;
+
+  if ((request->props.sample_count > 0) && request->props.sample_count != current_sample_count)
+    return false;
+
+  return true;
+}
+
+LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, bool* does_output) {
+  __CHECK_NULL_ARGUMENT(output);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(does_output);
+
+  const uint32_t current_sample_count = device->sample_count.current_sample_count;
+
+  bool generate_output = output->output_is_dirty;
+
+  generate_output |= _device_output_recurring_needs_queueing(current_sample_count);
+
+  uint32_t num_output_requests;
+  __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
+
+  for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
+    DeviceOutputRequest* output_request = output->output_requests + output_request_id;
+
+    generate_output |= _device_output_request_needs_queueing(output_request, current_sample_count);
+  }
+
+  *does_output = generate_output;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
@@ -150,6 +215,17 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   }
 
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
+
+  // TODO: There is a bug where the undersampling breaks if we update the constant memory here, so we can only do it afterwards.
+  // This is only important if sample times are high which is not the case during undersampling so this is not very important.
+  if (output->output_is_dirty && device->undersampling_state == 0) {
+    // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
+    __FAILURE_HANDLE(device_sync_constant_memory(device));
+  }
+
+  output->output_is_dirty = false;
+
+  const uint32_t current_sample_count = device->sample_count.current_sample_count;
 
   KernelArgsGenerateFinalImage generate_final_image_args;
 
@@ -169,7 +245,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   data->descriptor.is_recurring_output       = true;
   data->descriptor.meta_data.width           = output->width;
   data->descriptor.meta_data.height          = output->height;
-  data->descriptor.meta_data.sample_count    = device->sample_count.current_sample_count;
+  data->descriptor.meta_data.sample_count    = current_sample_count;
   data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
   data->descriptor.data                      = output->buffers[output->buffer_index];
 
@@ -184,10 +260,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
     DeviceOutputRequest* output_request = output->output_requests + output_request_id;
 
-    if (output_request->queued)
-      continue;
-
-    if ((output_request->props.sample_count > 0) && output_request->props.sample_count != device->sample_count.current_sample_count)
+    if (_device_output_request_needs_queueing(output_request, current_sample_count) == false)
       continue;
 
     data = output->callback_data + output->callback_index;
@@ -196,7 +269,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     data->descriptor.is_recurring_output       = false;
     data->descriptor.meta_data.width           = output_request->props.width;
     data->descriptor.meta_data.height          = output_request->props.height;
-    data->descriptor.meta_data.sample_count    = device->sample_count.current_sample_count;
+    data->descriptor.meta_data.sample_count    = current_sample_count;
     data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
     data->descriptor.data                      = output_request->buffer;
 
