@@ -52,11 +52,14 @@ static LuminaryResult _lum_compiler_message_init(LumCompilerMessage* message, co
   return LUMINARY_SUCCESS;
 }
 
+#define LUM_VARIABLE_ID_INVALID 0xFFFFFFFF
+
 struct LumVariable {
   size_t offset;
   uint32_t current_register_map;
   LumBuiltinType type;
   bool is_named;
+  bool is_data_section;
   char* name;
 } typedef LumVariable;
 
@@ -140,6 +143,7 @@ struct LumCompilerState {
   LumCompilerContext context_stack[LUM_COMPILER_CONTEXT_STACK_SIZE];
   size_t used_stack_size;
   LumCompilerDataSection data;
+  uint32_t register_variable_map[LUM_REGISTER_COUNT];
 } typedef LumCompilerState;
 
 static LuminaryResult _lum_compiler_state_create(LumCompilerState** state) {
@@ -155,6 +159,8 @@ static LuminaryResult _lum_compiler_state_create(LumCompilerState** state) {
 
   (*state)->data.total_bytes = 0;
   __FAILURE_HANDLE(array_create(&(*state)->data.entries, sizeof(LumCompilerDataEntry), 16));
+
+  memset((*state)->register_variable_map, 0xFF, sizeof(uint32_t) * LUM_REGISTER_COUNT);
 
   return LUMINARY_SUCCESS;
 }
@@ -193,7 +199,7 @@ static LuminaryResult _lum_compiler_emit_return(LumBinary* binary) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_compiler_emit_call(LumBinary* binary) {
+static LuminaryResult _lum_compiler_emit_call(LumBinary* binary, uint8_t dst_reg, uint8_t src_regs[4]) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
@@ -244,6 +250,37 @@ static LuminaryResult _lum_compiler_null_binary(LumBinary* binary) {
 // Variables
 ////////////////////////////////////////////////////////////////////
 
+static LuminaryResult _lum_compiler_map_variable_to_register(LumCompilerState* state, uint32_t variable_id) {
+  __CHECK_NULL_ARGUMENT(state);
+
+  LumVariable* variable = state->variables + variable_id;
+
+  if (variable->current_register_map != LUM_VARIABLE_REGISTER_NOT_ASSIGNED)
+    return LUMINARY_SUCCESS;
+
+  uint32_t reg = LUM_VARIABLE_REGISTER_NOT_ASSIGNED;
+
+  // TODO: Handle the case where all registers are already assigned
+  for (uint32_t register_id = 0; register_id < LUM_REGISTER_COUNT; register_id++) {
+    const uint32_t current_variable = state->register_variable_map[register_id];
+
+    if (current_variable == LUM_VARIABLE_ID_INVALID) {
+      reg = register_id;
+      break;
+    }
+  }
+
+  if (reg == LUM_VARIABLE_REGISTER_NOT_ASSIGNED) {
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "All registers are already mapped, remapping is not implemented.");
+  }
+
+  __FAILURE_HANDLE(_lum_compiler_emit_regmap(state->binary, reg, variable->is_data_section, variable->offset));
+
+  state->register_variable_map[reg] = variable_id;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_compiler_allocate_variable(LumCompilerState* state, LumBuiltinType type, const char* name, uint32_t* id) {
   __CHECK_NULL_ARGUMENT(state);
 
@@ -251,6 +288,7 @@ static LuminaryResult _lum_compiler_allocate_variable(LumCompilerState* state, L
   new_variable.offset               = state->used_stack_size;
   new_variable.current_register_map = LUM_VARIABLE_REGISTER_NOT_ASSIGNED;
   new_variable.type                 = type;
+  new_variable.is_data_section      = false;
 
   new_variable.is_named = (name != (const char*) 0);
 
@@ -284,27 +322,55 @@ static LuminaryResult _lum_compiler_allocate_literal(LumCompilerState* state, co
 
   LumBuiltinType type = LUM_BUILTIN_TYPE_UINT32;
   const void* data;
+  float double_to_float;
 
   switch (token->literal.type) {
     case LUM_LITERAL_TYPE_FLOAT:
       type = LUM_BUILTIN_TYPE_FLOAT;
       data = (const void*) &token->literal.val_float;
       break;
+    case LUM_LITERAL_TYPE_DOUBLE:
+      type            = LUM_BUILTIN_TYPE_FLOAT;
+      double_to_float = token->literal.val_double;
+      data            = (const void*) &double_to_float;
+      break;
+    case LUM_LITERAL_TYPE_UINT:
+      type = LUM_BUILTIN_TYPE_UINT32;
+      data = (const void*) &token->literal.val_uint;
+      break;
+    case LUM_LITERAL_TYPE_BOOL:
+      type = LUM_BUILTIN_TYPE_BOOL;
+      data = (const void*) &token->literal.val_bool;
+      break;
+    case LUM_LITERAL_TYPE_ENUM:
+      type = LUM_BUILTIN_TYPE_ENUM;
+      data = (const void*) &token->literal.val_enum;
+      break;
     case LUM_LITERAL_TYPE_STRING:
       type = LUM_BUILTIN_TYPE_STRING;
       data = (const void*) token->literal.val_string;
       break;
     default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid literal type");
       break;
   }
 
   uint32_t data_section_offset;
   __FAILURE_HANDLE(_lum_compiler_data_section_add(&state->data, lum_builtin_types_sizes[type], data, &data_section_offset));
 
-  __FAILURE_HANDLE(_lum_compiler_allocate_variable(state, type, (const char*) 0, id));
+  LumVariable new_variable;
+  new_variable.offset               = data_section_offset;
+  new_variable.current_register_map = LUM_VARIABLE_REGISTER_NOT_ASSIGNED;
+  new_variable.type                 = type;
+  new_variable.is_named             = false;
+  new_variable.name                 = (char*) 0;
+  new_variable.is_data_section      = true;
 
-  // TODO: Compute register to use for this variable
-  __FAILURE_HANDLE(_lum_compiler_emit_regmap(state->binary, 0, true, data_section_offset));
+  if (id != (uint32_t*) 0) {
+    __FAILURE_HANDLE(array_get_num_elements(state->variables, id));
+  }
+
+  __FAILURE_HANDLE(array_push(&state->variables, &new_variable));
 
   return LUMINARY_SUCCESS;
 }
@@ -366,7 +432,32 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
         return LUMINARY_SUCCESS;
       }
 
-      __FAILURE_HANDLE(_lum_compiler_emit_call(state->binary));
+      for (uint32_t argument_id = 0; argument_id < context->function.expected_arguments; argument_id++) {
+        const uint32_t variable_id = context->function.argument_variable_ids[argument_id];
+
+        __FAILURE_HANDLE(_lum_compiler_map_variable_to_register(state, variable_id));
+      }
+
+      uint8_t dst_reg = 0;
+
+      // TODO: Get the output type of this function and allocate a variable for it
+      //_lum_compiler_allocate_variable
+
+      uint8_t src_regs[4];
+
+      for (uint32_t argument_id = 0; argument_id < 4; argument_id++) {
+        uint8_t reg = 0;
+
+        if (argument_id < context->function.expected_arguments) {
+          const uint32_t variable_id = context->function.argument_variable_ids[argument_id];
+
+          reg = (uint8_t) state->variables[variable_id].current_register_map;
+        }
+
+        src_regs[argument_id] = reg;
+      }
+
+      __FAILURE_HANDLE(_lum_compiler_emit_call(state->binary, dst_reg, src_regs));
 
       // TODO:
       // state->returned_variable_id = instruction.dst_operand;

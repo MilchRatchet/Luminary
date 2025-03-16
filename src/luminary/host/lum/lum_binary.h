@@ -12,6 +12,8 @@ enum LumBinaryEntryPoint {
 
 #define LUM_BINARY_ENTRY_POINT_INVALID 0xFFFFFFFF
 
+#define LUM_REGISTER_COUNT 256
+
 struct LumBinary {
   size_t stack_frame_size;
   uint32_t entry_points[LUM_BINARY_ENTRY_POINT_COUNT];
