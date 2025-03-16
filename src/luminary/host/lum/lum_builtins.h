@@ -5,6 +5,7 @@
 
 enum LumBuiltinType {
   // Version 1
+  LUM_BUILTIN_TYPE_VOID,
   LUM_BUILTIN_TYPE_RGBF,
   LUM_BUILTIN_TYPE_VEC3,
   LUM_BUILTIN_TYPE_UINT16,
@@ -30,6 +31,7 @@ enum LumBuiltinType {
 
 extern const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT];
 extern const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT];
+extern const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT];
 
 #define LUM_BUILTIN_ENUM_COUNT                                                                            \
   (LUMINARY_SHADING_MODE_COUNT + LUMINARY_FILTER_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_APERTURE_COUNT \
@@ -41,7 +43,5 @@ struct LumBuiltinEnumValuePair {
 } typedef LumBuiltinEnumValuePair;
 
 extern const LumBuiltinEnumValuePair lum_builtin_enums[LUM_BUILTIN_ENUM_COUNT];
-
-enum LumDataType { LUM_DATA_TYPE_NULL, LUM_DATA_TYPE_VOID, LUM_DATA_TYPE_FLOAT, LUM_DATA_TYPE_UINT32 } typedef LumDataType;
 
 #endif /* LUMINARY_LUM_BUILTINS_H */

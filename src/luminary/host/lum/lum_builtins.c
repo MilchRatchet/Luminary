@@ -3,17 +3,16 @@
 #include "lum_tokenizer.h"
 
 const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
-  [LUM_BUILTIN_TYPE_RGBF] = "RGBF",         [LUM_BUILTIN_TYPE_VEC3] = "vec3",
-  [LUM_BUILTIN_TYPE_UINT16] = "uint16_t",   [LUM_BUILTIN_TYPE_UINT32] = "uint32_t",
-  [LUM_BUILTIN_TYPE_BOOL] = "bool",         [LUM_BUILTIN_TYPE_FLOAT] = "float",
-  [LUM_BUILTIN_TYPE_ENUM] = "Enum",         [LUM_BUILTIN_TYPE_SETTINGS] = "Settings",
-  [LUM_BUILTIN_TYPE_CAMERA] = "Camera",     [LUM_BUILTIN_TYPE_OCEAN] = "Ocean",
-  [LUM_BUILTIN_TYPE_SKY] = "Sky",           [LUM_BUILTIN_TYPE_CLOUD] = "Cloud",
-  [LUM_BUILTIN_TYPE_FOG] = "Fog",           [LUM_BUILTIN_TYPE_PARTICLES] = "Particles",
-  [LUM_BUILTIN_TYPE_MATERIAL] = "Material", [LUM_BUILTIN_TYPE_INSTANCE] = "Instance",
-  [LUM_BUILTIN_TYPE_METADATA] = "MetaData", [LUM_BUILTIN_TYPE_STRING] = "String"};
+  [LUM_BUILTIN_TYPE_VOID] = "void",         [LUM_BUILTIN_TYPE_RGBF] = "RGBF",         [LUM_BUILTIN_TYPE_VEC3] = "vec3",
+  [LUM_BUILTIN_TYPE_UINT16] = "uint16_t",   [LUM_BUILTIN_TYPE_UINT32] = "uint32_t",   [LUM_BUILTIN_TYPE_BOOL] = "bool",
+  [LUM_BUILTIN_TYPE_FLOAT] = "float",       [LUM_BUILTIN_TYPE_ENUM] = "Enum",         [LUM_BUILTIN_TYPE_SETTINGS] = "Settings",
+  [LUM_BUILTIN_TYPE_CAMERA] = "Camera",     [LUM_BUILTIN_TYPE_OCEAN] = "Ocean",       [LUM_BUILTIN_TYPE_SKY] = "Sky",
+  [LUM_BUILTIN_TYPE_CLOUD] = "Cloud",       [LUM_BUILTIN_TYPE_FOG] = "Fog",           [LUM_BUILTIN_TYPE_PARTICLES] = "Particles",
+  [LUM_BUILTIN_TYPE_MATERIAL] = "Material", [LUM_BUILTIN_TYPE_INSTANCE] = "Instance", [LUM_BUILTIN_TYPE_METADATA] = "MetaData",
+  [LUM_BUILTIN_TYPE_STRING] = "String"};
 
 const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
+  [LUM_BUILTIN_TYPE_VOID]      = 0,
   [LUM_BUILTIN_TYPE_RGBF]      = sizeof(LuminaryRGBF),
   [LUM_BUILTIN_TYPE_VEC3]      = sizeof(LuminaryVec3),
   [LUM_BUILTIN_TYPE_UINT16]    = sizeof(uint16_t),
@@ -32,6 +31,15 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_INSTANCE]  = sizeof(LuminaryInstance),
   [LUM_BUILTIN_TYPE_METADATA]  = 0,  // Static
   [LUM_BUILTIN_TYPE_STRING]    = LUM_LITERAL_STRING_MAX_LENGTH};
+
+const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
+  [LUM_BUILTIN_TYPE_VOID] = "",        [LUM_BUILTIN_TYPE_RGBF] = "f32x3",   [LUM_BUILTIN_TYPE_VEC3] = "f32x3",
+  [LUM_BUILTIN_TYPE_UINT16] = "u16",   [LUM_BUILTIN_TYPE_UINT32] = "u32",   [LUM_BUILTIN_TYPE_BOOL] = "bool",
+  [LUM_BUILTIN_TYPE_FLOAT] = "f32",    [LUM_BUILTIN_TYPE_ENUM] = "u32",     [LUM_BUILTIN_TYPE_SETTINGS] = "set",
+  [LUM_BUILTIN_TYPE_CAMERA] = "cam",   [LUM_BUILTIN_TYPE_OCEAN] = "oce",    [LUM_BUILTIN_TYPE_SKY] = "sky",
+  [LUM_BUILTIN_TYPE_CLOUD] = "clo",    [LUM_BUILTIN_TYPE_FOG] = "fog",      [LUM_BUILTIN_TYPE_PARTICLES] = "par",
+  [LUM_BUILTIN_TYPE_MATERIAL] = "mat", [LUM_BUILTIN_TYPE_INSTANCE] = "ins", [LUM_BUILTIN_TYPE_METADATA] = "",
+  [LUM_BUILTIN_TYPE_STRING] = "str"};
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum) {.string = #__internal_macro_enum, .value = __internal_macro_enum}
 

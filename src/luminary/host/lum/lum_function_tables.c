@@ -3,63 +3,113 @@
 #include "lum_function_implementations.h"
 
 static const LumFunctionEntry lum_function_tables_settings[] = {
-  {.name      = "init",
-   .func      = &lum_function_settings_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_settings_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_SETTINGS,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_camera[] = {
-  {.name      = "init",
-   .func      = &lum_function_camera_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_camera_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_CAMERA,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_ocean[] = {
-  {.name      = "init",
-   .func      = &lum_function_ocean_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_ocean_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_OCEAN,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_sky[] = {
-  {.name      = "init",
-   .func      = &lum_function_sky_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_sky_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_SKY,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_cloud[] = {
-  {.name      = "init",
-   .func      = &lum_function_cloud_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_cloud_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_CLOUD,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_fog[] = {
-  {.name      = "init",
-   .func      = &lum_function_fog_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_fog_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_FOG,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_particles[] = {
-  {.name      = "init",
-   .func      = &lum_function_particles_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_particles_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_PARTICLES,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_material[] = {
-  {.name      = "init",
-   .func      = &lum_function_material_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_material_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_MATERIAL,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_instance[] = {
-  {.name      = "init",
-   .func      = &lum_function_instance_init,
-   .signature = {.dst = LUM_DATA_TYPE_VOID, .src_a = LUM_DATA_TYPE_NULL, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "init",
+   .func = &lum_function_instance_init,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_INSTANCE,
+      .src_0 = LUM_BUILTIN_TYPE_VOID,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 static const LumFunctionEntry lum_function_tables_metadata[] = {
-  {.name      = "setMinorVersion",
-   .func      = &lum_function_metadata_setminorversion,
-   .signature = {.dst = LUM_DATA_TYPE_NULL, .src_a = LUM_DATA_TYPE_UINT32, .src_b = LUM_DATA_TYPE_NULL, .src_c = LUM_DATA_TYPE_NULL},
+  {.name = "setMinorVersion",
+   .func = &lum_function_metadata_setminorversion,
+   .signature =
+     {.dst   = LUM_BUILTIN_TYPE_VOID,
+      .src_0 = LUM_BUILTIN_TYPE_UINT32,
+      .src_1 = LUM_BUILTIN_TYPE_VOID,
+      .src_2 = LUM_BUILTIN_TYPE_VOID,
+      .src_3 = LUM_BUILTIN_TYPE_VOID},
    .is_static = true}};
 
 const LumFunctionEntry* lum_function_tables[LUM_BUILTIN_TYPE_COUNT] = {

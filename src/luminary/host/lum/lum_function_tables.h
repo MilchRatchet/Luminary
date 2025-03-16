@@ -9,10 +9,11 @@ struct LumFunctionOperand {
 } typedef LumFunctionOperand;
 
 struct LumFunctionSignature {
-  LumDataType dst;
-  LumDataType src_a;
-  LumDataType src_b;
-  LumDataType src_c;
+  LumBuiltinType dst;
+  LumBuiltinType src_0;
+  LumBuiltinType src_1;
+  LumBuiltinType src_2;
+  LumBuiltinType src_3;
 } typedef LumFunctionSignature;
 
 // TODO:

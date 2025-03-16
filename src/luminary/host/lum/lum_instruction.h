@@ -1,6 +1,7 @@
 #ifndef LUMINARY_LUM_INSTRUCTION_H
 #define LUMINARY_LUM_INSTRUCTION_H
 
+#include "lum_builtins.h"
 #include "utils.h"
 
 enum LumInstructionType {
@@ -22,8 +23,9 @@ LuminaryResult lum_instruction_get_args(const LumInstruction* instruction, char*
 
 LuminaryResult lum_instruction_encode_nop(LumInstruction* instruction);
 LuminaryResult lum_instruction_encode_regmap(LumInstruction* instruction, uint8_t reg, bool is_data_section, uint32_t offset);
-LuminaryResult lum_instruction_encode_mov(LumInstruction* instruction);
-LuminaryResult lum_instruction_encode_call(LumInstruction* instruction);
+LuminaryResult lum_instruction_encode_mov(LumInstruction* instruction, LumBuiltinType type, uint8_t dst_reg, uint8_t src_reg);
+LuminaryResult lum_instruction_encode_call(
+  LumInstruction* instruction, LumBuiltinType type, uint8_t func_id, uint8_t dst_reg, uint8_t src_regs[4]);
 LuminaryResult lum_instruction_encode_ret(LumInstruction* instruction);
 LuminaryResult lum_instruction_encode_cvt(LumInstruction* instruction);
 

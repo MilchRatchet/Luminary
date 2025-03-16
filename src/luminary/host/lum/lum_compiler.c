@@ -86,11 +86,18 @@ struct LumDeclarationContext {
   const char* name;
 } typedef LumDeclarationContext;
 
+struct LumOperatorContext {
+  LumBuiltinType type;
+  uint32_t dst_variable;
+  uint32_t src_variable;
+} typedef LumOperatorContext;
+
 struct LumCompilerContext {
   LumCompilerContextType type;
   union {
     LumFunctionContext function;
     LumDeclarationContext declaration;
+    LumOperatorContext operator;
   };
 } typedef LumCompilerContext;
 
@@ -199,22 +206,23 @@ static LuminaryResult _lum_compiler_emit_return(LumBinary* binary) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_compiler_emit_call(LumBinary* binary, uint8_t dst_reg, uint8_t src_regs[4]) {
+static LuminaryResult _lum_compiler_emit_call(
+  LumBinary* binary, LumBuiltinType type, uint32_t func_id, uint8_t dst_reg, uint8_t src_regs[4]) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
-  __FAILURE_HANDLE(lum_instruction_encode_call(&instruction));
+  __FAILURE_HANDLE(lum_instruction_encode_call(&instruction, type, func_id, dst_reg, src_regs));
 
   __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_compiler_emit_move(LumBinary* binary) {
+static LuminaryResult _lum_compiler_emit_move(LumBinary* binary, LumBuiltinType type, uint8_t dst_reg, uint8_t src_reg) {
   __CHECK_NULL_ARGUMENT(binary);
 
   LumInstruction instruction;
-  __FAILURE_HANDLE(lum_instruction_encode_mov(&instruction));
+  __FAILURE_HANDLE(lum_instruction_encode_mov(&instruction, type, dst_reg, src_reg));
 
   __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
 
@@ -275,6 +283,8 @@ static LuminaryResult _lum_compiler_map_variable_to_register(LumCompilerState* s
   }
 
   __FAILURE_HANDLE(_lum_compiler_emit_regmap(state->binary, reg, variable->is_data_section, variable->offset));
+
+  variable->current_register_map = reg;
 
   state->register_variable_map[reg] = variable_id;
 
@@ -432,16 +442,24 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
         return LUMINARY_SUCCESS;
       }
 
+      const LumFunctionEntry function = lum_function_tables[context->function.class][context->function.function_id];
+
+      uint8_t dst_reg       = 0;
+      uint32_t dst_variable = LUM_VARIABLE_ID_INVALID;
+
+      if (function.signature.dst != LUM_BUILTIN_TYPE_VOID) {
+        __FAILURE_HANDLE(_lum_compiler_allocate_variable(state, function.signature.dst, (char*) 0, &dst_variable));
+
+        __FAILURE_HANDLE(_lum_compiler_map_variable_to_register(state, dst_variable));
+
+        dst_reg = (uint8_t) state->variables[dst_variable].current_register_map;
+      }
+
       for (uint32_t argument_id = 0; argument_id < context->function.expected_arguments; argument_id++) {
         const uint32_t variable_id = context->function.argument_variable_ids[argument_id];
 
         __FAILURE_HANDLE(_lum_compiler_map_variable_to_register(state, variable_id));
       }
-
-      uint8_t dst_reg = 0;
-
-      // TODO: Get the output type of this function and allocate a variable for it
-      //_lum_compiler_allocate_variable
 
       uint8_t src_regs[4];
 
@@ -457,19 +475,27 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
         src_regs[argument_id] = reg;
       }
 
-      __FAILURE_HANDLE(_lum_compiler_emit_call(state->binary, dst_reg, src_regs));
+      __FAILURE_HANDLE(_lum_compiler_emit_call(state->binary, context->function.class, context->function.function_id, dst_reg, src_regs));
 
-      // TODO:
-      // state->returned_variable_id = instruction.dst_operand;
+      state->returned_variable_id = dst_variable;
     } break;
     case LUM_COMPILER_CONTEXT_TYPE_DECLARATION:
       __FAILURE_HANDLE(
         _lum_compiler_allocate_variable(state, context->declaration.type, context->declaration.name, &state->returned_variable_id));
       break;
     case LUM_COMPILER_CONTEXT_TYPE_OPERATOR: {
-      __FAILURE_HANDLE(_lum_compiler_emit_move(state->binary));
+      // TODO: If the types don't match, insert a conversion instruction.
+      context->operator.src_variable = state->returned_variable_id;
 
-      state->returned_variable_id = LUM_VARIABLE_NOT_FOUND;
+      __FAILURE_HANDLE(_lum_compiler_map_variable_to_register(state, context->operator.dst_variable));
+      const uint8_t dst_reg = (uint8_t) state->variables[context->operator.dst_variable].current_register_map;
+
+      __FAILURE_HANDLE(_lum_compiler_map_variable_to_register(state, context->operator.src_variable));
+     const uint8_t src_reg = (uint8_t) state->variables[context->operator.src_variable].current_register_map;
+
+     __FAILURE_HANDLE(_lum_compiler_emit_move(state->binary, context->operator.type, dst_reg, src_reg));
+
+     state->returned_variable_id = context->operator.dst_variable;
     } break;
     default:
       break;
@@ -615,9 +641,10 @@ static LuminaryResult _lum_compiler_handle_identifier_function_context(LumCompil
         }
 
         uint32_t expected_arguments = 0;
-        expected_arguments += (function->signature.src_a != LUM_DATA_TYPE_NULL) ? 1 : 0;
-        expected_arguments += (function->signature.src_b != LUM_DATA_TYPE_NULL) ? 1 : 0;
-        expected_arguments += (function->signature.src_c != LUM_DATA_TYPE_NULL) ? 1 : 0;
+        expected_arguments += (function->signature.src_0 != LUM_BUILTIN_TYPE_VOID) ? 1 : 0;
+        expected_arguments += (function->signature.src_1 != LUM_BUILTIN_TYPE_VOID) ? 1 : 0;
+        expected_arguments += (function->signature.src_2 != LUM_BUILTIN_TYPE_VOID) ? 1 : 0;
+        expected_arguments += (function->signature.src_3 != LUM_BUILTIN_TYPE_VOID) ? 1 : 0;
 
         state->context_stack[state->stack_ptr].function.function_id        = corresponding_function;
         state->context_stack[state->stack_ptr].function.expected_arguments = expected_arguments;
@@ -776,7 +803,7 @@ static LuminaryResult _lum_compiler_handle_operator(LumCompilerState* state, con
 
   if (type != LUM_COMPILER_CONTEXT_TYPE_NULL) {
     LumCompilerMessage message;
-    message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
+    __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_ERROR, token));
     sprintf(message.message, "<source>:%u:%u: error: unexpected operator", token->line, token->col);
     __FAILURE_HANDLE(array_push(&state->messages, &message));
 
@@ -786,6 +813,22 @@ static LuminaryResult _lum_compiler_handle_operator(LumCompilerState* state, con
 
   LumCompilerContext context;
   context.type = LUM_COMPILER_CONTEXT_TYPE_OPERATOR;
+
+  if (state->returned_variable_id == LUM_VARIABLE_ID_INVALID) {
+    LumCompilerMessage message;
+    __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_ERROR, token));
+    sprintf(message.message, "<source>:%u:%u: error: unexpected operator", token->line, token->col);
+    __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+    state->error_occurred = true;
+    return LUMINARY_SUCCESS;
+  }
+
+  LumVariable* variable = state->variables + state->returned_variable_id;
+
+  context.operator.dst_variable = state->returned_variable_id;
+  context.operator.type         = variable->type;
+  context.operator.src_variable = LUM_VARIABLE_ID_INVALID;
 
   state->context_stack[++state->stack_ptr] = context;
 
