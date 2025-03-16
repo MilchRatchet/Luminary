@@ -976,6 +976,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
+  __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
+
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));
   }
@@ -985,7 +987,6 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
   __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
   __FAILURE_HANDLE(sky_stars_destroy(&(*device_manager)->sky_stars));
-  __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
   __FAILURE_HANDLE(bsdf_lut_destroy(&(*device_manager)->bsdf_lut));
   __FAILURE_HANDLE(sample_time_destroy(&(*device_manager)->sample_time));
 

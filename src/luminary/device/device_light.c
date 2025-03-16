@@ -9,6 +9,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "internal_error.h"
+#include "kernel_args.h"
 #include "texture.h"
 #include "utils.h"
 
@@ -1061,40 +1062,6 @@ static void _light_tree_debug_output_export_binary_node(
 
   buffer_offset = 0;
 
-  if (node.type == LIGHT_TREE_NODE_TYPE_LEAF) {
-    for (uint32_t i = 0; i < node.triangle_count; i++) {
-      const uint32_t light_id = node.triangles_address + i;
-
-      // This is crashing, no idea why. This is due to changes in the host rework project.
-      LightTreeBVHTriangle light = work->bvh_triangles[light_id];
-
-      buffer_offset += sprintf(buffer + buffer_offset, "o Node%u - Tri%u\n", id, light_id);
-
-      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex.x, light.vertex.y, light.vertex.z);
-      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex1.x, light.vertex1.y, light.vertex1.z);
-      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex2.x, light.vertex2.y, light.vertex2.z);
-
-      buffer_offset += sprintf(buffer + buffer_offset, "usemtl TriMTL%u\n", light_id);
-
-      buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
-
-      fwrite(buffer, buffer_offset, 1, obj_file);
-
-      v_offset += 3;
-      buffer_offset = 0;
-
-      buffer_offset += sprintf(buffer + buffer_offset, "newmtl TriMTL%u\n", light_id);
-      buffer_offset += sprintf(
-        buffer + buffer_offset, "Kd %f %f %f\n", (light_id & 0b100) ? 1.0f : 0.0f, (light_id & 0b10) ? 1.0f : 0.0f,
-        (light_id & 0b1) ? 1.0f : 0.0f);
-      buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 1.0f);
-
-      fwrite(buffer, buffer_offset, 1, mtl_file);
-
-      buffer_offset = 0;
-    }
-  }
-
   *vertex_offset = v_offset;
 }
 
@@ -1132,6 +1099,19 @@ LuminaryResult light_tree_create(LightTree** tree) {
   __FAILURE_HANDLE(array_create(&(*tree)->cache.meshes, sizeof(LightTreeCacheMesh), 4));
   __FAILURE_HANDLE(array_create(&(*tree)->cache.instances, sizeof(LightTreeCacheInstance), 4));
   __FAILURE_HANDLE(array_create(&(*tree)->cache.materials, sizeof(LightTreeCacheMaterial), 4));
+
+  ////////////////////////////////////////////////////////////////////
+  // Initialize integrator
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(array_create(&(*tree)->integrator.tasks, sizeof(LightTreeIntegratorTask), 1024));
+  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.mesh_ids, sizeof(uint32_t) * 1024));
+  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.triangle_ids, sizeof(uint32_t) * 1024));
+  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.average_intensities, sizeof(float) * 1024));
+  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_mesh_ids, sizeof(uint32_t) * 1024));
+  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_triangle_ids, sizeof(uint32_t) * 1024));
+  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_average_intensities, sizeof(float) * 1024));
+  (*tree)->integrator.allocated_tasks = 1024;
 
   return LUMINARY_SUCCESS;
 }
@@ -1228,11 +1208,12 @@ static LuminaryResult _light_tree_update_cache_mesh(
     const Vec128 edge2  = vec128_set(triangle->edge2.x, triangle->edge2.y, triangle->edge2.z, 0.0f);
 
     LightTreeCacheTriangle cache_triangle;
-    cache_triangle.tri_id  = tri_id;
-    cache_triangle.vertex  = vertex;
-    cache_triangle.vertex1 = vec128_add(vertex, edge1);
-    cache_triangle.vertex2 = vec128_add(vertex, edge2);
-    cache_triangle.cross   = vec128_cross(edge1, edge2);
+    cache_triangle.tri_id            = tri_id;
+    cache_triangle.vertex            = vertex;
+    cache_triangle.vertex1           = vec128_add(vertex, edge1);
+    cache_triangle.vertex2           = vec128_add(vertex, edge2);
+    cache_triangle.cross             = vec128_cross(edge1, edge2);
+    cache_triangle.average_intensity = 1.0f;
 
     __FAILURE_HANDLE(array_push(&cache->material_triangles[material_slot], &cache_triangle));
   }
@@ -1380,6 +1361,7 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
     if (cache->has_textured_emission != has_textured_emission) {
       cache->has_textured_emission = has_textured_emission;
       material_is_dirty            = true;
+      cache->needs_reintegration   = true;
     }
 
     if (has_textured_emission) {
@@ -1450,6 +1432,129 @@ LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material*
 // Light Tree construction
 ////////////////////////////////////////////////////////////////////
 
+static LuminaryResult _light_tree_queue_texture_integrations(LightTree* tree, const uint32_t mesh_id) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  if (mesh_id == MESH_ID_INVALID)
+    return LUMINARY_SUCCESS;
+
+  const LightTreeCacheMesh* mesh = tree->cache.meshes + mesh_id;
+
+  if (!mesh->has_emission)
+    return LUMINARY_SUCCESS;
+
+  uint32_t num_materials;
+  __FAILURE_HANDLE(array_get_num_elements(mesh->materials, &num_materials));
+
+  uint32_t num_cached_materials;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_cached_materials));
+
+  for (uint32_t material_slot_id = 0; material_slot_id < num_materials; material_slot_id++) {
+    const uint16_t material_id = mesh->materials[material_slot_id];
+
+    // Material is not cached, consider it non existent.
+    if (material_id >= num_cached_materials)
+      continue;
+
+    const LightTreeCacheMaterial* material = tree->cache.materials + material_id;
+
+    if (material->has_emission == false || material->needs_reintegration == false)
+      continue;
+
+    const ARRAY LightTreeCacheTriangle* material_triangles = mesh->material_triangles[material_slot_id];
+
+    uint32_t num_material_triangles;
+    __FAILURE_HANDLE(array_get_num_elements(material_triangles, &num_material_triangles));
+
+    for (uint32_t tri_id = 0; tri_id < num_material_triangles; tri_id++) {
+      const LightTreeCacheTriangle* triangle = material_triangles + tri_id;
+
+      LightTreeIntegratorTask task;
+      task.mesh_id              = mesh_id;
+      task.material_slot_id     = material_slot_id;
+      task.material_slot_tri_id = tri_id;
+      task.triangle_id          = triangle->tri_id;
+
+      __FAILURE_HANDLE(array_push(&tree->integrator.tasks, &task));
+    }
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(device);
+
+  uint32_t num_tasks;
+  __FAILURE_HANDLE(array_get_num_elements(tree->integrator.tasks, &num_tasks));
+
+  if (num_tasks == 0)
+    return LUMINARY_SUCCESS;
+
+  // TODO: Optimize, this will only rarely run so it does not really matter for now
+
+  if (num_tasks > tree->integrator.allocated_tasks) {
+    __FAILURE_HANDLE(host_free(&tree->integrator.mesh_ids));
+    __FAILURE_HANDLE(host_free(&tree->integrator.triangle_ids));
+    __FAILURE_HANDLE(host_free(&tree->integrator.average_intensities));
+
+    __FAILURE_HANDLE(host_malloc(&tree->integrator.mesh_ids, sizeof(uint32_t) * num_tasks));
+    __FAILURE_HANDLE(host_malloc(&tree->integrator.triangle_ids, sizeof(uint32_t) * num_tasks));
+    __FAILURE_HANDLE(host_malloc(&tree->integrator.average_intensities, sizeof(float) * num_tasks));
+
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_mesh_ids));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_triangle_ids));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_average_intensities));
+
+    __FAILURE_HANDLE(device_malloc(&tree->integrator.device_mesh_ids, sizeof(uint32_t) * num_tasks));
+    __FAILURE_HANDLE(device_malloc(&tree->integrator.device_triangle_ids, sizeof(uint32_t) * num_tasks));
+    __FAILURE_HANDLE(device_malloc(&tree->integrator.device_average_intensities, sizeof(float) * num_tasks));
+
+    tree->integrator.allocated_tasks = num_tasks;
+  }
+
+  for (uint32_t task_id = 0; task_id < num_tasks; task_id++) {
+    LightTreeIntegratorTask* task = tree->integrator.tasks + task_id;
+
+    tree->integrator.mesh_ids[task_id]     = task->mesh_id;
+    tree->integrator.triangle_ids[task_id] = task->triangle_id;
+  }
+
+  __FAILURE_HANDLE(
+    device_upload(tree->integrator.device_mesh_ids, tree->integrator.mesh_ids, 0, sizeof(uint32_t) * num_tasks, device->stream_main));
+  __FAILURE_HANDLE(device_upload(
+    tree->integrator.device_triangle_ids, tree->integrator.triangle_ids, 0, sizeof(uint32_t) * num_tasks, device->stream_main));
+
+  KernelArgsLightComputeIntensity args;
+  args.mesh_ids                = DEVICE_PTR(tree->integrator.device_mesh_ids);
+  args.triangle_ids            = DEVICE_PTR(tree->integrator.device_triangle_ids);
+  args.dst_average_intensities = DEVICE_PTR(tree->integrator.device_average_intensities);
+  args.lights_count            = num_tasks;
+
+  const uint32_t num_blocks = (num_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+
+  __FAILURE_HANDLE(kernel_execute_custom(
+    device->cuda_kernels[CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY], 128, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
+
+  __FAILURE_HANDLE(device_download(
+    tree->integrator.average_intensities, tree->integrator.device_average_intensities, 0, sizeof(float) * num_tasks, device->stream_main));
+
+  for (uint32_t task_id = 0; task_id < num_tasks; task_id++) {
+    LightTreeIntegratorTask* task = tree->integrator.tasks + task_id;
+
+    LightTreeCacheMesh* mesh = tree->cache.meshes + task->mesh_id;
+
+    ARRAY LightTreeCacheTriangle* material_triangles = mesh->material_triangles[task->material_slot_id];
+
+    LightTreeCacheTriangle* triangle = material_triangles + task->material_slot_tri_id;
+
+    triangle->average_intensity = tree->integrator.average_intensities[task_id];
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, const uint32_t instance_id) {
   __CHECK_NULL_ARGUMENT(tree);
 
@@ -1512,14 +1617,14 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
 
       const float area = 0.5f * vec128_norm2(cross);
 
-      if (area == 0.0f)
+      if (area == 0.0f || triangle->average_intensity == 0.0f)
         continue;
 
       LightTreeFragment fragment;
       fragment.low         = vec128_min(vertex, vec128_min(vertex1, vertex2));
       fragment.high        = vec128_max(vertex, vec128_max(vertex1, vertex2));
       fragment.middle      = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
-      fragment.power       = material->constant_emission_intensity * area;
+      fragment.power       = material->constant_emission_intensity * area * triangle->average_intensity;
       fragment.instance_id = instance_id;
       fragment.tri_id      = triangle->tri_id;
 
@@ -1539,8 +1644,24 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _light_tree_handle_dirty_states(LightTree* tree) {
+static LuminaryResult _light_tree_handle_dirty_states(LightTree* tree, Device* device) {
   __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(array_clear(tree->integrator.tasks));
+
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.meshes, &num_meshes));
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    LightTreeCacheMesh* mesh = tree->cache.meshes + mesh_id;
+
+    if (mesh->is_dirty) {
+      __FAILURE_HANDLE(_light_tree_queue_texture_integrations(tree, mesh_id));
+    }
+  }
+
+  __FAILURE_HANDLE(_light_tree_integrate(tree, device));
 
   uint32_t num_instances;
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.instances, &num_instances));
@@ -1562,11 +1683,15 @@ static LuminaryResult _light_tree_handle_dirty_states(LightTree* tree) {
   }
 
   // Reset mesh dirty flags
-  uint32_t num_meshes;
-  __FAILURE_HANDLE(array_get_num_elements(tree->cache.meshes, &num_meshes));
-
   for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
     tree->cache.meshes[mesh_id].is_dirty = false;
+  }
+
+  uint32_t num_materials;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_materials));
+
+  for (uint32_t material_id = 0; material_id < num_materials; material_id++) {
+    tree->cache.materials[material_id].needs_reintegration = false;
   }
 
   tree->cache.is_dirty = false;
@@ -1650,7 +1775,7 @@ LuminaryResult light_tree_build(LightTree* tree, Device* device) {
 
   __FAILURE_HANDLE(_light_tree_free_data(tree));
 
-  __FAILURE_HANDLE(_light_tree_handle_dirty_states(tree));
+  __FAILURE_HANDLE(_light_tree_handle_dirty_states(tree, device));
 
   LightTreeWork work;
   memset(&work, 0, sizeof(LightTreeWork));
@@ -1714,6 +1839,14 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
       __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
     }
   }
+
+  __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
+  __FAILURE_HANDLE(host_free(&(*tree)->integrator.mesh_ids));
+  __FAILURE_HANDLE(host_free(&(*tree)->integrator.triangle_ids));
+  __FAILURE_HANDLE(host_free(&(*tree)->integrator.average_intensities));
+  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_mesh_ids));
+  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_triangle_ids));
+  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_average_intensities));
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.meshes));
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.instances));

@@ -24,6 +24,7 @@ struct LightTreeCacheTriangle {
   Vec128 vertex1;
   Vec128 vertex2;
   Vec128 cross;
+  float average_intensity;
 } typedef LightTreeCacheTriangle;
 
 struct LightTreeCacheMesh {
@@ -57,6 +58,7 @@ struct LightTreeCacheMaterial {
   bool has_emission;
   uint64_t emission_texture_hash;
   bool has_textured_emission;
+  bool needs_reintegration;
   float constant_emission_intensity;
 } typedef LightTreeCacheMaterial;
 
@@ -67,9 +69,28 @@ struct LightTreeCache {
   ARRAY LightTreeCacheMaterial* materials;
 } typedef LightTreeCache;
 
+struct LightTreeIntegratorTask {
+  uint32_t mesh_id;
+  uint32_t material_slot_id;
+  uint32_t material_slot_tri_id;
+  uint32_t triangle_id;
+} typedef LightTreeIntegratorTask;
+
+struct LightTreeIntegrator {
+  ARRAY LightTreeIntegratorTask* tasks;
+  uint32_t* mesh_ids;
+  uint32_t* triangle_ids;
+  float* average_intensities;
+  DEVICE uint32_t* device_mesh_ids;
+  DEVICE uint32_t* device_triangle_ids;
+  DEVICE float* device_average_intensities;
+  uint32_t allocated_tasks;
+} typedef LightTreeIntegrator;
+
 struct LightTree {
   uint32_t build_id;
   LightTreeCache cache;
+  LightTreeIntegrator integrator;
   void* nodes_data;
   size_t nodes_size;
   void* paths_data;

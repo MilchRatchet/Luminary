@@ -64,6 +64,13 @@ struct KernelArgsParticleGenerate {
   Quad* quads;
 } typedef KernelArgsParticleGenerate;
 
+struct KernelArgsLightComputeIntensity {
+  const uint32_t* mesh_ids;
+  const uint32_t* triangle_ids;
+  uint32_t lights_count;
+  float* dst_average_intensities;
+} typedef KernelArgsLightComputeIntensity;
+
 struct KernelArgsGenerateFinalImage {
   RGBF* src;
   RGBF color_correction;

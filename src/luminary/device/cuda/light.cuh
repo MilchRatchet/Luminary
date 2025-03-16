@@ -607,30 +607,32 @@ __device__ float lights_integrate_emission(const DeviceMaterial material, const 
   return color_importance(accumulator) / texel_count;
 }
 
-LUMINARY_KERNEL void light_compute_power(const TriangleHandle* handles, const uint32_t lights_count, float* power_dst) {
-  for (uint32_t light = THREAD_ID; light < lights_count; light += blockDim.x * gridDim.x) {
-    const TriangleHandle handle = handles[light];
+LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensity args) {
+  const uint32_t light = threadIdx.x + blockIdx.x * blockDim.x;
 
-    const uint32_t mesh_id = mesh_id_load(handle.instance_id);
+  if (light >= args.lights_count)
+    return;
 
-    const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
-    const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
+  const uint32_t mesh_id     = args.mesh_ids[light];
+  const uint32_t triangle_id = args.triangle_ids[light];
 
-    const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
-    const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, handle.tri_id, triangle_count));
+  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
+  const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
 
-    const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
-    const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
-    const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, triangle_id, triangle_count));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_id, triangle_count));
 
-    const UV edge1_texture = uv_sub(vertex1_texture, vertex_texture);
-    const UV edge2_texture = uv_sub(vertex2_texture, vertex_texture);
+  const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
 
-    const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
-    const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
+  const UV edge1_texture = uv_sub(vertex1_texture, vertex_texture);
+  const UV edge2_texture = uv_sub(vertex2_texture, vertex_texture);
 
-    power_dst[light] = lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture);
-  }
+  const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
+  const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
+
+  args.dst_average_intensities[light] = lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture);
 }
 
 #endif /* !SHADING_KERNEL */

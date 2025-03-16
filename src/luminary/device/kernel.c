@@ -41,7 +41,7 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS]             = {.name = "particle_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG]       = {.name = "particle_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]                  = {.name = "particle_generate", .param_size = 0},
-  [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_POWER]                = {.name = "light_compute_power", .param_size = 0},
+  [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY]            = {.name = "light_compute_intensity", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE] = {.name = "temporal_accumulation_first_sample", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE]       = {.name = "temporal_accumulation_update", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT]       = {.name = "temporal_accumulation_output", .param_size = 0},
