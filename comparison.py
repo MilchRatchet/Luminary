@@ -1,14 +1,13 @@
 import flip_evaluator as flip
 import matplotlib.pyplot as plt
+import numpy as np
 import argparse
 import glob
+import os
 
 def GatherData(ref, testPath):
-  if testPath == None:
-    return [], [], []
-
-  files = glob.glob(testPath[0] + '/*.png')
-  resultsFile = testPath[0] + '/LuminaryBenchmarkResults.txt'
+  files = glob.glob(testPath + '/*.png')
+  resultsFile = testPath + '/LuminaryBenchmarkResults.txt'
 
   errors = []
   for img in files:
@@ -25,43 +24,55 @@ def GatherData(ref, testPath):
       sampleCounts.append(int(values[0]))
       times.append(float(values[1]))
 
-  return errors, sampleCounts, times
+  return (os.path.basename(testPath), errors, sampleCounts, times)
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser("simple_example")
   parser.add_argument("--reference", type=str, nargs=1, required=True, help="Path to reference image")
-  parser.add_argument("--testA", type=str, nargs=1, required=True, help="Path to directory containing test images of run A")
-  parser.add_argument("--testB", type=str, nargs=1, required=False, help="Path to directory containing test images of run B")
+  parser.add_argument("--test", type=str, nargs='+', required=True, help="Paths to directories containing test images")
   parser.add_argument("--output", type=str, nargs=1, required=True, help="Path to output directory")
   args = parser.parse_args()
 
   ref = args.reference[0]
 
-  errorsA, sampleCountsA, timesA = GatherData(ref, args.testA)
-  errorsB, sampleCountsB, timesB = GatherData(ref, args.testB)
+  results = []
+  for testSet in args.test:
+    results.append(GatherData(ref, testSet))
 
-  plt.plot(sampleCountsA, errorsA, color='green')
-  plt.plot(sampleCountsB, errorsB, color='orange')
 
-  plt.title('Convergence (Number of Samples)')
-  plt.ylabel('Mean Error')
-  plt.xlabel('Number of Samples')
+  maxSampleCountLog2 = 1
+  for result in results:
+    maxSampleCountLog2 = max(maxSampleCountLog2, len(result[2]) - 1)
 
   axes = plt.gca()
 
-  axes.set_xscale('log')
+  axes.set_yscale('log')
+
+  for result in results:
+    plt.plot(result[2], result[1], label=result[0])
+
+  plt.title('Convergence (Number of Samples)')
+  plt.ylabel('Mean FLIP Error')
+  plt.xlabel('Number of Samples')
+  plt.legend(loc='best')
+  plt.xticks(np.linspace(0, 2 ** maxSampleCountLog2, 5))
 
   plt.savefig(args.output[0] + "/error_samples.png")
 
   plt.figure()
 
-  plt.plot(timesA, errorsA, color='green')
-  plt.plot(timesB, errorsB, color='orange')
+  axes = plt.gca()
+
+  axes.set_yscale('log')
+
+  for result in results:
+    plt.plot(result[3], result[1], label=result[0])
 
   plt.title('Convergence (Execution Time)')
-  plt.ylabel('Mean Error')
-  plt.xlabel('Execution Time')
+  plt.ylabel('Mean FLIP Error')
+  plt.xlabel('Execution Time (s)')
+  plt.legend(loc='best')
 
   plt.savefig(args.output[0] + "/error_times.png")
 
