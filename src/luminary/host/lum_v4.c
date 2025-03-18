@@ -718,6 +718,9 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     else if (line[0] == '#' || line[0] == 10) {
       // Comment
     }
+    else if (line[0] == '\r') {
+      // Carriage return
+    }
     else {
       warn_message("Scene file contains unknown line!\n Content: %s", line);
     }
