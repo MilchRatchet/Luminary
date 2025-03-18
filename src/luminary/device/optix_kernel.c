@@ -237,8 +237,9 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
 
-  const uint32_t thread_internal_task_id =
+  const uint32_t pixels_per_thread =
     device->constant_memory->pixels_per_thread >> ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT);
+  const uint32_t thread_internal_task_id = max(1, pixels_per_thread);
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
     kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
