@@ -4,18 +4,28 @@
 #include "math.cuh"
 #include "utils.cuh"
 
+// #define CAMERA_DEBUG_RENDER
+
 __device__ float2 camera_get_jitter() {
+#ifndef CAMERA_DEBUG_RENDER
   if (device.state.sample_id == 0)
     return make_float2(0.5f, 0.5f);
 
   return quasirandom_sequence_2D_base_float(QUASI_RANDOM_TARGET_CAMERA_JITTER, make_ushort2(0, 0), device.state.sample_id, 0);
+#else
+  return make_float2(0.5f, 0.5f);
+#endif
 }
 
 __device__ vec3 camera_sample_aperture(const ushort2 pixel_coords) {
   if (device.camera.aperture_size == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
+#ifndef CAMERA_DEBUG_RENDER
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel_coords);
+#else
+  const float2 random = make_float2(((float) pixel_coords.x) / device.settings.width, ((float) pixel_coords.y) / device.settings.height);
+#endif
   float2 sample;
 
   switch (device.camera.aperture_shape) {
@@ -56,9 +66,15 @@ __device__ DeviceTask camera_get_ray(DeviceTask task) {
   const float step = 2.0f * (device.camera.fov / device.settings.width);
   const float vfov = step * device.settings.height * 0.5f;
 
+#ifndef CAMERA_DEBUG_RENDER
+  const ushort2 film_index = task.index;
+#else
+  const ushort2 film_index = make_ushort2(device.settings.width >> 1, device.settings.height >> 1);
+#endif
+
   vec3 film_point;
-  film_point.x = device.camera.fov - step * (task.index.x + jitter.x);
-  film_point.y = -vfov + step * (task.index.y + jitter.y);
+  film_point.x = device.camera.fov - step * (film_index.x + jitter.x);
+  film_point.y = -vfov + step * (film_index.y + jitter.y);
   film_point.z = 1.0f;
 
   vec3 film_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), film_point));
