@@ -79,8 +79,10 @@ __device__ DeviceTask camera_get_ray(DeviceTask task) {
 
   vec3 film_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), film_point));
 
+  const float focal_length = fmaxf(device.camera.focal_length, 0.01f);
+
   // The minus is because we are always looking in -Z direction
-  vec3 focal_point = scale_vector(film_to_focal_ray, -device.camera.focal_length / film_to_focal_ray.z);
+  vec3 focal_point = scale_vector(film_to_focal_ray, -focal_length / film_to_focal_ray.z);
 
   vec3 aperture_point = camera_sample_aperture(task.index);
 
