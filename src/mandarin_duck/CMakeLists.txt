@@ -35,3 +35,11 @@ target_include_directories(LuminaryMD PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(LuminaryMD PRIVATE SDL3::SDL3)
 target_link_libraries(LuminaryMD PRIVATE SDL3_ttf::SDL3_ttf)
 target_link_libraries(LuminaryMD PRIVATE Luminary::Library)
+
+#=============================================================
+# Print summary
+#=============================================================
+
+message("========================== Mandarin Duck ==========================")
+message("SDL3 Directory                 ||  ${SDL3_DIR}")
+message("SDL3_ttf Directory             ||  ${SDL3_ttf_DIR}")

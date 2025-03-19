@@ -4,7 +4,7 @@ IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 ENDIF()
 
-project("Luminary" LANGUAGES C CUDA)
+project("Luminary" LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -34,33 +34,6 @@ if(WIN32)
   if(DEFINED MSVC_LIB_DIR)
     link_directories(${MSVC_LIB_DIR})
   endif()
-endif()
-
-
-#=============================================================
-# Set CUDA flags
-#=============================================================
-
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --split-compile=0")
-if(WIN32)
-    set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O2 -fp:fast -arch:AVX2 -W4")
-    set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Od -fp:fast -arch:AVX2 -g")
-else()
-    set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O3 -march=native -Wextra")
-    set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Og -g")
-endif()
-
-if(SHOW_KERNEL_STATS)
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --ptxas-options=-v")
-endif()
-
-if(NATIVE_CUDA_ARCH)
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=native")
-    set(CMAKE_CUDA_ARCHITECTURES OFF)
-elseif(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    message(SEND_ERROR "No CUDA Architecture selected. Building for all major archs.")
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=all-major")
-    set(CMAKE_CUDA_ARCHITECTURES OFF)
 endif()
 
 #=============================================================
@@ -111,45 +84,21 @@ if(USE_ADDRESS_SANITIZER)
 endif()
 
 #=============================================================
-# Print directories
-#=============================================================
-
-message("")
-message("============================= DIRECTORIES =============================")
-message("CUDA Toolkit Include:        ${CUDAToolkit_INCLUDE_DIR}")
-message("CUDA Toolkit Libraries:      ${CUDAToolkit_LIBRARY_DIR}")
-message("CUDA Toolkit NVCC:           ${CUDAToolkit_NVCC_EXECUTABLE}")
-message("Optix Include:               ${OptiX_INCLUDE}")
-message("SDL2                         ${SDL2_DIR}")
-message("SDL2_ttf                     ${SDL2_ttf_DIR}")
-message("=======================================================================")
-
-#=============================================================
 # Print compile flags
 #=============================================================
 
-message("")
-message("=============================== SUMMARY ===============================")
-message("Debug Mode                     ${DEBUG}")
-message("Use Native CUDA Architecture   ${NATIVE_CUDA_ARCH}")
-message("Show CUDA Kernel Stats         ${SHOW_KERNEL_STATS}")
+message("============================= Overall =============================")
+message("Debug Mode                     ||  ${DEBUG}")
 
-message("C Compiler:                    ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
-message("CUDA Compiler:                 ${CMAKE_CUDA_COMPILER_ID} ${CMAKE_CUDA_COMPILER_VERSION}")
+message("C Compiler:                    ||  ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 
-message("C Flags:                       ${CMAKE_C_FLAGS}")
-message("CUDA Flags:                    ${CMAKE_CUDA_FLAGS}")
+message("C Flags:                       ||  ${CMAKE_C_FLAGS}")
 
 if (DEBUG)
-    message("C Debug Flags:                 ${CMAKE_C_FLAGS_DEBUG}")
-    message("CUDA Debug Flags:              ${CMAKE_CUDA_FLAGS_DEBUG}")
+    message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
 else()
-    message("C Release Flags:               ${CMAKE_C_FLAGS_RELEASE}")
-    message("CUDA Release Flags:            ${CMAKE_CUDA_FLAGS_RELEASE}")
+    message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
 endif()
-
-message("=======================================================================")
-message("")
 
 #=============================================================
 # Set output directory
@@ -198,3 +147,5 @@ else()
 endif()
 
 configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h")
+
+message("===================================================================")

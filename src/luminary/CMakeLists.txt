@@ -41,6 +41,23 @@ add_subdirectory(Ceb)
 include_directories(${CEB_INCLUDE_DIR})
 
 #=============================================================
+# Gather flags
+#=============================================================
+
+set(CUDA_KERNEL_FLAGS --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true)
+
+if(SHOW_KERNEL_STATS)
+  set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} --ptxas-options=-v)
+endif()
+
+if(NATIVE_CUDA_ARCH)
+    set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} -arch=native)
+else()
+    message(SEND_ERROR "No CUDA Architecture selected. Building for all major archs.")
+    set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} -arch=all-major)
+endif()
+
+#=============================================================
 # Create CUBIN files
 #=============================================================
 
@@ -52,7 +69,7 @@ function(compile_cubin kernel_name)
       "${CMAKE_BINARY_DIR}/cubin/${kernel_name}.cubin"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/${kernel_name}.cu"
-      -arch=native --cubin --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      --cubin ${CUDA_KERNEL_FLAGS}
       -o "${CMAKE_BINARY_DIR}/cubin/${kernel_name}.cubin"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
@@ -89,7 +106,7 @@ function(compile_ptx cuda_file_name kernel_name)
       "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${cuda_file_name}.cu"
-      -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      --ptx ${CUDA_KERNEL_FLAGS}
       -D${kernel_name}
       -o "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
@@ -177,3 +194,16 @@ target_link_libraries(Luminary PUBLIC $<TARGET_NAME:Luminary::Headers>)
 if(LUMINARY_MEMORY_DEBUG)
   target_compile_definitions(Luminary PRIVATE "LUMINARY_MEMORY_DEBUG")
 endif()
+
+#=============================================================
+# Print summary
+#=============================================================
+
+message("============================= Luminary ============================")
+message("Use Native CUDA Architecture   ||  ${NATIVE_CUDA_ARCH}")
+message("Show CUDA Kernel Stats         ||  ${SHOW_KERNEL_STATS}")
+message("Verbose Memory Checking        ||  ${LUMINARY_MEMORY_DEBUG}")
+message("CUDA Toolkit Libraries:        ||  ${CUDAToolkit_LIBRARY_DIR}")
+message("CUDA Toolkit NVCC:             ||  ${CUDAToolkit_NVCC_EXECUTABLE}")
+message("Optix Include:                 ||  ${OptiX_INCLUDE}")
+message("CUDA Flags:                    ||  ${CUDA_KERNEL_FLAGS}")
