@@ -39,7 +39,7 @@
 // Failure handles
 ////////////////////////////////////////////////////////////////////
 
-#define CUDA_STALL_VALIDATION
+// #define CUDA_STALL_VALIDATION
 
 #ifdef CUDA_STALL_VALIDATION
 
@@ -62,7 +62,7 @@ extern WallTime* __cuda_stall_validation_macro_walltime;
       __RETURN_ERROR(LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", __error_name, __error_string, #command); \
     }                                                                                                                              \
   }
-#else
+#else /* CUDA_STALL_VALIDATION */
 #define CUDA_FAILURE_HANDLE(command)                                                                                               \
   {                                                                                                                                \
     const CUresult __cuda_err = (command);                                                                                         \
@@ -74,7 +74,7 @@ extern WallTime* __cuda_stall_validation_macro_walltime;
       __RETURN_ERROR(LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", __error_name, __error_string, #command); \
     }                                                                                                                              \
   }
-#endif
+#endif /* !CUDA_STALL_VALIDATION */
 
 #define OPTIX_FAILURE_HANDLE(command)                                                                                                 \
   {                                                                                                                                   \
