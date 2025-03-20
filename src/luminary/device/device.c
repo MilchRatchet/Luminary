@@ -1426,7 +1426,7 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
 
   // If undersampling state is now 0, we thus have now exactly one sample per pixel, we must increment sample id, else
   // we would recompute this sample now.
-  if (new_undersampling_state == 0 && device->undersampling_state != 0) {
+  if ((new_undersampling_state == 0) && ((device->undersampling_state & ~UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0)) {
     device->sample_count.current_sample_count++;
   }
 

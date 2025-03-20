@@ -395,7 +395,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
         if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-          if (device->sample_count.current_sample_count == 0 || (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK)) {
+          if (device->sample_count.current_sample_count == 0) {
             __FAILURE_HANDLE(
               _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE, &launch_id));
           }
