@@ -1396,13 +1396,15 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
   device->gbuffer_meta_state = GBUFFER_META_STATE_NOT_READY;
+  uint32_t renderer_event_id;
 
   __FAILURE_HANDLE(device_sync_constant_memory(device));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
   __FAILURE_HANDLE(device_post_apply(device->post, device));
-  __FAILURE_HANDLE(device_output_generate_output(device->output, device, 0))
+  __FAILURE_HANDLE(device_renderer_get_latest_event_id(device->renderer, &renderer_event_id));
+  __FAILURE_HANDLE(device_output_generate_output(device->output, device, renderer_event_id))
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

@@ -514,6 +514,20 @@ LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(event_id);
+
+  if (renderer->event_id == 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Renderer has not been executed yet.");
+  }
+
+  // Event ID is the ID of the next event so we need to decrement.
+  *event_id = renderer->event_id - 1;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(*renderer);
