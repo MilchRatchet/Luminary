@@ -51,7 +51,7 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const float2 jitter = camera_get_jitter();
 
-  const uint32_t bucket_id = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
+  const uint32_t bucket_id = 0;
 
   float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
   float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
@@ -89,13 +89,6 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
   }
 }
 
-__device__ uint32_t temporal_get_bucket_sample_count(const uint32_t bucket_id) {
-  const uint32_t overall_sample_count           = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
-  const uint32_t buckets_with_additional_sample = device.state.sample_id - overall_sample_count * MAX_NUM_INDIRECT_BUCKETS;
-
-  return overall_sample_count + ((bucket_id < buckets_with_additional_sample) ? 1 : 0);
-}
-
 LUMINARY_KERNEL void temporal_accumulation_update() {
   HANDLE_DEVICE_ABORT();
 
@@ -107,18 +100,17 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   const float2 jitter = camera_get_jitter();
 
   const float prev_scale     = device.state.sample_id;
-  const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
+  const float curr_inv_scale = 1.0f / (device.state.sample_id + 1);
 
-  const uint32_t bucket_id = device.state.sample_id % MAX_NUM_INDIRECT_BUCKETS;
+  const uint32_t bucket_sample_count = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
+  const uint32_t bucket_id           = device.state.sample_id - bucket_sample_count * MAX_NUM_INDIRECT_BUCKETS;
 
   float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
   float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
   float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
 
-  const uint32_t bucket_sample_count = temporal_get_bucket_sample_count(bucket_id);
-
   const float prev_indirect_scale     = bucket_sample_count;
-  const float curr_indirect_inv_scale = 1.0f / (bucket_sample_count + 1.0f);
+  const float curr_indirect_inv_scale = 1.0f / (bucket_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = device.settings.window_y + offset / width;
