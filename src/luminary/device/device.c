@@ -19,7 +19,7 @@
 WallTime* __cuda_stall_validation_macro_walltime;
 #endif
 
-static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
+static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[SCENE_ENTITY_GLOBAL_COUNT] = {
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
   DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
   DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN,      // SCENE_ENTITY_OCEAN
@@ -28,9 +28,8 @@ static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_memb
   DEVICE_CONSTANT_MEMORY_MEMBER_FOG,        // SCENE_ENTITY_FOG
   DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES,  // SCENE_ENTITY_PARTICLES
 };
-LUM_STATIC_SIZE_ASSERT(device_scene_entity_to_const_memory_member, sizeof(DeviceConstantMemoryMember) * SCENE_ENTITY_GLOBAL_COUNT);
 
-static const size_t device_cuda_const_memory_offsets[] = {
+static const size_t device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEMBER_COUNT + 1] = {
   offsetof(DeviceConstantMemory, ptrs),                          // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
   offsetof(DeviceConstantMemory, settings),                      // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
   offsetof(DeviceConstantMemory, camera),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
@@ -47,11 +46,10 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
   offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
-  SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
+  sizeof(DeviceConstantMemory)                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
-LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * (DEVICE_CONSTANT_MEMORY_MEMBER_COUNT + 1));
 
-static const size_t device_cuda_const_memory_sizes[] = {
+static const size_t device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBER_COUNT] = {
   sizeof(DevicePointers),              // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
   sizeof(DeviceRendererSettings),      // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
   sizeof(DeviceCamera),                // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
@@ -69,7 +67,6 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(DeviceTextureObject) * 3,     // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
   sizeof(DeviceExecutionState)         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
 };
-LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
 
 #define DEVICE_UPDATE_CONSTANT_MEMORY(member, value)                                              \
   {                                                                                               \
