@@ -105,18 +105,49 @@ LUMINARY_KERNEL void volume_process_events() {
 
       float pdf = 1.0f;
       if (choice_random < volume_intersection_probability) {
-        const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
+        float selected_dist = FLT_MAX;
+        float selected_target_pdf;
+        float sum_weight = 0.0f;
 
-        const float volume_dist = volume_sample_intersection(volume, path.start, path.length, random);
+        float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_RIS, task.index);
 
-        if (volume_dist < depth) {
-          depth              = volume_dist;
+        const uint32_t num_ris_samples = 32;
+
+        for (uint32_t sample_index = 0; sample_index < num_ris_samples; sample_index++) {
+          const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST + sample_index, task.index);
+
+          const float volume_dist = volume_sample_intersection(volume, path.start, path.length, random);
+
+          if (volume_dist < depth) {
+            const float target_pdf = color_importance(volume_integrate_transmittance_precomputed(volume, path.start, volume_dist));
+            const float pdf        = volume_sample_intersection_pdf(volume, path.start, volume_dist);
+
+            const float weight = target_pdf / (pdf * num_ris_samples);
+
+            sum_weight += weight;
+
+            const float resampling_probability = weight / sum_weight;
+
+            if (resampling_random < resampling_probability) {
+              selected_dist       = volume_dist;
+              selected_target_pdf = target_pdf;
+
+              resampling_random = resampling_random / resampling_probability;
+            }
+            else {
+              resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
+            }
+          }
+        }
+
+        if (selected_dist < depth) {
+          depth              = selected_dist;
           handle.instance_id = VOLUME_TYPE_TO_HIT(volume.type);
           handle.tri_id      = 0;
 
           record = mul_color(record, volume.scattering);
 
-          pdf *= volume_sample_intersection_pdf(volume, path.start, volume_dist) * volume_intersection_probability;
+          pdf *= (selected_target_pdf / sum_weight) * volume_intersection_probability;
         }
         else {
           handle.instance_id = HIT_TYPE_INVALID;
