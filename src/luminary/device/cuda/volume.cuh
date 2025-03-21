@@ -4,6 +4,7 @@
 #include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
+#include "sky.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
@@ -81,10 +82,29 @@ LUMINARY_KERNEL void volume_process_events() {
     RGBF record          = load_RGBF(device.ptrs.records + pixel);
 
     if (volume.type != VOLUME_TYPE_NONE) {
+      float volume_intersection_probability = 0.5f;
+
+      if (handle.instance_id == HIT_TYPE_SKY && device.sky.mode != LUMINARY_SKY_MODE_DEFAULT) {
+        RGBF sky_color = sky_color_no_compute(task.ray, task.state);
+        sky_color      = mul_color(sky_color, record);
+
+        sky_color = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.start, path.length));
+
+        if (device.state.depth <= 1) {
+          write_beauty_buffer_direct(sky_color, pixel);
+        }
+        else {
+          write_beauty_buffer(sky_color, pixel, task.state);
+        }
+
+        volume_intersection_probability = 1.0f;
+        handle.instance_id              = HIT_TYPE_INVALID;
+      }
+
       const float choice_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_STRATEGY, task.index);
 
-      float pdf = 0.5f;
-      if (choice_random < 0.5f) {
+      float pdf = 1.0f;
+      if (choice_random < volume_intersection_probability) {
         const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
 
         const float volume_dist = volume_sample_intersection(volume, path.start, path.length, random);
@@ -96,11 +116,14 @@ LUMINARY_KERNEL void volume_process_events() {
 
           record = mul_color(record, volume.scattering);
 
-          pdf *= volume_sample_intersection_pdf(volume, path.start, volume_dist);
+          pdf *= volume_sample_intersection_pdf(volume, path.start, volume_dist) * volume_intersection_probability;
         }
         else {
           handle.instance_id = HIT_TYPE_INVALID;
         }
+      }
+      else {
+        pdf *= (1.0f - volume_intersection_probability);
       }
 
       record = mul_color(record, volume_integrate_transmittance_precomputed(volume, path.start, depth));

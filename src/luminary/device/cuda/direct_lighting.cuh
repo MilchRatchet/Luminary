@@ -416,7 +416,7 @@ __device__ RGBF direct_lighting_ambient_sample(GBufferData data, const ushort2 i
   RGBF light_color       = splat_color(1.0f);
 #endif
 
-  light_color = mul_color(light_color, sky_color_no_compute(ray));
+  light_color = mul_color(light_color, sky_color_no_compute(ray, 0));
 
   if (color_importance(light_color) == 0.0f) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
