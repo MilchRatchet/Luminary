@@ -82,6 +82,25 @@ __device__ VolumeType volume_get_type_at_position(const vec3 pos) {
   return type;
 }
 
+struct VolumePath {
+  union {
+    float2 data;
+    struct {
+      float start;
+      float length;
+    };
+  };
+} typedef VolumePath;
+
+__device__ VolumePath make_volume_path(const float start, const float length) {
+  VolumePath path;
+
+  path.start  = start;
+  path.length = length;
+
+  return path;
+}
+
 /*
  * Computes the start and length of a ray path through a volume.
  * The output path is only valid if the start is non-negative.
@@ -93,12 +112,12 @@ __device__ VolumeType volume_get_type_at_position(const vec3 pos) {
  *                  - [x] = Start in world space.
  *                  - [y] = Distance through fog in world space.
  */
-__device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+__device__ VolumePath volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
   if (limit <= 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   if (volume.max_height <= volume.min_height)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   // Vertical intersection
   float start_y;
@@ -130,7 +149,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
         end_y   = volume.dist;
       }
       else {
-        return make_float2(-FLT_MAX, 0.0f);
+        return make_volume_path(-FLT_MAX, 0.0f);
       }
     }
     else {
@@ -163,7 +182,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   const float d = r2 - (kx * kx + kz * kz);
 
   if (d < 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   const float sd = sqrtf(d);
   const float q  = -dot - copysignf(sd, dot);
@@ -175,15 +194,15 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   const float end_xz   = fmaxf(t0, t1);
 
   if (end_xz < start_xz || limit < start_xz)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   const float start = fmaxf(start_xz, start_y);
   const float dist  = fminf(fminf(end_xz, end_y) - start, limit - start);
 
   if (dist < 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
-  return make_float2(start, dist);
+  return make_volume_path(start, dist);
 }
 
 /*
@@ -192,14 +211,14 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  *
  * @param volume VolumeDescriptor of the corresponding volume.
  * @param start Start offset of ray.
- * @param max_dist Maximum dist ray may travel after start.
+ * @param max_length Maximum distance ray may travel after start.
  * @result Distance of intersection point and origin in world space.
  */
-__device__ float volume_sample_intersection(const VolumeDescriptor volume, const float start, const float max_dist, const float random) {
+__device__ float volume_sample_intersection(const VolumeDescriptor volume, const float start, const float max_length, const float random) {
   // [FonWKH17] Equation 15
   const float t = (-logf(random)) / volume.max_scattering;
 
-  if (t > max_dist)
+  if (t > max_length)
     return FLT_MAX;
 
   return start + t;
@@ -225,19 +244,31 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
   return scale_color(opaque_color(data.albedo), phase);
 }
 
+__device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float start, const float end) {
+  const RGBF volume_transmittance = volume_get_transmittance(volume);
+  const float length              = end - start;
+
+  RGBF result;
+  result.r = expf(-length * volume_transmittance.r);
+  result.g = expf(-length * volume_transmittance.g);
+  result.b = expf(-length * volume_transmittance.b);
+
+  return result;
+}
+
 __device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const vec3 ray, const float depth, const bool force_path = false) {
   RGBF ocean_transmittance = get_color(1.0f, 1.0f, 1.0f);
 
   if (device.ocean.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-    const float2 path             = (force_path) ? make_float2(0.0f, depth) : volume_compute_path(volume, origin, ray, depth);
+    const VolumePath path         = (force_path) ? make_volume_path(0.0f, depth) : volume_compute_path(volume, origin, ray, depth);
 
-    if (path.x >= 0.0f) {
+    if (path.start >= 0.0f) {
       RGBF volume_transmittance = volume_get_transmittance(volume);
 
-      ocean_transmittance.r = expf(-path.y * volume_transmittance.r);
-      ocean_transmittance.g = expf(-path.y * volume_transmittance.g);
-      ocean_transmittance.b = expf(-path.y * volume_transmittance.b);
+      ocean_transmittance.r = expf(-path.length * volume_transmittance.r);
+      ocean_transmittance.g = expf(-path.length * volume_transmittance.g);
+      ocean_transmittance.b = expf(-path.length * volume_transmittance.b);
     }
   }
 
@@ -249,10 +280,10 @@ __device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec
 
   if (device.fog.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+    const VolumePath path         = volume_compute_path(volume, origin, ray, depth);
 
-    if (path.x >= 0.0f) {
-      fog_transmittance = expf(-path.y * volume.max_scattering);
+    if (path.start >= 0.0f) {
+      fog_transmittance = expf(-path.length * volume.max_scattering);
     }
   }
 

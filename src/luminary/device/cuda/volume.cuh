@@ -43,27 +43,6 @@ LUMINARY_KERNEL void volume_process_events() {
     float depth           = trace_depth_load(offset);
     TriangleHandle handle = triangle_handle_load(offset);
 
-    const uint32_t pixel = get_pixel_id(task.index);
-
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
-
-    const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
-
-    if (device.fog.active) {
-      const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
-
-      if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
-
-        if (volume_dist < depth) {
-          depth              = volume_dist;
-          handle.instance_id = HIT_TYPE_VOLUME_FOG;
-          handle.tri_id      = 0;
-        }
-      }
-    }
-
     if (device.ocean.active) {
       const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
@@ -72,34 +51,61 @@ LUMINARY_KERNEL void volume_process_events() {
         handle.instance_id = HIT_TYPE_OCEAN;
         handle.tri_id      = 0;
       }
+    }
 
-      const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+    VolumePath path = make_volume_path(FLT_MAX, 0.0f);
+    VolumeDescriptor volume;
+    volume.type = VOLUME_TYPE_NONE;
 
-      if (path.x >= 0.0f) {
-        float integration_depth = path.y;
+    if (device.fog.active) {
+      const VolumeDescriptor fog_volume = volume_get_descriptor_preset_fog();
+      const VolumePath fog_path         = volume_compute_path(fog_volume, task.origin, task.ray, depth);
 
-        const bool allow_ocean_volume_hit = device.ocean.multiscattering || !(task.state & STATE_FLAG_VOLUME_SCATTERED);
-
-        if (allow_ocean_volume_hit) {
-          const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
-
-          if (volume_dist < depth) {
-            depth              = volume_dist;
-            handle.instance_id = HIT_TYPE_VOLUME_OCEAN;
-            handle.tri_id      = 0;
-
-            integration_depth = depth - path.x;
-
-            const float sampling_pdf = volume.max_scattering * expf(-integration_depth * volume.max_scattering);
-            record                   = mul_color(record, scale_color(volume.scattering, 1.0f / sampling_pdf));
-          }
-        }
-
-        record.r *= expf(-integration_depth * (volume.absorption.r + volume.scattering.r));
-        record.g *= expf(-integration_depth * (volume.absorption.g + volume.scattering.g));
-        record.b *= expf(-integration_depth * (volume.absorption.b + volume.scattering.b));
+      if (fog_path.length > 0.0f && fog_path.start < path.start) {
+        volume = fog_volume;
+        path   = fog_path;
       }
+    }
+
+    if (device.ocean.active) {
+      const VolumeDescriptor fog_volume = volume_get_descriptor_preset_ocean();
+      const VolumePath fog_path         = volume_compute_path(fog_volume, task.origin, task.ray, depth);
+
+      if (fog_path.length > 0.0f && fog_path.start < path.start) {
+        volume = fog_volume;
+        path   = fog_path;
+      }
+    }
+
+    const uint32_t pixel = get_pixel_id(task.index);
+    RGBF record          = load_RGBF(device.ptrs.records + pixel);
+
+    if (volume.type != VOLUME_TYPE_NONE) {
+      const float choice_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_STRATEGY, task.index);
+
+      float pdf = 0.5f;
+      if (choice_random < 0.5f) {
+        const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
+
+        const float volume_dist = volume_sample_intersection(volume, path.start, path.length, random);
+
+        if (volume_dist < depth) {
+          depth              = volume_dist;
+          handle.instance_id = VOLUME_TYPE_TO_HIT(volume.type);
+          handle.tri_id      = 0;
+
+          record = mul_color(record, volume.scattering);
+
+          pdf *= volume_sample_intersection_pdf(volume, path.start, volume_dist);
+        }
+        else {
+          handle.instance_id = HIT_TYPE_INVALID;
+        }
+      }
+
+      record = mul_color(record, volume_integrate_transmittance_precomputed(volume, path.start, depth));
+
+      record = scale_color(record, 1.0f / pdf);
     }
 
     trace_depth_store(depth, offset);
