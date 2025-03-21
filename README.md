@@ -2,7 +2,7 @@
 <p align="center">
   <h1><p align="center" style="font-weight: bold;">Luminary</p></h1>
   <p align="center">
-    CUDA Pathtracing Renderer
+   Offline Toy Renderer made with CUDA
     </p>
 </p>
 <p align="center">
@@ -29,117 +29,66 @@
   <img src="demo_images/Pokitaru.png" alt="Aranos Example">
 </p>
 
+_Assets exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer)._
+
 # About
 
-Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material, illuminance and normal textures. All other effects come parameterized. This project is for fun and to learn more about rendering.
+>📝 Luminary underwent a major host side rework recently and features might be missing or faulty. The latest stable commit is [`3068682
+`](https://github.com/MilchRatchet/Luminary/commit/306868268a3e74995416baa6ff3f33876190d210).
 
-The goal is to use as few libraries as feasible. Currently, the following libraries are used: `SDL2`, `zlib`, `qoi`, `OptiX` and `Ceb`.
+The goal is to build an offline renderer that achieves high quality final renders in the lowest possible render time.
 
-Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
+`Luminary` does not aim to be a production-ready renderer, instead, the feature set is kept small and only a small range of hardware is supported. There is in general no backwards compatibility with older scenes, if the renderer changes then so does the render of the scene. The focus is on a non-artist friendly user interface.
 
 # Usage
 
+>📝 Luminary currently transitions to a new scene description format, this new format is not yet available. Luminary can still parse the old format but it can no longer export scenes in the old format.
+
 The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md). It is possible to specify a `*.obj` file instead of a `*.lum` file. This will load the mesh and use the default settings. Then one can make changes to the settings and automatically generate a `*.lum` file.
 
-You can start as:
+Luminary comes with its own frontend called `Mandarin Duck`. You can run Mandarin Duck through:
 
 ```
-Luminary [File] [Option]
+LuminaryMD [File] [Args...]
 ```
 
-where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Option is one or more of:
+where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Args is optionally one or more of:
 
 ```
--o, --offline
-        start in offline mode, which renders one image using the specified settings
+-b, --benchmark [Log2 of Sample Count, Name of Benchmark Run]
+        render the given scene and output an image at each power of two sample count up to the given target sample count
 
--t, --timings
-        print execution times of some CPU functions
+-h, --help
+        print all available arguments
 
--l, --logs
-        write a log file at the end of execution
-
--s, --samples
-        set custom sample count for offline rendering (overrides value set by input file)
-
--w, --width
-        set custom width (overrides value set by input file)
-
--h, --height
-        set custom height (overrides value set by input file)
-
--p, --post-menu
-        open post process menu after rendering an image in offline mode
-
--u, --unittest
-        run a test suite, no rendering is done
+-o, --output [Path]
+        Specify the output path to which renders are stored
 
 -v, --version
         print build information and exit
-
-    --force-displacement
-        turn on displacement map usage on Ampere and Turing architecture GPUs
-
-    --no-omm
-        turn off opacity micromap usage
-
-    --aov-mode
-        generate and output additional variables like albedo, normal, direct lighting and indirect lighting
-
-    --qoi
-        set output image format to QOI
-
-    --png
-        set output image format to PNG
-
-    --optix-validation
-        enables OptiX validation for debugging
 ```
-
-## Realtime Mode
-
-<p align="center">
-  <img src="demo_images/SiberiusUI.png" alt="UI Example">
-</p>
-
-In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be controlled with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change most parameters.
-
->📝 In a UI panel, if the number is colored when hovering, you can change the value by holding the left mouse button and moving the mouse left/right.
 
 # Building
 
 Requirements:
 - CUDA Toolkit 12.6
 - Optix 8.0 SDK
-- SDL2 and SDL2_ttf
+- SDL3 and SDL3_ttf
 - Modern CMake
 - Make or Ninja
-- SSE 4.1 compatible CPU
+- AVX2 compatible CPU
 - Supported Nvidia GPU (Pascal or later)
 
->📝 The use of opacity micromaps and displacement micromaps at the same time is only possible on Ada Lovelace Arch GPUs. (This seems to not be documented anywhere.)
-
-`zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. This is due to the compiler limitations of CUDA on Windows which makes usage of zlib-ng inconvenient.
->📝 `zlib` and `qoi` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
+>📝 `zlib`, `qoi` and `Ceb` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
 ## CMake Options
 | Option                     | Description
-| ------------------------------| --------------------------------------------
-| -DDEBUG=ON/OFF                | Enable Debug Mode. Default: OFF
-| -DNATIVE_CUDA_ARCH=ON/OFF     | Enable that the CUDA architecture is based on the installed GPU. Default: ON
-| -DSHOW_KERNEL_STATS=ON/OFF    | Enable that CUDA kernel stats are printed at compilation. Default: OFF
+| ------------------------------ | --------------------------------------------
+| -DDEBUG=ON/OFF                 | Enable Debug Mode. Default: OFF
+| -DNATIVE_CUDA_ARCH=ON/OFF      | Enable that the CUDA architecture is based on the installed GPU. Default: ON
+| -DSHOW_KERNEL_STATS=ON/OFF     | Enable that CUDA kernel stats are printed at compilation. Default: OFF
+| -DLUMINARY_MEMORY_DEBUG=ON/OFF | Enable tracking of all host side allocations. Default: OFF
 
-## Linux
-
-You need a `nvcc` compatible host compiler. Which compilers are supported can be found in the [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements). In general, any modern GCC, ICC or clang will work. By default, `nvcc` uses `gcc`/`g++`.
-
-```
-mkdir build
-cmake -B ./build -S .
-cd build
-make
-```
-If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
 
 ## Windows
 
@@ -148,7 +97,7 @@ Additional requirements:
 - Windows SDK
 - clang-cl
 
-All these dependencies come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, OptiX, SDL2 and SDL2_ttf must be defined in the PATH environment variable, otherwise they need to be defined in CMake using `-D{PACKAGENAME}_ROOT="{PATH}"`.
+All these dependencies come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, OptiX, SDL3 and SDL3_ttf must be defined in the PATH environment variable, otherwise they need to be defined in CMake using `-D{PACKAGENAME}_ROOT="{PATH}"`.
 
 Regarding MSVC and Windows SDK paths, there are two possibilities:
 
@@ -169,28 +118,39 @@ Additionally, you need to pass the path to the libraries to cmake, the paths loo
 {Windows SDK Path}/10/Lib/{Version}
 ```
 
-__Regarding SDL2__: You need to download SDL2_devel and SDL2_ttf_devel for VC, these are for example available on Github.
-
 You can build using the following commands in the main project directory:
 ```
 mkdir build
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER=clang-cl
 cd build && ninja
 ```
 or alternatively:
 ```
 mkdir build
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/{Version}" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER=clang-cl -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/{Version}" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
 cd build && ninja
 ```
 
 Notes:
-- It is important to use either `clang-cl.exe` or `cl.exe` as the C compiler.
+- It is important to use `clang-cl.exe` as the C compiler.
 - If you use the first option, run `vcvarsall.bat` only once per terminal.
-- `SDL2.dll` and `SDL2_ttf.dll` are automatically copied into the build dir and always need to reside in the same directory as `Luminary.exe`.
 
 >📝 This is all only necessary because CUDA only supports MSVC as a host compiler on Windows. If this changes in the future then the Windows build will look similar to the Linux build.
+
+## Linux
+
+>📝 Linux support is not actively maintained, it may just not build.
+
+You need a `nvcc` compatible host compiler. Which compilers are supported can be found in the [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements). In general, any modern GCC, ICC or clang will work. By default, `nvcc` uses `gcc`/`g++`.
+
+```
+mkdir build
+cmake -B ./build -S .
+cd build
+make
+```
+If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
 
 # Licence
 
