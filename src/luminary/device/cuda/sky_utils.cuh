@@ -294,27 +294,24 @@ __device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
   //  {{0.0076500,0.2345212,0.3027571,0.0357158,0.0698887,0.4671353,0.9607998,0.9384000},
   //   {0.0002170,0.0085286,0.0548572,0.2024885,0.7218860,0.9971143,0.8316430,0.4412000},
   //   {0.0362100,1.1380633,1.7012999,0.4867545,0.0752499,0.0074643,0.0014714,0.0002400}}
-  // XYZ TO sRGB
+  // XYZ to sRGB
   //  {{3.2406, -1.5372, -0.4986},
   //   {-0.9689, 1.8758, 0.0415},
   //   {0.0557, -0.2040, 1.0570}}
-  //
-  // I could premultiply the matrices, there is no particular reason besides lazyness as to why that did not happen yet.
+  // Radiance to sRGB
+  //  {{0.00640271,   0.179441, 0.04852,    -0.43822, -0.920721,  -0.0226871, 1.83443,    2.36265},
+  //   {-0.00550232,  -0.164,   -0.119836,  0.365423, 1.28952,    1.41809,    0.629138,   -0.0816028},
+  //   {0.0386558,    1.21426,  1.80395,    0.475181, -0.0638328, -0.169502,  -0.114583,  -0.0374822}}
 
-  const float x = 0.0076500f * radiance.v[0] + 0.2345212f * radiance.v[1] + 0.3027571f * radiance.v[2] + 0.0357158f * radiance.v[3]
-                  + 0.0698887f * radiance.v[4] + 0.4671353f * radiance.v[5] + 0.9607998f * radiance.v[6] + 0.9384000f * radiance.v[7];
-  const float y = 0.0002170f * radiance.v[0] + 0.0085286f * radiance.v[1] + 0.0548572f * radiance.v[2] + 0.2024885f * radiance.v[3]
-                  + 0.7218860f * radiance.v[4] + 0.9971143f * radiance.v[5] + 0.8316430f * radiance.v[6] + 0.4412000f * radiance.v[7];
-  const float z = 0.0362100f * radiance.v[0] + 1.1380633f * radiance.v[1] + 1.7012999f * radiance.v[2] + 0.4867545f * radiance.v[3]
-                  + 0.0752499f * radiance.v[4] + 0.0074643f * radiance.v[5] + 0.0014714f * radiance.v[6] + 0.0002400f * radiance.v[7];
+  const float r = 0.00640271f * radiance.v[0] + 0.179441f * radiance.v[1] + 0.04852f * radiance.v[2] - 0.43822f * radiance.v[3]
+                  - 0.920721f * radiance.v[4] - 0.0226871f * radiance.v[5] + 1.83443f * radiance.v[6] + 2.36265f * radiance.v[7];
+  const float g = -0.00550232f * radiance.v[0] - 0.164f * radiance.v[1] - 0.119836f * radiance.v[2] + 0.365423f * radiance.v[3]
+                  + 1.28952f * radiance.v[4] + 1.41809f * radiance.v[5] + 0.629138f * radiance.v[6] - 0.0816028f * radiance.v[7];
+  const float b = 0.0386558f * radiance.v[0] + 1.21426f * radiance.v[1] + 1.80395f * radiance.v[2] + 0.475181f * radiance.v[3]
+                  - 0.0638328f * radiance.v[4] - 0.169502f * radiance.v[5] - 0.114583f * radiance.v[6] - 0.0374822f * radiance.v[7];
 
   // Negative numbers can show up, hence we need to clamp to 0 here.
-  RGBF result;
-  result.r = fmaxf(3.2406f * x - 1.5372f * y - 0.4986f * z, 0.0f);
-  result.g = fmaxf(-0.9689f * x + 1.8758f * y + 0.0415f * z, 0.0f);
-  result.b = fmaxf(0.0557f * x - 0.2040f * y + 1.0570f * z, 0.0f);
-
-  return result;
+  return max_color(get_color(r, g, b), splat_color(0.0f));
 }
 
 // This is a quick way of obtaining the color of the sun disk times transmittance
