@@ -26,62 +26,62 @@ typedef uint64_t LuminaryResult;
 /*
  * No error.
  */
-#define LUMINARY_SUCCESS (0x0000000000000000ull)
-
-/*
- * Error was propagated from an internal function returning an error.
- */
-#define LUMINARY_ERROR_PROPAGATED (0x0000000000000001ull)
+#define LUMINARY_SUCCESS (0ull)
 
 /*
  * Non-optional argument was NULL.
  */
-#define LUMINARY_ERROR_ARGUMENT_NULL (0x0000000000000002ull)
+#define LUMINARY_ERROR_ARGUMENT_NULL (1ull)
 
 /*
  * Encountered code path that was not implemented.
  */
-#define LUMINARY_ERROR_NOT_IMPLEMENTED (0x0000000000000004ull)
+#define LUMINARY_ERROR_NOT_IMPLEMENTED (2ull)
 
 /*
  * Argument given to an API function was invalid.
  */
-#define LUMINARY_ERROR_INVALID_API_ARGUMENT (0x0000000000000008ull)
+#define LUMINARY_ERROR_INVALID_API_ARGUMENT (3ull)
 
 /*
  * Action would cause a memory leak.
  */
-#define LUMINARY_ERROR_MEMORY_LEAK (0x0000000000000010ull)
+#define LUMINARY_ERROR_MEMORY_LEAK (4ull)
 
 /*
  * Insufficient memory for action.
  */
-#define LUMINARY_ERROR_OUT_OF_MEMORY (0x0000000000000020ull)
+#define LUMINARY_ERROR_OUT_OF_MEMORY (5ull)
 
 /*
  * Error in C standard library.
  */
-#define LUMINARY_ERROR_C_STD (0x0000000000000040ull)
+#define LUMINARY_ERROR_C_STD (6ull)
 
 /*
  * API function was used in a non-compliant way.
  */
-#define LUMINARY_ERROR_API_EXCEPTION (0x0000000000000080ull)
+#define LUMINARY_ERROR_API_EXCEPTION (7ull)
 
 /*
  * Error in CUDA library.
  */
-#define LUMINARY_ERROR_CUDA (0x0000000000000100ull)
+#define LUMINARY_ERROR_CUDA (8ull)
 
 /*
  * Error in OptiX library.
  */
-#define LUMINARY_ERROR_OPTIX (0x0000000000000200ull)
+#define LUMINARY_ERROR_OPTIX (9ull)
 
 /*
  * Error due to Luminary being in an unstable state caused by a previous error.
  */
-#define LUMINARY_ERROR_PREVIOUS_ERROR (0x0000000000000400ull)
+#define LUMINARY_ERROR_PREVIOUS_ERROR (10ull)
+
+/*
+ * Error was propagated from an internal function returning an error.
+ */
+#define LUMINARY_ERROR_PROPAGATED (0x8000000000000000ull)
 
 LUMINARY_API const char* luminary_result_to_string(LuminaryResult result);
 
