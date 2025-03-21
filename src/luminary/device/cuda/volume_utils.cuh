@@ -82,6 +82,13 @@ __device__ VolumeType volume_get_type_at_position(const vec3 pos) {
   return type;
 }
 
+__device__ bool volume_should_do_direct_lighting(const VolumeType type, const uint8_t state) {
+  if (((state & STATE_FLAG_DELTA_PATH) == 0) || (!device.ocean.triangle_light_contribution && type == VOLUME_TYPE_OCEAN))
+    return false;
+
+  return true;
+}
+
 struct VolumePath {
   union {
     float2 data;
@@ -228,6 +235,10 @@ __device__ float volume_sample_intersection_pdf(const VolumeDescriptor volume, c
   return volume.max_scattering * expf(-volume.max_scattering * (t - start));
 }
 
+__device__ float volume_sample_intersection_miss_probability(const VolumeDescriptor volume, const float depth) {
+  return expf(-volume.max_scattering * depth);
+}
+
 __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
   const float cos_angle = -dot_product(data.V, ray);
 
@@ -244,9 +255,8 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
   return scale_color(opaque_color(data.albedo), phase);
 }
 
-__device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float start, const float end) {
+__device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float length) {
   const RGBF volume_transmittance = volume_get_transmittance(volume);
-  const float length              = end - start;
 
   RGBF result;
   result.r = expf(-length * volume_transmittance.r);

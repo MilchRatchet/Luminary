@@ -33,7 +33,7 @@ extern "C" __global__ void __raygen__optix() {
   const VolumeType volume_type = VOLUME_HIT_TYPE(handle.instance_id);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  if (((task.state & STATE_FLAG_DELTA_PATH) == 0) || (!device.ocean.triangle_light_contribution && volume_type == VOLUME_TYPE_OCEAN))
+  if (volume_should_do_direct_lighting(volume_type, task.state) == false)
     return;
 #endif
 
