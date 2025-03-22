@@ -199,3 +199,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - J. Buisine, S. Delepoulle, C. Renaud, _Firefly Removal in Monte Carlo Rendering with Adaptive Median of meaNs_, Eurographics Symposium on Rendering, 2021.
 - B. Burley, _Practical Hash-based Owen Scrambling_, Journal of Computer Graphics Techniques (JCGT), pp. 1-20, 2020.
 - A. G. M. Ahmed, _An Implementation Algorithm of 2D Sobol Sequence Fast, Elegant, and Compact_, Eurographics Symposium on Rendering, 2024.
+- E. Ciklabakkal, A. Gruson, I. Georgiev, D. Nowrouzezahrai, T. Hachisuka, _Single-pass stratified importance resampling_, Computer Graphics Forum (Proceedings of EGSR), 2022.

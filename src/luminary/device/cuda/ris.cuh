@@ -7,8 +7,6 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
-#if defined(SHADING_KERNEL) && !defined(VOLUME_KERNEL)
-
 ////////////////////////////////////////////////////////////////////
 // Literature
 ////////////////////////////////////////////////////////////////////
@@ -21,20 +19,62 @@
 // [Wym21]
 // C. Wyman, A. Panteleev, "Rearchitecting Spatiotemporal Resampling for Production",
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
+//
+// [Cik22]
+// E. Ciklabakkal, A. Gruson, I. Georgiev, D. Nowrouzezahrai, T. Hachisuka, "Single-pass stratified importance resampling",
+// Computer Graphics Forum (Proceedings of EGSR), 2022
+
+// For light tree based technique, we stratify the RIS light tree random number dimensions using 1D latin hypercube sampling
+// to achieve the desired ordered stratification. The other dimensions are entirely dependent on this first dimension so it makes no
+// sense to apply any further stratification for those within RIS.
+__device__ float ris_transform_stratum(const uint32_t index, const uint32_t num_samples, const float random) {
+#if 1
+  const float section_length = 1.0f / num_samples;
+
+  return (index + random) * section_length;
+#else
+  return random;
+#endif
+}
+
+__device__ float2 ris_transform_stratum2(const uint32_t index, const uint32_t num_samples, const float2 random) {
+#if 0
+  float2 result = random;
+
+  result.x *= 0.25;
+  result.y *= 0.25;
+
+  if (index & 0b1)
+    result.x += 0.25f;
+  if (index & 0b10)
+    result.y += 0.25f;
+  if (index & 0b100)
+    result.x += 0.5f;
+  if (index & 0b1000)
+    result.y += 0.5f;
+
+  return result;
+#else
+  return random;
+#endif
+}
+
+#if defined(SHADING_KERNEL) && !defined(VOLUME_KERNEL)
 
 __device__ TriangleHandle ris_sample_light(
   const GBufferData data, const ushort2 pixel, const uint32_t bsdf_sample_light_key, const vec3 bsdf_sample_ray,
   const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
-  TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
+  const uint32_t reservoir_size = (IS_PRIMARY_RAY) ? device.settings.light_num_ris_samples : 1;
 
-  float sum_weight = 0.0f;
+  float sum_weights_front = 0.0f;
+  float sum_weights_back  = 0.0f;
 
   selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
   selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
   selected_dist          = 1.0f;
   selected_is_refraction = false;
 
-  const int reservoir_size = (IS_PRIMARY_RAY) ? device.settings.light_num_ris_samples : 1;
+  TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
 
   // Don't allow triangles to sample themselves.
   const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
@@ -81,7 +121,8 @@ __device__ TriangleHandle ris_sample_light(
 
       const float weight = target_pdf * mis_weight;
 
-      sum_weight += weight;
+      // First sample is trivially always the front sample
+      sum_weights_front += weight;
 
       selected_handle        = bsdf_sample_handle;
       selected_light_color   = (target_pdf > 0.0f) ? scale_color(light_color, 1.0f / target_pdf) : get_color(0.0f, 0.0f, 0.0f);
@@ -95,10 +136,27 @@ __device__ TriangleHandle ris_sample_light(
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
-  float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
+  // The paper first computes the first and last candidate and then enters the common logic,
+  // to simplify the code, we prepend a candidate to the front and back each and just prepend that they
+  // are outside the support of the target PDF, this way, all the logic can be inside the loop.
+  uint32_t index_front = (uint32_t) -1;
+  uint32_t index_back  = reservoir_size;
 
-  for (int i = 0; i < reservoir_size; i++) {
-    const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + i, pixel);
+  const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
+
+  while (index_front != index_back) {
+    const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+
+    uint32_t current_index;
+    if (compute_front) {
+      current_index = ++index_front;
+    }
+    else {
+      current_index = --index_back;
+    }
+
+    const float light_tree_random = ris_transform_stratum(
+      current_index, reservoir_size, quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + current_index, pixel));
 
     float light_tree_pdf;
     DeviceTransform trans;
@@ -110,7 +168,8 @@ __device__ TriangleHandle ris_sample_light(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
 
-    const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + i, pixel);
+    const float2 ray_random = ris_transform_stratum2(
+      current_index, reservoir_size, quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + current_index, pixel));
 
     vec3 ray;
     float dist, solid_angle;
@@ -129,29 +188,29 @@ __device__ TriangleHandle ris_sample_light(
     if (target_pdf == 0.0f)
       continue;
 
-    const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
-    const float one_over_nee_sample_pdf = solid_angle / ((float) reservoir_size * light_tree_pdf);
-
-    const float mis_weight =
-      one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
-
-    const float weight = target_pdf * mis_weight;
-
-    sum_weight += weight;
-
-    const float resampling_probability = weight / sum_weight;
-
-    if (resampling_random < resampling_probability) {
+    if (compute_front) {
       selected_handle        = light_handle;
       selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
       selected_ray           = ray;
       selected_dist          = dist;
       selected_is_refraction = is_refraction;
-
-      resampling_random = resampling_random / resampling_probability;
     }
-    else {
-      resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
+
+    if (index_front != index_back) {
+      const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
+      const float one_over_nee_sample_pdf = solid_angle / ((float) reservoir_size * light_tree_pdf);
+
+      const float mis_weight =
+        one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+
+      const float weight = target_pdf * mis_weight;
+
+      if (compute_front) {
+        sum_weights_front += weight;
+      }
+      else {
+        sum_weights_back += weight;
+      }
     }
   }
 
@@ -160,7 +219,7 @@ __device__ TriangleHandle ris_sample_light(
   ////////////////////////////////////////////////////////////////////
 
   // Selected light color already includes 1 / target_pdf.
-  selected_light_color = scale_color(selected_light_color, sum_weight);
+  selected_light_color = scale_color(selected_light_color, sum_weights_front + sum_weights_back);
 
   UTILS_CHECK_NANS(pixel, selected_light_color);
 

@@ -9,6 +9,7 @@
 #include "ocean_utils.cuh"
 #include "optix_include.cuh"
 #include "random.cuh"
+#include "ris.cuh"
 #include "utils.cuh"
 #include "utils.h"
 #include "volume_utils.cuh"
@@ -339,18 +340,34 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
   float selected_scale           = 0.0f;
   float selected_target_pdf      = FLT_MAX;
 
-  float sum_weight = 0.0f;
+  float sum_weights_front = 0.0f;
+  float sum_weights_back  = 0.0f;
 
-  float random_resampling = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_RESAMPLING, task.index);
+  uint32_t index_front = (uint32_t) -1;
+  uint32_t index_back  = device.settings.bridge_num_ris_samples;
 
-  for (uint32_t i = 0; i < device.settings.bridge_num_ris_samples; i++) {
+  const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_RESAMPLING, task.index);
+
+  while (index_front != index_back) {
+    const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+
+    uint32_t current_index;
+    if (compute_front) {
+      current_index = ++index_front;
+    }
+    else {
+      current_index = --index_back;
+    }
+
     float sample_pdf = 1.0f;
 
     ////////////////////////////////////////////////////////////////////
     // Sample light
     ////////////////////////////////////////////////////////////////////
 
-    const float random_light_tree = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + i, task.index);
+    const float random_light_tree = ris_transform_stratum(
+      current_index, device.settings.bridge_num_ris_samples,
+      quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + current_index, task.index));
 
     float light_list_pdf;
     DeviceTransform light_transform;
@@ -365,7 +382,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     // Sample light point
     ////////////////////////////////////////////////////////////////////
 
-    const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + i, task.index);
+    const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + current_index, task.index);
 
     vec3 light_dir;
     float area, light_dist;
@@ -394,8 +411,8 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     float sample_path_pdf;
     float sample_path_scale;
     vec3 sample_path_end_vertex;
-    RGBF sample_path_weight =
-      bridges_sample_bridge(task.origin, volume, light_point, i, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
+    RGBF sample_path_weight = bridges_sample_bridge(
+      task.origin, volume, light_point, current_index, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
     if (sample_path_pdf == 0.0f)
       continue;
@@ -426,27 +443,25 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     if (target_pdf == 0.0f)
       continue;
 
-    const float weight = (sample_pdf > 0.0f) ? target_pdf / sample_pdf : 0.0f;
-
-    sum_weight += weight;
-
-    const float resampling_probability = weight / sum_weight;
-
-    if (random_resampling < resampling_probability) {
-      selected_seed       = i;
+    if (compute_front) {
+      selected_seed       = current_index;
       selected_handle     = light_handle;
       selected_rotation   = sample_rotation;
       selected_scale      = sample_path_scale;
       selected_target_pdf = target_pdf;
-
-      random_resampling = random_resampling / resampling_probability;
     }
-    else {
-      random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
+
+    if (index_front != index_back) {
+      const float weight = (sample_pdf > 0.0f) ? target_pdf / sample_pdf : 0.0f;
+
+      if (compute_front) {
+        sum_weights_front += weight;
+      }
+      else {
+        sum_weights_back += weight;
+      }
     }
   }
-
-  sum_weight /= device.settings.bridge_num_ris_samples;
 
   ////////////////////////////////////////////////////////////////////
   // Evaluate sampled path
@@ -454,7 +469,10 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
 
   RGBF bridge_color = bridges_evaluate_bridge(task, volume, selected_handle, selected_seed, selected_rotation, selected_scale);
 
-  bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : splat_color(0.0f);
+  bridge_color =
+    (selected_target_pdf > 0.0f)
+      ? scale_color(bridge_color, (sum_weights_front + sum_weights_back) / (selected_target_pdf * device.settings.bridge_num_ris_samples))
+      : splat_color(0.0f);
 
   UTILS_CHECK_NANS(task.index, bridge_color);
 
