@@ -77,16 +77,44 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
 
       LUM_FAILURE_HANDLE(array_create(&duck->benchmark_output_promises, sizeof(LuminaryOutputPromiseHandle), args.num_benchmark_outputs));
 
-      for (uint32_t output_id = 0; output_id <= args.num_benchmark_outputs; output_id++) {
+      const uint32_t num_exponential_outputs = (args.num_benchmark_outputs < 5) ? args.num_benchmark_outputs : 5;
+
+      for (uint32_t output_id = 0; output_id <= num_exponential_outputs; output_id++) {
         LuminaryOutputRequestProperties properties;
+        LuminaryOutputPromiseHandle handle;
+
         properties.sample_count = 1 << output_id;
         properties.width        = renderer_settings.width;
         properties.height       = renderer_settings.height;
 
-        LuminaryOutputPromiseHandle handle;
         LUM_FAILURE_HANDLE(luminary_host_request_output(duck->host, properties, &handle));
-
         LUM_FAILURE_HANDLE(array_push(&duck->benchmark_output_promises, &handle));
+
+        if (output_id > 0) {
+          properties.sample_count = (1 << output_id) + (1 << (output_id - 1));
+          properties.width        = renderer_settings.width;
+          properties.height       = renderer_settings.height;
+
+          LUM_FAILURE_HANDLE(luminary_host_request_output(duck->host, properties, &handle));
+          LUM_FAILURE_HANDLE(array_push(&duck->benchmark_output_promises, &handle));
+        }
+      }
+
+      if (args.num_benchmark_outputs > 5) {
+        const uint32_t max_sample_count   = 1 << args.num_benchmark_outputs;
+        const uint32_t start_sample_count = 1 << 6;
+
+        for (uint32_t sample_count = start_sample_count; sample_count <= max_sample_count; sample_count += 32) {
+          LuminaryOutputRequestProperties properties;
+          LuminaryOutputPromiseHandle handle;
+
+          properties.sample_count = sample_count;
+          properties.width        = renderer_settings.width;
+          properties.height       = renderer_settings.height;
+
+          LUM_FAILURE_HANDLE(luminary_host_request_output(duck->host, properties, &handle));
+          LUM_FAILURE_HANDLE(array_push(&duck->benchmark_output_promises, &handle));
+        }
       }
     } break;
     default:

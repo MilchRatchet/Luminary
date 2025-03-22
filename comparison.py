@@ -41,24 +41,24 @@ if __name__ == '__main__':
     results.append(GatherData(ref, testSet))
 
 
-  maxSampleCountLog2 = 1
+  maxSampleCount = 1
   for result in results:
-    maxSampleCountLog2 = max(maxSampleCountLog2, len(result[2]) - 1)
+    maxSampleCount = max(maxSampleCount, max(result[2]))
 
   axes = plt.gca()
 
   axes.set_yscale('log')
 
   for result in results:
-    plt.plot(result[2], result[1], label=result[0])
+    plt.plot(result[2], result[1], label=result[0], linestyle='dashed', linewidth=0.5)
 
   plt.title('Convergence (Number of Samples)')
   plt.ylabel('Mean FLIP Error')
   plt.xlabel('Number of Samples')
   plt.legend(loc='best')
-  plt.xticks(np.linspace(0, 2 ** maxSampleCountLog2, 5))
+  plt.xticks(np.linspace(0, maxSampleCount, 5))
 
-  plt.savefig(args.output[0] + "/error_samples.png")
+  plt.savefig(args.output[0] + "/error_samples.png", format='png', dpi=1200)
 
   plt.figure()
 
@@ -67,12 +67,12 @@ if __name__ == '__main__':
   axes.set_yscale('log')
 
   for result in results:
-    plt.plot(result[3], result[1], label=result[0])
+    plt.plot(result[3], result[1], label=result[0], linestyle='dashed', linewidth=0.5)
 
   plt.title('Convergence (Execution Time)')
   plt.ylabel('Mean FLIP Error')
   plt.xlabel('Execution Time (s)')
   plt.legend(loc='best')
 
-  plt.savefig(args.output[0] + "/error_times.png")
+  plt.savefig(args.output[0] + "/error_times.png", format='png', dpi=1200)
 
