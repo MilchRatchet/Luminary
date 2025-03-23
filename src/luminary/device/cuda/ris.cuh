@@ -42,7 +42,7 @@ __device__ float2 ris_transform_stratum_2D(const uint32_t index, const uint32_t 
 __device__ TriangleHandle ris_sample_light(
   const GBufferData data, const ushort2 pixel, const uint32_t bsdf_sample_light_key, const vec3 bsdf_sample_ray,
   const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
-  const uint32_t reservoir_size = (IS_PRIMARY_RAY) ? device.settings.light_num_ris_samples : 1;
+  const uint32_t num_samples = (IS_PRIMARY_RAY) ? device.settings.light_num_ris_samples : 1;
 
   float sum_weights_front = 0.0f;
   float sum_weights_back  = 0.0f;
@@ -85,9 +85,9 @@ __device__ TriangleHandle ris_sample_light(
       const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, bsdf_sample_ray);
 
       float mis_weight;
-      if (reservoir_size > 0) {
+      if (num_samples > 0) {
         const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_light_key);
-        const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
+        const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * num_samples);
 
         // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
         mis_weight = bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf
@@ -115,15 +115,18 @@ __device__ TriangleHandle ris_sample_light(
   ////////////////////////////////////////////////////////////////////
 
   // The paper first computes the first and last candidate and then enters the common logic,
-  // to simplify the code, we prepend a candidate to the front and back each and just prepend that they
+  // to simplify the code, we prepend a candidate to the front and back each and just pretend that they
   // are outside the support of the target PDF, this way, all the logic can be inside the loop.
   uint32_t index_front = (uint32_t) -1;
-  uint32_t index_back  = reservoir_size;
+  uint32_t index_back  = num_samples;
 
   const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
 
-  while (index_front != index_back) {
+  for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
     const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+
+    if (!compute_front && iteration == num_samples)
+      break;
 
     uint32_t current_index;
     if (compute_front) {
@@ -133,8 +136,8 @@ __device__ TriangleHandle ris_sample_light(
       current_index = --index_back;
     }
 
-    const float light_tree_random = ris_transform_stratum(
-      current_index, reservoir_size, quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + current_index, pixel));
+    const float light_tree_random =
+      ris_transform_stratum(current_index, num_samples, quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + current_index, pixel));
 
     float light_tree_pdf;
     DeviceTransform trans;
@@ -173,21 +176,23 @@ __device__ TriangleHandle ris_sample_light(
       selected_is_refraction = is_refraction;
     }
 
-    if (index_front != index_back) {
-      const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
-      const float one_over_nee_sample_pdf = solid_angle / ((float) reservoir_size * light_tree_pdf);
+    // Last iteration cannot add to the weight sums to avoid double counting
+    if (iteration == num_samples)
+      break;
 
-      const float mis_weight =
-        one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+    const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
+    const float one_over_nee_sample_pdf = solid_angle / ((float) num_samples * light_tree_pdf);
 
-      const float weight = target_pdf * mis_weight;
+    const float mis_weight =
+      one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
 
-      if (compute_front) {
-        sum_weights_front += weight;
-      }
-      else {
-        sum_weights_back += weight;
-      }
+    const float weight = target_pdf * mis_weight;
+
+    if (compute_front) {
+      sum_weights_front += weight;
+    }
+    else {
+      sum_weights_back += weight;
     }
   }
 

@@ -343,13 +343,18 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
   float sum_weights_front = 0.0f;
   float sum_weights_back  = 0.0f;
 
+  const uint32_t num_samples = device.settings.bridge_num_ris_samples;
+
   uint32_t index_front = (uint32_t) -1;
-  uint32_t index_back  = device.settings.bridge_num_ris_samples;
+  uint32_t index_back  = num_samples;
 
   const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_RESAMPLING, task.index);
 
-  while (index_front != index_back) {
+  for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
     const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+
+    if (!compute_front && iteration == num_samples)
+      break;
 
     uint32_t current_index;
     if (compute_front) {
@@ -366,8 +371,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     ////////////////////////////////////////////////////////////////////
 
     const float random_light_tree = ris_transform_stratum(
-      current_index, device.settings.bridge_num_ris_samples,
-      quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + current_index, task.index));
+      current_index, num_samples, quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + current_index, task.index));
 
     float light_list_pdf;
     DeviceTransform light_transform;
@@ -451,15 +455,17 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
       selected_target_pdf = target_pdf;
     }
 
-    if (index_front != index_back) {
-      const float weight = (sample_pdf > 0.0f) ? target_pdf / sample_pdf : 0.0f;
+    // Last iteration cannot add to the weight sums to avoid double counting
+    if (iteration == num_samples)
+      break;
 
-      if (compute_front) {
-        sum_weights_front += weight;
-      }
-      else {
-        sum_weights_back += weight;
-      }
+    const float weight = (sample_pdf > 0.0f) ? target_pdf / sample_pdf : 0.0f;
+
+    if (compute_front) {
+      sum_weights_front += weight;
+    }
+    else {
+      sum_weights_back += weight;
     }
   }
 

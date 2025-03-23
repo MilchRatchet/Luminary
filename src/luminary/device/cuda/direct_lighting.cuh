@@ -242,8 +242,11 @@ __device__ RGBF direct_lighting_sun_caustic(
 
     const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
 
-    while (index_front != index_back) {
+    for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
       const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+
+      if (!compute_front && iteration == num_samples)
+        break;
 
       uint32_t current_index;
       if (compute_front) {
@@ -254,21 +257,26 @@ __device__ RGBF direct_lighting_sun_caustic(
       }
 
       vec3 sample_point;
-      float sample_weight;
-      if (caustics_find_connection_point(
-            data, index, sampling_domain, is_underwater, current_index, num_samples, sample_point, sample_weight)) {
-        if (compute_front) {
-          connection_point = sample_point;
-        }
+      float sample_weight  = 0.0f;
+      const bool valid_hit = caustics_find_connection_point(
+        data, index, sampling_domain, is_underwater, current_index, num_samples, sample_point, sample_weight);
 
-        if (index_front != index_back) {
-          if (compute_front) {
-            sum_weights_front += sample_weight;
-          }
-          else {
-            sum_weights_back += sample_weight;
-          }
-        }
+      if (valid_hit == false || sample_weight == 0.0f)
+        continue;
+
+      if (compute_front) {
+        connection_point = sample_point;
+      }
+
+      // Last iteration cannot add to the weight sums to avoid double counting
+      if (iteration == num_samples)
+        break;
+
+      if (compute_front) {
+        sum_weights_front += sample_weight;
+      }
+      else {
+        sum_weights_back += sample_weight;
       }
     }
 
