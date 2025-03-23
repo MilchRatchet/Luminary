@@ -225,7 +225,7 @@ __device__ RGBF direct_lighting_sun_caustic(
   if (sampling_domain.fast_path) {
     vec3 sample_point;
     float sample_weight;
-    caustics_find_connection_point(data, index, sampling_domain, is_underwater, 0, sample_point, sample_weight);
+    caustics_find_connection_point(data, index, sampling_domain, is_underwater, 0, 1, sample_point, sample_weight);
 
     sum_connection_weight = sample_weight;
     connection_point      = sample_point;
@@ -234,26 +234,45 @@ __device__ RGBF direct_lighting_sun_caustic(
   else {
     const uint32_t num_samples = device.ocean.caustics_ris_sample_count + 1;
 
-    float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
+    float sum_weights_front = 0.0f;
+    float sum_weights_back  = 0.0f;
 
-    // RIS with target weight being the Dirac delta of if the connection point is valid or not.
-    for (uint32_t i = 0; i < num_samples; i++) {
+    uint32_t index_front = (uint32_t) -1;
+    uint32_t index_back  = num_samples;
+
+    const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
+
+    while (index_front != index_back) {
+      const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+
+      uint32_t current_index;
+      if (compute_front) {
+        current_index = ++index_front;
+      }
+      else {
+        current_index = --index_back;
+      }
+
       vec3 sample_point;
       float sample_weight;
-      if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
-        sum_connection_weight += sample_weight;
-
-        const float resampling_probability = sample_weight / sum_connection_weight;
-        if (resampling_random < resampling_probability) {
+      if (caustics_find_connection_point(
+            data, index, sampling_domain, is_underwater, current_index, num_samples, sample_point, sample_weight)) {
+        if (compute_front) {
           connection_point = sample_point;
-
-          resampling_random = resampling_random / resampling_probability;
         }
-        else {
-          resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
+
+        if (index_front != index_back) {
+          if (compute_front) {
+            sum_weights_front += sample_weight;
+          }
+          else {
+            sum_weights_back += sample_weight;
+          }
         }
       }
     }
+
+    sum_connection_weight = sum_weights_front + sum_weights_back;
 
     connection_weight = (1.0f / num_samples) * sum_connection_weight;
 

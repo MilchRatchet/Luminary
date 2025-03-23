@@ -28,35 +28,13 @@
 // to achieve the desired ordered stratification. The other dimensions are entirely dependent on this first dimension so it makes no
 // sense to apply any further stratification for those within RIS.
 __device__ float ris_transform_stratum(const uint32_t index, const uint32_t num_samples, const float random) {
-#if 1
   const float section_length = 1.0f / num_samples;
 
   return (index + random) * section_length;
-#else
-  return random;
-#endif
 }
 
-__device__ float2 ris_transform_stratum2(const uint32_t index, const uint32_t num_samples, const float2 random) {
-#if 0
-  float2 result = random;
-
-  result.x *= 0.25;
-  result.y *= 0.25;
-
-  if (index & 0b1)
-    result.x += 0.25f;
-  if (index & 0b10)
-    result.y += 0.25f;
-  if (index & 0b100)
-    result.x += 0.5f;
-  if (index & 0b1000)
-    result.y += 0.5f;
-
-  return result;
-#else
-  return random;
-#endif
+__device__ float2 ris_transform_stratum_2D(const uint32_t index, const uint32_t num_samples, const float2 random) {
+  return make_float2(ris_transform_stratum(index, num_samples, random.x), random.y);
 }
 
 #if defined(SHADING_KERNEL) && !defined(VOLUME_KERNEL)
@@ -168,8 +146,7 @@ __device__ TriangleHandle ris_sample_light(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
 
-    const float2 ray_random = ris_transform_stratum2(
-      current_index, reservoir_size, quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + current_index, pixel));
+    const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + current_index, pixel);
 
     vec3 ray;
     float dist, solid_angle;
