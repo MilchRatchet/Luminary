@@ -178,6 +178,10 @@ inline float vec128_norm2(const Vec128 a) {
   return sqrtf(vec128_hsum(vec128_mul(a, a)));
 }
 
+inline float vec128_dot(const Vec128 a, const Vec128 b) {
+  return vec128_hsum(vec128_mul(a, b));
+}
+
 /*
  * Implicitely assumes w is 0. Call vec128_set_w_to_0 first if that is not given.
  */

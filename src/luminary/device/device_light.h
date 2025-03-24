@@ -11,12 +11,13 @@ struct LightTreeFragment {
   Vec128 high;
   Vec128 low;
   Vec128 middle;
+  Vec128 average_direction;  // Normal, but flipped to be in Z+ orientation and scaled by 0.5
   uint32_t instance_id;
   uint32_t tri_id;
   float power;
   uint32_t instance_cache_tri_id;
 } typedef LightTreeFragment;
-LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x40);
+LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x50);
 
 struct LightTreeCacheTriangle {
   uint32_t tri_id;

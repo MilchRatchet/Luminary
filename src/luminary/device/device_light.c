@@ -46,16 +46,20 @@ struct LightTreeBinaryNode {
 } typedef LightTreeBinaryNode;
 
 struct LightTreeNode {
-  vec3 left_ref_point;
-  vec3 right_ref_point;
-  float left_confidence;
-  float right_confidence;
+  vec3 left_vmf_dir;
+  vec3 right_vmf_dir;
+  float left_vmf_sharpness;
+  float right_vmf_sharpness;
+  vec3 left_mean;
+  vec3 right_mean;
+  float left_variance;
+  float right_variance;
   float left_energy;
   float right_energy;
   uint32_t ptr;
   uint32_t light_count;
 } typedef LightTreeNode;
-static_assert(sizeof(LightTreeNode) == 0x30, "Incorrect packing size.");
+static_assert(sizeof(LightTreeNode) == 0x50, "Incorrect packing size.");
 
 struct LightTreeChildNode {
   vec3 point;
@@ -457,37 +461,43 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   return LUMINARY_SUCCESS;
 }
 
-static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point, float* ref_dist) {
+static void _lights_get_vmf_and_mean_and_variance(
+  const LightTreeWork* work, const LightTreeBinaryNode node, const float energy, vec3* vmf_direction, float* vmf_sharpness, vec3* mean,
+  float* variance) {
+  // TODO: This could instead be done in a bottom up fashion like in the paper which would be much faster, however, this here might be more
+  // accurate
   const float inverse_total_energy = 1.0f / energy;
 
-  vec3 p = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+  Vec128 average_direction = vec128_set_1(0.0f);
+  Vec128 p                 = vec128_set_1(0.0f);
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const float weight = frag.power * inverse_total_energy;
+    const float frag_spatial_variance = frag.middle.w;
+    const float weight                = frag.power * inverse_total_energy;
+    const Vec128 weight_vector        = vec128_set_1(weight);
 
-    p.x += weight * frag.middle.x;
-    p.y += weight * frag.middle.y;
-    p.z += weight * frag.middle.z;
+    average_direction = vec128_fmadd(frag.average_direction, weight_vector, average_direction);
+    p                 = vec128_fmadd(frag.middle, weight_vector, p);
   }
 
-  float weighted_dist = 0.0f;
+  float spatial_variance = 0.0f;
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const vec3 diff = {.x = frag.middle.x - p.x, .y = frag.middle.y - p.y, .z = frag.middle.z - p.z};
-
-    const float dist = sqrtf(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
-
+    const Vec128 diff  = vec128_sub(frag.middle, p);
     const float weight = frag.power * inverse_total_energy;
 
-    weighted_dist += weight * dist;
+    spatial_variance += weight * vec128_dot(diff, diff);
   }
 
-  weighted_dist = fmaxf(weighted_dist, 0.0001f);
+  const float avg_dir_norm = vec128_norm2(average_direction);
 
-  *ref_point = p;
-  *ref_dist  = weighted_dist;
+  *vmf_direction =
+    (vec3) {.x = average_direction.x / avg_dir_norm, .y = average_direction.y / avg_dir_norm, .z = average_direction.z / avg_dir_norm};
+  *vmf_sharpness = (3.0f * avg_dir_norm - avg_dir_norm * avg_dir_norm * avg_dir_norm) / (1.0f - avg_dir_norm * avg_dir_norm);
+  *mean          = (vec3) {.x = p.x, .y = p.y, .z = p.z};
+  *variance      = spatial_variance;
 }
 
 // Set the reference point in each node to be the energy weighted mean of the centers of the lights.
@@ -499,6 +509,7 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
 
   for (uint32_t i = 0; i < work->nodes_count; i++) {
     LightTreeBinaryNode binary_node = work->binary_nodes[i];
+    LightTreeBinaryNode* children   = work->binary_nodes + binary_node.child_address;
 
     LightTreeNode node;
 
@@ -510,10 +521,10 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
         node.light_count = 0;
         node.ptr         = binary_node.child_address;
 
-        _lights_get_ref_point_and_dist(
-          work, work->binary_nodes[binary_node.child_address + 0], node.left_energy, &node.left_ref_point, &node.left_confidence);
-        _lights_get_ref_point_and_dist(
-          work, work->binary_nodes[binary_node.child_address + 1], node.right_energy, &node.right_ref_point, &node.right_confidence);
+        _lights_get_vmf_and_mean_and_variance(
+          work, children[0], node.left_energy, &node.left_vmf_dir, &node.left_vmf_sharpness, &node.left_mean, &node.left_variance);
+        _lights_get_vmf_and_mean_and_variance(
+          work, children[1], node.right_energy, &node.right_vmf_dir, &node.right_vmf_sharpness, &node.right_mean, &node.right_variance);
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
@@ -1621,12 +1632,17 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
         continue;
 
       LightTreeFragment fragment;
-      fragment.low         = vec128_min(vertex, vec128_min(vertex1, vertex2));
-      fragment.high        = vec128_max(vertex, vec128_max(vertex1, vertex2));
-      fragment.middle      = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
-      fragment.power       = material->constant_emission_intensity * area * triangle->average_intensity;
-      fragment.instance_id = instance_id;
-      fragment.tri_id      = triangle->tri_id;
+      fragment.low               = vec128_min(vertex, vec128_min(vertex1, vertex2));
+      fragment.high              = vec128_max(vertex, vec128_max(vertex1, vertex2));
+      fragment.middle            = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
+      fragment.average_direction = vec128_mul(cross, vec128_set_1(0.5f));
+      fragment.power             = material->constant_emission_intensity * area * triangle->average_intensity;
+      fragment.instance_id       = instance_id;
+      fragment.tri_id            = triangle->tri_id;
+
+      // The paper assumes unidirectional lights, ours are bidirectional, to get consistent direction, we force them to be in Z+ orientation
+      // TODO: If I add unidirectional light support, I need to figure out something else
+      fragment.average_direction.z = fabsf(fragment.average_direction.z);
 
       __FAILURE_HANDLE(array_get_num_elements(instance->bvh_triangles, &fragment.instance_cache_tri_id));
 
