@@ -816,6 +816,17 @@ __device__ RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }
 
+__device__ RGBAF transparent_color(const RGBF a, const float alpha) {
+  RGBAF result;
+
+  result.r = a.r;
+  result.g = a.g;
+  result.b = a.b;
+  result.a = alpha;
+
+  return result;
+}
+
 __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const float a) {
   RGBAF result;
 
@@ -823,6 +834,28 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   result.g = g;
   result.b = b;
   result.a = a;
+
+  return result;
+}
+
+__device__ RGBAF RGBAF_add(const RGBAF a, const RGBAF b) {
+  RGBAF result;
+
+  result.r = a.r + b.r;
+  result.g = a.g + b.g;
+  result.b = a.b + b.b;
+  result.a = a.a + b.a;
+
+  return result;
+}
+
+__device__ RGBAF RGBAF_scale(const RGBAF a, const float b) {
+  RGBAF result;
+
+  result.r = a.r * b;
+  result.g = a.g * b;
+  result.b = a.b * b;
+  result.a = a.a * b;
 
   return result;
 }

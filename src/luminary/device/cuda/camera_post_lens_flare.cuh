@@ -33,7 +33,7 @@ LUMINARY_KERNEL void camera_post_lens_flare_ghosts(const KernelArgsCameraPostLen
       const float sxi = ((sx - 0.5f) * ghost_scales[i]) + 0.5f;
       const float syi = ((sy - 0.5f) * ghost_scales[i]) + 0.5f;
 
-      RGBF ghost = sample_pixel_border(args.src, sxi, syi, args.sw, args.sh);
+      RGBF ghost = opaque_color(sample_pixel_border(args.src, sxi, syi, args.sw, args.sh));
 
       ghost = scale_color(ghost, 0.0005f);
       ghost = mul_color(ghost, ghost_colors[i]);
@@ -99,9 +99,9 @@ LUMINARY_KERNEL void camera_post_lens_flare_halo(const KernelArgsCameraPostLensF
     src_uv_b.u = (fish_uv.u - 0.5f) * (1.0f - chroma_shift) + 0.5f + v_halo.x;
     src_uv_b.v = (fish_uv.v - 0.5f) * (1.0f - chroma_shift) + 0.5f + v_halo.y;
 
-    const RGBF pr = sample_pixel_border(args.src, src_uv_r.u, src_uv_r.v, args.sw, args.sh);
-    const RGBF pg = sample_pixel_border(args.src, src_uv_g.u, src_uv_g.v, args.sw, args.sh);
-    const RGBF pb = sample_pixel_border(args.src, src_uv_b.u, src_uv_b.v, args.sw, args.sh);
+    const RGBF pr = opaque_color(sample_pixel_border(args.src, src_uv_r.u, src_uv_r.v, args.sw, args.sh));
+    const RGBF pg = opaque_color(sample_pixel_border(args.src, src_uv_g.u, src_uv_g.v, args.sw, args.sh));
+    const RGBF pb = opaque_color(sample_pixel_border(args.src, src_uv_b.u, src_uv_b.v, args.sw, args.sh));
 
     const RGBF pixel = get_color(pr.r, pg.g, pb.b);
 
