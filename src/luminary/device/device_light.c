@@ -485,10 +485,16 @@ static void _lights_get_vmf_and_mean_and_variance(
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const Vec128 diff  = vec128_sub(frag.middle, p);
     const float weight = frag.power * inverse_total_energy;
 
-    spatial_variance += weight * vec128_dot(diff, diff);
+    const Vec128 diff0 = vec128_sub(frag.v0, p);
+    spatial_variance += weight * vec128_dot(diff0, diff0);
+
+    const Vec128 diff1 = vec128_sub(frag.v1, p);
+    spatial_variance += weight * vec128_dot(diff1, diff1);
+
+    const Vec128 diff2 = vec128_sub(frag.v2, p);
+    spatial_variance += weight * vec128_dot(diff2, diff2);
   }
 
   const float avg_dir_norm = vec128_norm2(average_direction);
@@ -1636,6 +1642,9 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.high              = vec128_max(vertex, vec128_max(vertex1, vertex2));
       fragment.middle            = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
       fragment.average_direction = vec128_mul(cross, vec128_set_1(0.5f));
+      fragment.v0                = vertex;
+      fragment.v1                = vertex1;
+      fragment.v2                = vertex2;
       fragment.power             = material->constant_emission_intensity * area * triangle->average_intensity;
       fragment.instance_id       = instance_id;
       fragment.tri_id            = triangle->tri_id;
