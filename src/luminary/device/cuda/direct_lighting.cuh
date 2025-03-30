@@ -41,6 +41,7 @@ __device__ bool direct_lighting_geometry_is_valid(const DeviceTask task) {
 ////////////////////////////////////////////////////////////////////
 
 __device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(const GBufferData data, const ushort2 index) {
+#ifndef DL_GEO_NO_BSDF_SAMPLE
   bool bsdf_sample_is_refraction = false;
   bool bsdf_sample_is_valid      = false;
   const vec3 bsdf_dir = bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
@@ -62,6 +63,12 @@ __device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(const GBuffe
   sample.light_id      = payload.triangle_id;
   sample.ray           = bsdf_dir;
   sample.is_refraction = bsdf_sample_is_refraction;
+#else  /* !DL_GEO_NO_BSDF_SAMPLE */
+  DirectLightingBSDFSample sample;
+  sample.light_id      = HIT_TYPE_LIGHT_BSDF_HINT;
+  sample.ray           = get_vector(0.0f, 0.0f, 1.0f);
+  sample.is_refraction = false;
+#endif /* DL_GEO_NO_BSDF_SAMPLE */
 
   return sample;
 }

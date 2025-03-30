@@ -28,6 +28,8 @@
 #define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)
 #define BSDF_ROUGHNESS_CLAMP (0.025f)
 
+#define DL_GEO_NO_BSDF_SAMPLE
+
 enum HitType : uint32_t {
   HIT_TYPE_INVALID           = 0xFFFFFFFFu,
   HIT_TYPE_SKY               = 0xFFFFFFFEu,

@@ -67,6 +67,20 @@ __device__ float smoothstep(const float x, const float edge0, const float edge1)
   return t * t * (3.0f - 2.0f * t);
 }
 
+// (exp(x) - 1)/x with cancellation of rounding errors.
+__device__ float expm1_over_x(const float x) {
+  const float u = expf(x);
+
+  if (u == 1.0f) {
+    return 1.0f;
+  }
+
+  const float y = u - 1.0f;
+  const float z = (fabsf(x) < 1.0f) ? logf(u) : x;
+
+  return y / z;
+}
+
 __device__ vec3 get_vector(const float x, const float y, const float z) {
   vec3 result;
 

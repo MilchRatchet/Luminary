@@ -61,6 +61,7 @@ __device__ TriangleHandle ris_sample_light(
   // Initialize reservoir with an initial sample
   ////////////////////////////////////////////////////////////////////
 
+#ifndef DL_GEO_NO_BSDF_SAMPLE
   TriangleHandle bsdf_sample_handle = blocked_handle;
   if (bsdf_sample_light_key != HIT_TYPE_LIGHT_BSDF_HINT) {
     bsdf_sample_handle = device.ptrs.light_tree_tri_handle_map[bsdf_sample_light_key];
@@ -109,6 +110,7 @@ __device__ TriangleHandle ris_sample_light(
       selected_is_refraction = initial_is_refraction;
     }
   }
+#endif /* !DL_GEO_NO_BSDF_SAMPLE */
 
   ////////////////////////////////////////////////////////////////////
   // Resample NEE samples
@@ -180,11 +182,15 @@ __device__ TriangleHandle ris_sample_light(
     if (iteration == num_samples)
       break;
 
+#ifndef DL_GEO_NO_BSDF_SAMPLE
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
     const float one_over_nee_sample_pdf = solid_angle / ((float) num_samples * light_tree_pdf);
 
     const float mis_weight =
       one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+#else  /* !DL_GEO_NO_BSDF_SAMPLE */
+    const float mis_weight = solid_angle / (num_samples * light_tree_pdf);
+#endif /* DL_GEO_NO_BSDF_SAMPLE */
 
     const float weight = target_pdf * mis_weight;
 

@@ -859,10 +859,10 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         uint64_t child_rel_mean_x        = (uint64_t) floorf((child_node.mean.x - node.base_mean.x) * compression_x);
         uint64_t child_rel_mean_y        = (uint64_t) floorf((child_node.mean.y - node.base_mean.y) * compression_y);
         uint64_t child_rel_mean_z        = (uint64_t) floorf((child_node.mean.z - node.base_mean.z) * compression_z);
-        uint64_t child_rel_power         = (uint64_t) floorf(255.0f * child_node.power / max_power);
         uint64_t child_rel_variance_leaf = (((uint64_t) (child_node.variance * compression_v)) << 1) | ((uint64_t) child_node.light_count);
+        uint64_t child_rel_power         = (uint64_t) floorf(255.0f * child_node.power / max_power);
 
-        if (child_rel_mean_x > 255 || child_rel_mean_y > 255 || child_rel_mean_z > 255 || (rel_variance_leaf >> 1) > 127) {
+        if (child_rel_mean_x > 255 || child_rel_mean_y > 255 || child_rel_mean_z > 255 || (child_rel_variance_leaf >> 1) > 127) {
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Value exceeded bit limit.");
         }
 
@@ -911,8 +911,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         rel_mean_x |= child_rel_mean_x << (i * 8);
         rel_mean_y |= child_rel_mean_y << (i * 8);
         rel_mean_z |= child_rel_mean_z << (i * 8);
-        rel_power |= child_rel_power << (i * 8);
         rel_variance_leaf |= child_rel_variance_leaf << (i * 8);
+        rel_power |= child_rel_power << (i * 8);
       }
 
       node.rel_mean_x[0]        = (uint32_t) (rel_mean_x & 0xFFFFFFFF);
@@ -921,10 +921,10 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       node.rel_mean_y[1]        = (uint32_t) ((rel_mean_y >> 32) & 0xFFFFFFFF);
       node.rel_mean_z[0]        = (uint32_t) (rel_mean_z & 0xFFFFFFFF);
       node.rel_mean_z[1]        = (uint32_t) ((rel_mean_z >> 32) & 0xFFFFFFFF);
-      node.rel_power[0]         = (uint32_t) (rel_power & 0xFFFFFFFF);
-      node.rel_power[1]         = (uint32_t) ((rel_power >> 32) & 0xFFFFFFFF);
       node.rel_variance_leaf[0] = (uint32_t) (rel_variance_leaf & 0xFFFFFFFF);
       node.rel_variance_leaf[1] = (uint32_t) ((rel_variance_leaf >> 32) & 0xFFFFFFFF);
+      node.rel_power[0]         = (uint32_t) (rel_power & 0xFFFFFFFF);
+      node.rel_power[1]         = (uint32_t) ((rel_power >> 32) & 0xFFFFFFFF);
 
       // Prepare the next nodes to be constructed from the respective binary nodes.
       for (uint64_t i = 0; i < child_count; i++) {

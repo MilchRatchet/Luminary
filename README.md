@@ -200,3 +200,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - B. Burley, _Practical Hash-based Owen Scrambling_, Journal of Computer Graphics Techniques (JCGT), pp. 1-20, 2020.
 - A. G. M. Ahmed, _An Implementation Algorithm of 2D Sobol Sequence Fast, Elegant, and Compact_, Eurographics Symposium on Rendering, 2024.
 - E. Ciklabakkal, A. Gruson, I. Georgiev, D. Nowrouzezahrai, T. Hachisuka, _Single-pass stratified importance resampling_, Computer Graphics Forum (Proceedings of EGSR), 2022.
+- Y. Tokuyoshi, S. Ikeda, P. Kulkarni, T. Harada, _Hierarchical Light Sampling with Accurate Spherical Gaussian Lighting_, SIGGRAPH Asia 2024 Conference Papers, 2024.

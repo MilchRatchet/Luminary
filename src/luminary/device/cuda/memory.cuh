@@ -341,28 +341,28 @@ __device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
 
   DeviceLightTreeNode node;
 
-  node.base_point.x   = v0.x;
-  node.base_point.y   = v0.y;
-  node.base_point.z   = v0.z;
-  node.exp_x          = *((int8_t*) &v0.w + 0);
-  node.exp_y          = *((int8_t*) &v0.w + 1);
-  node.exp_z          = *((int8_t*) &v0.w + 2);
-  node.exp_confidence = *((uint8_t*) &v0.w + 3);
+  node.base_mean.x  = v0.x;
+  node.base_mean.y  = v0.y;
+  node.base_mean.z  = v0.z;
+  node.exp_x        = *((int8_t*) &v0.w + 0);
+  node.exp_y        = *((int8_t*) &v0.w + 1);
+  node.exp_z        = *((int8_t*) &v0.w + 2);
+  node.exp_variance = *((uint8_t*) &v0.w + 3);
 
-  node.child_ptr      = __float_as_uint(v1.x);
-  node.light_ptr      = __float_as_uint(v1.y);
-  node.rel_point_x[0] = __float_as_uint(v1.z);
-  node.rel_point_x[1] = __float_as_uint(v1.w);
+  node.child_ptr     = __float_as_uint(v1.x);
+  node.light_ptr     = __float_as_uint(v1.y);
+  node.rel_mean_x[0] = __float_as_uint(v1.z);
+  node.rel_mean_x[1] = __float_as_uint(v1.w);
 
-  node.rel_point_y[0] = __float_as_uint(v2.x);
-  node.rel_point_y[1] = __float_as_uint(v2.y);
-  node.rel_point_z[0] = __float_as_uint(v2.z);
-  node.rel_point_z[1] = __float_as_uint(v2.w);
+  node.rel_mean_y[0] = __float_as_uint(v2.x);
+  node.rel_mean_y[1] = __float_as_uint(v2.y);
+  node.rel_mean_z[0] = __float_as_uint(v2.z);
+  node.rel_mean_z[1] = __float_as_uint(v2.w);
 
-  node.rel_energy[0]       = __float_as_uint(v3.x);
-  node.rel_energy[1]       = __float_as_uint(v3.y);
-  node.confidence_light[0] = __float_as_uint(v3.z);
-  node.confidence_light[1] = __float_as_uint(v3.w);
+  node.rel_variance_leaf[0] = __float_as_uint(v3.x);
+  node.rel_variance_leaf[1] = __float_as_uint(v3.y);
+  node.rel_power[0]         = __float_as_uint(v3.z);
+  node.rel_power[1]         = __float_as_uint(v3.w);
 
   return node;
 }

@@ -11,6 +11,249 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
+////////////////////////////////////////////////////////////////////
+// Literature
+////////////////////////////////////////////////////////////////////
+
+// [Tok24]
+// Y. Tokuyoshi and S. Ikeda and P. Kulkarni and T. Harada, "Hierarchical Light Sampling with Accurate Spherical Gaussian Lighting",
+// SIGGRAPH Asia 2024 Conference Papers, 2024
+
+////////////////////////////////////////////////////////////////////
+// SG Lighting
+////////////////////////////////////////////////////////////////////
+
+// Code taken from the SG lighting demo distributed with [Tok24].
+
+#define LIGHT_SG_VARIANCE_THRESHOLD (0x1.0p-31f)
+#define LIGHT_SG_INV_SQRTPI (0.56418958354775628694807945156077f)
+
+__device__ float light_sg_integral(const float sharpness) {
+  return 4.0f * PI * expm1_over_x(-2.0f * sharpness);
+}
+
+// Approximate hemispherical integral for a vMF distribution (i.e. normalized SG).
+__device__ float light_vmf_integral(const float cosine, const float sharpness) {
+  // Interpolation factor [Tokuyoshi 2022].
+  const float A          = 0.6517328826907056171791055021459f;
+  const float B          = 1.3418280033141287699294252888649f;
+  const float C          = 7.2216687798956709087860872386955f;
+  const float steepness  = sharpness * sqrtf((0.5f * sharpness + A) / ((sharpness + B) * sharpness + C));
+  const float lerpFactor = __saturatef(0.5f + 0.5f * (erff(steepness * clampf(cosine, -1.0f, 1.0f)) / erff(steepness)));
+
+  // Interpolation between upper and lower hemispherical integrals .
+  const float e = expf(-sharpness);
+
+  return lerp(e, 1.0f, lerpFactor) / (e + 1.0f);
+}
+
+__device__ float light_sg_cosine_integral_upper_hemisphere(const float sharpness) {
+  if (sharpness <= 0.5) {
+    // Taylor-series approximation for the numerical stability.
+    return (((((((-1.0f / 362880.0f) * sharpness + 1.0f / 40320.0f) * sharpness - 1.0f / 5040.0f) * sharpness + 1.0f / 720.0f) * sharpness
+              - 1.0f / 120.0f)
+               * sharpness
+             + 1.0f / 24.0f)
+              * sharpness
+            - 1.0f / 6.0f)
+             * sharpness
+           + 0.5f;
+  }
+
+  return (expm1f(-sharpness) + sharpness) / (sharpness * sharpness);
+}
+
+__device__ float light_sg_cosine_integral_lower_hemisphere(const float sharpness) {
+  const float e = expf(-sharpness);
+
+  if (sharpness <= 0.5f) {
+    // Taylor-series approximation for the numerical stability.
+    return e
+           * (((((((((1.0f / 403200.0f) * sharpness - 1.0f / 45360.0f) * sharpness + 1.0f / 5760.0f) * sharpness - 1.0f / 840.0f) * sharpness + 1.0f / 144.0f) * sharpness - 1.0f / 30.0f) * sharpness + 1.0f / 8.0f) * sharpness - 1.0f / 3.0f) * sharpness + 0.5f);
+  }
+
+  return e * (-expm1f(-sharpness) - sharpness * e) / (sharpness * sharpness);
+}
+
+__device__ float light_sg_cosine_integral(const float z, const float sharpness) {
+  // Fitted approximation for t(sharpness).
+  const float A  = 2.7360831611272558028247203765204f;
+  const float B  = 17.02129778174187535455530451145f;
+  const float C  = 4.0100826728510421403939290030394f;
+  const float D  = 15.219156263147210594866010069381f;
+  const float E  = 76.087896272360737270901154261082f;
+  const float t  = sharpness * sqrtf(0.5f * ((sharpness + A) * sharpness + B) / (((sharpness + C) * sharpness + D) * sharpness + E));
+  const float tz = t * z;
+
+  const float lerp_factor = __saturatef(
+    FLT_EPSILON * 0.5f + 0.5f * (z * erfcf(-tz) + erfcf(t))
+    - 0.5f * LIGHT_SG_INV_SQRTPI * expf(-tz * tz) * expm1f(t * t * (z * z - 1.0f)) / t);
+
+  // Interpolation between upper and lower hemispherical integrals.
+  const float lowerIntegral = light_sg_cosine_integral_lower_hemisphere(sharpness);
+  const float upperIntegral = light_sg_cosine_integral_upper_hemisphere(sharpness);
+
+  return 2.0f * lerp(lowerIntegral, upperIntegral, lerp_factor);
+}
+
+__device__ float light_sg_ggx(const vec3 m, const float mat00, const float mat01, const float mat11) {
+  const float det = fmaxf(mat00 * mat11 - mat01 * mat01, eps);
+
+  const float m_roughness_x = mat11 * m.x - mat01 * m.y;
+  const float m_roughness_y = -mat01 * m.x + mat00 * m.y;
+
+  const float dot = m.x * m_roughness_x + m.y * m_roughness_y;
+
+  const float length2 = dot / det + m.z * m.z;
+
+  return 1.0f / (PI * sqrtf(det) * length2 * length2);
+}
+
+// Reflection lobe based the symmetric GGX VNDF.
+__device__ float light_sg_ggx_reflection_pdf(const vec3 wi, const vec3 m, const float mat00, const float mat01, const float mat11) {
+  const float ggx = light_sg_ggx(m, mat00, mat01, mat11);
+
+  const float wi_roughness_x = mat00 * wi.x + mat01 * wi.y;
+  const float wi_roughness_y = mat01 * wi.x + mat11 * wi.y;
+
+  const float dot = wi.x * wi_roughness_x + wi.y * wi_roughness_y;
+
+  return ggx / (4.0f * sqrtf(dot + wi.z * wi.z));
+}
+
+struct LightTreeRuntimeData {
+  float diffuse_weight;
+  float reflection_weight;
+  Quaternion rotation_to_z;
+  float proj_roughness_u2;
+  float proj_roughness_v2;
+  vec3 V_local;
+  float JJT00;
+  float JJT01;
+  float JJT11;
+  float det_JJT4;
+  vec3 reflection_vec;
+} typedef LightTreeRuntimeData;
+
+__device__ LightTreeRuntimeData light_sg_prepare(const GBufferData data) {
+  const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(data.normal);
+
+  // This is already accounting for future anisotropy support.
+  const float roughness_u = data.roughness;
+  const float roughness_v = data.roughness;
+
+  // Convert the roughness from slope space to projected space.
+  const float roughness_u2      = roughness_u * roughness_u;
+  const float roughness_v2      = roughness_v * roughness_v;
+  const float proj_roughness_u2 = roughness_u2 / fmaxf(1.0f - roughness_u2, eps);
+  const float proj_roughness_v2 = roughness_v2 / fmaxf(1.0f - roughness_v2, eps);
+
+  // Compute the Jacobian J for the transformation between halfvetors and reflection vectors at halfvector = normal.
+  const vec3 V_local         = quaternion_apply(rotation_to_z, data.V);
+  const float V_local_length = sqrtf(V_local.x * V_local.x + V_local.y * V_local.y);
+  const float view_x         = (V_local_length != 0.0f) ? V_local.x / V_local_length : 1.0f;
+  const float view_y         = (V_local_length != 0.0f) ? V_local.y / V_local_length : 0.0f;
+
+  const float reflection_jacobian00 = 0.5f * view_x;
+  const float reflection_jacobian01 = -0.5f * view_y / V_local.z;
+  const float reflection_jacobian10 = 0.5f * view_y;
+  const float reflection_jacobian11 = 0.5f * view_x / V_local.z;
+
+  // Compute JJ^T matrix.
+  const float JJT00 = reflection_jacobian00 * reflection_jacobian00 + reflection_jacobian01 * reflection_jacobian01;
+  const float JJT01 = reflection_jacobian00 * reflection_jacobian10 + reflection_jacobian01 * reflection_jacobian11;
+  const float JJT11 = reflection_jacobian10 * reflection_jacobian10 + reflection_jacobian11 * reflection_jacobian11;
+
+  const float det_JJT4 = 1.0f / (4.0f * V_local.z * V_local.z);  // = 4 * determiant(JJ^T).
+
+  // Preprocess for the lobe visibility.
+  // Approximate the reflection lobe with an SG whose axis is the perfect specular reflection vector.
+  // We use a conservative sharpness to filter the visibility.
+  const float roughness_max2       = fmaxf(roughness_u2, roughness_v2);
+  const float reflection_sharpness = (1.0f - roughness_max2) / fmaxf(2.0f * roughness_max2, eps);
+  const vec3 reflection_vec        = scale_vector(reflect_vector(data.V, data.normal), reflection_sharpness);
+
+  LightTreeRuntimeData runtime_data;
+  runtime_data.diffuse_weight = (data.flags & (G_BUFFER_FLAG_METALLIC | G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)) ? 0.0f : 1.0f;  // TODO
+  runtime_data.reflection_weight = 1.0f;
+  runtime_data.rotation_to_z     = rotation_to_z;
+  runtime_data.proj_roughness_u2 = proj_roughness_u2;
+  runtime_data.proj_roughness_v2 = proj_roughness_v2;
+  runtime_data.V_local           = V_local;
+  runtime_data.JJT00             = JJT00;
+  runtime_data.JJT01             = JJT01;
+  runtime_data.JJT11             = JJT11;
+  runtime_data.det_JJT4          = det_JJT4;
+  runtime_data.reflection_vec    = reflection_vec;
+
+  return runtime_data;
+}
+
+// In our case, all light clusters are considered omnidirectional, i.e. sharpness = 0.
+__device__ float light_sg_evaluate(
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power) {
+  const vec3 light_vec    = sub_vector(mean, position);
+  const float distance_sq = dot_product(light_vec, light_vec);
+  const vec3 light_dir    = scale_vector(light_vec, rsqrt(distance_sq));
+
+  // Clamp the variance for the numerical stability.
+  const float light_variance = max(variance, LIGHT_SG_VARIANCE_THRESHOLD * distance_sq);
+
+  const float emissive = power / light_variance;
+
+  // Compute SG sharpness for a light distribution viewed from the shading point.
+  const float light_sharpness = distance_sq / light_variance;
+
+  // Axis of the SG product lobe.
+  const vec3 product_vec          = add_vector(data.reflection_vec, scale_vector(light_dir, light_sharpness));
+  const float product_sharpness   = get_length(product_vec);
+  const vec3 product_dir          = scale_vector(product_vec, 1.0f / product_sharpness);
+  const float light_lobe_variance = 1.0f / light_sharpness;
+
+  const float filtered_proj_roughness00 = data.proj_roughness_u2 + 2.0f * light_lobe_variance * data.JJT00;
+  const float filtered_proj_roughness01 = 2.0f * light_lobe_variance * data.JJT01;
+  const float filtered_proj_roughness11 = data.proj_roughness_v2 + 2.0f * light_lobe_variance * data.JJT11;
+
+  // Compute determinant(filteredProjRoughnessMat) in a numerically stable manner.
+  const float det = data.proj_roughness_u2 * data.proj_roughness_v2
+                    + 2.0f * light_lobe_variance * (data.proj_roughness_u2 * data.JJT00 + data.proj_roughness_v2 * data.JJT11)
+                    + light_lobe_variance * light_lobe_variance * data.det_JJT4;
+
+  // NDF filtering in a numerically stable manner.
+  const float tr = filtered_proj_roughness00 + filtered_proj_roughness11;
+
+  const float denom       = 1.0f / (1.0f + tr + det);
+  const bool denom_finite = is_non_finite(denom) == false;
+
+  const float filtered_roughness_mat00 = (denom_finite)
+                                           ? fminf(filtered_proj_roughness00 + det, FLT_MAX) * denom
+                                           : fminf(filtered_proj_roughness00, FLT_MAX) / fminf(filtered_proj_roughness00 + 1.0f, FLT_MAX);
+  const float filtered_roughness_mat01 = (denom_finite) ? fminf(filtered_proj_roughness01, FLT_MAX) * denom : 0.0f;
+  const float filtered_roughness_mat11 = (denom_finite)
+                                           ? fminf(filtered_proj_roughness11 + det, FLT_MAX) * denom
+                                           : fminf(filtered_proj_roughness11, FLT_MAX) / fminf(filtered_proj_roughness11 + 1.0f, FLT_MAX);
+
+  // Evaluate the filtered distribution.
+  const vec3 H            = add_vector(data.V_local, quaternion_apply(data.rotation_to_z, light_dir));
+  const vec3 H_normalized = scale_vector(H, 1.0f / fmaxf(get_length(H), eps));
+  const float pdf =
+    light_sg_ggx_reflection_pdf(data.V_local, H_normalized, filtered_roughness_mat00, filtered_roughness_mat01, filtered_roughness_mat11);
+
+  // Microfacet reflection importance.
+  const float visibility            = light_vmf_integral(dot_product(product_dir, normal), product_sharpness);
+  const float reflection_importance = visibility * pdf * light_sg_integral(light_sharpness);
+
+  // Diffuse importance.
+  const float cosine             = clampf(dot_product(light_dir, normal), -1.0f, 1.0f);
+  const float diffuse_importance = light_sg_cosine_integral(cosine, light_sharpness);
+
+  return emissive * (data.diffuse_weight * diffuse_importance + data.reflection_weight * reflection_importance);
+}
+
+////////////////////////////////////////////////////////////////////
+// Kernel
+////////////////////////////////////////////////////////////////////
+
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);
@@ -217,6 +460,7 @@ __device__ RGBF light_get_color(const TriangleLight triangle) {
 }
 
 #ifdef VOLUME_KERNEL
+#if 0
 __device__ float light_tree_child_importance(
   const float transmittance_importance, const vec3 origin, const vec3 ray, const LightTreeNode8Packed node, const vec3 exp,
   const float exp_c, const uint32_t i) {
@@ -351,12 +595,18 @@ __device__ uint32_t light_tree_traverse(const VolumeDescriptor volume, const vec
 
   return subset_ptr;
 }
+#endif
 
+// TODO: Support light trees for volumes.
 __device__ TriangleHandle
   light_tree_query(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, float random, float& pdf, DeviceTransform& trans) {
   pdf = 1.0f;
 
+#if 0
   const uint32_t light_tree_handle_key = light_tree_traverse(volume, origin, ray, random, pdf);
+#else
+  const uint32_t light_tree_handle_key = 0;
+#endif
 
   const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[light_tree_handle_key];
 
@@ -368,38 +618,37 @@ __device__ TriangleHandle
 #else /* VOLUME_KERNEL */
 
 __device__ float light_tree_child_importance(
-  const vec3 position, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const LightTreeNode8Packed node, const vec3 exp,
+  const float exp_v, const uint32_t i) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
-  const uint32_t rel_energy = lower_data ? node.rel_energy[0] : node.rel_energy[1];
+  const uint32_t rel_power = lower_data ? node.rel_power[0] : node.rel_power[1];
 
-  vec3 point;
-  const float energy = (float) ((rel_energy >> shift) & 0xFF);
+  const float power = (float) ((rel_power >> shift) & 0xFF);
 
-  if (energy == 0.0f)
+  if (power == 0.0f)
     return 0.0f;
 
-  const uint32_t rel_point_x = lower_data ? node.rel_point_x[0] : node.rel_point_x[1];
-  const uint32_t rel_point_y = lower_data ? node.rel_point_y[0] : node.rel_point_y[1];
-  const uint32_t rel_point_z = lower_data ? node.rel_point_z[0] : node.rel_point_z[1];
+  const uint32_t rel_mean_x = lower_data ? node.rel_mean_x[0] : node.rel_mean_x[1];
+  const uint32_t rel_mean_y = lower_data ? node.rel_mean_y[0] : node.rel_mean_y[1];
+  const uint32_t rel_mean_z = lower_data ? node.rel_mean_z[0] : node.rel_mean_z[1];
 
-  point = get_vector((rel_point_x >> shift) & 0xFF, (rel_point_y >> shift) & 0xFF, (rel_point_z >> shift) & 0xFF);
-  point = mul_vector(point, exp);
-  point = add_vector(point, node.base_point);
+  vec3 mean;
+  mean = get_vector((rel_mean_x >> shift) & 0xFF, (rel_mean_y >> shift) & 0xFF, (rel_mean_z >> shift) & 0xFF);
+  mean = add_vector(mul_vector(mean, exp), node.base_mean);
 
-  const uint32_t confidence_light = lower_data ? node.confidence_light[0] : node.confidence_light[1];
+  const uint32_t rel_variance = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
 
-  float confidence;
-  confidence = (confidence_light >> (shift + 2)) & 0x3F;
-  confidence = confidence * exp_c;
+  float variance;
+  variance = (rel_variance >> (shift + 1)) & 0x7F;
+  variance = variance * exp_v;
 
-  const vec3 diff = sub_vector(point, position);
-
-  return energy / fmaxf(dot_product(diff, diff), confidence * confidence);
+  return light_sg_evaluate(data, position, normal, mean, variance, power);
 }
 
-__device__ uint32_t light_tree_traverse(const vec3 position, float& random, float& pdf) {
+__device__ uint32_t
+  light_tree_traverse(const LightTreeRuntimeData data, const vec3 position, const vec3 normal, float& random, float& pdf) {
   DeviceLightTreeNode node = load_light_tree_node(0);
 
   uint32_t result_id = 0xFFFFFFFF;
@@ -408,18 +657,17 @@ __device__ uint32_t light_tree_traverse(const vec3 position, float& random, floa
 
   while (result_id == 0xFFFFFFFFu) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_c = exp2f(node.exp_confidence);
+    const float exp_v = exp2f(node.exp_variance);
 
     float importance[8];
-
-    importance[0] = light_tree_child_importance(position, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(position, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(position, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(position, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(position, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(position, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(position, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(position, node, exp, exp_c, 7);
+    importance[0] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 0);
+    importance[1] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 1);
+    importance[2] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 2);
+    importance[3] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 3);
+    importance[4] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 4);
+    importance[5] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 5);
+    importance[6] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 6);
+    importance[7] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -430,35 +678,37 @@ __device__ uint32_t light_tree_traverse(const vec3 position, float& random, floa
 
     uint32_t selected_child             = 0xFFFFFFFF;
     uint32_t selected_child_light_ptr   = 0;
-    uint32_t selected_child_light_count = 0;
-    uint32_t sum_lights                 = 0;
+    bool selected_child_is_leaf         = false;
+    uint32_t current_child_light_offset = 0;
     float selected_importance           = 0.0f;
     float random_shift                  = 0.0f;
 
     random *= sum_importance;
 
+#pragma unroll
     for (uint32_t i = 0; i < 8; i++) {
       const float child_importance = importance[i];
       accumulated_importance += child_importance;
 
-      const bool lower_data                 = (i < 4);
-      const uint32_t child_light_count_data = lower_data ? node.confidence_light[0] : node.confidence_light[1];
-      const uint32_t shift                  = (lower_data ? i : (i - 4)) << 3;
+      const bool lower_data             = (i < 4);
+      const uint32_t variance_leaf_data = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
+      const uint32_t shift              = (lower_data ? i : (i - 4)) << 3;
 
-      uint32_t child_light_count = (child_light_count_data >> shift) & 0x3;
-      sum_lights += child_light_count;
+      const bool is_leaf = ((variance_leaf_data >> shift) & 0x1) != 0;
 
       if (accumulated_importance > random) {
-        selected_child             = i;
-        selected_child_light_count = child_light_count;
-        selected_child_light_ptr   = sum_lights - child_light_count;
-        selected_importance        = child_importance;
+        selected_child           = i;
+        selected_child_is_leaf   = is_leaf;
+        selected_child_light_ptr = current_child_light_offset;
+        selected_importance      = child_importance;
 
         random_shift = accumulated_importance - child_importance;
 
         // No control flow, we always loop over all children.
         accumulated_importance = -FLT_MAX;
       }
+
+      current_child_light_offset += (is_leaf) ? 1 : 0;
     }
 
     if (selected_child == 0xFFFFFFFF) {
@@ -471,7 +721,7 @@ __device__ uint32_t light_tree_traverse(const vec3 position, float& random, floa
     // Rescale random number
     random = random_saturate((random - random_shift) / selected_importance);
 
-    if (selected_child_light_count > 0) {
+    if (selected_child_is_leaf) {
       result_id = node.light_ptr + selected_child_light_ptr;
       break;
     }
@@ -482,7 +732,8 @@ __device__ uint32_t light_tree_traverse(const vec3 position, float& random, floa
   return result_id;
 }
 
-__device__ float light_tree_traverse_pdf(const vec3 position, const uint32_t primitive_id) {
+__device__ float light_tree_traverse_pdf(
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const uint32_t primitive_id) {
   float pdf = 1.0f;
 
   const uint2 light_paths = __ldg(device.ptrs.light_tree_paths + primitive_id);
@@ -494,18 +745,17 @@ __device__ float light_tree_traverse_pdf(const vec3 position, const uint32_t pri
 
   while (true) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_c = exp2f(node.exp_confidence);
+    const float exp_v = exp2f(node.exp_variance);
 
     float importance[8];
-
-    importance[0] = light_tree_child_importance(position, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(position, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(position, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(position, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(position, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(position, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(position, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(position, node, exp, exp_c, 7);
+    importance[0] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 0);
+    importance[1] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 1);
+    importance[2] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 2);
+    importance[3] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 3);
+    importance[4] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 4);
+    importance[5] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 5);
+    importance[6] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 6);
+    importance[7] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -514,17 +764,17 @@ __device__ float light_tree_traverse_pdf(const vec3 position, const uint32_t pri
 
     const float one_over_sum = 1.0f / sum_importance;
 
-    uint32_t selected_child             = 0xFFFFFFFF;
-    uint32_t selected_child_light_count = 0;
-    float child_pdf                     = 0.0f;
+    uint32_t selected_child     = 0xFFFFFFFF;
+    bool selected_child_is_leaf = false;
+    float child_pdf             = 0.0f;
 
     for (uint32_t i = 0; i < 8; i++) {
       const float child_importance = importance[i];
 
       if ((current_light_path & 0x7) == i) {
-        selected_child             = i;
-        selected_child_light_count = ((i < 4) ? (node.confidence_light[0] >> (i * 8)) : (node.confidence_light[1] >> ((i - 4) * 8))) & 0x3;
-        child_pdf                  = child_importance * one_over_sum;
+        selected_child         = i;
+        selected_child_is_leaf = ((i < 4) ? (node.rel_variance_leaf[0] >> (i * 8)) : (node.rel_variance_leaf[1] >> ((i - 4) * 8))) & 0x1;
+        child_pdf              = child_importance * one_over_sum;
       }
     }
 
@@ -534,7 +784,7 @@ __device__ float light_tree_traverse_pdf(const vec3 position, const uint32_t pri
 
     pdf *= child_pdf;
 
-    if (selected_child_light_count > 0) {
+    if (selected_child_is_leaf) {
       break;
     }
 
@@ -554,7 +804,9 @@ __device__ float light_tree_traverse_pdf(const vec3 position, const uint32_t pri
 __device__ TriangleHandle light_tree_query(const GBufferData data, float random, float& pdf, DeviceTransform& trans) {
   pdf = 1.0f;
 
-  const uint32_t light_tree_handle_key = light_tree_traverse(data.position, random, pdf);
+  const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
+
+  const uint32_t light_tree_handle_key = light_tree_traverse(runtime_data, data.position, data.normal, random, pdf);
 
   const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[light_tree_handle_key];
 
@@ -564,7 +816,9 @@ __device__ TriangleHandle light_tree_query(const GBufferData data, float random,
 }
 
 __device__ float light_tree_query_pdf(const GBufferData data, const uint32_t light_tree_handle_key) {
-  return light_tree_traverse_pdf(data.position, light_tree_handle_key);
+  const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
+
+  return light_tree_traverse_pdf(runtime_data, data.position, data.normal, light_tree_handle_key);
 }
 
 #endif /* !VOLUME_KERNEL */
