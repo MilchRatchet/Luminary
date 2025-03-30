@@ -14,6 +14,7 @@
 #include "utils.h"
 
 // #define LIGHT_TREE_DEBUG_OUTPUT
+// #define LIGHT_COMPUTE_VMF_DISTRIBUTIONS
 
 enum LightTreeSweepAxis {
   LIGHT_TREE_SWEEP_AXIS_X = 0,
@@ -39,32 +40,38 @@ struct LightTreeBinaryNode {
   uint32_t child_address;
   float surface_area;
   LightTreeNodeType type;
-  float left_energy;
-  float right_energy;
+  float left_power;
+  float right_power;
   uint32_t path;
   uint32_t depth;
 } typedef LightTreeBinaryNode;
 
 struct LightTreeNode {
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
   vec3 left_vmf_dir;
   vec3 right_vmf_dir;
   float left_vmf_sharpness;
   float right_vmf_sharpness;
+#endif /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
   vec3 left_mean;
   vec3 right_mean;
   float left_variance;
   float right_variance;
-  float left_energy;
-  float right_energy;
+  float left_power;
+  float right_power;
   uint32_t ptr;
   uint32_t light_count;
 } typedef LightTreeNode;
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
 static_assert(sizeof(LightTreeNode) == 0x50, "Incorrect packing size.");
+#else  /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
+static_assert(sizeof(LightTreeNode) == 0x30, "Incorrect packing size.");
+#endif /* !LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
 
 struct LightTreeChildNode {
-  vec3 point;
-  float energy;
-  float confidence;
+  vec3 mean;
+  float variance;
+  float power;
   uint32_t light_count;
 } typedef LightTreeChildNode;
 
@@ -84,7 +91,7 @@ struct Bin {
   Vec128 low;
   int32_t entry;
   int32_t exit;
-  float energy;
+  float power;
   uint32_t padding;
 } typedef Bin;
 
@@ -157,7 +164,7 @@ inline void _light_tree_fit_bounds_of_bins(
                                                                                                                                           \
       __macro_in_bins[__macro_pos].entry++;                                                                                               \
       __macro_in_bins[__macro_pos].exit++;                                                                                                \
-      __macro_in_bins[__macro_pos].energy += __macro_in_fragments[__macro_i].power;                                                       \
+      __macro_in_bins[__macro_pos].power += __macro_in_fragments[__macro_i].power;                                                        \
                                                                                                                                           \
       Vec128 __macro_high_bin        = vec128_load((const float*) &(__macro_in_bins[__macro_pos].high));                                  \
       Vec128 __macro_low_bin         = vec128_load((const float*) &(__macro_in_bins[__macro_pos].low));                                   \
@@ -197,7 +204,7 @@ static double _light_tree_construct_bins(
     .low.z  = MAX_VALUE,
     .entry  = 0,
     .exit   = 0,
-    .energy = 0.0f};
+    .power  = 0.0f};
   bins[0] = b;
 
   for (uint32_t i = 1; i < OBJECT_SPLIT_BIN_COUNT; i = i << 1) {
@@ -305,7 +312,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       double optimal_splitting_plane;
       bool found_split = false;
       uint32_t optimal_split;
-      float optimal_left_energy, optimal_right_energy;
+      float optimal_left_power, optimal_right_power;
 
       // For each axis, perform a greedy search for an optimal split.
       for (uint32_t a = 0; a < 3; a++) {
@@ -320,11 +327,11 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
         uint32_t left = 0;
 
-        float left_energy  = 0.0f;
-        float right_energy = 0.0f;
+        float left_power  = 0.0f;
+        float right_power = 0.0f;
 
         for (uint32_t k = 0; k < OBJECT_SPLIT_BIN_COUNT; k++) {
-          right_energy += bins[k].energy;
+          right_power += bins[k].power;
         }
 
         Vec128 high_left  = vec128_set_1(-MAX_VALUE);
@@ -336,8 +343,8 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
           _light_tree_update_bounds_of_bins(bins + k - 1, high_left, low_left);
           _light_tree_fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
-          left_energy += bins[k - 1].energy;
-          right_energy -= bins[k - 1].energy;
+          left_power += bins[k - 1].power;
+          right_power -= bins[k - 1].power;
 
           const Vec128 diff_left  = vec128_sub(high_left, low_left);
           const Vec128 diff_right = vec128_sub(high_right, low_right);
@@ -350,7 +357,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
           if (left == 0 || left == fragments_count)
             continue;
 
-          const double total_cost = interval_cost * (left_energy * left_area + right_energy * right_area) / parent_surface_area;
+          const double total_cost = interval_cost * (left_power * left_area + right_power * right_area) / parent_surface_area;
 
           if (total_cost < optimal_cost) {
             optimal_cost            = total_cost;
@@ -358,8 +365,8 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
             optimal_splitting_plane = low_split + k * interval;
             found_split             = true;
             axis                    = a;
-            optimal_left_energy     = left_energy;
-            optimal_right_energy    = right_energy;
+            optimal_left_power      = left_power;
+            optimal_right_power     = right_power;
           }
         }
       }
@@ -371,22 +378,22 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
         // We didn't find a split but we have too many triangles so we need to do a simply list split.
         optimal_split = fragments_count / 2;
 
-        optimal_left_energy  = 0.0f;
-        optimal_right_energy = 0.0f;
+        optimal_left_power  = 0.0f;
+        optimal_right_power = 0.0f;
 
         uint32_t frag_id = 0;
 
         for (; frag_id < optimal_split; frag_id++) {
-          optimal_left_energy += fragments[fragments_ptr + frag_id].power;
+          optimal_left_power += fragments[fragments_ptr + frag_id].power;
         }
 
         for (; frag_id < fragments_count; frag_id++) {
-          optimal_right_energy += fragments[fragments_ptr + frag_id].power;
+          optimal_right_power += fragments[fragments_ptr + frag_id].power;
         }
       }
 
-      node.left_energy  = optimal_left_energy;
-      node.right_energy = optimal_right_energy;
+      node.left_power  = optimal_left_power;
+      node.right_power = optimal_right_power;
 
       _light_tree_fit_bounds(fragments + fragments_ptr, optimal_split, &high, &low);
 
@@ -462,11 +469,10 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 }
 
 static void _lights_get_vmf_and_mean_and_variance(
-  const LightTreeWork* work, const LightTreeBinaryNode node, const float energy, vec3* vmf_direction, float* vmf_sharpness, vec3* mean,
-  float* variance) {
+  const LightTreeWork* work, const LightTreeBinaryNode node, const float power, vec3* mean, float* variance) {
   // TODO: This could instead be done in a bottom up fashion like in the paper which would be much faster, however, this here might be more
   // accurate
-  const float inverse_total_energy = 1.0f / energy;
+  const float inverse_total_power = 1.0f / power;
 
   Vec128 average_direction = vec128_set_1(0.0f);
   Vec128 p                 = vec128_set_1(0.0f);
@@ -474,7 +480,7 @@ static void _lights_get_vmf_and_mean_and_variance(
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
     const float frag_spatial_variance = frag.middle.w;
-    const float weight                = frag.power * inverse_total_energy;
+    const float weight                = frag.power * inverse_total_power;
     const Vec128 weight_vector        = vec128_set_1(weight);
 
     average_direction = vec128_fmadd(frag.average_direction, weight_vector, average_direction);
@@ -485,7 +491,7 @@ static void _lights_get_vmf_and_mean_and_variance(
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const float weight = frag.power * inverse_total_energy;
+    const float weight = frag.power * inverse_total_power;
 
     const Vec128 diff0 = vec128_sub(frag.v0, p);
     spatial_variance += weight * vec128_dot(diff0, diff0);
@@ -499,14 +505,16 @@ static void _lights_get_vmf_and_mean_and_variance(
 
   const float avg_dir_norm = vec128_norm2(average_direction);
 
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
   *vmf_direction =
     (vec3) {.x = average_direction.x / avg_dir_norm, .y = average_direction.y / avg_dir_norm, .z = average_direction.z / avg_dir_norm};
   *vmf_sharpness = (3.0f * avg_dir_norm - avg_dir_norm * avg_dir_norm * avg_dir_norm) / (1.0f - avg_dir_norm * avg_dir_norm);
-  *mean          = (vec3) {.x = p.x, .y = p.y, .z = p.z};
-  *variance      = spatial_variance;
+#endif /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
+  *mean     = (vec3) {.x = p.x, .y = p.y, .z = p.z};
+  *variance = (1.0f / 3.0f) * spatial_variance;  // Each triangle contributed 3 times to the spatial variance
 }
 
-// Set the reference point in each node to be the energy weighted mean of the centers of the lights.
+// Set the reference point in each node to be the power weighted mean of the centers of the lights.
 // Then, based on that reference point, compute the smallest distance to any light center.
 // This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
 static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work) {
@@ -519,18 +527,23 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
 
     LightTreeNode node;
 
-    node.left_energy  = binary_node.left_energy;
-    node.right_energy = binary_node.right_energy;
+    node.left_power  = binary_node.left_power;
+    node.right_power = binary_node.right_power;
 
     switch (binary_node.type) {
       case LIGHT_TREE_NODE_TYPE_INTERNAL:
         node.light_count = 0;
         node.ptr         = binary_node.child_address;
 
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
         _lights_get_vmf_and_mean_and_variance(
-          work, children[0], node.left_energy, &node.left_vmf_dir, &node.left_vmf_sharpness, &node.left_mean, &node.left_variance);
+          work, children[0], node.left_power, &node.left_vmf_dir, &node.left_vmf_sharpness, &node.left_mean, &node.left_variance);
         _lights_get_vmf_and_mean_and_variance(
-          work, children[1], node.right_energy, &node.right_vmf_dir, &node.right_vmf_sharpness, &node.right_mean, &node.right_variance);
+          work, children[1], node.right_power, &node.right_vmf_dir, &node.right_vmf_sharpness, &node.right_mean, &node.right_variance);
+#else  /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
+        _lights_get_vmf_and_mean_and_variance(work, children[0], node.left_power, &node.left_mean, &node.left_variance);
+        _lights_get_vmf_and_mean_and_variance(work, children[1], node.right_power, &node.right_mean, &node.right_variance);
+#endif /* !LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
@@ -629,9 +642,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         LightTreeChildNode left_child;
         memset(&left_child, 0, sizeof(LightTreeChildNode));
 
-        left_child.point      = binary_node.left_ref_point;
-        left_child.energy     = binary_node.left_energy;
-        left_child.confidence = binary_node.left_confidence;
+        left_child.mean     = binary_node.left_mean;
+        left_child.variance = binary_node.left_variance;
+        left_child.power    = binary_node.left_power;
 
         child_binary_index[child_count] = binary_node.ptr;
 
@@ -640,9 +653,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         LightTreeChildNode right_child;
         memset(&right_child, 0, sizeof(LightTreeChildNode));
 
-        right_child.point      = binary_node.right_ref_point;
-        right_child.energy     = binary_node.right_energy;
-        right_child.confidence = binary_node.right_confidence;
+        right_child.mean     = binary_node.right_mean;
+        right_child.variance = binary_node.right_variance;
+        right_child.power    = binary_node.right_power;
 
         child_binary_index[child_count] = binary_node.ptr + 1;
 
@@ -654,7 +667,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         LightTreeChildNode child;
         memset(&child, 0, sizeof(LightTreeChildNode));
 
-        child.energy = 1.0f;
+        child.power = 1.0f;
 
         child_leaf_light_ptr[child_count]   = binary_nodes[binary_index].ptr;
         child_leaf_light_count[child_count] = binary_nodes[binary_index].light_count;
@@ -680,9 +693,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             LightTreeChildNode left_child;
             memset(&left_child, 0, sizeof(LightTreeChildNode));
 
-            left_child.point      = binary_node.left_ref_point;
-            left_child.energy     = binary_node.left_energy;
-            left_child.confidence = binary_node.left_confidence;
+            left_child.mean     = binary_node.left_mean;
+            left_child.variance = binary_node.left_variance;
+            left_child.power    = binary_node.left_power;
 
             child_binary_index[child_ptr] = binary_node.ptr;
 
@@ -691,9 +704,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             LightTreeChildNode right_child;
             memset(&right_child, 0, sizeof(LightTreeChildNode));
 
-            right_child.point      = binary_node.right_ref_point;
-            right_child.energy     = binary_node.right_energy;
-            right_child.confidence = binary_node.right_confidence;
+            right_child.mean     = binary_node.right_mean;
+            right_child.variance = binary_node.right_variance;
+            right_child.power    = binary_node.right_power;
 
             child_binary_index[child_count] = binary_node.ptr + 1;
 
@@ -788,125 +801,130 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         }
       }
 
-      vec3 min_point       = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
-      vec3 max_point       = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
-      float max_energy     = 0.0f;
-      float max_confidence = 0.0f;
+      vec3 min_mean      = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
+      vec3 max_mean      = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
+      float max_variance = 0.0f;
+      float max_power    = 0.0f;
 
       for (uint32_t i = 0; i < child_count; i++) {
-        const vec3 point = children[i].point;
+        const vec3 mean = children[i].mean;
 
-        min_point.x = min(min_point.x, point.x);
-        min_point.y = min(min_point.y, point.y);
-        min_point.z = min(min_point.z, point.z);
+        min_mean.x = fminf(min_mean.x, mean.x);
+        min_mean.y = fminf(min_mean.y, mean.y);
+        min_mean.z = fminf(min_mean.z, mean.z);
 
-        max_point.x = max(max_point.x, point.x);
-        max_point.y = max(max_point.y, point.y);
-        max_point.z = max(max_point.z, point.z);
+        max_mean.x = fmaxf(max_mean.x, mean.x);
+        max_mean.y = fmaxf(max_mean.y, mean.y);
+        max_mean.z = fmaxf(max_mean.z, mean.z);
 
-        max_energy     = fmaxf(max_energy, children[i].energy);
-        max_confidence = fmaxf(max_confidence, children[i].confidence);
+        max_variance = fmaxf(max_variance, children[i].variance);
+        max_power    = fmaxf(max_power, children[i].power);
       }
 
-      node.base_point = min_point;
+      node.base_mean = min_mean;
 
-      node.exp_x = (int8_t) (max_point.x != min_point.x) ? ceilf(log2f((max_point.x - min_point.x) * 1.0 / 255.0)) : 0;
-      node.exp_y = (int8_t) (max_point.y != min_point.y) ? ceilf(log2f((max_point.y - min_point.y) * 1.0 / 255.0)) : 0;
-      node.exp_z = (int8_t) (max_point.z != min_point.z) ? ceilf(log2f((max_point.z - min_point.z) * 1.0 / 255.0)) : 0;
+      node.exp_x = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 255.0f)) : 0;
+      node.exp_y = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
+      node.exp_z = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
 
-      node.exp_confidence = ((int8_t) ceilf(log2f(max_confidence * 1.0 / 63.0)));
+      node.exp_variance = ((int8_t) ceilf(log2f(max_variance * 1.0f / 127.0f)));
 
       const float compression_x = 1.0f / exp2f(node.exp_x);
       const float compression_y = 1.0f / exp2f(node.exp_y);
       const float compression_z = 1.0f / exp2f(node.exp_z);
-      const float compression_c = 1.0f / exp2f(node.exp_confidence);
+      const float compression_v = 1.0f / exp2f(node.exp_variance);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
       info_message("==== %u ====", node_ptr);
       info_message("Meta:  %u (%u) %u", node.child_ptr, child_count, node.light_ptr);
-      info_message("Point: (%f, %f, %f)", node.base_point.x, node.base_point.y, node.base_point.z);
+      info_message("Mean: (%f, %f, %f)", node.base_mean.x, node.base_mean.y, node.base_mean.z);
       info_message(
         "Exponents: %d %d %d => %f %f %f | %d => %f", node.exp_x, node.exp_y, node.exp_z, 1.0f / compression_x, 1.0f / compression_y,
-        1.0f / compression_z, node.exp_confidence, 1.0f / compression_c);
+        1.0f / compression_z, node.exp_variance, 1.0f / compression_v);
 #endif
 
-      uint64_t rel_point_x      = 0;
-      uint64_t rel_point_y      = 0;
-      uint64_t rel_point_z      = 0;
-      uint64_t rel_energy       = 0;
-      uint64_t confidence_light = 0;
+      uint64_t rel_mean_x        = 0;
+      uint64_t rel_mean_y        = 0;
+      uint64_t rel_mean_z        = 0;
+      uint64_t rel_power         = 0;
+      uint64_t rel_variance_leaf = 0;
 
       for (uint32_t i = 0; i < child_count; i++) {
         const LightTreeChildNode child_node = children[i];
 
-        uint64_t child_rel_point_x      = (uint64_t) floorf((child_node.point.x - node.base_point.x) * compression_x);
-        uint64_t child_rel_point_y      = (uint64_t) floorf((child_node.point.y - node.base_point.y) * compression_y);
-        uint64_t child_rel_point_z      = (uint64_t) floorf((child_node.point.z - node.base_point.z) * compression_z);
-        uint64_t child_rel_energy       = (uint64_t) floorf(255.0f * child_node.energy / max_energy);
-        uint64_t child_confidence_light = (((uint64_t) (child_node.confidence * compression_c)) << 2) | ((uint64_t) child_node.light_count);
+        if (child_node.light_count > 1) {
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Leaf node contained multiple lights.");
+        }
 
-        if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255 || (child_confidence_light >> 2) > 63) {
+        uint64_t child_rel_mean_x        = (uint64_t) floorf((child_node.mean.x - node.base_mean.x) * compression_x);
+        uint64_t child_rel_mean_y        = (uint64_t) floorf((child_node.mean.y - node.base_mean.y) * compression_y);
+        uint64_t child_rel_mean_z        = (uint64_t) floorf((child_node.mean.z - node.base_mean.z) * compression_z);
+        uint64_t child_rel_power         = (uint64_t) floorf(255.0f * child_node.power / max_power);
+        uint64_t child_rel_variance_leaf = (((uint64_t) (child_node.variance * compression_v)) << 1) | ((uint64_t) child_node.light_count);
+
+        if (child_rel_mean_x > 255 || child_rel_mean_y > 255 || child_rel_mean_z > 255 || (rel_variance_leaf >> 1) > 127) {
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Value exceeded bit limit.");
         }
 
-        child_rel_energy = max(1, child_rel_energy);
+        // Power may not be zero
+        // TODO: Consider doing this implicitly, i.e. imply power = 1 + stored_power
+        child_rel_power = max(1, child_rel_power);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
         info_message(
-          "[%u] %llX %llX %llX %llX %llX", i, child_rel_point_x, child_rel_point_y, child_rel_point_z, child_rel_energy,
-          child_confidence_light);
+          "[%u] %llX %llX %llX %llX %llX", i, child_rel_mean_x, child_rel_mean_y, child_rel_mean_z, child_rel_power,
+          child_rel_variance_leaf);
 
         {
-          // Check error of compressed point
+          // Check error of compressed mean
 
           const float decompression_x = exp2f(node.exp_x);
           const float decompression_y = exp2f(node.exp_y);
           const float decompression_z = exp2f(node.exp_z);
 
-          const float decompressed_point_x = child_rel_point_x * decompression_x + node.base_point.x;
-          const float decompressed_point_y = child_rel_point_y * decompression_y + node.base_point.y;
-          const float decompressed_point_z = child_rel_point_z * decompression_z + node.base_point.z;
+          const float decompressed_mean_x = child_rel_mean_x * decompression_x + node.base_mean.x;
+          const float decompressed_mean_y = child_rel_mean_y * decompression_y + node.base_mean.y;
+          const float decompressed_mean_z = child_rel_mean_z * decompression_z + node.base_mean.z;
 
-          const float diff_x = decompressed_point_x - child_node.point.x;
-          const float diff_y = decompressed_point_y - child_node.point.y;
-          const float diff_z = decompressed_point_z - child_node.point.z;
+          const float diff_x = decompressed_mean_x - child_node.mean.x;
+          const float diff_y = decompressed_mean_y - child_node.mean.y;
+          const float diff_z = decompressed_mean_z - child_node.mean.z;
 
           const float error = sqrtf(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
 
           info_message(
-            "    (%f, %f, %f) => (%f, %f, %f) [Err: %f]", child_node.point.x, child_node.point.y, child_node.point.z, decompressed_point_x,
-            decompressed_point_y, decompressed_point_z, error);
+            "    (%f, %f, %f) => (%f, %f, %f) [Err: %f]", child_node.mean.x, child_node.mean.y, child_node.mean.z, decompressed_mean_x,
+            decompressed_mean_y, decompressed_mean_z, error);
         }
 
         {
-          // Check error of confidence
+          // Check error of variance
 
-          const float decompression_c = exp2f(node.exp_confidence);
+          const float decompression_v = exp2f(node.exp_variance);
 
-          const float decompressed_confidence = (child_confidence_light >> 2) * decompression_c;
+          const float decompressed_variance = (child_rel_variance_leaf >> 1) * decompression_v;
 
-          info_message(
-            "    %f => %f [Err: %f]", child_node.confidence, decompressed_confidence, child_node.confidence - decompressed_confidence);
+          info_message("    %f => %f [Err: %f]", child_node.variance, decompressed_variance, child_node.variance - decompressed_variance);
         }
 #endif
 
-        rel_point_x |= child_rel_point_x << (i * 8);
-        rel_point_y |= child_rel_point_y << (i * 8);
-        rel_point_z |= child_rel_point_z << (i * 8);
-        rel_energy |= child_rel_energy << (i * 8);
-        confidence_light |= child_confidence_light << (i * 8);
+        rel_mean_x |= child_rel_mean_x << (i * 8);
+        rel_mean_y |= child_rel_mean_y << (i * 8);
+        rel_mean_z |= child_rel_mean_z << (i * 8);
+        rel_power |= child_rel_power << (i * 8);
+        rel_variance_leaf |= child_rel_variance_leaf << (i * 8);
       }
 
-      node.rel_point_x[0]      = (uint32_t) (rel_point_x & 0xFFFFFFFF);
-      node.rel_point_x[1]      = (uint32_t) ((rel_point_x >> 32) & 0xFFFFFFFF);
-      node.rel_point_y[0]      = (uint32_t) (rel_point_y & 0xFFFFFFFF);
-      node.rel_point_y[1]      = (uint32_t) ((rel_point_y >> 32) & 0xFFFFFFFF);
-      node.rel_point_z[0]      = (uint32_t) (rel_point_z & 0xFFFFFFFF);
-      node.rel_point_z[1]      = (uint32_t) ((rel_point_z >> 32) & 0xFFFFFFFF);
-      node.rel_energy[0]       = (uint32_t) (rel_energy & 0xFFFFFFFF);
-      node.rel_energy[1]       = (uint32_t) ((rel_energy >> 32) & 0xFFFFFFFF);
-      node.confidence_light[0] = (uint32_t) (confidence_light & 0xFFFFFFFF);
-      node.confidence_light[1] = (uint32_t) ((confidence_light >> 32) & 0xFFFFFFFF);
+      node.rel_mean_x[0]        = (uint32_t) (rel_mean_x & 0xFFFFFFFF);
+      node.rel_mean_x[1]        = (uint32_t) ((rel_mean_x >> 32) & 0xFFFFFFFF);
+      node.rel_mean_y[0]        = (uint32_t) (rel_mean_y & 0xFFFFFFFF);
+      node.rel_mean_y[1]        = (uint32_t) ((rel_mean_y >> 32) & 0xFFFFFFFF);
+      node.rel_mean_z[0]        = (uint32_t) (rel_mean_z & 0xFFFFFFFF);
+      node.rel_mean_z[1]        = (uint32_t) ((rel_mean_z >> 32) & 0xFFFFFFFF);
+      node.rel_power[0]         = (uint32_t) (rel_power & 0xFFFFFFFF);
+      node.rel_power[1]         = (uint32_t) ((rel_power >> 32) & 0xFFFFFFFF);
+      node.rel_variance_leaf[0] = (uint32_t) (rel_variance_leaf & 0xFFFFFFFF);
+      node.rel_variance_leaf[1] = (uint32_t) ((rel_variance_leaf >> 32) & 0xFFFFFFFF);
 
       // Prepare the next nodes to be constructed from the respective binary nodes.
       for (uint64_t i = 0; i < child_count; i++) {
