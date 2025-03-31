@@ -113,6 +113,17 @@ __device__ TriangleHandle ris_sample_light(
 #endif /* !DL_GEO_NO_BSDF_SAMPLE */
 
   ////////////////////////////////////////////////////////////////////
+  // Sample light tree
+  ////////////////////////////////////////////////////////////////////
+
+  const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
+
+  LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE];
+
+  uint32_t num_tree_samples;
+  light_tree_query(data, light_tree_random, stack, num_tree_samples);
+
+  ////////////////////////////////////////////////////////////////////
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
@@ -120,14 +131,14 @@ __device__ TriangleHandle ris_sample_light(
   // to simplify the code, we prepend a candidate to the front and back each and just pretend that they
   // are outside the support of the target PDF, this way, all the logic can be inside the loop.
   uint32_t index_front = (uint32_t) -1;
-  uint32_t index_back  = num_samples;
+  uint32_t index_back  = num_tree_samples;
 
   const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
 
-  for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
+  for (uint32_t iteration = 0; iteration <= num_tree_samples; iteration++) {
     const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
 
-    if (!compute_front && iteration == num_samples)
+    if (!compute_front && iteration == num_tree_samples)
       break;
 
     uint32_t current_index;
@@ -138,12 +149,18 @@ __device__ TriangleHandle ris_sample_light(
       current_index = --index_back;
     }
 
-    const float light_tree_random =
-      ris_transform_stratum(current_index, num_samples, quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + current_index, pixel));
+    // This happens if all samples had a weight of zero
+    if (current_index == num_tree_samples)
+      break;
 
-    float light_tree_pdf;
+    LightTreeStackEntry entry = stack[current_index];
+
+    // Invalid entry
+    if (entry.pdf < 0.0f)
+      continue;
+
     DeviceTransform trans;
-    const TriangleHandle light_handle = light_tree_query(data, light_tree_random, light_tree_pdf, trans);
+    const TriangleHandle light_handle = light_tree_get_light(entry.id, trans);
 
     if (triangle_handle_equal(light_handle, blocked_handle))
       continue;
@@ -179,7 +196,7 @@ __device__ TriangleHandle ris_sample_light(
     }
 
     // Last iteration cannot add to the weight sums to avoid double counting
-    if (iteration == num_samples)
+    if (iteration == num_tree_samples)
       break;
 
 #ifndef DL_GEO_NO_BSDF_SAMPLE
@@ -189,7 +206,7 @@ __device__ TriangleHandle ris_sample_light(
     const float mis_weight =
       one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
 #else  /* !DL_GEO_NO_BSDF_SAMPLE */
-    const float mis_weight = solid_angle / (num_samples * light_tree_pdf);
+    const float mis_weight = solid_angle / (num_tree_samples * entry.pdf);
 #endif /* DL_GEO_NO_BSDF_SAMPLE */
 
     const float weight = target_pdf * mis_weight;

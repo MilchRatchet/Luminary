@@ -251,8 +251,15 @@ __device__ float light_sg_evaluate(
 }
 
 ////////////////////////////////////////////////////////////////////
-// Kernel
+// Light Tree
 ////////////////////////////////////////////////////////////////////
+
+#define LIGHT_TREE_STACK_SIZE 16
+
+struct LightTreeStackEntry {
+  uint32_t id;  // Either the index to a node in the tree or the index of a light
+  float pdf;
+} typedef LightTreeStackEntry;
 
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
@@ -647,89 +654,104 @@ __device__ float light_tree_child_importance(
   return light_sg_evaluate(data, position, normal, mean, variance, power);
 }
 
-__device__ uint32_t
-  light_tree_traverse(const LightTreeRuntimeData data, const vec3 position, const vec3 normal, float& random, float& pdf) {
-  DeviceLightTreeNode node = load_light_tree_node(0);
-
-  uint32_t result_id = 0xFFFFFFFF;
-
+__device__ void light_tree_traverse(
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, float& random, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE],
+  uint32_t& num_stack_entries) {
   random = random_saturate(random);
 
-  while (result_id == 0xFFFFFFFFu) {
-    const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_v = exp2f(node.exp_variance);
+  for (uint32_t entry_id = 0; entry_id < num_stack_entries; entry_id++) {
+    const LightTreeStackEntry entry = stack[entry_id];
 
-    float importance[8];
-    importance[0] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 0);
-    importance[1] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 1);
-    importance[2] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 2);
-    importance[3] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 3);
-    importance[4] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 4);
-    importance[5] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 5);
-    importance[6] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 6);
-    importance[7] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 7);
+    // Entry is light
+    if (entry.pdf >= 0.0f)
+      continue;
 
-    float sum_importance = 0.0f;
-    for (uint32_t i = 0; i < 8; i++) {
-      sum_importance += importance[i];
-    }
+    DeviceLightTreeNode node = load_light_tree_node(entry.id);
+    float pdf                = fabsf(entry.pdf);
 
-    float accumulated_importance = 0.0f;
+    uint32_t result_id = 0xFFFFFFFF;
 
-    uint32_t selected_child             = 0xFFFFFFFF;
-    uint32_t selected_child_light_ptr   = 0;
-    bool selected_child_is_leaf         = false;
-    uint32_t current_child_light_offset = 0;
-    float selected_importance           = 0.0f;
-    float random_shift                  = 0.0f;
+    while (result_id == 0xFFFFFFFFu) {
+      const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
+      const float exp_v = exp2f(node.exp_variance);
 
-    random *= sum_importance;
+      float importance[8];
+      importance[0] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 0);
+      importance[1] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 1);
+      importance[2] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 2);
+      importance[3] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 3);
+      importance[4] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 4);
+      importance[5] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 5);
+      importance[6] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 6);
+      importance[7] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 7);
 
-#pragma unroll
-    for (uint32_t i = 0; i < 8; i++) {
-      const float child_importance = importance[i];
-      accumulated_importance += child_importance;
-
-      const bool lower_data             = (i < 4);
-      const uint32_t variance_leaf_data = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
-      const uint32_t shift              = (lower_data ? i : (i - 4)) << 3;
-
-      const bool is_leaf = ((variance_leaf_data >> shift) & 0x1) != 0;
-
-      if (accumulated_importance > random) {
-        selected_child           = i;
-        selected_child_is_leaf   = is_leaf;
-        selected_child_light_ptr = current_child_light_offset;
-        selected_importance      = child_importance;
-
-        random_shift = accumulated_importance - child_importance;
-
-        // No control flow, we always loop over all children.
-        accumulated_importance = -FLT_MAX;
+      float sum_importance = 0.0f;
+      for (uint32_t i = 0; i < 8; i++) {
+        sum_importance += importance[i];
       }
 
-      current_child_light_offset += (is_leaf) ? 1 : 0;
+      float accumulated_importance = 0.0f;
+
+      uint32_t selected_child             = 0xFFFFFFFF;
+      uint32_t selected_child_light_ptr   = 0;
+      bool selected_child_is_leaf         = false;
+      uint32_t current_child_light_offset = 0;
+      float selected_importance           = 0.0f;
+      float random_shift                  = 0.0f;
+
+      random *= sum_importance;
+
+#pragma unroll
+      for (uint32_t i = 0; i < 8; i++) {
+        const float child_importance = importance[i];
+        accumulated_importance += child_importance;
+
+        const bool lower_data             = (i < 4);
+        const uint32_t variance_leaf_data = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
+        const uint32_t shift              = (lower_data ? i : (i - 4)) << 3;
+
+        const bool is_leaf = ((variance_leaf_data >> shift) & 0x1) != 0;
+
+        if (accumulated_importance > random) {
+          selected_child           = i;
+          selected_child_is_leaf   = is_leaf;
+          selected_child_light_ptr = current_child_light_offset;
+          selected_importance      = child_importance;
+
+          random_shift = accumulated_importance - child_importance;
+
+          // No control flow, we always loop over all children.
+          accumulated_importance = -FLT_MAX;
+        }
+
+        current_child_light_offset += (is_leaf) ? 1 : 0;
+      }
+
+      if (selected_child == 0xFFFFFFFF) {
+        pdf = -1.0f;
+        break;
+      }
+
+      pdf *= selected_importance / sum_importance;
+
+      // Rescale random number
+      random = random_saturate((random - random_shift) / selected_importance);
+
+      if (selected_child_is_leaf) {
+        result_id = node.light_ptr + selected_child_light_ptr;
+        break;
+      }
+
+      node = load_light_tree_node(node.child_ptr + selected_child);
     }
 
-    if (selected_child == 0xFFFFFFFF) {
-      result_id = 0;
-      break;
-    }
+    // Save result onto stack
+    LightTreeStackEntry result_entry;
+    result_entry.id  = result_id;
+    result_entry.pdf = pdf;
 
-    pdf *= selected_importance / sum_importance;
-
-    // Rescale random number
-    random = random_saturate((random - random_shift) / selected_importance);
-
-    if (selected_child_is_leaf) {
-      result_id = node.light_ptr + selected_child_light_ptr;
-      break;
-    }
-
-    node = load_light_tree_node(node.child_ptr + selected_child);
+    stack[entry_id] = result_entry;
   }
-
-  return result_id;
 }
 
 __device__ float light_tree_traverse_pdf(
@@ -801,16 +823,21 @@ __device__ float light_tree_traverse_pdf(
   return pdf;
 }
 
-__device__ TriangleHandle light_tree_query(const GBufferData data, float random, float& pdf, DeviceTransform& trans) {
-  pdf = 1.0f;
-
+__device__ void light_tree_query(
+  const GBufferData data, float random, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE], uint32_t& num_stack_entries) {
   const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
 
-  const uint32_t light_tree_handle_key = light_tree_traverse(runtime_data, data.position, data.normal, random, pdf);
+  stack[0].id       = 0;
+  stack[0].pdf      = -1.0f;
+  num_stack_entries = 1;
 
-  const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[light_tree_handle_key];
+  light_tree_traverse(runtime_data, data.position, data.normal, random, stack, num_stack_entries);
+}
 
-  trans = load_transform(handle.instance_id);
+__device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {
+  const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[id];
+
+  transform = load_transform(handle.instance_id);
 
   return handle;
 }
