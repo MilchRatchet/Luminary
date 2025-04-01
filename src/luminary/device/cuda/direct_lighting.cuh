@@ -263,6 +263,10 @@ __device__ RGBF direct_lighting_sun_caustic(
         current_index = --index_back;
       }
 
+      // This happens if all samples had a weight of zero
+      if (current_index == num_samples)
+        break;
+
       vec3 sample_point;
       float sample_weight  = 0.0f;
       const bool valid_hit = caustics_find_connection_point(

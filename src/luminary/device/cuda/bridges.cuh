@@ -364,6 +364,10 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
       current_index = --index_back;
     }
 
+    // This happens if all samples had a weight of zero
+    if (current_index == num_samples)
+      break;
+
     float sample_pdf = 1.0f;
 
     ////////////////////////////////////////////////////////////////////
