@@ -15,6 +15,10 @@
 // Literature
 ////////////////////////////////////////////////////////////////////
 
+// [Est24]
+// A. C. Estevez and P. Lecocq and C. Hellmuth, "A Resampled Tree for Many Lights Rendering",
+// ACM SIGGRAPH 2024 Talks, 2024
+
 // [Tok24]
 // Y. Tokuyoshi and S. Ikeda and P. Kulkarni and T. Harada, "Hierarchical Light Sampling with Accurate Spherical Gaussian Lighting",
 // SIGGRAPH Asia 2024 Conference Papers, 2024
@@ -27,6 +31,7 @@
 
 #define LIGHT_SG_VARIANCE_THRESHOLD (0x1.0p-31f)
 #define LIGHT_SG_INV_SQRTPI (0.56418958354775628694807945156077f)
+#define LIGHT_SG_UNCERTAINTY_AGGRESSIVENESS (0.7f)
 
 __device__ float light_sg_integral(const float sharpness) {
   return 4.0f * PI * expm1_over_x(-2.0f * sharpness);
@@ -191,10 +196,15 @@ __device__ LightTreeRuntimeData light_sg_prepare(const GBufferData data) {
 
 // In our case, all light clusters are considered omnidirectional, i.e. sharpness = 0.
 __device__ float light_sg_evaluate(
-  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power) {
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power,
+  float& uncertainty) {
   const vec3 light_vec    = sub_vector(mean, position);
   const float distance_sq = dot_product(light_vec, light_vec);
   const vec3 light_dir    = scale_vector(light_vec, rsqrt(distance_sq));
+
+  // Compute uncertainty like in [Est24].
+  const float t = fmaxf(sqrtf(distance_sq) - variance, 0.0f) / fmaxf(variance, eps);
+  uncertainty   = 1.0f / (1.0f + t * t * (1.0f / LIGHT_SG_UNCERTAINTY_AGGRESSIVENESS));
 
   // Clamp the variance for the numerical stability.
   const float light_variance = max(variance, LIGHT_SG_VARIANCE_THRESHOLD * distance_sq);
@@ -624,9 +634,10 @@ __device__ TriangleHandle
 
 #else /* VOLUME_KERNEL */
 
-__device__ float light_tree_child_importance(
+__device__ void light_tree_child_importance(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const LightTreeNode8Packed node, const vec3 exp,
-  const float exp_v, const uint32_t i) {
+  const float exp_v, const float pdf, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE], uint32_t& num_stack_entries,
+  const float splitting_random, float importance[8], const uint32_t i) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
@@ -634,8 +645,11 @@ __device__ float light_tree_child_importance(
 
   const float power = (float) ((rel_power >> shift) & 0xFF);
 
-  if (power == 0.0f)
-    return 0.0f;
+  // TODO: Remove, this should never happen
+  if (power == 0.0f) {
+    importance[i] = 0.0f;
+    return;
+  }
 
   const uint32_t rel_mean_x = lower_data ? node.rel_mean_x[0] : node.rel_mean_x[1];
   const uint32_t rel_mean_y = lower_data ? node.rel_mean_y[0] : node.rel_mean_y[1];
@@ -651,13 +665,28 @@ __device__ float light_tree_child_importance(
   variance = (rel_variance >> (shift + 1)) & 0x7F;
   variance = variance * exp_v;
 
-  return light_sg_evaluate(data, position, normal, mean, variance, power);
+  float uncertainty;
+  const float approx_importance = light_sg_evaluate(data, position, normal, mean, variance, power, uncertainty);
+
+  // Stop splitting if we have reached the light tree stack size.
+  const bool force_traversal = uncertainty > splitting_random && num_stack_entries < LIGHT_TREE_STACK_SIZE;
+
+  // Set the importance to 0 so we will not naturally traverse this.
+  importance[i] = (force_traversal) ? 0.0f : approx_importance;
+
+  if (force_traversal) {
+    LightTreeStackEntry entry;
+    entry.id  = node.child_ptr + i;
+    entry.pdf = pdf;
+
+    stack[num_stack_entries++] = entry;
+  }
 }
 
 __device__ void light_tree_traverse(
-  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, float& random, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE],
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, float2 random, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE],
   uint32_t& num_stack_entries) {
-  random = random_saturate(random);
+  random.x = random_saturate(random.x);
 
   for (uint32_t entry_id = 0; entry_id < num_stack_entries; entry_id++) {
     const LightTreeStackEntry entry = stack[entry_id];
@@ -676,17 +705,11 @@ __device__ void light_tree_traverse(
       const float exp_v = exp2f(node.exp_variance);
 
       float importance[8];
-      importance[0] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 0);
-      importance[1] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 1);
-      importance[2] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 2);
-      importance[3] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 3);
-      importance[4] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 4);
-      importance[5] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 5);
-      importance[6] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 6);
-      importance[7] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 7);
-
       float sum_importance = 0.0f;
+
+#pragma unroll
       for (uint32_t i = 0; i < 8; i++) {
+        light_tree_child_importance(data, position, normal, node, exp, exp_v, pdf, stack, num_stack_entries, random.y, importance, i);
         sum_importance += importance[i];
       }
 
@@ -699,7 +722,7 @@ __device__ void light_tree_traverse(
       float selected_importance           = 0.0f;
       float random_shift                  = 0.0f;
 
-      random *= sum_importance;
+      random.x *= sum_importance;
 
 #pragma unroll
       for (uint32_t i = 0; i < 8; i++) {
@@ -712,7 +735,7 @@ __device__ void light_tree_traverse(
 
         const bool is_leaf = ((variance_leaf_data >> shift) & 0x1) != 0;
 
-        if (accumulated_importance > random) {
+        if (accumulated_importance > random.x) {
           selected_child           = i;
           selected_child_is_leaf   = is_leaf;
           selected_child_light_ptr = current_child_light_offset;
@@ -735,7 +758,7 @@ __device__ void light_tree_traverse(
       pdf *= selected_importance / sum_importance;
 
       // Rescale random number
-      random = random_saturate((random - random_shift) / selected_importance);
+      random.x = random_saturate((random.x - random_shift) / selected_importance);
 
       if (selected_child_is_leaf) {
         result_id = node.light_ptr + selected_child_light_ptr;
@@ -754,6 +777,7 @@ __device__ void light_tree_traverse(
   }
 }
 
+#if 0
 __device__ float light_tree_traverse_pdf(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const uint32_t primitive_id) {
   float pdf = 1.0f;
@@ -822,9 +846,10 @@ __device__ float light_tree_traverse_pdf(
 
   return pdf;
 }
+#endif
 
 __device__ void light_tree_query(
-  const GBufferData data, float random, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE], uint32_t& num_stack_entries) {
+  const GBufferData data, const float2 random, LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE], uint32_t& num_stack_entries) {
   const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
 
   stack[0].id       = 0;
@@ -842,11 +867,13 @@ __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransfor
   return handle;
 }
 
+#if 0
 __device__ float light_tree_query_pdf(const GBufferData data, const uint32_t light_tree_handle_key) {
   const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
 
   return light_tree_traverse_pdf(runtime_data, data.position, data.normal, light_tree_handle_key);
 }
+#endif
 
 #endif /* !VOLUME_KERNEL */
 
