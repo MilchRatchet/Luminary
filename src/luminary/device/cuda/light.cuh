@@ -298,7 +298,8 @@ __device__ float light_tree_unpack_probability(const PackedProb p) {
 }
 
 __device__ PackedProb light_tree_pack_probability(const float p) {
-  const uint32_t data = __float_as_uint(p);
+  // Add this term to round to nearest
+  const uint32_t data = __float_as_uint(p) + (1u << 11);
 
   // The 2 bits in the exponent will automatically be truncated
   return (PackedProb) (data >> 12);
@@ -311,7 +312,10 @@ __device__ float light_tree_bfloat_to_float(const BFloat16 val) {
 }
 
 __device__ BFloat16 light_tree_float_to_bfloat(const float val) {
-  return (BFloat16) (__float_as_uint(val) >> 16);
+  // Add this term to round to nearest
+  const uint32_t data = __float_as_uint(val) + (1u << 15);
+
+  return (BFloat16) (data >> 16);
 }
 
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
@@ -822,7 +826,7 @@ __device__ void light_tree_traverse(
             entry.final_prob = light_tree_pack_probability(T_child * (1.0f - parent_split_child) + parent_split_child);
             entry.importance = light_tree_float_to_bfloat(fabsf(importance[i]));
 
-            sum_leaf_importance += fabsf(importance[i]);
+            sum_leaf_importance += light_tree_bfloat_to_float(entry.importance);
           }
           else {
             entry.id           = LIGHT_TREE_STACK_FLAG_NODE | (node.child_ptr + i);
@@ -861,7 +865,7 @@ __device__ void light_tree_traverse(
 
         stack[entry_id] = result_entry;
 
-        sum_leaf_importance += selected_importance;
+        sum_leaf_importance += light_tree_bfloat_to_float(result_entry.importance);
         break;
       }
 
