@@ -121,11 +121,64 @@ __device__ TriangleHandle ris_sample_light(
   LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE];
 
   uint32_t num_tree_samples;
-  light_tree_query(data, light_tree_random, stack, num_tree_samples);
+  float sum_importance_tree_samples;
+  light_tree_query(data, light_tree_random, stack, num_tree_samples, sum_importance_tree_samples);
 
   ////////////////////////////////////////////////////////////////////
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
+
+#if 1
+  const float random_light_id = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID, pixel);
+
+  const float target           = random_light_id * sum_importance_tree_samples;
+  float accumulated_importance = 0.0f;
+
+  float selected_probability;
+  uint32_t selected_light_id;
+
+  for (uint32_t sample_id = 0; sample_id < num_tree_samples; sample_id++) {
+    const float sample_importance = light_tree_bfloat_to_float(stack[sample_id].importance);
+    accumulated_importance += sample_importance;
+
+    if (accumulated_importance > target) {
+      selected_light_id    = stack[sample_id].id;
+      selected_probability = (sample_importance / sum_importance_tree_samples) * light_tree_unpack_probability(stack[sample_id].final_prob);
+      break;
+    }
+  }
+
+  DeviceTransform trans;
+  const TriangleHandle light_handle = light_tree_get_light(selected_light_id, trans);
+
+  if (triangle_handle_equal(light_handle, blocked_handle))
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
+  uint3 light_uv_packed;
+  TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
+
+  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
+
+  vec3 ray;
+  float dist, solid_angle;
+  light_load_sample_finalize(triangle_light, light_uv_packed, data.position, ray_random, ray, dist, solid_angle);
+
+  if (dist == FLT_MAX || solid_angle == 0.0f)
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
+  RGBF light_color = light_get_color(triangle_light);
+
+  bool is_refraction;
+  const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
+  light_color            = mul_color(light_color, bsdf_weight);
+
+  const float one_over_nee_sample_pdf = solid_angle / selected_probability;
+
+  light_color = scale_color(light_color, one_over_nee_sample_pdf);
+
+  return light_handle;
+
+#else
 
   // The paper first computes the first and last candidate and then enters the common logic,
   // to simplify the code, we prepend a candidate to the front and back each and just pretend that they
@@ -160,8 +213,8 @@ __device__ TriangleHandle ris_sample_light(
 
     LightTreeStackEntry entry = stack[random_index];
 
-    // Invalid entry
-    if (entry.pdf < 0.0f)
+    // Entry is a node, that should never happen.
+    if ((entry.id & LIGHT_TREE_STACK_FLAG_NODE) != 0)
       continue;
 
     DeviceTransform trans;
@@ -234,6 +287,7 @@ __device__ TriangleHandle ris_sample_light(
   UTILS_CHECK_NANS(pixel, selected_light_color);
 
   return selected_handle;
+#endif
 }
 #endif /* SHADING_KERNEL && !VOLUME_KERNEL */
 
