@@ -683,7 +683,7 @@ __device__ TriangleHandle
 
 __device__ void light_tree_child_importance(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const LightTreeNode8Packed node, const vec3 exp,
-  const float exp_v, float importance[8], float splitting_prob[8], const uint32_t i) {
+  const float exp_v, float importance[8], float splitting_prob[8], const uint32_t i, const uint32_t num_stack_entries) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
@@ -705,17 +705,20 @@ __device__ void light_tree_child_importance(
   mean = get_vector((rel_mean_x >> shift) & 0xFF, (rel_mean_y >> shift) & 0xFF, (rel_mean_z >> shift) & 0xFF);
   mean = add_vector(mul_vector(mean, exp), node.base_mean);
 
-  const uint32_t rel_variance = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
+  const uint32_t rel_variance_leaf = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
 
   float variance;
-  variance = (rel_variance >> (shift + 1)) & 0x7F;
+  variance = (rel_variance_leaf >> (shift + 1)) & 0x7F;
   variance = variance * exp_v;
 
   float uncertainty;
   const float approx_importance = light_sg_evaluate(data, position, normal, mean, variance, power, uncertainty);
 
-  const uint32_t variance_leaf_data = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
-  const bool is_leaf                = ((variance_leaf_data >> shift) & 0x1) != 0;
+  if (num_stack_entries + i >= LIGHT_TREE_STACK_SIZE) {
+    uncertainty = 0.0f;
+  }
+
+  const bool is_leaf = ((rel_variance_leaf >> shift) & 0x1) != 0;
 
   // Uncertainty is in the range [0,1] and also acts as the probability for splitting.
   // For non leaf nodes we reduce the importance based on the uncertainty. We cannot do that for
@@ -744,6 +747,7 @@ __device__ void light_tree_traverse(
     float parent_split       = light_tree_unpack_probability(entry.parent_split);
 
     uint32_t result_id = 0xFFFFFFFF;
+    float result_importance;
 
     while (result_id == 0xFFFFFFFFu) {
       const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
@@ -753,7 +757,7 @@ __device__ void light_tree_traverse(
 
 #pragma unroll
       for (uint32_t i = 0; i < 8; i++) {
-        light_tree_child_importance(data, position, normal, node, exp, exp_v, importance, split_probability, i);
+        light_tree_child_importance(data, position, normal, node, exp, exp_v, importance, split_probability, i, num_stack_entries);
         sum_importance += importance[i];
       }
 
@@ -767,7 +771,7 @@ __device__ void light_tree_traverse(
       float selected_split_prob           = 0.0f;
       float random_shift                  = 0.0f;
 
-      random.x *= sum_importance;
+      const float importance_target = random.x * sum_importance;
 
 #pragma unroll
       for (uint32_t i = 0; i < 8; i++) {
@@ -782,7 +786,7 @@ __device__ void light_tree_traverse(
 
         const float split_prob = split_probability[i];
 
-        if (accumulated_importance > random.x) {
+        if (accumulated_importance >= importance_target) {
           selected_child           = i;
           selected_child_is_leaf   = is_leaf;
           selected_child_light_ptr = current_child_light_offset;
@@ -835,7 +839,7 @@ __device__ void light_tree_traverse(
       const float selection_probability = selected_importance / sum_importance;
 
       // Rescale random number
-      random.x = random_saturate((random.x - random_shift) / selected_importance);
+      random.x = (sum_importance > 0.0f) ? random_saturate((random.x * sum_importance - random_shift) / selected_importance) : random.x;
 
       const float prob_parent_split_given_no_split = (parent_split - selected_split_prob) / fmaxf(1.0f - selected_split_prob, eps);
 
@@ -843,20 +847,23 @@ __device__ void light_tree_traverse(
       parent_split = selected_split_prob;
 
       if (selected_child_is_leaf) {
-        // Save result onto stack
-        LightTreeStackEntry result_entry;
-        result_entry.id         = node.light_ptr + selected_child_light_ptr;
-        result_entry.final_prob = light_tree_pack_probability(T * (1.0f - parent_split) + parent_split);
-        result_entry.importance = light_tree_float_to_bfloat(selected_importance);
-
-        stack[entry_id] = result_entry;
-
-        sum_leaf_importance += light_tree_bfloat_to_float(result_entry.importance);
+        result_id         = node.light_ptr + selected_child_light_ptr;
+        result_importance = selected_importance;
         break;
       }
 
       node = load_light_tree_node(node.child_ptr + selected_child);
     }
+
+    // Save result onto stack
+    LightTreeStackEntry result_entry;
+    result_entry.id         = result_id;
+    result_entry.final_prob = light_tree_pack_probability(T * (1.0f - parent_split) + parent_split);
+    result_entry.importance = light_tree_float_to_bfloat(result_importance);
+
+    stack[entry_id] = result_entry;
+
+    sum_leaf_importance += light_tree_bfloat_to_float(result_entry.importance);
   }
 }
 
