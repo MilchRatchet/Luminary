@@ -134,22 +134,24 @@ __device__ TriangleHandle ris_sample_light(
   const float target           = random_light_id * sum_importance_tree_samples;
   float accumulated_importance = 0.0f;
 
-  float selected_probability;
-  uint32_t selected_light_id;
-
-  for (uint32_t sample_id = 0; sample_id < num_tree_samples; sample_id++) {
+  uint32_t sample_id = 0;
+  for (; sample_id < num_tree_samples; sample_id++) {
     const float sample_importance = light_tree_bfloat_to_float(stack[sample_id].importance);
     accumulated_importance += sample_importance;
 
-    if (accumulated_importance > target) {
-      selected_light_id    = stack[sample_id].id;
-      selected_probability = (sample_importance / sum_importance_tree_samples) * light_tree_unpack_probability(stack[sample_id].final_prob);
+    if (accumulated_importance >= target) {
       break;
     }
   }
 
+  const float sample_importance = light_tree_bfloat_to_float(stack[sample_id].importance);
+
+  const uint32_t light_id    = stack[sample_id].id;
+  float selected_probability = sample_importance / sum_importance_tree_samples;
+  selected_probability *= light_tree_unpack_probability(stack[sample_id].final_prob);
+
   DeviceTransform trans;
-  const TriangleHandle light_handle = light_tree_get_light(selected_light_id, trans);
+  const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
 
   if (triangle_handle_equal(light_handle, blocked_handle))
     return triangle_handle_get(LIGHT_ID_NONE, 0);
@@ -175,6 +177,11 @@ __device__ TriangleHandle ris_sample_light(
   const float one_over_nee_sample_pdf = solid_angle / selected_probability;
 
   light_color = scale_color(light_color, one_over_nee_sample_pdf);
+
+  selected_light_color   = light_color;
+  selected_ray           = ray;
+  selected_dist          = dist;
+  selected_is_refraction = is_refraction;
 
   return light_handle;
 

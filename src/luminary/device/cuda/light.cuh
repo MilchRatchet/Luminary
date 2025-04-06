@@ -714,10 +714,13 @@ __device__ void light_tree_child_importance(
   float uncertainty;
   const float approx_importance = light_sg_evaluate(data, position, normal, mean, variance, power, uncertainty);
 
+  const uint32_t variance_leaf_data = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
+  const bool is_leaf                = ((variance_leaf_data >> shift) & 0x1) != 0;
+
   // Uncertainty is in the range [0,1] and also acts as the probability for splitting.
-  // Nodes with are uncertainty have less importance, instead they are in the pool of nodes
-  // to get picked for splitting.
-  importance[i]     = approx_importance * (1.0f - uncertainty);
+  // For non leaf nodes we reduce the importance based on the uncertainty. We cannot do that for
+  // leafs because we will resample later based on the importance.
+  importance[i]     = (is_leaf) ? approx_importance : approx_importance * (1.0f - uncertainty);
   splitting_prob[i] = uncertainty;
 }
 
@@ -777,43 +780,24 @@ __device__ void light_tree_traverse(
 
         const bool is_leaf = ((variance_leaf_data >> shift) & 0x1) != 0;
 
-        // Mark this node as a leaf, this is important in the case we split at this child because
-        // we need to know if we need to traverse at it or not.
-        importance[i] = (is_leaf) ? -child_importance : child_importance;
+        const float split_prob = split_probability[i];
 
         if (accumulated_importance > random.x) {
           selected_child           = i;
           selected_child_is_leaf   = is_leaf;
           selected_child_light_ptr = current_child_light_offset;
           selected_importance      = child_importance;
-          selected_split_prob      = split_probability[i];
+          selected_split_prob      = split_prob;
 
           random_shift = accumulated_importance - child_importance;
 
           // No control flow, we always loop over all children.
           accumulated_importance = -FLT_MAX;
         }
-
-        current_child_light_offset += (is_leaf) ? 1 : 0;
-      }
-
-#pragma unroll
-      for (uint32_t i = 0; i < 8; i++) {
-        // Don't pick nodes twice, if we selected a node due to importance, it doesn't matter
-        // if we would have also picked it for splitting.
-        if (i == selected_child)
-          continue;
-
-        const float split_prob = split_probability[i];
-
-        // TODO: Reaching the stack limit will fuck up the PDFs, I guess I will just have to make it large it enough for that to never
-        // happen :) How the fuck did Sony do this efficiently??????
-        if (split_prob > random.y && num_stack_entries < LIGHT_TREE_STACK_SIZE) {
-          // We set the sign bit if the node is a leaf.
-          const bool is_leaf = (__float_as_uint(importance[i]) & 0x80000000) != 0;
-
-          const float prob_parent_split_given_no_split_child = (parent_split - split_prob) / (1.0f - split_prob);
-          const float selection_prob_child                   = importance[i] / sum_importance;
+        // Split this node
+        else if (split_prob > random.y && num_stack_entries < LIGHT_TREE_STACK_SIZE) {
+          const float prob_parent_split_given_no_split_child = (parent_split - split_prob) / fmaxf(1.0f - split_prob, eps);
+          const float selection_prob_child                   = fabsf(importance[i]) / sum_importance;
 
           const float T_child =
             selection_prob_child * (prob_parent_split_given_no_split_child + (1.0f - prob_parent_split_given_no_split_child) * T);
@@ -836,6 +820,8 @@ __device__ void light_tree_traverse(
 
           stack[num_stack_entries++] = entry;
         }
+
+        current_child_light_offset += (is_leaf) ? 1 : 0;
       }
 
       // TODO: Do some kind of debug statement here, however, this should never happen and hence we shouldn't waste any logic on this.
@@ -851,7 +837,7 @@ __device__ void light_tree_traverse(
       // Rescale random number
       random.x = random_saturate((random.x - random_shift) / selected_importance);
 
-      const float prob_parent_split_given_no_split = (parent_split - selected_split_prob) / (1.0f - selected_split_prob);
+      const float prob_parent_split_given_no_split = (parent_split - selected_split_prob) / fmaxf(1.0f - selected_split_prob, eps);
 
       T            = selection_probability * (prob_parent_split_given_no_split + (1.0f - prob_parent_split_given_no_split) * T);
       parent_split = selected_split_prob;
@@ -954,7 +940,7 @@ __device__ void light_tree_query(
 
   stack[0].id           = LIGHT_TREE_STACK_FLAG_NODE | 0;
   stack[0].T            = light_tree_pack_probability(1.0f);
-  stack[0].parent_split = light_tree_pack_probability(0.0f);
+  stack[0].parent_split = light_tree_pack_probability(1.0f);
   num_stack_entries     = 1;
 
   light_tree_traverse(runtime_data, data.position, data.normal, random, stack, num_stack_entries, sum_importance);
