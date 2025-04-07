@@ -118,77 +118,22 @@ __device__ TriangleHandle ris_sample_light(
 
   const float2 light_tree_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
 
-  LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE];
+  LightTreeReservoir reservoir;
 
-  uint32_t num_tree_samples;
-  float sum_importance_tree_samples;
-  light_tree_query(data, light_tree_random, stack, num_tree_samples, sum_importance_tree_samples);
+  reservoir.sum_weight = 0.0f;
+  reservoir.light_id   = 0xFFFFFFFF;
+  reservoir.target_pdf = 0.0f;
+  reservoir.random     = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
+
+  light_tree_query(data, light_tree_random, pixel, reservoir);
 
   ////////////////////////////////////////////////////////////////////
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
 #if 1
-  const float random_light_id = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID, pixel);
-
-  const float target           = random_light_id * sum_importance_tree_samples;
-  float accumulated_importance = 0.0f;
-
-  // The paper first computes the first and last candidate and then enters the common logic,
-  // to simplify the code, we prepend a candidate to the front and back each and just pretend that they
-  // are outside the support of the target PDF, this way, all the logic can be inside the loop.
-  uint32_t index_front = (uint32_t) -1;
-  uint32_t index_back  = num_tree_samples;
-
-  const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
-
-  uint32_t selected_index   = 0xFFFFFFFF;
-  float selected_target_pdf = 0.0f;
-
-  for (uint32_t iteration = 0; iteration <= num_tree_samples; iteration++) {
-    const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
-
-    if (!compute_front && iteration == num_tree_samples)
-      break;
-
-    uint32_t current_index;
-    if (compute_front) {
-      current_index = ++index_front;
-    }
-    else {
-      current_index = --index_back;
-    }
-
-    // This happens if all samples had a weight of zero
-    if (current_index == num_tree_samples)
-      break;
-
-    const float target_pdf = light_tree_bfloat_to_float(stack[current_index].importance);
-
-    if (target_pdf == 0.0f)
-      continue;
-
-    if (compute_front) {
-      selected_index      = current_index;
-      selected_target_pdf = target_pdf;
-    }
-
-    // Last iteration cannot add to the weight sums to avoid double counting
-    if (iteration == num_tree_samples)
-      break;
-
-    const float weight = target_pdf / light_tree_unpack_probability(stack[current_index].final_prob);
-
-    if (compute_front) {
-      sum_weights_front += weight;
-    }
-    else {
-      sum_weights_back += weight;
-    }
-  }
-
-  const float resampling_weight = (sum_weights_front + sum_weights_back) / selected_target_pdf;
-  const uint32_t light_id       = stack[selected_index].id;
+  const float resampling_weight = reservoir.sum_weight / reservoir.target_pdf;
+  const uint32_t light_id       = reservoir.light_id;
 
   DeviceTransform trans;
   const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
