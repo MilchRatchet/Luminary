@@ -135,6 +135,10 @@ __device__ TriangleHandle ris_sample_light(
   const float resampling_weight = reservoir.sum_weight / reservoir.target_pdf;
   const uint32_t light_id       = reservoir.light_id;
 
+  // This happens if no light with non zero importance was found.
+  if (light_id == 0xFFFFFFFF)
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
   DeviceTransform trans;
   const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
 
