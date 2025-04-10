@@ -215,7 +215,7 @@ struct GBufferMetaData {
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
 
 ////////////////////////////////////////////////////////////////////
-// Kernel passing structs
+// Kernel Passing Structs
 ////////////////////////////////////////////////////////////////////
 
 struct DeviceTask {
@@ -226,6 +226,10 @@ struct DeviceTask {
   vec3 ray;
 } typedef DeviceTask;
 LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
+
+////////////////////////////////////////////////////////////////////
+// Light Importance Sampling Structs
+////////////////////////////////////////////////////////////////////
 
 struct DeviceLightTreeNode {
   vec3 base_mean;
@@ -242,8 +246,6 @@ struct DeviceLightTreeNode {
   uint32_t rel_power[2];
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
-
-typedef DeviceLightTreeNode LightTreeNode8Packed;
 
 #define MAX_NUM_INDIRECT_BUCKETS 3
 
@@ -279,7 +281,7 @@ struct DevicePointers {
   DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
   DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
   DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
-  DEVICE const LightTreeNode8Packed* LUM_RESTRICT light_tree_nodes;
+  DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const Quad* LUM_RESTRICT particle_quads;

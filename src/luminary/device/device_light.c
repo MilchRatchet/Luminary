@@ -81,7 +81,7 @@ struct LightTreeWork {
   uint2* paths;
   ARRAY LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
-  LightTreeNode8Packed* nodes8_packed;
+  DeviceLightTreeNode* nodes8_packed;
   uint32_t nodes_count;
   uint32_t nodes_8_count;
 } typedef LightTreeWork;
@@ -578,8 +578,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   uint32_t node_count = binary_nodes_count;
 
-  LightTreeNode8Packed* nodes;
-  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(LightTreeNode8Packed) * node_count));
+  DeviceLightTreeNode* nodes;
+  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(DeviceLightTreeNode) * node_count));
 
   uint64_t* node_paths;
   __FAILURE_HANDLE(host_malloc(&node_paths, sizeof(uint64_t) * node_count));
@@ -609,7 +609,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
-      LightTreeNode8Packed node = nodes[node_ptr];
+      DeviceLightTreeNode node = nodes[node_ptr];
 
       const uint32_t binary_index = node.child_ptr;
 
@@ -981,7 +981,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   node_count = write_ptr;
 
-  __FAILURE_HANDLE(host_realloc(&nodes, sizeof(LightTreeNode8Packed) * node_count));
+  __FAILURE_HANDLE(host_realloc(&nodes, sizeof(DeviceLightTreeNode) * node_count));
 
   work->nodes8_packed = nodes;
   work->nodes_8_count = node_count;
@@ -1019,7 +1019,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   // Assign light tree data
   ////////////////////////////////////////////////////////////////////
 
-  tree->nodes_size = sizeof(LightTreeNode8Packed) * work->nodes_8_count;
+  info_message("Nodes: %u", work->nodes_8_count);
+
+  tree->nodes_size = sizeof(DeviceLightTreeNode) * work->nodes_8_count;
   tree->nodes_data = (void*) work->nodes8_packed;
 
   tree->paths_size = sizeof(uint2) * work->fragments_count;
@@ -1031,7 +1033,7 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
   tree->light_count            = work->fragments_count;
 
-  work->nodes8_packed = (LightTreeNode8Packed*) 0;
+  work->nodes8_packed = (DeviceLightTreeNode*) 0;
   work->paths         = (uint2*) 0;
 
   return LUMINARY_SUCCESS;

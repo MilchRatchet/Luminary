@@ -536,7 +536,7 @@ __device__ RGBF light_get_color(const TriangleLight triangle) {
 #ifdef VOLUME_KERNEL
 #if 0
 __device__ float light_tree_child_importance(
-  const float transmittance_importance, const vec3 origin, const vec3 ray, const LightTreeNode8Packed node, const vec3 exp,
+  const float transmittance_importance, const vec3 origin, const vec3 ray, const DeviceLightTreeNode node, const vec3 exp,
   const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
@@ -692,7 +692,7 @@ __device__ TriangleHandle
 #else /* VOLUME_KERNEL */
 
 __device__ void light_tree_child_importance(
-  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const LightTreeNode8Packed node, const vec3 exp,
+  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const DeviceLightTreeNode node, const vec3 exp,
   const float exp_v, float importance[8], float splitting_prob[8], const uint32_t i, bool& is_leaf) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
@@ -897,7 +897,7 @@ __device__ float light_tree_traverse_pdf(
   uint32_t current_light_path = light_paths.x;
   uint32_t current_depth      = 0;
 
-  LightTreeNode8Packed node = load_light_tree_node(0);
+  DeviceLightTreeNode node = load_light_tree_node(0);
 
   while (true) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
