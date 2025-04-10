@@ -101,6 +101,8 @@ struct LightTree {
   size_t paths_size;
   void* tri_handle_map_data;
   size_t tri_handle_map_size;
+  void* leafs_data;
+  size_t leafs_size;
   void* bvh_vertex_buffer_data;
   uint32_t light_count;
 } typedef LightTree;

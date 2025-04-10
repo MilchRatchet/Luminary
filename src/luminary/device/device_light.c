@@ -8,6 +8,7 @@
 
 #include "ceb.h"
 #include "device.h"
+#include "device_packing.h"
 #include "internal_error.h"
 #include "kernel_args.h"
 #include "texture.h"
@@ -474,17 +475,20 @@ static void _lights_get_vmf_and_mean_and_variance(
   // accurate
   const float inverse_total_power = 1.0f / power;
 
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
   Vec128 average_direction = vec128_set_1(0.0f);
-  Vec128 p                 = vec128_set_1(0.0f);
+#endif /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
+  Vec128 p = vec128_set_1(0.0f);
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const float frag_spatial_variance = frag.middle.w;
-    const float weight                = frag.power * inverse_total_power;
-    const Vec128 weight_vector        = vec128_set_1(weight);
+    const float weight         = frag.power * inverse_total_power;
+    const Vec128 weight_vector = vec128_set_1(weight);
 
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
     average_direction = vec128_fmadd(frag.average_direction, weight_vector, average_direction);
-    p                 = vec128_fmadd(frag.middle, weight_vector, p);
+#endif /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
+    p = vec128_fmadd(frag.middle, weight_vector, p);
   }
 
   float spatial_variance = 0.0f;
@@ -503,9 +507,9 @@ static void _lights_get_vmf_and_mean_and_variance(
     spatial_variance += weight * vec128_dot(diff2, diff2);
   }
 
+#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
   const float avg_dir_norm = vec128_norm2(average_direction);
 
-#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
   *vmf_direction =
     (vec3) {.x = average_direction.x / avg_dir_norm, .y = average_direction.y / avg_dir_norm, .z = average_direction.z / avg_dir_norm};
   *vmf_sharpness = (3.0f * avg_dir_norm - avg_dir_norm * avg_dir_norm * avg_dir_norm) / (1.0f - avg_dir_norm * avg_dir_norm);
@@ -1000,6 +1004,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   TriangleHandle* tri_handle_map;
   __FAILURE_HANDLE(host_malloc(&tri_handle_map, sizeof(TriangleHandle) * work->fragments_count));
 
+  DeviceLightTreeLeaf* leafs;
+  __FAILURE_HANDLE(host_malloc(&leafs, sizeof(DeviceLightTreeLeaf) * work->fragments_count));
+
   LightTreeBVHTriangle* bvh_triangles;
   __FAILURE_HANDLE(host_malloc(&bvh_triangles, sizeof(LightTreeBVHTriangle) * work->fragments_count));
 
@@ -1013,6 +1020,14 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
     const TriangleHandle handle = (TriangleHandle) {.instance_id = frag.instance_id, .tri_id = frag.tri_id};
 
     tri_handle_map[id] = handle;
+
+    const vec3 normal = {.x = frag.average_direction.x, .y = frag.average_direction.y, .z = frag.average_direction.w};
+
+    DeviceLightTreeLeaf leaf;
+    leaf.power         = frag.power;
+    leaf.packed_normal = device_pack_normal(normal);
+
+    leafs[id] = leaf;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -1029,6 +1044,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
   tree->tri_handle_map_size = sizeof(TriangleHandle) * work->fragments_count;
   tree->tri_handle_map_data = (void*) tri_handle_map;
+
+  tree->leafs_size = sizeof(DeviceLightTreeLeaf) * work->fragments_count;
+  tree->leafs_data = (void*) leafs;
 
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
   tree->light_count            = work->fragments_count;
@@ -1661,7 +1679,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.low               = vec128_min(vertex, vec128_min(vertex1, vertex2));
       fragment.high              = vec128_max(vertex, vec128_max(vertex1, vertex2));
       fragment.middle            = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
-      fragment.average_direction = vec128_mul(cross, vec128_set_1(0.5f));
+      fragment.average_direction = cross;
       fragment.v0                = vertex;
       fragment.v1                = vertex1;
       fragment.v2                = vertex2;
@@ -1671,6 +1689,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
 
       // The paper assumes unidirectional lights, ours are bidirectional, to get consistent direction, we force them to be in Z+ orientation
       // TODO: If I add unidirectional light support, I need to figure out something else
+      // Note: This is also used for leaf importance estimation
       fragment.average_direction.z = fabsf(fragment.average_direction.z);
 
       __FAILURE_HANDLE(array_get_num_elements(instance->bvh_triangles, &fragment.instance_cache_tri_id));
@@ -1792,14 +1811,22 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
 
   if (tree->nodes_data) {
     __FAILURE_HANDLE(host_free(&tree->nodes_data));
+    tree->nodes_size = 0;
   }
 
   if (tree->paths_data) {
     __FAILURE_HANDLE(host_free(&tree->paths_data));
+    tree->paths_size = 0;
   }
 
   if (tree->tri_handle_map_data) {
     __FAILURE_HANDLE(host_free(&tree->tri_handle_map_data));
+    tree->tri_handle_map_size = 0;
+  }
+
+  if (tree->leafs_data) {
+    __FAILURE_HANDLE(host_free(&tree->leafs_data));
+    tree->leafs_size = 0;
   }
 
   if (tree->bvh_vertex_buffer_data) {

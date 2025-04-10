@@ -197,22 +197,24 @@ __device__ LightTreeRuntimeData light_sg_prepare(const GBufferData data) {
 // In our case, all light clusters are considered omnidirectional, i.e. sharpness = 0.
 __device__ float light_sg_evaluate(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power,
-  float& uncertainty) {
+  const vec3 light_normal, const bool apply_light_normal, float& uncertainty) {
   const vec3 light_vec    = sub_vector(mean, position);
   const float distance_sq = dot_product(light_vec, light_vec);
   const vec3 light_dir    = scale_vector(light_vec, rsqrt(distance_sq));
 
-  // Compute uncertainty like in [Est24].
-  const float t = fmaxf(sqrtf(distance_sq) - variance, 0.0f) / fmaxf(variance, eps);
-  uncertainty   = 1.0f / (1.0f + t * t * (1.0f / LIGHT_SG_UNCERTAINTY_AGGRESSIVENESS));
-
   // Clamp the variance for the numerical stability.
-  const float light_variance = max(variance, LIGHT_SG_VARIANCE_THRESHOLD * distance_sq);
+  const float light_variance = fmaxf(variance, LIGHT_SG_VARIANCE_THRESHOLD * distance_sq);
 
-  const float emissive = power / light_variance;
+  float emissive = power / light_variance;
+
+  if (apply_light_normal) {
+    emissive *= fabsf(dot_product(light_normal, light_dir));
+  }
 
   // Compute SG sharpness for a light distribution viewed from the shading point.
   const float light_sharpness = distance_sq / light_variance;
+
+  uncertainty = expf(-light_sharpness * device.settings.light_num_ris_samples);
 
   // Axis of the SG product lobe.
   const vec3 product_vec          = add_vector(data.reflection_vec, scale_vector(light_dir, light_sharpness));
@@ -693,13 +695,13 @@ __device__ TriangleHandle
 
 __device__ void light_tree_child_importance(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const DeviceLightTreeNode node, const vec3 exp,
-  const float exp_v, float importance[8], float splitting_prob[8], const uint32_t i, bool& is_leaf) {
+  const float exp_v, float importance[8], float splitting_prob[8], const uint32_t i, const uint32_t child_light_id, bool& is_leaf) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
   const uint32_t rel_power = lower_data ? node.rel_power[0] : node.rel_power[1];
 
-  const float power = (float) ((rel_power >> shift) & 0xFF);
+  float power = (float) ((rel_power >> shift) & 0xFF);
 
   // This means this is a NULL node.
   if (power == 0.0f) {
@@ -707,6 +709,19 @@ __device__ void light_tree_child_importance(
     splitting_prob[i] = 0.0f;
     return;
   }
+  const uint32_t rel_variance_leaf = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
+
+  is_leaf = ((rel_variance_leaf >> shift) & 0x1) != 0;
+
+  DeviceLightTreeLeaf leaf_data;
+  if (is_leaf) {
+    // TODO: Single load instruction
+    leaf_data = device.ptrs.light_tree_leafs[node.child_ptr + child_light_id];
+  }
+
+  float variance;
+  variance = (rel_variance_leaf >> (shift + 1)) & 0x7F;
+  variance = variance * exp_v;
 
   const uint32_t rel_mean_x = lower_data ? node.rel_mean_x[0] : node.rel_mean_x[1];
   const uint32_t rel_mean_y = lower_data ? node.rel_mean_y[0] : node.rel_mean_y[1];
@@ -716,16 +731,14 @@ __device__ void light_tree_child_importance(
   mean = get_vector((rel_mean_x >> shift) & 0xFF, (rel_mean_y >> shift) & 0xFF, (rel_mean_z >> shift) & 0xFF);
   mean = add_vector(mul_vector(mean, exp), node.base_mean);
 
-  const uint32_t rel_variance_leaf = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
-
-  float variance;
-  variance = (rel_variance_leaf >> (shift + 1)) & 0x7F;
-  variance = variance * exp_v;
+  vec3 leaf_normal = get_vector(0.0f, 0.0f, 0.0f);
+  if (is_leaf) {
+    leaf_normal = normal_unpack(leaf_data.packed_normal);
+    power       = leaf_data.power;
+  }
 
   float uncertainty;
-  const float approx_importance = light_sg_evaluate(data, position, normal, mean, variance, power, uncertainty);
-
-  is_leaf = ((rel_variance_leaf >> shift) & 0x1) != 0;
+  const float approx_importance = light_sg_evaluate(data, position, normal, mean, variance, power, leaf_normal, is_leaf, uncertainty);
 
   // Uncertainty is in the range [0,1] and also acts as the probability for splitting.
   // For non leaf nodes we reduce the importance based on the uncertainty. We cannot do that for
@@ -772,28 +785,34 @@ __device__ void light_tree_traverse(
       const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
       const float exp_v = exp2f(node.exp_variance);
 
-      float sum_importance = 0.0f;
+      float sum_importance  = 0.0f;
+      uint32_t child_lights = 0;
 
 #pragma unroll
       for (uint32_t i = 0; i < 8; i++) {
         bool is_leaf;
-        light_tree_child_importance(data, position, normal, node, exp, exp_v, importance, split_probability, i, is_leaf);
+        light_tree_child_importance(data, position, normal, node, exp, exp_v, importance, split_probability, i, child_lights, is_leaf);
+
+        child_lights += (is_leaf) ? 1 : 0;
 
         // Leafs are always send to the reservoir, we don't select them
-        sum_importance += (is_leaf) ? 0.0f : importance[i];
+        if (is_leaf == false) {
+          sum_importance += importance[i];
+          split_probability[i] *= parent_split;
+        }
       }
 
       float accumulated_importance = 0.0f;
 
-      uint32_t selected_child             = 0xFFFFFFFF;
-      uint32_t selected_child_light_ptr   = 0;
-      bool selected_child_is_leaf         = false;
-      uint32_t current_child_light_offset = 0;
-      float selected_importance           = 0.0f;
-      float selected_split_prob           = 0.0f;
-      float random_shift                  = 0.0f;
+      uint32_t selected_child     = 0xFFFFFFFF;
+      bool selected_child_is_leaf = false;
+      float selected_importance   = 0.0f;
+      float selected_split_prob   = 0.0f;
+      float random_shift          = 0.0f;
 
       const float importance_target = random.x * sum_importance;
+
+      child_lights = 0;
 
 #pragma unroll
       for (uint32_t i = 0; i < 8; i++) {
@@ -812,7 +831,7 @@ __device__ void light_tree_traverse(
           // printf("RESERVOIR: %u %f %f\n", node.light_ptr + current_child_light_offset, child_importance, leaf_probability);
           //}
 
-          light_tree_reservoir_add_light(node.light_ptr + current_child_light_offset, child_importance, leaf_probability, reservoir);
+          light_tree_reservoir_add_light(node.light_ptr + child_lights, child_importance, leaf_probability, reservoir);
         }
         else {
           accumulated_importance += child_importance;
@@ -857,7 +876,7 @@ __device__ void light_tree_traverse(
           }
         }
 
-        current_child_light_offset += (is_leaf) ? 1 : 0;
+        child_lights += (is_leaf) ? 1 : 0;
       }
 
       // This can only happen if all children were leafs

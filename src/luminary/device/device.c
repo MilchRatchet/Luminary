@@ -576,6 +576,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
+  __DEVICE_BUFFER_FREE(light_tree_leafs);
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
@@ -1077,10 +1078,12 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
+  __DEVICE_BUFFER_FREE(light_tree_leafs);
 
   __DEVICE_BUFFER_ALLOCATE(light_tree_nodes, tree->nodes_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_paths, tree->paths_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_tri_handle_map, tree->tri_handle_map_size);
+  __DEVICE_BUFFER_ALLOCATE(light_tree_leafs, tree->leafs_size);
 
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->nodes_data, (DEVICE void*) device->buffers.light_tree_nodes, 0, tree->nodes_size));
@@ -1089,6 +1092,8 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->tri_handle_map_data, (DEVICE void*) device->buffers.light_tree_tri_handle_map, 0,
     tree->tri_handle_map_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, tree->leafs_data, (DEVICE void*) device->buffers.light_tree_leafs, 0, tree->leafs_size));
 
   __FAILURE_HANDLE(optix_bvh_light_build(device->optix_bvh_light, device, tree));
 
