@@ -214,7 +214,7 @@ __device__ float light_sg_evaluate(
   // Compute SG sharpness for a light distribution viewed from the shading point.
   const float light_sharpness = distance_sq / light_variance;
 
-  uncertainty = expf(-light_sharpness * device.settings.light_num_ris_samples);
+  uncertainty = expf(-light_sharpness * LIGHT_SG_UNCERTAINTY_AGGRESSIVENESS);
 
   // Axis of the SG product lobe.
   const vec3 product_vec          = add_vector(data.reflection_vec, scale_vector(light_dir, light_sharpness));
@@ -804,11 +804,10 @@ __device__ void light_tree_traverse(
 
       float accumulated_importance = 0.0f;
 
-      uint32_t selected_child     = 0xFFFFFFFF;
-      bool selected_child_is_leaf = false;
-      float selected_importance   = 0.0f;
-      float selected_split_prob   = 0.0f;
-      float random_shift          = 0.0f;
+      uint32_t selected_child   = 0xFFFFFFFF;
+      float selected_importance = 0.0f;
+      float selected_split_prob = 0.0f;
+      float random_shift        = 0.0f;
 
       const float importance_target = random.x * sum_importance;
 

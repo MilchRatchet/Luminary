@@ -131,7 +131,6 @@ __device__ TriangleHandle ris_sample_light(
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
-#if 1
   const float resampling_weight = reservoir.sum_weight / reservoir.target_pdf;
   const uint32_t light_id       = reservoir.light_id;
 
@@ -148,41 +147,13 @@ __device__ TriangleHandle ris_sample_light(
   uint3 light_uv_packed;
   TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
 
-  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
-
-  vec3 ray;
-  float dist, solid_angle;
-  light_load_sample_finalize(triangle_light, light_uv_packed, data.position, ray_random, ray, dist, solid_angle);
-
-  if (dist == FLT_MAX || solid_angle == 0.0f)
-    return triangle_handle_get(LIGHT_ID_NONE, 0);
-
-  RGBF light_color = light_get_color(triangle_light);
-
-  bool is_refraction;
-  const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
-  light_color            = mul_color(light_color, bsdf_weight);
-
-  const float one_over_nee_sample_pdf = solid_angle * resampling_weight;
-
-  light_color = scale_color(light_color, one_over_nee_sample_pdf);
-
-  selected_light_color   = light_color;
-  selected_ray           = ray;
-  selected_dist          = dist;
-  selected_is_refraction = is_refraction;
-
-  return light_handle;
-
-#else
-
   // The paper first computes the first and last candidate and then enters the common logic,
   // to simplify the code, we prepend a candidate to the front and back each and just pretend that they
   // are outside the support of the target PDF, this way, all the logic can be inside the loop.
   uint32_t index_front = (uint32_t) -1;
   uint32_t index_back  = num_samples;
 
-  const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
+  const float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID, pixel);
 
   for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
     const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
@@ -201,26 +172,6 @@ __device__ TriangleHandle ris_sample_light(
     // This happens if all samples had a weight of zero
     if (current_index == num_samples)
       break;
-
-    const float random_light_id =
-      ris_transform_stratum(current_index, num_samples, quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + current_index, pixel));
-
-    const uint32_t random_index = (uint32_t) ((num_tree_samples - 1) * random_light_id + 0.5f);
-
-    LightTreeStackEntry entry = stack[random_index];
-
-    // Entry is a node, that should never happen.
-    if ((entry.id & LIGHT_TREE_STACK_FLAG_NODE) != 0)
-      continue;
-
-    DeviceTransform trans;
-    const TriangleHandle light_handle = light_tree_get_light(entry.id, trans);
-
-    if (triangle_handle_equal(light_handle, blocked_handle))
-      continue;
-
-    uint3 light_uv_packed;
-    TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
 
     const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + current_index, pixel);
 
@@ -260,7 +211,7 @@ __device__ TriangleHandle ris_sample_light(
     const float mis_weight =
       one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
 #else  /* !DL_GEO_NO_BSDF_SAMPLE */
-    const float mis_weight = solid_angle * num_tree_samples / (num_samples * entry.pdf);
+    const float mis_weight = solid_angle / num_samples;
 #endif /* DL_GEO_NO_BSDF_SAMPLE */
 
     const float weight = target_pdf * mis_weight;
@@ -278,12 +229,11 @@ __device__ TriangleHandle ris_sample_light(
   ////////////////////////////////////////////////////////////////////
 
   // Selected light color already includes 1 / target_pdf.
-  selected_light_color = scale_color(selected_light_color, sum_weights_front + sum_weights_back);
+  selected_light_color = scale_color(selected_light_color, (sum_weights_front + sum_weights_back) * resampling_weight);
 
   UTILS_CHECK_NANS(pixel, selected_light_color);
 
   return selected_handle;
-#endif
 }
 #endif /* SHADING_KERNEL && !VOLUME_KERNEL */
 

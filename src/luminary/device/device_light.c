@@ -1679,18 +1679,13 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.low               = vec128_min(vertex, vec128_min(vertex1, vertex2));
       fragment.high              = vec128_max(vertex, vec128_max(vertex1, vertex2));
       fragment.middle            = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
-      fragment.average_direction = cross;
+      fragment.average_direction = vec128_scale(cross, 0.5f / area);
       fragment.v0                = vertex;
       fragment.v1                = vertex1;
       fragment.v2                = vertex2;
       fragment.power             = material->constant_emission_intensity * area * triangle->average_intensity;
       fragment.instance_id       = instance_id;
       fragment.tri_id            = triangle->tri_id;
-
-      // The paper assumes unidirectional lights, ours are bidirectional, to get consistent direction, we force them to be in Z+ orientation
-      // TODO: If I add unidirectional light support, I need to figure out something else
-      // Note: This is also used for leaf importance estimation
-      fragment.average_direction.z = fabsf(fragment.average_direction.z);
 
       __FAILURE_HANDLE(array_get_num_elements(instance->bvh_triangles, &fragment.instance_cache_tri_id));
 
