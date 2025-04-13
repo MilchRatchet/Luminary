@@ -6,11 +6,11 @@
 #include "bridges.cuh"
 #include "bsdf.cuh"
 #include "caustics.cuh"
+#include "light.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "optix_include.cuh"
 #include "random.cuh"
-#include "ris.cuh"
 #include "sky.cuh"
 #include "utils.cuh"
 
@@ -34,43 +34,6 @@ struct DirectLightingBSDFSample {
 
 __device__ bool direct_lighting_geometry_is_valid(const DeviceTask task) {
   return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
-}
-
-////////////////////////////////////////////////////////////////////
-// BSDF Sampling
-////////////////////////////////////////////////////////////////////
-
-__device__ DirectLightingBSDFSample direct_lighting_get_bsdf_sample(const GBufferData data, const ushort2 index) {
-#ifndef DL_GEO_NO_BSDF_SAMPLE
-  bool bsdf_sample_is_refraction = false;
-  bool bsdf_sample_is_valid      = false;
-  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
-
-  float shift   = bsdf_sample_is_refraction ? -eps : eps;
-  vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
-
-  // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
-  const OptixTraceStatus light_trace_status = (bsdf_sample_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-
-  OptixKernelFunctionLightBSDFTracePayload payload;
-  payload.triangle_id = HIT_TYPE_LIGHT_BSDF_HINT;
-
-  optixKernelFunctionLightBSDFTrace(
-    device.optix_bvh_light, position, bsdf_dir, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-    light_trace_status, payload);
-
-  DirectLightingBSDFSample sample;
-  sample.light_id      = payload.triangle_id;
-  sample.ray           = bsdf_dir;
-  sample.is_refraction = bsdf_sample_is_refraction;
-#else  /* !DL_GEO_NO_BSDF_SAMPLE */
-  DirectLightingBSDFSample sample;
-  sample.light_id      = HIT_TYPE_LIGHT_BSDF_HINT;
-  sample.ray           = get_vector(0.0f, 0.0f, 1.0f);
-  sample.is_refraction = false;
-#endif /* DL_GEO_NO_BSDF_SAMPLE */
-
-  return sample;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -374,8 +337,7 @@ __device__ RGBF direct_lighting_sun_caustic(
 ////////////////////////////////////////////////////////////////////
 
 #ifndef VOLUME_KERNEL
-__device__ RGBF direct_lighting_geometry_sample(
-  GBufferData data, const ushort2 index, const DirectLightingBSDFSample bsdf_sample, DirectLightingShadowTask& task) {
+__device__ RGBF direct_lighting_geometry_sample(GBufferData data, const ushort2 pixel, DirectLightingShadowTask& task) {
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
   ////////////////////////////////////////////////////////////////////
@@ -384,10 +346,9 @@ __device__ RGBF direct_lighting_geometry_sample(
   RGBF light_color;
   float dist;
   bool is_refraction;
-  const TriangleHandle light_handle =
-    ris_sample_light(data, index, bsdf_sample.light_id, bsdf_sample.ray, bsdf_sample.is_refraction, dir, light_color, dist, is_refraction);
+  const TriangleHandle light_handle = light_sample(data, pixel, dir, light_color, dist, is_refraction);
 
-  if (color_importance(light_color) == 0.0f || light_handle.instance_id == LIGHT_ID_NONE) {
+  if (light_handle.instance_id == LIGHT_ID_NONE) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
@@ -584,10 +545,8 @@ __device__ RGBF direct_lighting_sun_phase(const GBufferData data, const ushort2 
 
 #ifndef VOLUME_KERNEL
 __device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
-  const DirectLightingBSDFSample bsdf_sample = direct_lighting_get_bsdf_sample(data, index);
-
   DirectLightingShadowTask task;
-  RGBF light = direct_lighting_geometry_sample(data, index, bsdf_sample, task);
+  RGBF light = direct_lighting_geometry_sample(data, index, task);
 
   light = mul_color(light, direct_lighting_shadowing(task));
 

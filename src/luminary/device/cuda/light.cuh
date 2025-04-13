@@ -3,9 +3,11 @@
 
 #if defined(SHADING_KERNEL)
 
+#include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
 #include "memory.cuh"
+#include "ris.cuh"
 #include "sky_utils.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
@@ -266,13 +268,6 @@ __device__ float light_sg_evaluate(
 // Light Tree
 ////////////////////////////////////////////////////////////////////
 
-struct LightTreeReservoir {
-  float sum_weight;
-  uint32_t light_id;
-  float target_pdf;
-  float random;
-} typedef LightTreeReservoir;
-
 #define LIGHT_TREE_STACK_SIZE 64
 
 #define LIGHT_TREE_STACK_POP(__macro_internal_stack, __macro_internal_ptr, __macro_internal_entry) \
@@ -285,19 +280,9 @@ typedef uint16_t PackedProb;
 typedef uint16_t BFloat16;
 
 struct LightTreeStackEntry {
-  uint32_t id;  // Either the index to a node in the tree or the index of a light, first bit set implies that its a node
-  union {
-    // Node
-    struct {
-      PackedProb T;
-      PackedProb parent_split;
-    };
-    // Light
-    struct {
-      PackedProb final_prob;
-      BFloat16 importance;
-    };
-  };
+  uint32_t id;
+  PackedProb T;
+  PackedProb parent_split;
 } typedef LightTreeStackEntry;
 LUM_STATIC_SIZE_ASSERT(LightTreeStackEntry, 0x08);
 
@@ -415,11 +400,33 @@ __device__ TriangleLight light_load_sample_init(const TriangleHandle handle, con
   return triangle;
 }
 
+__device__ bool light_load_sample_finalize_dist_and_uvs(
+  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const vec3 ray, float& dist) {
+  if (is_non_finite(ray.x) || is_non_finite(ray.y) || is_non_finite(ray.z)) {
+    return false;
+  }
+
+  float2 coords;
+  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
+
+  // Our ray does not actually hit the light, abort.
+  if (dist == FLT_MAX) {
+    return false;
+  }
+
+  const UV vertex_texture  = uv_unpack(packed_light_data.x);
+  const UV vertex1_texture = uv_unpack(packed_light_data.y);
+  const UV vertex2_texture = uv_unpack(packed_light_data.z);
+  triangle.tex_coords      = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
+
+  return true;
+}
+
 /*
  * Robust solid angle sampling method from
  * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
  */
-__device__ void light_load_sample_finalize(
+__device__ bool light_load_sample_finalize(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist,
   float& solid_angle) {
   const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, origin));
@@ -433,9 +440,7 @@ __device__ void light_load_sample_finalize(
   solid_angle = 2.0f * atan2f(G0, G1 + G2);
 
   if (is_non_finite(solid_angle) || solid_angle < 1e-7f) {
-    solid_angle = 0.0f;
-    dist        = 1.0f;
-    return;
+    return false;
   }
 
   const float sampled_solid_angle = random.x * solid_angle;
@@ -452,29 +457,14 @@ __device__ void light_load_sample_finalize(
 
   ray = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
 
-  if (is_non_finite(ray.x) || is_non_finite(ray.y) || is_non_finite(ray.z)) {
-    solid_angle = 0.0f;
-    dist        = FLT_MAX;
-    return;
-  }
+  bool success = true;
 
-  float2 coords;
-  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
+  success &= light_load_sample_finalize_dist_and_uvs(triangle, packed_light_data, origin, ray, dist);
 
-  // Our ray does not actually hit the light, abort.
-  if (dist == FLT_MAX) {
-    solid_angle = 0.0f;
-    dist        = 1.0f;
-    return;
-  }
-
-  const UV vertex_texture  = uv_unpack(packed_light_data.x);
-  const UV vertex1_texture = uv_unpack(packed_light_data.y);
-  const UV vertex2_texture = uv_unpack(packed_light_data.z);
-  triangle.tex_coords      = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
+  return success;
 }
 
-__device__ void light_load_sample_finalize_bridges(
+__device__ bool light_load_sample_finalize_bridges(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist, float& area) {
   const float r1 = sqrtf(random.x);
   const float r2 = random.y;
@@ -490,20 +480,11 @@ __device__ void light_load_sample_finalize_bridges(
 
   ray = normalize_vector(sub_vector(point_on_light, origin));
 
-  float2 coords;
-  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
+  bool success = true;
 
-  // Our ray does not actually hit the light, abort.
-  if (dist == FLT_MAX) {
-    area = 0.0f;
-    dist = 1.0f;
-    return;
-  }
+  success &= light_load_sample_finalize_dist_and_uvs(triangle, packed_light_data, origin, ray, dist);
 
-  const UV vertex_texture  = uv_unpack(packed_light_data.x);
-  const UV vertex1_texture = uv_unpack(packed_light_data.y);
-  const UV vertex2_texture = uv_unpack(packed_light_data.z);
-  triangle.tex_coords      = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
+  return success;
 }
 
 __device__ RGBF light_get_color(const TriangleLight triangle) {
@@ -747,27 +728,9 @@ __device__ void light_tree_child_importance(
   splitting_prob[i] = uncertainty;
 }
 
-__device__ void light_tree_reservoir_add_light(uint32_t light_id, float importance, float pdf, LightTreeReservoir& reservoir) {
-  const float weight = importance / pdf;
-
-  reservoir.sum_weight += weight;
-
-  const float resampling_probability = weight / reservoir.sum_weight;
-
-  if (reservoir.random <= resampling_probability) {
-    reservoir.light_id   = light_id;
-    reservoir.target_pdf = importance;
-
-    reservoir.random = reservoir.random / resampling_probability;
-  }
-  else {
-    reservoir.random = (reservoir.random - resampling_probability) / (1.0f - resampling_probability);
-  }
-}
-
 __device__ void light_tree_traverse(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const ushort2 pixel, float2 random,
-  LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE], uint32_t& stack_ptr, LightTreeReservoir& reservoir) {
+  LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE], uint32_t& stack_ptr, RISReservoir& reservoir, uint32_t& light_id) {
   random.x = random_saturate(random.x);
 
   float importance[8];
@@ -830,7 +793,9 @@ __device__ void light_tree_traverse(
           // printf("RESERVOIR: %u %f %f\n", node.light_ptr + current_child_light_offset, child_importance, leaf_probability);
           //}
 
-          light_tree_reservoir_add_light(node.light_ptr + child_lights, child_importance, leaf_probability, reservoir);
+          if (ris_reservoir_add_sample(reservoir, child_importance, 1.0f / leaf_probability)) {
+            light_id = node.light_ptr + child_lights;
+          }
         }
         else {
           accumulated_importance += child_importance;
@@ -976,7 +941,7 @@ __device__ float light_tree_traverse_pdf(
 }
 #endif
 
-__device__ void light_tree_query(const GBufferData data, const float2 random, const ushort2 pixel, LightTreeReservoir& reservoir) {
+__device__ uint32_t light_tree_query(const GBufferData data, const float2 random, const ushort2 pixel, RISReservoir& reservoir) {
   const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
 
   LightTreeStackEntry stack[LIGHT_TREE_STACK_SIZE];
@@ -989,7 +954,11 @@ __device__ void light_tree_query(const GBufferData data, const float2 random, co
 
   LIGHT_TREE_STACK_PUSH(stack, stack_ptr, root);
 
-  light_tree_traverse(runtime_data, data.position, data.normal, pixel, random, stack, stack_ptr, reservoir);
+  uint32_t light_id = 0xFFFFFFFF;
+
+  light_tree_traverse(runtime_data, data.position, data.normal, pixel, random, stack, stack_ptr, reservoir, light_id);
+
+  return light_id;
 }
 
 __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {
@@ -1000,13 +969,146 @@ __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransfor
   return handle;
 }
 
-#if 0
-__device__ float light_tree_query_pdf(const GBufferData data, const uint32_t light_tree_handle_key) {
-  const LightTreeRuntimeData runtime_data = light_sg_prepare(data);
+////////////////////////////////////////////////////////////////////
+// Light Sampling
+////////////////////////////////////////////////////////////////////
 
-  return light_tree_traverse_pdf(runtime_data, data.position, data.normal, light_tree_handle_key);
+struct LightSampleWorkData {
+  // Current Sample
+  vec3 ray;
+  RGBF light_color;
+  float dist;
+  bool is_refraction;
+  // Reused data
+  float solid_angle;
+} typedef LightSampleWorkData;
+
+__device__ void light_sample_common(
+  const GBufferData data, const vec3 ray, const float dist, TriangleLight light, RISReservoir& reservoir, LightSampleWorkData& work) {
+  RGBF light_color = light_get_color(light);
+
+  // TODO: When I improve the BSDF, I need to make sure that I handle correctly refraction BSDF sampled directions, they could be
+  // incorrectly flagged as a reflection here or vice versa.
+  bool is_refraction;
+  const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
+  light_color            = mul_color(light_color, bsdf_weight);
+  const float target     = color_importance(light_color);
+
+  const float one_over_solid_angle_pdf = work.solid_angle;
+  const float bsdf_pdf                 = bsdf_sample_for_light_pdf(data, ray);
+
+  const float sampling_weight = one_over_solid_angle_pdf / (1.0f + bsdf_pdf * one_over_solid_angle_pdf);
+
+  if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
+    work.ray           = ray;
+    work.light_color   = light_color;
+    work.dist          = dist;
+    work.is_refraction = is_refraction;
+  }
 }
-#endif
+
+__device__ void light_sample_solid_angle(
+  const GBufferData data, const ushort2 pixel, TriangleLight triangle_light, const uint3 light_uv_packed, RISReservoir& reservoir,
+  LightSampleWorkData& work) {
+  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
+
+  vec3 ray;
+  float dist;
+  if (light_load_sample_finalize(triangle_light, light_uv_packed, data.position, ray_random, ray, dist, work.solid_angle) == false)
+    return;
+
+  light_sample_common(data, ray, dist, triangle_light, reservoir, work);
+}
+
+__device__ void light_sample_bsdf(
+  const GBufferData data, const ushort2 pixel, TriangleLight triangle_light, const uint3 light_uv_packed, RISReservoir& reservoir,
+  LightSampleWorkData& work) {
+  bool bsdf_sample_is_refraction = false;
+  bool bsdf_sample_is_valid      = false;
+  const vec3 ray = bsdf_sample_for_light(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+
+  float dist;
+  if (light_load_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, data.position, ray, dist) == false)
+    return;
+
+  light_sample_common(data, ray, dist, triangle_light, reservoir, work);
+}
+
+__device__ TriangleHandle light_sample(
+  const GBufferData data, const ushort2 pixel, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
+  bool& selected_is_refraction) {
+  selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
+  selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
+  selected_dist          = 1.0f;
+  selected_is_refraction = false;
+
+  // Don't allow triangles to sample themselves.
+  const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample light tree
+  ////////////////////////////////////////////////////////////////////
+
+  const float2 light_tree_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
+
+  RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
+
+  const uint32_t light_id = light_tree_query(data, light_tree_random, pixel, reservoir);
+
+  // This happens if no light with non zero importance was found.
+  if (light_id == 0xFFFFFFFF)
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
+  const float light_tree_sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample direction
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTransform trans;
+  const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
+
+  if (triangle_handle_equal(light_handle, blocked_handle))
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
+  uint3 light_uv_packed;
+  TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
+
+  reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID, pixel));
+
+  // We don't need to initialize it. It will end up uninitialized if and only if ris_reservoir.target is 0.
+  LightSampleWorkData work;
+
+  light_sample_solid_angle(data, pixel, triangle_light, light_uv_packed, reservoir, work);
+  light_sample_bsdf(data, pixel, triangle_light, light_uv_packed, reservoir, work);
+
+  // This happens if none of the techniques returned a valid sample.
+  if (reservoir.selected_target == 0.0f)
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
+  const float direction_sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
+
+  // if (is_center_pixel(pixel) && IS_PRIMARY_RAY) {
+  //   printf(
+  //     "ID:%u Num:%u Importance:%f Weight:%f\n=================\n", light_id, reservoir.num_samples, reservoir.selected_target,
+  //     direction_sampling_weight * light_tree_sampling_weight);
+  // }
+
+  selected_ray           = work.ray;
+  selected_light_color   = work.light_color;
+  selected_dist          = work.dist;
+  selected_is_refraction = work.is_refraction;
+
+  ////////////////////////////////////////////////////////////////////
+  // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
+  ////////////////////////////////////////////////////////////////////
+
+  selected_light_color = scale_color(selected_light_color, direction_sampling_weight * light_tree_sampling_weight);
+
+  UTILS_CHECK_NANS(pixel, selected_light_color);
+
+  return light_handle;
+}
 
 #endif /* !VOLUME_KERNEL */
 
