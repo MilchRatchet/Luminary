@@ -19,6 +19,12 @@
 WallTime* __cuda_stall_validation_macro_walltime;
 #endif
 
+#define DEVICE_ASSERT_AVAILABLE                    \
+  {                                                \
+    if (device->state == DEVICE_STATE_UNAVAILABLE) \
+      return LUMINARY_SUCCESS;                     \
+  }
+
 static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[SCENE_ENTITY_GLOBAL_COUNT] = {
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
   DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
@@ -797,6 +803,8 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
 LuminaryResult device_load_embedded_data(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(_device_load_light_bridge_lut(device));
@@ -811,6 +819,8 @@ LuminaryResult device_load_embedded_data(Device* device) {
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(object);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -829,6 +839,8 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
 
 LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -856,6 +868,8 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   CUDA_FAILURE_HANDLE(
@@ -869,6 +883,8 @@ LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth) {
 LuminaryResult device_sync_constant_memory(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(_device_update_constant_memory(device));
@@ -880,6 +896,8 @@ LuminaryResult device_sync_constant_memory(Device* device) {
 
 LuminaryResult device_allocate_work_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -894,6 +912,8 @@ LuminaryResult device_allocate_work_buffers(Device* device) {
 LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(mesh);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -955,6 +975,8 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(textures);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
@@ -987,6 +1009,8 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
 LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(instance_updates);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1054,6 +1078,8 @@ LuminaryResult device_apply_material_updates(
   __CHECK_NULL_ARGUMENT(updates);
   __CHECK_NULL_ARGUMENT(materials);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   uint32_t num_updates;
@@ -1091,6 +1117,8 @@ LuminaryResult device_build_light_tree(Device* device, LightTree* tree) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(tree);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(light_tree_build(tree, device));
@@ -1103,6 +1131,8 @@ LuminaryResult device_build_light_tree(Device* device, LightTree* tree) {
 LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(tree);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1139,6 +1169,8 @@ LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_lut);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(sky_lut_generate(sky_lut, device));
@@ -1151,6 +1183,8 @@ LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut) {
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_lut);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1179,6 +1213,8 @@ LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_hdri);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(sky_hdri_generate(sky_hdri, device));
@@ -1191,6 +1227,8 @@ LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri) {
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_hdri);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1213,6 +1251,8 @@ LuminaryResult device_update_sky_stars(Device* device, const SkyStars* sky_stars
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_stars);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   bool stars_has_changed = false;
@@ -1232,6 +1272,8 @@ LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(bsdf_lut);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(bsdf_lut_generate(bsdf_lut, device));
@@ -1244,6 +1286,8 @@ LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut) {
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(bsdf_lut);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1266,6 +1310,8 @@ LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(cloud);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_cloud_noise_generate(device->cloud_noise, cloud, device));
@@ -1286,6 +1332,8 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(particles);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_particles_handle_generate(device->particles_handle, particles, device));
@@ -1304,6 +1352,8 @@ LuminaryResult device_update_post(Device* device, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(camera);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_post_update(device->post, camera));
@@ -1315,6 +1365,8 @@ LuminaryResult device_update_post(Device* device, const Camera* camera) {
 
 LuminaryResult device_clear_lighting_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1337,6 +1389,8 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sample_count);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   if (device->sample_count.current_sample_count == device->sample_count.end_sample_count) {
@@ -1350,6 +1404,8 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
 
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   device->undersampling_state = 0;
 
@@ -1366,6 +1422,8 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_output_register_callback(device->output, funcs.output_callback_func, callback_data));
@@ -1380,6 +1438,8 @@ LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackF
 LuminaryResult device_set_output_dirty(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   __FAILURE_HANDLE(device_output_set_output_dirty(device->output));
 
   return LUMINARY_SUCCESS;
@@ -1387,6 +1447,8 @@ LuminaryResult device_set_output_dirty(Device* device) {
 
 LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1400,6 +1462,8 @@ LuminaryResult device_update_output_properties(Device* device, uint32_t width, u
 LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_output_set_camera_params(device->output, camera));
@@ -1412,6 +1476,8 @@ LuminaryResult device_update_output_camera_params(Device* device, const Camera* 
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_output_add_request(device->output, properties));
@@ -1423,6 +1489,8 @@ LuminaryResult device_add_output_request(Device* device, OutputRequestProperties
 
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1446,6 +1514,8 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   bool continuation_is_valid;
   __FAILURE_HANDLE(device_renderer_handle_callback(device->renderer, callback_data, &continuation_is_valid));
@@ -1491,6 +1561,8 @@ LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackDat
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(callback_data);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_renderer_update_render_time(device->renderer, callback_data->render_event_id));
@@ -1502,6 +1574,8 @@ LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackDat
 
 LuminaryResult device_set_abort(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1524,6 +1598,8 @@ LuminaryResult device_set_abort(Device* device) {
 LuminaryResult device_unset_abort(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
+  DEVICE_ASSERT_AVAILABLE
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
@@ -1540,6 +1616,8 @@ LuminaryResult device_unset_abort(Device* device) {
 
 LuminaryResult device_query_gbuffer_meta(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1559,6 +1637,8 @@ LuminaryResult device_query_gbuffer_meta(Device* device) {
 
 LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, GBufferMetaData* data) {
   __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
 
   x = x >> 1;
   y = y >> 1;

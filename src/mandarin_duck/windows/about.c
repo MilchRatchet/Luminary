@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "display.h"
+#include "elements/button.h"
 #include "elements/checkbox.h"
 #include "elements/separator.h"
 #include "elements/text.h"
@@ -173,13 +174,26 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
     LUM_FAILURE_HANDLE(luminary_host_get_device_info(host, device_id, &device_info));
 
     // TODO: Allow for toggling of devices
-    bool device_active = true;
+    bool device_active = device_info.is_enabled;
 
     window_push_section(window, 32, 4);
     {
-      element_checkbox(
-        window, display, mouse_state,
-        (ElementCheckBoxArgs) {.size = (ElementSize) {.width = 24, .height = 24}, .data_binding = &device_active});
+      if (device_info.is_unavailable) {
+        element_button(
+          window, display, mouse_state,
+          (ElementButtonArgs) {.shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+                               .image        = ELEMENT_BUTTON_IMAGE_ERROR,
+                               .size         = (ElementSize) {.width = 24, .height = 24},
+                               .color        = MD_COLOR_ACCENT_LIGHT_2,
+                               .hover_color  = MD_COLOR_ACCENT_LIGHT_2,
+                               .press_color  = MD_COLOR_ACCENT_LIGHT_2,
+                               .tooltip_text = "GPU is unavailable, see logs."});
+      }
+      else {
+        element_checkbox(
+          window, display, mouse_state,
+          (ElementCheckBoxArgs) {.size = (ElementSize) {.width = 24, .height = 24}, .data_binding = &device_active});
+      }
 
       element_text(
         window, display, mouse_state,
@@ -195,9 +209,15 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
           .is_clickable = false});
 
       char memory_string[64];
-      sprintf(
-        memory_string, "%.1f GB / %.1f GB", device_info.allocated_memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)),
-        device_info.memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)));
+
+      if (device_info.is_unavailable) {
+        sprintf(memory_string, "N/A");
+      }
+      else {
+        sprintf(
+          memory_string, "%.1f GB / %.1f GB", device_info.allocated_memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)),
+          device_info.memory_size * (1.0 / (1024.0 * 1024.0 * 1024.0)));
+      }
 
       element_text(
         window, display, mouse_state,
@@ -423,6 +443,8 @@ void window_about_create(Window** window) {
   (*window)->auto_align      = false;
   (*window)->action_func     = _window_about_action;
   (*window)->fixed_depth     = false;
+
+  window_create_subwindow(*window);
 
   window_allocate_memory(*window);
 }

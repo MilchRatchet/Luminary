@@ -53,6 +53,8 @@ LUMINARY_API struct LuminaryRendererSettings {
 } typedef LuminaryRendererSettings;
 
 LUMINARY_API struct LuminaryDeviceInfo {
+  bool is_unavailable;
+  bool is_enabled;
   char name[256];
   size_t memory_size;
   size_t allocated_memory_size;

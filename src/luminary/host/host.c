@@ -398,6 +398,9 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
 
   Device* device = host->device_manager->devices[device_id];
 
+  info->is_unavailable = device->state == DEVICE_STATE_UNAVAILABLE;
+  info->is_enabled     = device->state == DEVICE_STATE_ENABLED;
+
   static_assert(sizeof(info->name) >= 256 && sizeof(device->properties.name) >= 256, "Name buffers are too small.");
   memcpy(info->name, device->properties.name, 256);
 
