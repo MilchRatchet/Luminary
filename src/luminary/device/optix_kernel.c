@@ -21,13 +21,13 @@ struct OptixKernelConfig {
 
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE]              = {.name = "optix_kernel_raytrace.ptx", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_GEO]  = {.name = "optix_kernel_shading_geometry_geo.ptx", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_SKY]  = {.name = "optix_kernel_shading_geometry_sky.ptx", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_GEO]    = {.name = "optix_kernel_shading_volume_geo.ptx", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_SKY]    = {.name = "optix_kernel_shading_volume_sky.ptx", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_GEO] = {.name = "optix_kernel_shading_particles_geo.ptx", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_SKY] = {.name = "optix_kernel_shading_particles_sky.ptx", .register_count = 40, .allow_gas = false}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE]              = {.name = "optix_kernel_raytrace", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_GEO]  = {.name = "optix_kernel_shading_geometry_geo", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_SKY]  = {.name = "optix_kernel_shading_geometry_sky", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_GEO]    = {.name = "optix_kernel_shading_volume_geo", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_SKY]    = {.name = "optix_kernel_shading_volume_sky", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_GEO] = {.name = "optix_kernel_shading_particles_geo", .register_count = 40, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_SKY] = {.name = "optix_kernel_shading_particles_sky", .register_count = 40, .allow_gas = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__light_bsdf_trace", "__anyhit__shadow_trace",
@@ -105,15 +105,23 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   // Get PTX
   ////////////////////////////////////////////////////////////////////
 
+  char ptx_name[4096];
+  sprintf(ptx_name, "%s_sm_%u%u.ptx", optix_kernel_configs[type].name, device->properties.major, device->properties.minor);
+
   int64_t ptx_length;
   char* ptx;
   uint64_t ptx_info;
 
-  ceb_access(optix_kernel_configs[type].name, (void**) &ptx, &ptx_length, &ptx_info);
+  ceb_access(ptx_name, (void**) &ptx, &ptx_length, &ptx_info);
 
   if (ptx_info || !ptx_length) {
-    __RETURN_ERROR(
-      LUMINARY_ERROR_API_EXCEPTION, "Failed to load OptiX kernels %s. Ceb Error Code: %zu.", optix_kernel_configs[type].name, ptx_info);
+    warn_message(
+      "Failed to load OptiX kernel %s for CUDA architecture sm_%u%u. All devices of this architecture will be unavailable. Recompile "
+      "Luminary "
+      "with this architecture enabled.",
+      optix_kernel_configs[type].name, device->properties.major, device->properties.minor);
+
+    return LUMINARY_SUCCESS;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -229,6 +237,8 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
 
   (*kernel)->shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
   (*kernel)->shaders.hitgroupRecordCount         = OPTIX_KERNEL_FUNCTION_COUNT;
+
+  (*kernel)->available = true;
 
   return LUMINARY_SUCCESS;
 }

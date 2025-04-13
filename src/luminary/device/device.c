@@ -151,6 +151,9 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   int minor;
   CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device->cuda_device));
 
+  props->major = (uint32_t) major;
+  props->minor = (uint32_t) minor;
+
   CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
 
   CUDA_FAILURE_HANDLE(cuDeviceTotalMem(&props->memory_size, device->cuda_device));
@@ -191,11 +194,11 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
     case 8: {
       if (minor == 0) {
         // GA100 has no RT cores
-        props->arch            = DEVICE_ARCH_AMPERE;
+        props->arch            = DEVICE_ARCH_AMPERE_HPC;
         props->rt_core_version = 0;
       }
       else if (minor == 6 || minor == 7) {
-        props->arch            = DEVICE_ARCH_AMPERE;
+        props->arch            = DEVICE_ARCH_AMPERE_CONSUMER;
         props->rt_core_version = 2;
       }
       else if (minor == 9) {
@@ -219,8 +222,18 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
     } break;
     case 10: {
       if (minor == 0) {
-        props->arch            = DEVICE_ARCH_BLACKWELL;
+        props->arch            = DEVICE_ARCH_BLACKWELL_HPC;
         props->rt_core_version = 0;
+      }
+      else {
+        props->arch            = DEVICE_ARCH_UNKNOWN;
+        props->rt_core_version = 0;
+      }
+    } break;
+    case 12: {
+      if (minor == 0) {
+        props->arch            = DEVICE_ARCH_BLACKWELL_CONSUMER;
+        props->rt_core_version = 4;
       }
       else {
         props->arch            = DEVICE_ARCH_UNKNOWN;
@@ -234,8 +247,8 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   }
 
   if (props->arch == DEVICE_ARCH_UNKNOWN) {
-    warn_message(
-      "Luminary failed to identify architecture of CUDA compute capability %d.%d. Some features may not be working.", major, minor);
+    warn_message("Luminary failed to identify architecture of CUDA compute capability %d.%d. Deactivated %s.", major, minor, props->name);
+    device->state = DEVICE_STATE_UNAVAILABLE;
   }
 
   return LUMINARY_SUCCESS;
@@ -721,7 +734,13 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 LuminaryResult device_register_as_main(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
+  if (device->state == DEVICE_STATE_UNAVAILABLE) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Device %s was registered as the main device but it is not available.", device->properties.name);
+  }
+
   device->is_main_device = true;
+  device->state          = DEVICE_STATE_ENABLED;
 
   return LUMINARY_SUCCESS;
 }
@@ -737,6 +756,12 @@ LuminaryResult device_unregister_as_main(Device* device) {
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
   __CHECK_NULL_ARGUMENT(device);
 
+  if (library == (CUlibrary) 0) {
+    warn_message("Deactivating %s because no CUBIN is present for it.", device->properties.name);
+    device->state = DEVICE_STATE_UNAVAILABLE;
+    return LUMINARY_SUCCESS;
+  }
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   for (uint32_t kernel_id = 0; kernel_id < CUDA_KERNEL_TYPE_COUNT; kernel_id++) {
@@ -745,6 +770,12 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(optix_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
+
+    if (device->optix_kernels[kernel_id]->available == false) {
+      warn_message("Deactivating %s because an OptiX kernel is missing.", device->properties.name);
+      device->state = DEVICE_STATE_UNAVAILABLE;
+      return LUMINARY_SUCCESS;
+    }
   }
 
   size_t const_memory_size;

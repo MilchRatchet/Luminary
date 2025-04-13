@@ -1,6 +1,5 @@
 #include "device_manager.h"
 
-#include "ceb.h"
 #include "device_structs.h"
 #include "device_utils.h"
 #include "host/internal_host.h"
@@ -510,8 +509,11 @@ static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, 
 
     for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
       __FAILURE_HANDLE(device_update_mesh(device, args->meshes[mesh_id]));
-      __FAILURE_HANDLE(light_tree_update_cache_mesh(device_manager->light_tree, args->meshes[mesh_id]));
     }
+  }
+
+  for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
+    __FAILURE_HANDLE(light_tree_update_cache_mesh(device_manager->light_tree, args->meshes[mesh_id]));
   }
 
   return LUMINARY_SUCCESS;
@@ -567,54 +569,29 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
   __CHECK_NULL_ARGUMENT(device_manager);
 
   ////////////////////////////////////////////////////////////////////
-  // Load CUBIN
-  ////////////////////////////////////////////////////////////////////
-
-  uint64_t info = 0;
-
-  void* cuda_kernels_data;
-  int64_t cuda_kernels_data_length;
-  ceb_access("cuda_kernels.cubin", &cuda_kernels_data, &cuda_kernels_data_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load cuda_kernels cubin. Luminary was not compiled correctly.");
-  }
-
-  // Tells CUDA that we keep the cubin data unchanged which allows CUDA to not create a copy.
-  CUlibraryOption library_option = CU_LIBRARY_BINARY_IS_PRESERVED;
-
-  CUDA_FAILURE_HANDLE(cuLibraryLoadData(&device_manager->cuda_library, cuda_kernels_data, 0, 0, 0, &library_option, 0, 1));
-
-  ////////////////////////////////////////////////////////////////////
-  // Gather library content
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t kernel_count;
-  CUDA_FAILURE_HANDLE(cuLibraryGetKernelCount(&kernel_count, device_manager->cuda_library));
-
-  CUkernel* kernels;
-  __FAILURE_HANDLE(host_malloc(&kernels, sizeof(CUkernel) * kernel_count));
-
-  CUDA_FAILURE_HANDLE(cuLibraryEnumerateKernels(kernels, kernel_count, device_manager->cuda_library));
-
-  for (uint32_t kernel_id = 0; kernel_id < kernel_count; kernel_id++) {
-    const char* kernel_name;
-    CUDA_FAILURE_HANDLE(cuKernelGetName(&kernel_name, kernels[kernel_id]));
-
-    log_message("CUDA Kernel: %s", kernel_name);
-  }
-
-  __FAILURE_HANDLE(host_free(&kernels));
-
-  ////////////////////////////////////////////////////////////////////
-  // Compile kernels
+  // Load CUBINs for each present architecture
   ////////////////////////////////////////////////////////////////////
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_compile_kernels(device_manager->devices[device_id], device_manager->cuda_library));
+    Device* device = device_manager->devices[device_id];
+
+    __FAILURE_HANDLE(device_library_add(device_manager->library, device->properties.major, device->properties.minor));
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Compile kernels
+  ////////////////////////////////////////////////////////////////////
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    Device* device = device_manager->devices[device_id];
+
+    CUlibrary cuda_library;
+    __FAILURE_HANDLE(device_library_get(device_manager->library, device->properties.major, device->properties.minor, &cuda_library));
+
+    __FAILURE_HANDLE(device_compile_kernels(device, cuda_library));
   }
 
   return LUMINARY_SUCCESS;
@@ -694,6 +671,8 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   device_manager->host = host;
 
   __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
+
+  __FAILURE_HANDLE(device_library_create(&device_manager->library));
 
   int32_t device_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
@@ -983,6 +962,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
+
+  __FAILURE_HANDLE(device_library_destroy(&(*device_manager)->library));
 
   __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
   __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));

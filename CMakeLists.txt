@@ -10,6 +10,7 @@ set(CMAKE_C_STANDARD 11)
 
 option(DEBUG "Debug Mode" OFF)
 option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
+option(LUMINARY_KERNEL_ARCHS "Architecture to build" "")
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
 option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
 
@@ -89,9 +90,7 @@ endif()
 
 message("============================= Overall =============================")
 message("Debug Mode                     ||  ${DEBUG}")
-
 message("C Compiler:                    ||  ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
-
 message("C Flags:                       ||  ${CMAKE_C_FLAGS}")
 
 if (DEBUG)

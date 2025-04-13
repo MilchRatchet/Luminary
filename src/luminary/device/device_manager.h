@@ -23,6 +23,7 @@
 
 #include "device.h"
 #include "device_bsdf.h"
+#include "device_library.h"
 #include "device_light.h"
 #include "device_sampletime.h"
 #include "device_sky.h"
@@ -35,7 +36,7 @@ struct DeviceManager {
   SampleCountSlice sample_count;
   ARRAY Device** devices;
   uint32_t main_device_index;
-  CUlibrary cuda_library;
+  DeviceLibrary* library;
   Queue* work_queue;
   RingBuffer* ringbuffer;
   WallTime* queue_wall_time;

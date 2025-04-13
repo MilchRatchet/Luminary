@@ -25,10 +25,12 @@ enum DeviceArch {
   DEVICE_ARCH_PASCAL,
   DEVICE_ARCH_VOLTA,
   DEVICE_ARCH_TURING,
-  DEVICE_ARCH_AMPERE,
+  DEVICE_ARCH_AMPERE_HPC,
+  DEVICE_ARCH_AMPERE_CONSUMER,
   DEVICE_ARCH_ADA,
   DEVICE_ARCH_HOPPER,
-  DEVICE_ARCH_BLACKWELL,
+  DEVICE_ARCH_BLACKWELL_HPC,
+  DEVICE_ARCH_BLACKWELL_CONSUMER,
   DEVICE_ARCH_COUNT
 } typedef DeviceArch;
 
@@ -37,6 +39,8 @@ struct DeviceProperties {
   DeviceArch arch;
   uint32_t rt_core_version;
   size_t memory_size;
+  uint32_t major;
+  uint32_t minor;
 } typedef DeviceProperties;
 
 struct DeviceConstantMemoryDirtyProperties {
@@ -60,7 +64,10 @@ struct DeviceOptixProperties {
 
 enum GBufferMetaState { GBUFFER_META_STATE_NOT_READY, GBUFFER_META_STATE_QUEUED, GBUFFER_META_STATE_READY } typedef GBufferMetaState;
 
+enum DeviceState { DEVICE_STATE_DISABLED, DEVICE_STATE_ENABLED, DEVICE_STATE_UNAVAILABLE } typedef DeviceState;
+
 struct Device {
+  DeviceState state;
   uint32_t index;
   DeviceProperties properties;
   DeviceOptixProperties optix_properties;
