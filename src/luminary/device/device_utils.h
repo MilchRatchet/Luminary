@@ -287,7 +287,7 @@ struct DevicePointers {
   DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
   DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
-  DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leafs;
+  DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
   DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const Quad* LUM_RESTRICT particle_quads;

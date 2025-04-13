@@ -697,7 +697,7 @@ __device__ void light_tree_child_importance(
   DeviceLightTreeLeaf leaf_data;
   if (is_leaf) {
     // TODO: Single load instruction
-    leaf_data = device.ptrs.light_tree_leafs[node.child_ptr + child_light_id];
+    leaf_data = device.ptrs.light_tree_leaves[node.light_ptr + child_light_id];
   }
 
   float variance;
@@ -723,7 +723,7 @@ __device__ void light_tree_child_importance(
 
   // Uncertainty is in the range [0,1] and also acts as the probability for splitting.
   // For non leaf nodes we reduce the importance based on the uncertainty. We cannot do that for
-  // leafs because we will resample later based on the importance.
+  // leaves because we will resample later based on the importance.
   importance[i]     = fmaxf((is_leaf) ? approx_importance : approx_importance * (1.0f - uncertainty), 0.0f);
   splitting_prob[i] = uncertainty;
 }
@@ -758,7 +758,7 @@ __device__ void light_tree_traverse(
 
         child_lights += (is_leaf) ? 1 : 0;
 
-        // Leafs are always send to the reservoir, we don't select them
+        // Leaves are always send to the reservoir, we don't select them
         if (is_leaf == false) {
           sum_importance += importance[i];
           split_probability[i] *= parent_split;
@@ -843,7 +843,7 @@ __device__ void light_tree_traverse(
         child_lights += (is_leaf) ? 1 : 0;
       }
 
-      // This can only happen if all children were leafs
+      // This can only happen if all children were leaves
       if (selected_child == 0xFFFFFFFF) {
         node.child_ptr = 0xFFFFFFFF;
         break;

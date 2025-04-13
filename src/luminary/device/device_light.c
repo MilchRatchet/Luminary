@@ -731,7 +731,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       // The above logic has a flaw in that that leaf nodes that were inserted during the last
       // loop would not be identified as such. Hence I loop again through the children to mark
-      // all children correctly as leafs.
+      // all children correctly as leaves.
       for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
         const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
@@ -1004,8 +1004,8 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   TriangleHandle* tri_handle_map;
   __FAILURE_HANDLE(host_malloc(&tri_handle_map, sizeof(TriangleHandle) * work->fragments_count));
 
-  DeviceLightTreeLeaf* leafs;
-  __FAILURE_HANDLE(host_malloc(&leafs, sizeof(DeviceLightTreeLeaf) * work->fragments_count));
+  DeviceLightTreeLeaf* leaves;
+  __FAILURE_HANDLE(host_malloc(&leaves, sizeof(DeviceLightTreeLeaf) * work->fragments_count));
 
   LightTreeBVHTriangle* bvh_triangles;
   __FAILURE_HANDLE(host_malloc(&bvh_triangles, sizeof(LightTreeBVHTriangle) * work->fragments_count));
@@ -1021,13 +1021,13 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
     tri_handle_map[id] = handle;
 
-    const vec3 normal = {.x = frag.average_direction.x, .y = frag.average_direction.y, .z = frag.average_direction.w};
+    const vec3 normal = {.x = frag.average_direction.x, .y = frag.average_direction.y, .z = frag.average_direction.z};
 
     DeviceLightTreeLeaf leaf;
     leaf.power         = frag.power;
     leaf.packed_normal = device_pack_normal(normal);
 
-    leafs[id] = leaf;
+    leaves[id] = leaf;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -1045,8 +1045,8 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   tree->tri_handle_map_size = sizeof(TriangleHandle) * work->fragments_count;
   tree->tri_handle_map_data = (void*) tri_handle_map;
 
-  tree->leafs_size = sizeof(DeviceLightTreeLeaf) * work->fragments_count;
-  tree->leafs_data = (void*) leafs;
+  tree->leaves_size = sizeof(DeviceLightTreeLeaf) * work->fragments_count;
+  tree->leaves_data = (void*) leaves;
 
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
   tree->light_count            = work->fragments_count;
@@ -1819,9 +1819,9 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
     tree->tri_handle_map_size = 0;
   }
 
-  if (tree->leafs_data) {
-    __FAILURE_HANDLE(host_free(&tree->leafs_data));
-    tree->leafs_size = 0;
+  if (tree->leaves_data) {
+    __FAILURE_HANDLE(host_free(&tree->leaves_data));
+    tree->leaves_size = 0;
   }
 
   if (tree->bvh_vertex_buffer_data) {
