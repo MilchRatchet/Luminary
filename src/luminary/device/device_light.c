@@ -1678,7 +1678,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       LightTreeFragment fragment;
       fragment.low               = vec128_min(vertex, vec128_min(vertex1, vertex2));
       fragment.high              = vec128_max(vertex, vec128_max(vertex1, vertex2));
-      fragment.middle            = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
+      fragment.middle            = vec128_scale(vec128_add(vertex, vec128_add(vertex1, vertex2)), 1.0f / 3.0f);
       fragment.average_direction = vec128_scale(cross, 0.5f / area);
       fragment.v0                = vertex;
       fragment.v1                = vertex1;
