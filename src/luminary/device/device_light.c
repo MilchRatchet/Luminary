@@ -469,11 +469,19 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   return LUMINARY_SUCCESS;
 }
 
+// #define LIGHT_TREE_UNIFORM_WEIGHTING
+// #define LIGHT_TREE_USE_BOUND_AS_VARIANCE
+
 static void _lights_get_vmf_and_mean_and_variance(
   const LightTreeWork* work, const LightTreeBinaryNode node, const float power, vec3* mean, float* variance) {
   // TODO: This could instead be done in a bottom up fashion like in the paper which would be much faster, however, this here might be more
   // accurate
+
+#ifdef LIGHT_TREE_UNIFORM_WEIGHTING
+  const float inverse_total_power = 1.0f / node.triangle_count;
+#else
   const float inverse_total_power = 1.0f / power;
+#endif
 
 #ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
   Vec128 average_direction = vec128_set_1(0.0f);
@@ -482,7 +490,12 @@ static void _lights_get_vmf_and_mean_and_variance(
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const float weight         = frag.power * inverse_total_power;
+#ifdef LIGHT_TREE_UNIFORM_WEIGHTING
+    const float weight = inverse_total_power;
+#else
+    const float weight = frag.power * inverse_total_power;
+#endif
+
     const Vec128 weight_vector = vec128_set_1(weight);
 
 #ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
@@ -495,7 +508,22 @@ static void _lights_get_vmf_and_mean_and_variance(
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
-    const float weight = frag.power * inverse_total_power;
+#ifdef LIGHT_TREE_USE_BOUND_AS_VARIANCE
+    const Vec128 diff0 = vec128_sub(frag.v0, p);
+    spatial_variance   = fmaxf(spatial_variance, 0.5f * vec128_dot(diff0, diff0));
+
+    const Vec128 diff1 = vec128_sub(frag.v1, p);
+    spatial_variance   = fmaxf(spatial_variance, 0.5f * vec128_dot(diff1, diff1));
+
+    const Vec128 diff2 = vec128_sub(frag.v2, p);
+    spatial_variance   = fmaxf(spatial_variance, 0.5f * vec128_dot(diff2, diff2));
+#else
+    // Each triangle contributed 3 times to the spatial variance
+#ifdef LIGHT_TREE_UNIFORM_WEIGHTING
+    const float weight = (1.0f / 3.0f) * inverse_total_power;
+#else
+    const float weight = (1.0f / 3.0f) * frag.power * inverse_total_power;
+#endif
 
     const Vec128 diff0 = vec128_sub(frag.v0, p);
     spatial_variance += weight * vec128_dot(diff0, diff0);
@@ -505,6 +533,7 @@ static void _lights_get_vmf_and_mean_and_variance(
 
     const Vec128 diff2 = vec128_sub(frag.v2, p);
     spatial_variance += weight * vec128_dot(diff2, diff2);
+#endif
   }
 
 #ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
@@ -515,7 +544,7 @@ static void _lights_get_vmf_and_mean_and_variance(
   *vmf_sharpness = (3.0f * avg_dir_norm - avg_dir_norm * avg_dir_norm * avg_dir_norm) / (1.0f - avg_dir_norm * avg_dir_norm);
 #endif /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
   *mean     = (vec3) {.x = p.x, .y = p.y, .z = p.z};
-  *variance = (1.0f / 3.0f) * spatial_variance;  // Each triangle contributed 3 times to the spatial variance
+  *variance = spatial_variance;
 }
 
 // Set the reference point in each node to be the power weighted mean of the centers of the lights.

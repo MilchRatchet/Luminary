@@ -187,6 +187,11 @@ enum GBufferFlag {
   G_BUFFER_FLAG_VOLUME_SCATTERED           = 0b10000
 } typedef GBufferFlag;
 
+#define GBUFFER_IS_SUBSTRATE_OPAQUE(__internal_macro_flags) \
+  (((__internal_macro_flags) & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) == G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
+#define GBUFFER_IS_SUBSTRATE_TRANSLUCENT(__internal_macro_flags) \
+  (((__internal_macro_flags) & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) == G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)
+
 struct GBufferData {
   uint32_t instance_id;
   uint32_t tri_id;

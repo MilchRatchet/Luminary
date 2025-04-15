@@ -181,8 +181,8 @@ __device__ LightTreeRuntimeData light_sg_prepare(const GBufferData data) {
   const vec3 reflection_vec        = scale_vector(reflect_vector(data.V, data.normal), reflection_sharpness);
 
   LightTreeRuntimeData runtime_data;
-  runtime_data.diffuse_weight = (data.flags & (G_BUFFER_FLAG_METALLIC | G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)) ? 0.0f : 1.0f;  // TODO
-  runtime_data.reflection_weight = 1.0f;
+  runtime_data.diffuse_weight    = (GBUFFER_IS_SUBSTRATE_TRANSLUCENT(data.flags) || (data.flags & G_BUFFER_FLAG_METALLIC)) ? 0.0f : 1.0f;
+  runtime_data.reflection_weight = (GBUFFER_IS_SUBSTRATE_OPAQUE(data.flags)) ? 1.0f - roughness_max2 : 1.0f;
   runtime_data.rotation_to_z     = rotation_to_z;
   runtime_data.proj_roughness_u2 = proj_roughness_u2;
   runtime_data.proj_roughness_v2 = proj_roughness_v2;
@@ -196,10 +196,12 @@ __device__ LightTreeRuntimeData light_sg_prepare(const GBufferData data) {
   return runtime_data;
 }
 
+#define LIGHT_TREE_NO_MICROFACET_VARIANCE_FACTOR
+
 // In our case, all light clusters are considered omnidirectional, i.e. sharpness = 0.
 __device__ float light_sg_evaluate(
   const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power,
-  const vec3 light_normal, const bool apply_light_normal, float& uncertainty) {
+  const vec3 light_normal, const bool is_leaf, float& uncertainty) {
   const vec3 light_vec    = sub_vector(mean, position);
   const float distance_sq = dot_product(light_vec, light_vec);
   const vec3 light_dir    = scale_vector(light_vec, rsqrt(distance_sq));
@@ -207,16 +209,26 @@ __device__ float light_sg_evaluate(
   // Clamp the variance for the numerical stability.
   const float light_variance = fmaxf(variance, LIGHT_SG_VARIANCE_THRESHOLD * distance_sq);
 
-  float emissive = power / light_variance;
+  float emissive_diffuse = power / light_variance;
 
-  if (apply_light_normal) {
-    emissive *= fabsf(dot_product(light_normal, light_dir));
+  if (is_leaf) {
+    emissive_diffuse *= fabsf(dot_product(light_normal, light_dir));
   }
+
+#ifdef LIGHT_TREE_NO_MICROFACET_VARIANCE_FACTOR
+  const float emissive_microfacet = (is_leaf) ? power : power / light_variance;
+#else
+  const float emissive_microfacet = power / light_variance;
+#endif
 
   // Compute SG sharpness for a light distribution viewed from the shading point.
   const float light_sharpness = distance_sq / light_variance;
 
+#if 0
   uncertainty = expf(-light_sharpness * LIGHT_SG_UNCERTAINTY_AGGRESSIVENESS);
+#else
+  uncertainty = 0.0f;
+#endif
 
   // Axis of the SG product lobe.
   const vec3 product_vec          = add_vector(data.reflection_vec, scale_vector(light_dir, light_sharpness));
@@ -261,7 +273,7 @@ __device__ float light_sg_evaluate(
   const float cosine             = clampf(dot_product(light_dir, normal), -1.0f, 1.0f);
   const float diffuse_importance = light_sg_cosine_integral(cosine, light_sharpness);
 
-  return emissive * (data.diffuse_weight * diffuse_importance + data.reflection_weight * reflection_importance);
+  return emissive_diffuse * data.diffuse_weight * diffuse_importance + emissive_microfacet * data.reflection_weight * reflection_importance;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -1026,6 +1038,9 @@ __device__ void light_sample_bsdf(
   bool bsdf_sample_is_refraction = false;
   bool bsdf_sample_is_valid      = false;
   const vec3 ray = bsdf_sample_for_light(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+
+  if (bsdf_sample_is_valid == false)
+    return;
 
   float dist;
   if (light_load_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, data.position, ray, dist) == false)
