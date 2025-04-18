@@ -1036,6 +1036,12 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   DeviceLightTreeLeaf* leaves;
   __FAILURE_HANDLE(host_malloc(&leaves, sizeof(DeviceLightTreeLeaf) * work->fragments_count));
 
+  float* importance_normalization;
+  __FAILURE_HANDLE(host_malloc(&importance_normalization, sizeof(float) * work->fragments_count));
+
+  DeviceLightMicroTriangleImportance* microtriangles;
+  __FAILURE_HANDLE(host_malloc(&microtriangles, sizeof(DeviceLightMicroTriangleImportance) * work->fragments_count));
+
   LightTreeBVHTriangle* bvh_triangles;
   __FAILURE_HANDLE(host_malloc(&bvh_triangles, sizeof(LightTreeBVHTriangle) * work->fragments_count));
 
@@ -1060,6 +1066,10 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
     leaf.packed_normal = device_pack_normal(normal);
 
     leaves[id] = leaf;
+
+    importance_normalization[id] = triangle->importance_normalization;
+
+    memcpy(microtriangles + id, &triangle->microtriangle_importance, sizeof(DeviceLightMicroTriangleImportance));
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -1079,6 +1089,12 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
   tree->leaves_size = sizeof(DeviceLightTreeLeaf) * work->fragments_count;
   tree->leaves_data = (void*) leaves;
+
+  tree->importance_normalization_size = sizeof(float) * work->fragments_count;
+  tree->importance_normalization_data = (void*) importance_normalization;
+
+  tree->microtriangle_size = sizeof(DeviceLightMicroTriangleImportance) * work->fragments_count;
+  tree->microtriangle_data = (void*) microtriangles;
 
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
   tree->light_count            = work->fragments_count;
@@ -1661,8 +1677,10 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
     triangle->average_intensity        = tree->integrator.intensities[task_id];
     triangle->importance_normalization = tree->integrator.importance_normalization[task_id];
 
+    LUM_ASSUME(sizeof(DeviceLightMicroTriangleImportance) == LIGHT_NUM_MICROTRIANGLES >> 1);
+
     memcpy(
-      triangle->microtriangle_importance, &tree->integrator.microtriangle_importance[task_id * (LIGHT_NUM_MICROTRIANGLES >> 1)],
+      &triangle->microtriangle_importance, &tree->integrator.microtriangle_importance[task_id * (LIGHT_NUM_MICROTRIANGLES >> 1)],
       LIGHT_NUM_MICROTRIANGLES >> 1);
   }
 
@@ -1882,6 +1900,16 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
   if (tree->leaves_data) {
     __FAILURE_HANDLE(host_free(&tree->leaves_data));
     tree->leaves_size = 0;
+  }
+
+  if (tree->importance_normalization_data) {
+    __FAILURE_HANDLE(host_free(&tree->importance_normalization_data));
+    tree->importance_normalization_size = 0;
+  }
+
+  if (tree->microtriangle_data) {
+    __FAILURE_HANDLE(host_free(&tree->microtriangle_data));
+    tree->microtriangle_size = 0;
   }
 
   if (tree->bvh_vertex_buffer_data) {
