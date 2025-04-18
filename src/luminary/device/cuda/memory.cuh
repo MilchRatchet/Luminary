@@ -24,6 +24,30 @@ __device__ void* triangle_get_entry_address(
 }
 
 ////////////////////////////////////////////////////////////////////
+// Interthread IO
+////////////////////////////////////////////////////////////////////
+
+template <typename T>
+__device__ T warp_reduce_sum(T sum) {
+  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 16);
+  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 8);
+  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 4);
+  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 2);
+  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 1);
+  return sum;
+}
+
+template <typename T>
+__device__ T warp_reduce_max(T max_value) {
+  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 16));
+  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 8));
+  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 4));
+  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 2));
+  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 1));
+  return max_value;
+}
+
+////////////////////////////////////////////////////////////////////
 // Task IO
 ////////////////////////////////////////////////////////////////////
 

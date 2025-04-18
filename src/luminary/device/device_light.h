@@ -16,11 +16,15 @@ struct LightTreeFragment {
   Vec128 v1;
   Vec128 v2;
   uint32_t instance_id;
-  uint32_t tri_id;
+  uint32_t material_slot_id;
+  uint32_t material_tri_id;
   float power;
   uint32_t instance_cache_tri_id;
+  uint32_t padding0;
+  uint32_t padding1;
+  uint32_t padding2;
 } typedef LightTreeFragment;
-LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x80);
+LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x90);
 
 struct LightTreeCacheTriangle {
   uint32_t tri_id;
@@ -29,6 +33,8 @@ struct LightTreeCacheTriangle {
   Vec128 vertex2;
   Vec128 cross;
   float average_intensity;
+  uint8_t microtriangle_importance[LIGHT_NUM_MICROTRIANGLES >> 1];
+  float importance_normalization;
 } typedef LightTreeCacheTriangle;
 
 struct LightTreeCacheMesh {
@@ -84,10 +90,14 @@ struct LightTreeIntegrator {
   ARRAY LightTreeIntegratorTask* tasks;
   uint32_t* mesh_ids;
   uint32_t* triangle_ids;
-  float* average_intensities;
+  uint8_t* microtriangle_importance;
+  float* importance_normalization;
+  float* intensities;
   DEVICE uint32_t* device_mesh_ids;
   DEVICE uint32_t* device_triangle_ids;
-  DEVICE float* device_average_intensities;
+  DEVICE float* device_microtriangle_importance;
+  DEVICE float* device_importance_normalization;
+  DEVICE float* device_intensities;
   uint32_t allocated_tasks;
 } typedef LightTreeIntegrator;
 

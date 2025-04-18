@@ -1044,9 +1044,12 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
     const LightTreeCacheInstance* instance = tree->cache.instances + frag.instance_id;
 
+    const LightTreeCacheMesh* mesh         = tree->cache.meshes + instance->mesh_id;
+    const LightTreeCacheTriangle* triangle = mesh->material_triangles[frag.material_slot_id] + frag.material_tri_id;
+
     bvh_triangles[id] = instance->bvh_triangles[frag.instance_cache_tri_id];
 
-    const TriangleHandle handle = (TriangleHandle) {.instance_id = frag.instance_id, .tri_id = frag.tri_id};
+    const TriangleHandle handle = (TriangleHandle) {.instance_id = frag.instance_id, .tri_id = triangle->tri_id};
 
     tri_handle_map[id] = handle;
 
@@ -1191,10 +1194,14 @@ LuminaryResult light_tree_create(LightTree** tree) {
   __FAILURE_HANDLE(array_create(&(*tree)->integrator.tasks, sizeof(LightTreeIntegratorTask), 1024));
   __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.mesh_ids, sizeof(uint32_t) * 1024));
   __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.triangle_ids, sizeof(uint32_t) * 1024));
-  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.average_intensities, sizeof(float) * 1024));
+  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.microtriangle_importance, sizeof(uint8_t) * 1024 * LIGHT_NUM_MICROTRIANGLES));
+  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.importance_normalization, sizeof(float) * 1024));
+  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.intensities, sizeof(float) * 1024));
   __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_mesh_ids, sizeof(uint32_t) * 1024));
   __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_triangle_ids, sizeof(uint32_t) * 1024));
-  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_average_intensities, sizeof(float) * 1024));
+  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_microtriangle_importance, sizeof(uint8_t) * 1024 * LIGHT_NUM_MICROTRIANGLES));
+  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_importance_normalization, sizeof(float) * 1024));
+  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_intensities, sizeof(float) * 1024));
   (*tree)->integrator.allocated_tasks = 1024;
 
   return LUMINARY_SUCCESS;
@@ -1581,19 +1588,28 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
   if (num_tasks > tree->integrator.allocated_tasks) {
     __FAILURE_HANDLE(host_free(&tree->integrator.mesh_ids));
     __FAILURE_HANDLE(host_free(&tree->integrator.triangle_ids));
-    __FAILURE_HANDLE(host_free(&tree->integrator.average_intensities));
+    __FAILURE_HANDLE(host_free(&tree->integrator.microtriangle_importance));
+    __FAILURE_HANDLE(host_free(&tree->integrator.importance_normalization));
+    __FAILURE_HANDLE(host_free(&tree->integrator.intensities));
 
     __FAILURE_HANDLE(host_malloc(&tree->integrator.mesh_ids, sizeof(uint32_t) * num_tasks));
     __FAILURE_HANDLE(host_malloc(&tree->integrator.triangle_ids, sizeof(uint32_t) * num_tasks));
-    __FAILURE_HANDLE(host_malloc(&tree->integrator.average_intensities, sizeof(float) * num_tasks));
+    __FAILURE_HANDLE(host_malloc(&tree->integrator.microtriangle_importance, sizeof(uint8_t) * num_tasks * LIGHT_NUM_MICROTRIANGLES));
+    __FAILURE_HANDLE(host_malloc(&tree->integrator.importance_normalization, sizeof(float) * num_tasks));
+    __FAILURE_HANDLE(host_malloc(&tree->integrator.intensities, sizeof(float) * num_tasks));
 
     __FAILURE_HANDLE(device_free(&tree->integrator.device_mesh_ids));
     __FAILURE_HANDLE(device_free(&tree->integrator.device_triangle_ids));
-    __FAILURE_HANDLE(device_free(&tree->integrator.device_average_intensities));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_microtriangle_importance));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_importance_normalization));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_intensities));
 
     __FAILURE_HANDLE(device_malloc(&tree->integrator.device_mesh_ids, sizeof(uint32_t) * num_tasks));
     __FAILURE_HANDLE(device_malloc(&tree->integrator.device_triangle_ids, sizeof(uint32_t) * num_tasks));
-    __FAILURE_HANDLE(device_malloc(&tree->integrator.device_average_intensities, sizeof(float) * num_tasks));
+    __FAILURE_HANDLE(
+      device_malloc(&tree->integrator.device_microtriangle_importance, sizeof(uint8_t) * num_tasks * LIGHT_NUM_MICROTRIANGLES));
+    __FAILURE_HANDLE(device_malloc(&tree->integrator.device_importance_normalization, sizeof(float) * num_tasks));
+    __FAILURE_HANDLE(device_malloc(&tree->integrator.device_intensities, sizeof(float) * num_tasks));
 
     tree->integrator.allocated_tasks = num_tasks;
   }
@@ -1611,18 +1627,27 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
     tree->integrator.device_triangle_ids, tree->integrator.triangle_ids, 0, sizeof(uint32_t) * num_tasks, device->stream_main));
 
   KernelArgsLightComputeIntensity args;
-  args.mesh_ids                = DEVICE_PTR(tree->integrator.device_mesh_ids);
-  args.triangle_ids            = DEVICE_PTR(tree->integrator.device_triangle_ids);
-  args.dst_average_intensities = DEVICE_PTR(tree->integrator.device_average_intensities);
-  args.lights_count            = num_tasks;
+  args.mesh_ids                     = DEVICE_PTR(tree->integrator.device_mesh_ids);
+  args.triangle_ids                 = DEVICE_PTR(tree->integrator.device_triangle_ids);
+  args.dst_microtriangle_importance = DEVICE_PTR(tree->integrator.device_microtriangle_importance);
+  args.dst_importance_normalization = DEVICE_PTR(tree->integrator.device_importance_normalization);
+  args.dst_intensities              = DEVICE_PTR(tree->integrator.device_intensities);
+  args.lights_count                 = num_tasks;
 
-  const uint32_t num_blocks = (num_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  // Every thread handles two microtriangles. Every warp handles 1 light.
+  const uint32_t num_blocks = (num_tasks * (LIGHT_NUM_MICROTRIANGLES >> 1) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
   __FAILURE_HANDLE(kernel_execute_custom(
-    device->cuda_kernels[CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY], 128, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
+    device->cuda_kernels[CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
 
   __FAILURE_HANDLE(device_download(
-    tree->integrator.average_intensities, tree->integrator.device_average_intensities, 0, sizeof(float) * num_tasks, device->stream_main));
+    tree->integrator.microtriangle_importance, tree->integrator.device_microtriangle_importance, 0,
+    sizeof(uint8_t) * num_tasks * LIGHT_NUM_MICROTRIANGLES, device->stream_main));
+  __FAILURE_HANDLE(device_download(
+    tree->integrator.importance_normalization, tree->integrator.device_importance_normalization, 0, sizeof(float) * num_tasks,
+    device->stream_main));
+  __FAILURE_HANDLE(
+    device_download(tree->integrator.intensities, tree->integrator.device_intensities, 0, sizeof(float) * num_tasks, device->stream_main));
 
   for (uint32_t task_id = 0; task_id < num_tasks; task_id++) {
     LightTreeIntegratorTask* task = tree->integrator.tasks + task_id;
@@ -1633,7 +1658,12 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
 
     LightTreeCacheTriangle* triangle = material_triangles + task->material_slot_tri_id;
 
-    triangle->average_intensity = tree->integrator.average_intensities[task_id];
+    triangle->average_intensity        = tree->integrator.intensities[task_id];
+    triangle->importance_normalization = tree->integrator.importance_normalization[task_id];
+
+    memcpy(
+      triangle->microtriangle_importance, &tree->integrator.microtriangle_importance[task_id * (LIGHT_NUM_MICROTRIANGLES >> 1)],
+      LIGHT_NUM_MICROTRIANGLES >> 1);
   }
 
   return LUMINARY_SUCCESS;
@@ -1714,7 +1744,8 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.v2                = vertex2;
       fragment.power             = material->constant_emission_intensity * area * triangle->average_intensity;
       fragment.instance_id       = instance_id;
-      fragment.tri_id            = triangle->tri_id;
+      fragment.material_slot_id  = material_slot_id;
+      fragment.material_tri_id   = tri_id;
 
       __FAILURE_HANDLE(array_get_num_elements(instance->bvh_triangles, &fragment.instance_cache_tri_id));
 
@@ -1939,10 +1970,14 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
   __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
   __FAILURE_HANDLE(host_free(&(*tree)->integrator.mesh_ids));
   __FAILURE_HANDLE(host_free(&(*tree)->integrator.triangle_ids));
-  __FAILURE_HANDLE(host_free(&(*tree)->integrator.average_intensities));
+  __FAILURE_HANDLE(host_free(&(*tree)->integrator.microtriangle_importance));
+  __FAILURE_HANDLE(host_free(&(*tree)->integrator.importance_normalization));
+  __FAILURE_HANDLE(host_free(&(*tree)->integrator.intensities));
   __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_mesh_ids));
   __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_triangle_ids));
-  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_average_intensities));
+  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_microtriangle_importance));
+  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_importance_normalization));
+  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_intensities));
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.meshes));
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.instances));
@@ -1954,196 +1989,3 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
 
   return LUMINARY_SUCCESS;
 }
-
-#if 0
-void lights_process(Scene* scene, int dmm_active) {
-  ////////////////////////////////////////////////////////////////////
-  // Iterate over all triangles and find all light candidates.
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t candidate_lights_length = 16;
-  uint32_t candidate_lights_count  = 0;
-  TriangleLight* candidate_lights  = (TriangleLight*) malloc(sizeof(TriangleLight) * candidate_lights_length);
-
-  uint32_t lights_length = 16;
-  uint32_t lights_count  = 0;
-  TriangleLight* lights  = (TriangleLight*) malloc(sizeof(TriangleLight) * candidate_lights_length);
-
-  for (uint32_t i = 0; i < scene->triangle_data.triangle_count; i++) {
-    const Triangle triangle = scene->triangles[i];
-
-    const PackedMaterial material = scene->materials[triangle.material_id];
-    const uint16_t tex_index      = material.luminance_tex;
-
-    // Triangles with displacement can't be light sources.
-    if (dmm_active && scene->materials[triangle.material_id].normal_tex)
-      continue;
-
-    const int is_textured_light = (tex_index != TEXTURE_NONE);
-
-    RGBF constant_emission;
-
-    constant_emission.r = _uint16_t_to_float(material.emission_r);
-    constant_emission.g = _uint16_t_to_float(material.emission_g);
-    constant_emission.b = _uint16_t_to_float(material.emission_b);
-
-    constant_emission.r *= material.emission_scale;
-    constant_emission.g *= material.emission_scale;
-    constant_emission.b *= material.emission_scale;
-
-    // Triangle is a light if it has a light texture with non-zero value at some point on the triangle's surface or it
-    // has no light texture but a non-zero constant emission.
-    const int is_light = is_textured_light || constant_emission.r || constant_emission.g || constant_emission.b;
-
-    if (is_light) {
-      TriangleLight light;
-
-      light.vertex      = triangle.vertex;
-      light.edge1       = triangle.edge1;
-      light.edge2       = triangle.edge2;
-      light.triangle_id = i;
-      light.material_id = triangle.material_id;
-
-      if (is_textured_light) {
-        light.power = 0.0f;  // To be determined...
-
-        candidate_lights[candidate_lights_count++] = light;
-        if (candidate_lights_count == candidate_lights_length) {
-          candidate_lights_length *= 2;
-          candidate_lights = (TriangleLight*) safe_realloc(candidate_lights, sizeof(TriangleLight) * candidate_lights_length);
-        }
-      }
-      else {
-        light.power = fmaxf(constant_emission.r, fmaxf(constant_emission.g, constant_emission.b));
-
-        scene->triangles[i].light_id = lights_count;
-
-        lights[lights_count++] = light;
-        if (lights_count == lights_length) {
-          lights_length *= 2;
-          lights = (TriangleLight*) safe_realloc(lights, sizeof(TriangleLight) * lights_length);
-        }
-      }
-    }
-  }
-
-  log_message("Number of untextured lights: %u", lights_count);
-  log_message("Number of textured candidate lights: %u", candidate_lights_count);
-
-  candidate_lights = (TriangleLight*) safe_realloc(candidate_lights, sizeof(TriangleLight) * candidate_lights_count);
-
-  ////////////////////////////////////////////////////////////////////
-  // Iterate over all light candidates and compute their power.
-  ////////////////////////////////////////////////////////////////////
-
-  float* power_dst;
-  device_malloc(&power_dst, sizeof(float) * candidate_lights_count);
-
-  TriangleLight* device_candidate_lights;
-  device_malloc(&device_candidate_lights, sizeof(TriangleLight) * candidate_lights_count);
-  device_upload(device_candidate_lights, candidate_lights, sizeof(TriangleLight) * candidate_lights_count);
-
-  lights_compute_power_host(device_candidate_lights, candidate_lights_count, power_dst);
-
-  float* power = (float*) malloc(sizeof(float) * candidate_lights_count);
-
-  device_download(power, power_dst, sizeof(float) * candidate_lights_count);
-
-  device_free(power_dst, sizeof(float) * candidate_lights_count);
-  device_free(device_candidate_lights, sizeof(TriangleLight) * candidate_lights_count);
-
-  float max_power = 0.0f;
-
-  for (uint32_t i = 0; i < candidate_lights_count; i++) {
-    const float candidate_light_power = power[i];
-
-    if (candidate_light_power > 1e-6f) {
-      TriangleLight light = candidate_lights[i];
-
-      max_power = max(max_power, candidate_light_power);
-
-      light.power = candidate_light_power;
-
-      lights[lights_count++] = light;
-      if (lights_count == lights_length) {
-        lights_length *= 2;
-        lights = (TriangleLight*) safe_realloc(lights, sizeof(TriangleLight) * lights_length);
-      }
-    }
-  }
-
-  free(power);
-  free(candidate_lights);
-
-  log_message("Number of textured lights: %u", lights_count);
-  log_message("Highest encountered light power: %f", max_power);
-
-  lights = (TriangleLight*) safe_realloc(lights, sizeof(TriangleLight) * lights_count);
-
-  scene->triangle_lights       = lights;
-  scene->triangle_lights_count = lights_count;
-
-  ////////////////////////////////////////////////////////////////////
-  // Create light tree.
-  ////////////////////////////////////////////////////////////////////
-
-  if (scene->triangle_lights_count > 0) {
-    _lights_build_light_tree(scene);
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Setup light ptrs in geometry.
-  ////////////////////////////////////////////////////////////////////
-
-  for (uint32_t light_id = 0; light_id < scene->triangle_lights_count; light_id++) {
-    TriangleLight light                          = scene->triangle_lights[light_id];
-    scene->triangles[light.triangle_id].light_id = light_id;
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Create vertex and index buffer for BVH creation.
-  ////////////////////////////////////////////////////////////////////
-
-  TriangleGeomData tri_data;
-
-  tri_data.vertex_count   = lights_count * 3;
-  tri_data.index_count    = lights_count * 3;
-  tri_data.triangle_count = lights_count;
-
-  const size_t vertex_buffer_size = sizeof(float) * 4 * 3 * lights_count;
-  const size_t index_buffer_size  = sizeof(uint32_t) * 4 * lights_count;
-
-  float* vertex_buffer   = (float*) malloc(vertex_buffer_size);
-  uint32_t* index_buffer = (uint32_t*) malloc(index_buffer_size);
-
-  for (uint32_t i = 0; i < lights_count; i++) {
-    const TriangleLight l = lights[i];
-
-    vertex_buffer[3 * 4 * i + 4 * 0 + 0] = l.vertex.x;
-    vertex_buffer[3 * 4 * i + 4 * 0 + 1] = l.vertex.y;
-    vertex_buffer[3 * 4 * i + 4 * 0 + 2] = l.vertex.z;
-    vertex_buffer[3 * 4 * i + 4 * 0 + 3] = 1.0f;
-    vertex_buffer[3 * 4 * i + 4 * 1 + 0] = l.vertex.x + l.edge1.x;
-    vertex_buffer[3 * 4 * i + 4 * 1 + 1] = l.vertex.y + l.edge1.y;
-    vertex_buffer[3 * 4 * i + 4 * 1 + 2] = l.vertex.z + l.edge1.z;
-    vertex_buffer[3 * 4 * i + 4 * 1 + 3] = 1.0f;
-    vertex_buffer[3 * 4 * i + 4 * 2 + 0] = l.vertex.x + l.edge2.x;
-    vertex_buffer[3 * 4 * i + 4 * 2 + 1] = l.vertex.y + l.edge2.y;
-    vertex_buffer[3 * 4 * i + 4 * 2 + 2] = l.vertex.z + l.edge2.z;
-    vertex_buffer[3 * 4 * i + 4 * 2 + 3] = 1.0f;
-
-    index_buffer[4 * i + 0] = 3 * i + 0;
-    index_buffer[4 * i + 1] = 3 * i + 1;
-    index_buffer[4 * i + 2] = 3 * i + 2;
-    index_buffer[4 * i + 3] = 0;
-  }
-
-  device_malloc(&tri_data.vertex_buffer, vertex_buffer_size);
-  device_upload(tri_data.vertex_buffer, vertex_buffer, vertex_buffer_size);
-
-  device_malloc(&tri_data.index_buffer, index_buffer_size);
-  device_upload(tri_data.index_buffer, index_buffer, index_buffer_size);
-
-  scene->triangle_lights_data = tri_data;
-}
-#endif

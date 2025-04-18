@@ -68,7 +68,9 @@ struct KernelArgsLightComputeIntensity {
   const uint32_t* mesh_ids;
   const uint32_t* triangle_ids;
   uint32_t lights_count;
-  float* dst_average_intensities;
+  uint8_t* dst_microtriangle_importance;
+  float* dst_importance_normalization;
+  float* dst_intensities;
 } typedef KernelArgsLightComputeIntensity;
 
 struct KernelArgsGenerateFinalImage {
