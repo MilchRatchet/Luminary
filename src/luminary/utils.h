@@ -20,6 +20,7 @@
 #define ENDIAN_ORDER ('ABCD')
 
 #define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size")
+#define LUM_ASSUME(assumption) static_assert((assumption), "Assumption: " #assumption " was violated.");
 
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
