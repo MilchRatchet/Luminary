@@ -1,8 +1,6 @@
 #ifndef CU_LIGHT_H
 #define CU_LIGHT_H
 
-#if defined(SHADING_KERNEL)
-
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
@@ -24,6 +22,85 @@
 // [Tok24]
 // Y. Tokuyoshi and S. Ikeda and P. Kulkarni and T. Harada, "Hierarchical Light Sampling with Accurate Spherical Gaussian Lighting",
 // SIGGRAPH Asia 2024 Conference Papers, 2024
+
+////////////////////////////////////////////////////////////////////
+// Microtriangles
+////////////////////////////////////////////////////////////////////
+
+static_assert(LIGHT_NUM_MICROTRIANGLES == 64, "This code requires this specific number of microtriangles.");
+__device__ void light_microtriangle_id_to_bary(const uint32_t id, float2& bary0, float2& bary1, float2& bary2) {
+  uint32_t row_id;
+  uint32_t col_id;
+
+  // Row 0
+  if (id <= 15) {
+    row_id = 0;
+    col_id = (id >> 1);
+  }
+  // Row 1
+  else if (id <= 15 + 13) {
+    row_id = 1;
+    col_id = ((id - 15) >> 1);
+  }
+  // Row 2
+  else if (id <= 15 + 13 + 11) {
+    row_id = 2;
+    col_id = ((id - 15 - 13) >> 1);
+  }
+  // Row 3
+  else if (id <= 15 + 13 + 11 + 9) {
+    row_id = 3;
+    col_id = ((id - 15 - 13 - 11) >> 1);
+  }
+  // Row 4
+  else if (id <= 15 + 13 + 11 + 9 + 7) {
+    row_id = 4;
+    col_id = ((id - 15 - 13 - 11 - 9) >> 1);
+  }
+  // Row 5
+  else if (id <= 15 + 13 + 11 + 9 + 7 + 5) {
+    row_id = 5;
+    col_id = ((id - 15 - 13 - 11 - 9 - 7) >> 1);
+  }
+  // Row 6
+  else if (id <= 15 + 13 + 11 + 9 + 7 + 5 + 3) {
+    row_id = 6;
+    col_id = ((id - 15 - 13 - 11 - 9 - 7 - 5) >> 1);
+  }
+  // Row 7
+  else {
+    row_id = 7;
+    col_id = 0;
+  }
+
+  const bool is_top = (id & 0b1) == (row_id & 0b1);
+
+  bary0 = make_float2(row_id, col_id + 1);
+  bary1 = make_float2(row_id + 1, col_id);
+  bary2 = is_top ? make_float2(row_id, col_id) : make_float2(row_id + 1, col_id + 1);
+
+  // Normalize
+  bary0.x *= 1.0f / 8.0f;
+  bary0.y *= 1.0f / 8.0f;
+  bary1.x *= 1.0f / 8.0f;
+  bary1.y *= 1.0f / 8.0f;
+  bary2.x *= 1.0f / 8.0f;
+  bary2.y *= 1.0f / 8.0f;
+}
+
+__device__ uint32_t light_microtriangle_bary_to_id(const float2 bary) {
+  const uint32_t index_row = (uint32_t) (bary.x * 8.0f);
+  const float row_mod      = bary.x * 8.0f - index_row;
+
+  const uint32_t cols_in_row = 8 - index_row;
+
+  const uint32_t index_col = (uint32_t) (bary.y * cols_in_row);
+  const float col_mod      = bary.y * cols_in_row - index_col;
+
+  return index_col * 2 + (((row_mod + col_mod) > 1.0f) ? 1 : 0);
+}
+
+#if defined(SHADING_KERNEL)
 
 ////////////////////////////////////////////////////////////////////
 // SG Lighting
@@ -327,15 +404,16 @@ __device__ BFloat16 light_tree_float_to_bfloat(const float val) {
   return (BFloat16) (data >> 16);
 }
 
-__device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
-  const vec3 h  = cross_product(ray, triangle.edge2);
-  const float a = dot_product(triangle.edge1, h);
+__device__ float light_triangle_intersection_uv_generic(
+  const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 origin, const vec3 ray, float2& coords) {
+  const vec3 h  = cross_product(ray, edge2);
+  const float a = dot_product(edge1, h);
 
   const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, triangle.vertex);
+  const vec3 s  = sub_vector(origin, vertex);
   const float u = f * dot_product(s, h);
 
-  const vec3 q  = cross_product(s, triangle.edge1);
+  const vec3 q  = cross_product(s, edge1);
   const float v = f * dot_product(ray, q);
 
   coords = make_float2(u, v);
@@ -344,9 +422,13 @@ __device__ float light_triangle_intersection_uv(const TriangleLight triangle, co
   if (v < 0.0f || u < 0.0f || !(u + v <= 1.0f))
     return FLT_MAX;
 
-  const float t = f * dot_product(triangle.edge2, q);
+  const float t = f * dot_product(edge2, q);
 
   return __fslctf(t, FLT_MAX, t);
+}
+
+__device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
+  return light_triangle_intersection_uv_generic(triangle.vertex, triangle.edge1, triangle.edge2, origin, ray, coords);
 }
 
 __device__ TriangleLight
@@ -414,10 +496,6 @@ __device__ TriangleLight light_load_sample_init(const TriangleHandle handle, con
 
 __device__ bool light_load_sample_finalize_dist_and_uvs(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const vec3 ray, float& dist) {
-  if (is_non_finite(ray.x) || is_non_finite(ray.y) || is_non_finite(ray.z)) {
-    return false;
-  }
-
   float2 coords;
   dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
 
@@ -434,16 +512,23 @@ __device__ bool light_load_sample_finalize_dist_and_uvs(
   return true;
 }
 
-/*
- * Robust solid angle sampling method from
- * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
- */
-__device__ bool light_load_sample_finalize(
-  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist,
-  float& solid_angle) {
-  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, origin));
-  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), origin));
-  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), origin));
+__device__ float light_triangle_get_solid_angle(const vec3 origin, const vec3 vertex, const vec3 edge1, const vec3 edge2) {
+  const vec3 v0 = normalize_vector(sub_vector(vertex, origin));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(vertex, edge1), origin));
+  const vec3 v2 = normalize_vector(sub_vector(add_vector(vertex, edge2), origin));
+
+  const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
+  const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
+  const float G2 = 1.0f + dot_product(v0, v1);
+
+  return 2.0f * atan2f(G0, G1 + G2);
+}
+
+__device__ bool light_load_sample_solid_angle(
+  const vec3 origin, const vec3 vertex, const vec3 edge1, const vec3 edge2, const float2 random, vec3& ray, float& solid_angle) {
+  const vec3 v0 = normalize_vector(sub_vector(vertex, origin));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(vertex, edge1), origin));
+  const vec3 v2 = normalize_vector(sub_vector(add_vector(vertex, edge2), origin));
 
   const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
   const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
@@ -469,9 +554,62 @@ __device__ bool light_load_sample_finalize(
 
   ray = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
 
+  if (is_non_finite(ray.x) || is_non_finite(ray.y) || is_non_finite(ray.z)) {
+    return false;
+  }
+
+  return true;
+}
+
+/*
+ * Robust solid angle sampling method from
+ * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
+ */
+__device__ bool light_load_sample_finalize(
+  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist,
+  float& solid_angle) {
   bool success = true;
 
+  success &= light_load_sample_solid_angle(origin, triangle.vertex, triangle.edge1, triangle.edge2, random, ray, solid_angle);
   success &= light_load_sample_finalize_dist_and_uvs(triangle, packed_light_data, origin, ray, dist);
+
+  return success;
+}
+
+__device__ bool light_load_sample_microtriangle_finalize(
+  TriangleLight& triangle, const float2 bary0, const float2 bary1, const float2 bary2, const uint3 packed_light_data, const vec3 origin,
+  const float2 random, vec3& ray, float& dist, float& solid_angle, float2& coords) {
+  const vec3 v0 = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, bary0.x), scale_vector(triangle.edge2, bary0.y)));
+  const vec3 v1 = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, bary1.x), scale_vector(triangle.edge2, bary1.y)));
+  const vec3 v2 = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, bary2.x), scale_vector(triangle.edge2, bary2.y)));
+
+  const vec3 edge1 = sub_vector(v1, v0);
+  const vec3 edge2 = sub_vector(v2, v0);
+
+  bool success = true;
+
+  success &= light_load_sample_solid_angle(origin, v0, edge1, edge2, random, ray, solid_angle);
+
+  if (success) {
+    dist = light_triangle_intersection_uv_generic(v0, edge1, edge2, origin, ray, coords);
+
+    if (dist == FLT_MAX) {
+      return false;
+    }
+
+    const UV vertex_texture  = uv_unpack(packed_light_data.x);
+    const UV vertex1_texture = uv_unpack(packed_light_data.y);
+    const UV vertex2_texture = uv_unpack(packed_light_data.z);
+
+    const UV edge1_texture = uv_sub(vertex1_texture, vertex_texture);
+    const UV edge2_texture = uv_sub(vertex2_texture, vertex_texture);
+
+    const UV v0_texture = add_uv(vertex_texture, add_uv(uv_scale(edge1_texture, bary0.x), uv_scale(edge2_texture, bary0.y)));
+    const UV v1_texture = add_uv(vertex_texture, add_uv(uv_scale(edge1_texture, bary1.x), uv_scale(edge2_texture, bary1.y)));
+    const UV v2_texture = add_uv(vertex_texture, add_uv(uv_scale(edge1_texture, bary2.x), uv_scale(edge2_texture, bary2.y)));
+
+    triangle.tex_coords = lerp_uv(v0_texture, v1_texture, v2_texture, coords);
+  }
 
   return success;
 }
@@ -499,7 +637,7 @@ __device__ bool light_load_sample_finalize_bridges(
   return success;
 }
 
-__device__ RGBF light_get_color(const TriangleLight triangle) {
+__device__ RGBF light_get_color(TriangleLight& triangle) {
   RGBF color = splat_color(0.0f);
 
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
@@ -508,9 +646,13 @@ __device__ RGBF light_get_color(const TriangleLight triangle) {
     const float4 emission = texture_load(load_texture_object(mat.luminance_tex), triangle.tex_coords);
 
     color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
+
+    triangle.is_textured = 1;
   }
   else {
     color = mat.emission;
+
+    triangle.is_textured = 0;
   }
 
   if (color_importance(color) > 0.0f) {
@@ -798,6 +940,10 @@ __device__ void light_tree_traverse(
 
         const bool is_leaf = ((variance_leaf_data >> shift) & 0x1) != 0;
 
+        // if (is_center_pixel(pixel) && IS_PRIMARY_RAY) {
+        //   printf("CHILD[%u]: %f %f %u\n", i, child_importance, split_probability[i], is_leaf ? 1 : 0);
+        // }
+
         if (is_leaf) {
           const float leaf_probability = T * (1.0f - parent_split) + parent_split;
 
@@ -993,10 +1139,39 @@ struct LightSampleWorkData {
   bool is_refraction;
   // Reused data
   float solid_angle;
+  float2 hit_coords;
+  uint32_t light_id;
 } typedef LightSampleWorkData;
 
+__device__ float light_sample_microtriangle_pdf(
+  const vec3 origin, TriangleLight light, const uint32_t microtriangle_id, const uint32_t light_id) {
+  const float importance_normalization = __ldg(device.ptrs.light_importance_normalization + light_id) * 15.0f;
+
+  const uint8_t* data_ptr = (uint8_t*) (device.ptrs.light_microtriangles + light_id);
+
+  const uint8_t data = __ldg(data_ptr + (microtriangle_id >> 1));
+
+  const float value = (microtriangle_id & 0b1) ? data >> 4 : data & 0xF;
+
+  const float selection_pdf = value * importance_normalization;
+
+  float2 bary0, bary1, bary2;
+  light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
+
+  const vec3 v0 = add_vector(light.vertex, add_vector(scale_vector(light.edge1, bary0.x), scale_vector(light.edge2, bary0.y)));
+  const vec3 v1 = add_vector(light.vertex, add_vector(scale_vector(light.edge1, bary1.x), scale_vector(light.edge2, bary1.y)));
+  const vec3 v2 = add_vector(light.vertex, add_vector(scale_vector(light.edge1, bary2.x), scale_vector(light.edge2, bary2.y)));
+
+  const vec3 edge1 = sub_vector(v1, v0);
+  const vec3 edge2 = sub_vector(v2, v0);
+
+  const float solid_angle = light_triangle_get_solid_angle(origin, v0, edge1, edge2);
+
+  return (solid_angle > eps) ? selection_pdf / solid_angle : 0.0f;
+}
+
 __device__ void light_sample_common(
-  const GBufferData data, const vec3 ray, const float dist, TriangleLight light, RISReservoir& reservoir, LightSampleWorkData& work) {
+  const GBufferData data, const vec3 ray, const float dist, TriangleLight& light, RISReservoir& reservoir, LightSampleWorkData& work) {
   RGBF light_color = light_get_color(light);
 
   // TODO: When I improve the BSDF, I need to make sure that I handle correctly refraction BSDF sampled directions, they could be
@@ -1009,7 +1184,17 @@ __device__ void light_sample_common(
   const float one_over_solid_angle_pdf = work.solid_angle;
   const float bsdf_pdf                 = bsdf_sample_for_light_pdf(data, ray);
 
-  const float sampling_weight = one_over_solid_angle_pdf / (1.0f + bsdf_pdf * one_over_solid_angle_pdf);
+  float microtriangle_pdf;
+  if (light.is_textured) {
+    const uint32_t microtriangle_id = light_microtriangle_bary_to_id(work.hit_coords);
+    microtriangle_pdf               = light_sample_microtriangle_pdf(data.position, light, microtriangle_id, work.light_id);
+  }
+  else {
+    microtriangle_pdf = 0.0f;
+  }
+
+  const float sampling_weight =
+    one_over_solid_angle_pdf / (1.0f + bsdf_pdf * one_over_solid_angle_pdf + microtriangle_pdf * one_over_solid_angle_pdf);
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
     work.ray           = ray;
@@ -1020,7 +1205,7 @@ __device__ void light_sample_common(
 }
 
 __device__ void light_sample_solid_angle(
-  const GBufferData data, const ushort2 pixel, TriangleLight triangle_light, const uint3 light_uv_packed, RISReservoir& reservoir,
+  const GBufferData data, const ushort2 pixel, TriangleLight& triangle_light, const uint3 light_uv_packed, RISReservoir& reservoir,
   LightSampleWorkData& work) {
   const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
 
@@ -1033,7 +1218,7 @@ __device__ void light_sample_solid_angle(
 }
 
 __device__ void light_sample_bsdf(
-  const GBufferData data, const ushort2 pixel, TriangleLight triangle_light, const uint3 light_uv_packed, RISReservoir& reservoir,
+  const GBufferData data, const ushort2 pixel, TriangleLight& triangle_light, const uint3 light_uv_packed, RISReservoir& reservoir,
   LightSampleWorkData& work) {
   bool bsdf_sample_is_refraction = false;
   bool bsdf_sample_is_valid      = false;
@@ -1047,6 +1232,87 @@ __device__ void light_sample_bsdf(
     return;
 
   light_sample_common(data, ray, dist, triangle_light, reservoir, work);
+}
+
+__device__ bool light_sample_microtriangle_iterate(
+  const uint32_t data, const float target_importance, const uint32_t result_offset, float& running_sum_importance, uint32_t& result) {
+  for (uint32_t microtriangle_id = 0; microtriangle_id < 8; microtriangle_id++) {
+    const uint8_t value = (data >> (microtriangle_id * 4)) & 0xF;
+
+    running_sum_importance += value;
+
+    if (running_sum_importance > target_importance) {
+      result = result_offset + microtriangle_id;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+__device__ void light_sample_microtriangle(
+  const GBufferData data, const ushort2 pixel, TriangleLight& light, const uint3 light_uv_packed, RISReservoir& reservoir,
+  LightSampleWorkData& work) {
+  const float microtriangle_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_MICROTRIANGLE, pixel);
+
+  const float importance_normalization = __ldg(device.ptrs.light_importance_normalization + work.light_id) * 15.0f;
+
+  const uint4* data_ptr = (uint4*) (device.ptrs.light_microtriangles + work.light_id);
+
+  const uint4 data0 = __ldg(data_ptr + 0);
+  const uint4 data1 = __ldg(data_ptr + 1);
+
+  const float target_importance = microtriangle_random * importance_normalization;
+
+  // TODO: I could in theory implement this through a binary search
+
+  uint32_t microtriangle_id    = 0;
+  float running_sum_importance = 0.0f;
+  bool found                   = false;
+
+  found |= light_sample_microtriangle_iterate(data0.x, target_importance, 0, running_sum_importance, microtriangle_id);
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data0.y, target_importance, 8, running_sum_importance, microtriangle_id);
+  }
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data0.z, target_importance, 16, running_sum_importance, microtriangle_id);
+  }
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data0.w, target_importance, 24, running_sum_importance, microtriangle_id);
+  }
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data1.x, target_importance, 32, running_sum_importance, microtriangle_id);
+  }
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data1.y, target_importance, 40, running_sum_importance, microtriangle_id);
+  }
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data1.z, target_importance, 48, running_sum_importance, microtriangle_id);
+  }
+
+  if (!found) {
+    found |= light_sample_microtriangle_iterate(data1.w, target_importance, 56, running_sum_importance, microtriangle_id);
+  }
+
+  float2 bary0, bary1, bary2;
+  light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
+
+  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_MICROTRIANGLE_DIR, pixel);
+
+  vec3 ray;
+  float dist;
+  float solid_angle;
+  if (!light_load_sample_microtriangle_finalize(
+        light, bary0, bary1, bary2, light_uv_packed, data.position, ray_random, ray, dist, solid_angle, work.hit_coords))
+    return;
+
+  light_sample_common(data, ray, dist, light, reservoir, work);
 }
 
 __device__ TriangleHandle light_sample(
@@ -1093,9 +1359,13 @@ __device__ TriangleHandle light_sample(
 
   // We don't need to initialize it. It will end up uninitialized if and only if ris_reservoir.target is 0.
   LightSampleWorkData work;
+  work.light_id = light_id;
 
   light_sample_solid_angle(data, pixel, triangle_light, light_uv_packed, reservoir, work);
   light_sample_bsdf(data, pixel, triangle_light, light_uv_packed, reservoir, work);
+  if (triangle_light.is_textured) {
+    light_sample_microtriangle(data, pixel, triangle_light, light_uv_packed, reservoir, work);
+  }
 
   // This happens if none of the techniques returned a valid sample.
   if (reservoir.selected_target == 0.0f)
@@ -1133,85 +1403,12 @@ __device__ TriangleHandle light_sample(
 // Light Processing
 ////////////////////////////////////////////////////////////////////
 
-static_assert(LIGHT_NUM_MICROTRIANGLES == 64, "This code requires this specific number of microtriangles.");
-__device__ void lights_microtriangle_id_to_bary(const uint32_t id, float2& bary0, float2& bary1, float2& bary2) {
-  uint32_t row_id;
-  uint32_t col_id;
-
-  // Row 0
-  if (id <= 15) {
-    row_id = 0;
-    col_id = (id >> 1);
-  }
-  // Row 1
-  else if (id <= 15 + 13) {
-    row_id = 1;
-    col_id = ((id - 15) >> 1);
-  }
-  // Row 2
-  else if (id <= 15 + 13 + 11) {
-    row_id = 2;
-    col_id = ((id - 15 - 13) >> 1);
-  }
-  // Row 3
-  else if (id <= 15 + 13 + 11 + 9) {
-    row_id = 3;
-    col_id = ((id - 15 - 13 - 11) >> 1);
-  }
-  // Row 4
-  else if (id <= 15 + 13 + 11 + 9 + 7) {
-    row_id = 4;
-    col_id = ((id - 15 - 13 - 11 - 9) >> 1);
-  }
-  // Row 5
-  else if (id <= 15 + 13 + 11 + 9 + 7 + 5) {
-    row_id = 5;
-    col_id = ((id - 15 - 13 - 11 - 9 - 7) >> 1);
-  }
-  // Row 6
-  else if (id <= 15 + 13 + 11 + 9 + 7 + 5 + 3) {
-    row_id = 6;
-    col_id = ((id - 15 - 13 - 11 - 9 - 7 - 5) >> 1);
-  }
-  // Row 7
-  else {
-    row_id = 7;
-    col_id = 0;
-  }
-
-  const bool is_top = (id & 0b1) == (row_id & 0b1);
-
-  bary0 = make_float2(row_id, col_id + 1);
-  bary1 = make_float2(row_id + 1, col_id);
-  bary2 = is_top ? make_float2(row_id, col_id) : make_float2(row_id + 1, col_id + 1);
-
-  // Normalize
-  bary0.x *= 1.0f / 8.0f;
-  bary0.y *= 1.0f / 8.0f;
-  bary1.x *= 1.0f / 8.0f;
-  bary1.y *= 1.0f / 8.0f;
-  bary2.x *= 1.0f / 8.0f;
-  bary2.y *= 1.0f / 8.0f;
-}
-
-__device__ uint32_t lights_microtriangle_bary_to_id(const float2 bary) {
-  const uint32_t index_row = (uint32_t) (bary.x * 8.0f);
-  const float row_mod      = bary.x * 8.0f - index_row;
-
-  const uint32_t cols_in_row = 8 - index_row;
-
-  const uint32_t index_col = (uint32_t) (bary.y * cols_in_row);
-  const float col_mod      = bary.y * cols_in_row - index_col;
-
-  return index_col * 2 + (((row_mod + col_mod) > 1.0f) ? 1 : 0);
-}
-
 __device__ float lights_integrate_emission(
   const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2, const uint32_t microtriangle_id) {
   const DeviceTextureObject tex = load_texture_object(material.luminance_tex);
 
   float2 bary0, bary1, bary2;
-  lights_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
+  light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
 
   const UV microv0 = get_uv(vertex.u + bary0.x * edge1.u + bary0.y * edge2.u, vertex.v + bary0.x * edge1.v + bary0.y * edge2.v);
   const UV microv1 = get_uv(vertex.u + bary1.x * edge1.u + bary1.y * edge2.u, vertex.v + bary1.x * edge1.v + bary1.y * edge2.v);
@@ -1278,31 +1475,34 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
 
   const float microtriangle_intensity1 =
     lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);
-
-  const float max_intensity1 = warp_reduce_max(microtriangle_intensity1);
-  const float sum_intensity1 = warp_reduce_sum(microtriangle_intensity1);
-
   const float microtriangle_intensity2 =
     lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 1);
 
-  const float max_intensity2 = warp_reduce_max(microtriangle_intensity2);
-  const float sum_intensity2 = warp_reduce_sum(microtriangle_intensity2);
+  const float max_microtriangle_intensity = fmaxf(microtriangle_intensity1, microtriangle_intensity2);
+  const float sum_microtriangle_intensity = microtriangle_intensity1 + microtriangle_intensity2;
 
-  const float max_intensity = max_intensity1 + max_intensity2;
-  const float sum_intensity = sum_intensity1 + sum_intensity2;
+  const float max_intensity = warp_reduce_max(max_microtriangle_intensity);
+  const float sum_intensity = warp_reduce_sum(sum_microtriangle_intensity);
 
   const float normalized_intensity1   = (max_intensity > 0.0f) ? microtriangle_intensity1 / max_intensity : 0.0f;
-  const uint8_t compressed_intensity1 = (uint8_t) (normalized_intensity1 * 15.0f + 0.5f);
+  const uint8_t compressed_intensity1 = max((uint8_t) (normalized_intensity1 * 15.0f + 0.5f), 1);
 
   const float normalized_intensity2   = (max_intensity > 0.0f) ? microtriangle_intensity2 / max_intensity : 0.0f;
-  const uint8_t compressed_intensity2 = (uint8_t) (normalized_intensity2 * 15.0f + 0.5f);
+  const uint8_t compressed_intensity2 = max((uint8_t) (normalized_intensity2 * 15.0f + 0.5f), 1);
 
   const uint8_t compressed_intensity = compressed_intensity1 | (compressed_intensity2 << 4);
 
   args.dst_microtriangle_importance[light_id * (LIGHT_NUM_MICROTRIANGLES >> 1) + (microtriangle_id >> 1)] = compressed_intensity;
 
+  const float uncompressed_intensity1 = compressed_intensity1 * (1.0f / 15.0f) * max_intensity;
+  const float uncompressed_intensity2 = compressed_intensity2 * (1.0f / 15.0f) * max_intensity;
+
+  const float uncompressed_intensity = uncompressed_intensity1 + uncompressed_intensity2;
+
+  const float sum_uncompressed_intensity = warp_reduce_sum(uncompressed_intensity);
+
   if (microtriangle_id == 0) {
-    args.dst_importance_normalization[light_id] = (sum_intensity > 0.0f) ? max_intensity / sum_intensity : 0.0f;
+    args.dst_importance_normalization[light_id] = (sum_uncompressed_intensity > 0.0f) ? max_intensity / sum_uncompressed_intensity : 0.0f;
     args.dst_intensities[light_id]              = sum_intensity;
   }
 }

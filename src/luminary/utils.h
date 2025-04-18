@@ -155,7 +155,7 @@ struct TriangleLight {
   vec3 edge1;
   vec3 edge2;
   uint16_t material_id;
-  uint16_t padding;
+  uint16_t is_textured;
   UV tex_coords;
 } typedef TriangleLight;
 LUM_STATIC_SIZE_ASSERT(TriangleLight, 0x30u);

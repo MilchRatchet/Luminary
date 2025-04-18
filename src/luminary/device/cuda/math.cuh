@@ -253,6 +253,15 @@ __device__ UV uv_sub(const UV a, const UV b) {
   return uv;
 }
 
+__device__ UV uv_scale(const UV a, const float b) {
+  UV uv;
+
+  uv.u = a.u * b;
+  uv.v = a.v * b;
+
+  return uv;
+}
+
 __device__ UV uv_unpack(const uint32_t data) {
   UV uv;
 
