@@ -89,15 +89,47 @@ __device__ void light_microtriangle_id_to_bary(const uint32_t id, float2& bary0,
 }
 
 __device__ uint32_t light_microtriangle_bary_to_id(const float2 bary) {
-  const uint32_t index_row = (uint32_t) (bary.x * 8.0f);
+  const uint32_t index_row = min((uint32_t) (fmaxf(bary.x, 0.0f) * 8.0f), 7);
   const float row_mod      = bary.x * 8.0f - index_row;
 
-  const uint32_t cols_in_row = 8 - index_row;
+  // This is funny, we need to scale bary.y into [0,1] range (because bary.y has a smaller range in higher rows),
+  // then we need to map the [0,1] to the column. In doing all of this, the number of cols cancel out and we
+  // just need to scale by 8 regardless of the row we are in.
+  const uint32_t index_col = min((uint32_t) (fmaxf(bary.y, 0.0f) * 8.0f), 7);
+  const float col_mod      = bary.y * 8.0f - index_col;
 
-  const uint32_t index_col = (uint32_t) (bary.y * cols_in_row);
-  const float col_mod      = bary.y * cols_in_row - index_col;
+  // TODO: There is definitely a branch-less way of doing this.
 
-  return index_col * 2 + (((row_mod + col_mod) > 1.0f) ? 1 : 0);
+  uint32_t offset;
+  switch (index_row) {
+    default:
+    case 0:
+      offset = 0;
+      break;
+    case 1:
+      offset = 15;
+      break;
+    case 2:
+      offset = 15 + 13;
+      break;
+    case 3:
+      offset = 15 + 13 + 11;
+      break;
+    case 4:
+      offset = 15 + 13 + 11 + 9;
+      break;
+    case 5:
+      offset = 15 + 13 + 11 + 9 + 7;
+      break;
+    case 6:
+      offset = 15 + 13 + 11 + 9 + 7 + 5;
+      break;
+    case 7:
+      offset = 15 + 13 + 11 + 9 + 7 + 5 + 3;
+      break;
+  }
+
+  return offset + (index_col * 2 + (((row_mod + col_mod) > 1.0f) ? 1 : 0));
 }
 
 #if defined(SHADING_KERNEL)
@@ -1153,7 +1185,7 @@ __device__ float light_sample_microtriangle_pdf(
 
   const float value = (microtriangle_id & 0b1) ? data >> 4 : data & 0xF;
 
-  const float selection_pdf = value * importance_normalization;
+  const float selection_pdf = value / importance_normalization;
 
   float2 bary0, bary1, bary2;
   light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
@@ -1255,7 +1287,7 @@ __device__ void light_sample_microtriangle(
   LightSampleWorkData& work) {
   const float microtriangle_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_MICROTRIANGLE, pixel);
 
-  const float importance_normalization = __ldg(device.ptrs.light_importance_normalization + work.light_id) * 15.0f;
+  const float importance_normalization = __ldg(device.ptrs.light_importance_normalization + work.light_id);
 
   const uint4* data_ptr = (uint4*) (device.ptrs.light_microtriangles + work.light_id);
 
@@ -1494,15 +1526,12 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
 
   args.dst_microtriangle_importance[light_id * (LIGHT_NUM_MICROTRIANGLES >> 1) + (microtriangle_id >> 1)] = compressed_intensity;
 
-  const float uncompressed_intensity1 = compressed_intensity1 * (1.0f / 15.0f) * max_intensity;
-  const float uncompressed_intensity2 = compressed_intensity2 * (1.0f / 15.0f) * max_intensity;
+  const float importance = compressed_intensity1 + compressed_intensity2;
 
-  const float uncompressed_intensity = uncompressed_intensity1 + uncompressed_intensity2;
-
-  const float sum_uncompressed_intensity = warp_reduce_sum(uncompressed_intensity);
+  const float sum_importance = warp_reduce_sum(importance);
 
   if (microtriangle_id == 0) {
-    args.dst_importance_normalization[light_id] = (sum_uncompressed_intensity > 0.0f) ? max_intensity / sum_uncompressed_intensity : 0.0f;
+    args.dst_importance_normalization[light_id] = sum_importance;
     args.dst_intensities[light_id]              = sum_intensity;
   }
 }
