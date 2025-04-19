@@ -81,6 +81,10 @@ __device__ float expm1_over_x(const float x) {
   return y / z;
 }
 
+////////////////////////////////////////////////////////////////////
+// Vector API
+////////////////////////////////////////////////////////////////////
+
 __device__ vec3 get_vector(const float x, const float y, const float z) {
   vec3 result;
 
@@ -504,6 +508,64 @@ __device__ vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
 
 __device__ vec3 transform_apply_inv(const DeviceTransform trans, const vec3 v) {
   return transform_apply_relative_inv(trans, transform_apply_absolute_inv(trans, v));
+}
+
+////////////////////////////////////////////////////////////////////
+// Matrix API
+////////////////////////////////////////////////////////////////////
+
+struct mat3 {
+  vec3 col0;
+  vec3 col1;
+  vec3 col2;
+} typedef mat3;
+
+__device__ mat3 mat3_get(const vec3 col0, const vec3 col1, const vec3 col2) {
+  mat3 result;
+
+  result.col0 = col0;
+  result.col1 = col1;
+  result.col2 = col2;
+
+  return result;
+}
+
+__device__ mat3 mat3_transpose(const mat3 mat) {
+  mat3 result;
+
+  result.col0.x = mat.col0.x;
+  result.col0.y = mat.col1.x;
+  result.col0.z = mat.col2.x;
+
+  result.col1.x = mat.col0.y;
+  result.col1.y = mat.col1.y;
+  result.col1.z = mat.col2.y;
+
+  result.col2.x = mat.col0.z;
+  result.col2.y = mat.col1.z;
+  result.col2.z = mat.col2.z;
+
+  return result;
+}
+
+__device__ mat3 mat3_lerp(const mat3 a, const mat3 b, const float t) {
+  mat3 result;
+
+  result.col0 = add_vector(scale_vector(a.col0, 1.0f - t), scale_vector(b.col0, t));
+  result.col1 = add_vector(scale_vector(a.col1, 1.0f - t), scale_vector(b.col1, t));
+  result.col2 = add_vector(scale_vector(a.col2, 1.0f - t), scale_vector(b.col2, t));
+
+  return result;
+}
+
+__device__ vec3 mat3_mul_vec(const mat3 a, const vec3 b) {
+  vec3 result;
+
+  result.x = a.col0.x * b.x + a.col1.x * b.y + a.col2.x * b.z;
+  result.y = a.col0.y * b.x + a.col1.y * b.y + a.col2.y * b.z;
+  result.z = a.col0.z * b.x + a.col1.z * b.y + a.col2.z * b.z;
+
+  return result;
 }
 
 /*

@@ -303,6 +303,7 @@ struct DevicePointers {
   DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;
   DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
+  DEVICE const float* LUM_RESTRICT light_ltc_amplitude;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
@@ -384,6 +385,10 @@ struct DeviceConstantMemory {
   DeviceTextureObject cloud_noise_shape_tex;
   DeviceTextureObject cloud_noise_detail_tex;
   DeviceTextureObject cloud_noise_weather_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_LTC_TEX
+  DeviceTextureObject ltc_1_tex;
+  DeviceTextureObject ltc_2_tex;
+  DeviceTextureObject ltc_3_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   DeviceExecutionState state;
 } typedef DeviceConstantMemory;

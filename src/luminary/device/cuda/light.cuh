@@ -4,6 +4,7 @@
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
+#include "light_ltc.cuh"
 #include "light_microtriangle.cuh"
 #include "light_sg.cuh"
 #include "light_tree.cuh"
