@@ -262,13 +262,13 @@ __device__ RGBF bridges_evaluate_bridge(
     const DeviceTransform light_transform = load_transform(light_handle.instance_id);
 
     uint3 light_packed_uv;
-    TriangleLight light = light_load_sample_init(light_handle, light_transform, light_packed_uv);
+    TriangleLight light = light_triangle_sample_init(light_handle, light_transform, light_packed_uv);
 
     const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + seed, task.index);
 
     vec3 light_dir;
     float light_dist, area;
-    light_load_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
+    light_triangle_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
 
     light_color  = light_get_color(light);
     light_vector = scale_vector(light_dir, light_dist);
@@ -384,7 +384,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
     sample_pdf *= light_list_pdf;
 
     uint3 light_packed_uv;
-    TriangleLight light = light_load_sample_init(light_handle, light_transform, light_packed_uv);
+    TriangleLight light = light_triangle_sample_init(light_handle, light_transform, light_packed_uv);
 
     ////////////////////////////////////////////////////////////////////
     // Sample light point
@@ -394,7 +394,7 @@ __device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor vol
 
     vec3 light_dir;
     float area, light_dist;
-    light_load_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
+    light_triangle_sample_finalize_bridges(light, light_packed_uv, task.origin, random_light_point, light_dir, light_dist, area);
 
     if (light_dist == FLT_MAX || area < eps)
       continue;

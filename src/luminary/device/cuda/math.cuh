@@ -1248,32 +1248,6 @@ __device__ float clampf(const float x, const float a, const float b) {
 }
 
 /*
- * Computes solid angle when sampling a triangle using the formula in "The Solid Angle of a Plane Triangle" (1983) by A. Van Oosterom and J.
- * Strackee.
- * @param triangle Triangle.
- * @param origin Point from which you sample.
- * @param normal Normalized normal of surface from which you sample.
- * @result Solid angle of triangle.
- */
-__device__ float light_get_solid_angle(const TriangleLight triangle, const vec3 origin) {
-  vec3 a       = sub_vector(triangle.vertex, origin);
-  const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
-  const vec3 c = normalize_vector(add_vector(triangle.edge2, a));
-  a            = normalize_vector(a);
-
-  const float num   = fabsf(dot_product(a, cross_product(b, c)));
-  const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
-
-  float solid_angle = 2.0f * atan2f(num, denom);
-
-  if (is_non_finite(solid_angle) || solid_angle < 1e-7f) {
-    solid_angle = 0.0f;
-  }
-
-  return solid_angle;
-}
-
-/*
  * A more numerically stable version of normalize(b-a).
  * Whether this is actually is any better, I don't know, I just pretend.
  */
@@ -1293,26 +1267,6 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
   vec3 d = sub_vector(a, b);
 
   return normalize_vector(d);
-}
-
-/*
- * Surface sample a triangle light.
- * @param triangle Triangle.
- * @param seed Random number used to sample the triangle.
- * @result Point on the triangle.
- */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const float2 random, float2& uv) {
-  float r1 = sqrtf(random.x);
-  float r2 = random.y;
-
-  // Map random numbers uniformly into [0.025,0.975].
-  r1 = 0.025f + 0.95f * r1;
-  r2 = 0.025f + 0.95f * r2;
-
-  uv.x = 1.0f - r1;
-  uv.y = r1 * r2;
-
-  return add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
 }
 
 /*

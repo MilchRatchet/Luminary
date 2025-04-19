@@ -145,21 +145,6 @@ struct TraversalTriangle {
   float padding2;
 } typedef TraversalTriangle;
 
-/*
- * This struct is computed on the device when needed, it is not stored in memory.
- * The expectation is that the vertex positions are already transformed and the UV
- * is already transformed using the triangle transforms.
- */
-struct TriangleLight {
-  vec3 vertex;
-  vec3 edge1;
-  vec3 edge2;
-  uint16_t material_id;
-  uint16_t is_textured;
-  UV tex_coords;
-} typedef TriangleLight;
-LUM_STATIC_SIZE_ASSERT(TriangleLight, 0x30u);
-
 struct Star {
   float altitude;
   float azimuth;
