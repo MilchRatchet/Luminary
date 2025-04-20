@@ -203,22 +203,7 @@ __device__ void light_ltc_clip_triangle(vec3 v[4], uint32_t& n) {
     v[3] = v[0];
 }
 
-__device__ float light_ltc_triangle_integral(
-  const LTCMatrix ltc_matrix, const vec3 origin, const Quaternion rotation_to_z, const vec3 vertex0, const vec3 vertex1,
-  const vec3 vertex2) {
-  const vec3 dir0 = sub_vector(vertex0, origin);
-  const vec3 dir1 = sub_vector(vertex1, origin);
-  const vec3 dir2 = sub_vector(vertex2, origin);
-
-  const vec3 dir0_local = quaternion_apply(rotation_to_z, dir0);
-  const vec3 dir1_local = quaternion_apply(rotation_to_z, dir1);
-  const vec3 dir2_local = quaternion_apply(rotation_to_z, dir2);
-
-  vec3 v[4];
-  v[0] = mat3_mul_vec(ltc_matrix.mat, dir0_local);
-  v[1] = mat3_mul_vec(ltc_matrix.mat, dir1_local);
-  v[2] = mat3_mul_vec(ltc_matrix.mat, dir2_local);
-
+__device__ float light_ltc_triangle_integral_impl(vec3 v[4]) {
   uint32_t n;
   light_ltc_clip_triangle(v, n);
 
@@ -237,7 +222,38 @@ __device__ float light_ltc_triangle_integral(
   if (n == 4)
     sum += light_ltc_edge_integral(v[3], v[0]);
 
-  return fabsf(sum) * ltc_matrix.normalization;
+  return sum;
+}
+
+__device__ float light_ltc_triangle_integral(
+  const LTCMatrix ltc_matrix, const bool include_diffuse, const vec3 origin, const Quaternion rotation_to_z, const vec3 vertex0,
+  const vec3 vertex1, const vec3 vertex2) {
+  const vec3 dir0 = sub_vector(vertex0, origin);
+  const vec3 dir1 = sub_vector(vertex1, origin);
+  const vec3 dir2 = sub_vector(vertex2, origin);
+
+  const vec3 dir0_local = quaternion_apply(rotation_to_z, dir0);
+  const vec3 dir1_local = quaternion_apply(rotation_to_z, dir1);
+  const vec3 dir2_local = quaternion_apply(rotation_to_z, dir2);
+
+  vec3 v[4];
+
+  float diffuse_intensity = 0.0f;
+  if (include_diffuse) {
+    v[0] = dir0_local;
+    v[1] = dir1_local;
+    v[2] = dir2_local;
+
+    diffuse_intensity = light_ltc_triangle_integral_impl(v);
+  }
+
+  v[0] = mat3_mul_vec(ltc_matrix.mat, dir0_local);
+  v[1] = mat3_mul_vec(ltc_matrix.mat, dir1_local);
+  v[2] = mat3_mul_vec(ltc_matrix.mat, dir2_local);
+
+  const float microfacet_intensity = light_ltc_triangle_integral_impl(v);
+
+  return fabsf(diffuse_intensity) + fabsf(microfacet_intensity) * ltc_matrix.normalization;
 }
 
 #endif /* CU_LUMINARY_LIGHT_LTC_H */
