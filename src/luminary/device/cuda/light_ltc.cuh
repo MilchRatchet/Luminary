@@ -141,6 +141,68 @@ __device__ float light_ltc_edge_integral(const vec3 v0, const vec3 v1) {
   return res;
 }
 
+__device__ vec3 light_ltc_clip_edge(const vec3 a, const vec3 b) {
+  return add_vector(scale_vector(a, -b.z), scale_vector(b, a.z));
+}
+
+__device__ void light_ltc_clip_triangle(vec3 v[4], uint32_t& n) {
+  int config = 0;
+  if (v[0].z > 0.0)
+    config += 1;
+  if (v[1].z > 0.0)
+    config += 2;
+  if (v[2].z > 0.0)
+    config += 4;
+
+  // clip
+  n = 0;
+
+  switch (config) {
+    case 0:
+      // clip all
+      break;
+    case 1:  // v0 clip v1 v2
+      n    = 3;
+      v[1] = light_ltc_clip_edge(v[0], v[1]);
+      v[2] = light_ltc_clip_edge(v[0], v[2]);
+      break;
+    case 2:  // v1 clip v0 v2
+      n    = 3;
+      v[0] = light_ltc_clip_edge(v[1], v[0]);
+      v[2] = light_ltc_clip_edge(v[1], v[2]);
+      break;
+    case 3:  // v0 v1 clip v2
+      n    = 4;
+      v[3] = light_ltc_clip_edge(v[0], v[2]);
+      v[2] = light_ltc_clip_edge(v[1], v[2]);
+      break;
+    case 4:  // v2 clip v0 v1
+      n    = 3;
+      v[0] = light_ltc_clip_edge(v[2], v[0]);
+      v[1] = light_ltc_clip_edge(v[2], v[1]);
+      break;
+    case 5:  // v0 v2 clip v1
+      n    = 4;
+      v[3] = v[2];
+      v[2] = light_ltc_clip_edge(v[3], v[1]);
+      v[1] = light_ltc_clip_edge(v[0], v[1]);
+      break;
+    case 6:  // v1 v2 clip v0
+      n    = 4;
+      v[3] = light_ltc_clip_edge(v[2], v[0]);
+      v[0] = light_ltc_clip_edge(v[1], v[0]);
+      break;
+    case 7:  // v0 v1 v2
+      n = 3;
+      break;
+    default:
+      break;
+  }
+
+  if (n == 3)
+    v[3] = v[0];
+}
+
 __device__ float light_ltc_triangle_integral(
   const LTCMatrix ltc_matrix, const vec3 origin, const Quaternion rotation_to_z, const vec3 vertex0, const vec3 vertex1,
   const vec3 vertex2) {
@@ -152,21 +214,28 @@ __device__ float light_ltc_triangle_integral(
   const vec3 dir1_local = quaternion_apply(rotation_to_z, dir1);
   const vec3 dir2_local = quaternion_apply(rotation_to_z, dir2);
 
-  // No clipping, the difference is negligible and this integral is very performance critical.
+  vec3 v[4];
+  v[0] = mat3_mul_vec(ltc_matrix.mat, dir0_local);
+  v[1] = mat3_mul_vec(ltc_matrix.mat, dir1_local);
+  v[2] = mat3_mul_vec(ltc_matrix.mat, dir2_local);
 
-  const vec3 dir0_transformed = normalize_vector(mat3_mul_vec(ltc_matrix.mat, dir0_local));
-  const vec3 dir1_transformed = normalize_vector(mat3_mul_vec(ltc_matrix.mat, dir1_local));
-  const vec3 dir2_transformed = normalize_vector(mat3_mul_vec(ltc_matrix.mat, dir2_local));
+  uint32_t n;
+  light_ltc_clip_triangle(v, n);
 
-  // TODO: This winding inversion is probably pointless since all lights are bidirectional
-  const vec3 v0 = dir0_transformed;
-  const vec3 v1 = (ltc_matrix.invert_winding) ? dir2_transformed : dir1_transformed;
-  const vec3 v2 = (ltc_matrix.invert_winding) ? dir1_transformed : dir2_transformed;
+  if (n == 0)
+    return 0.0f;
+
+  v[0] = normalize_vector(v[0]);
+  v[1] = normalize_vector(v[1]);
+  v[2] = normalize_vector(v[2]);
+  v[3] = normalize_vector(v[3]);
 
   float sum = 0.0f;
-  sum += light_ltc_edge_integral(v0, v1);
-  sum += light_ltc_edge_integral(v1, v2);
-  sum += light_ltc_edge_integral(v2, v0);
+  sum += light_ltc_edge_integral(v[0], v[1]);
+  sum += light_ltc_edge_integral(v[1], v[2]);
+  sum += light_ltc_edge_integral(v[2], v[3]);
+  if (n == 4)
+    sum += light_ltc_edge_integral(v[3], v[0]);
 
   return fabsf(sum) * ltc_matrix.normalization;
 }
