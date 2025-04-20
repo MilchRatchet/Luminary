@@ -4,9 +4,9 @@
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
+#include "light_linked_list.cuh"
 #include "light_ltc.cuh"
 #include "light_microtriangle.cuh"
-#include "light_sg.cuh"
 #include "light_tree.cuh"
 #include "light_triangle.cuh"
 #include "memory.cuh"
@@ -470,15 +470,22 @@ __device__ TriangleHandle light_sample(
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  const float2 light_tree_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
+  const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
+
+  LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES];
+  const uint32_t num_references = light_tree_query(data, light_tree_random, pixel, stack);
+
+  // This happens if no light with non zero importance was found.
+  if (num_references == 0)
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample from set of linked lists
+  ////////////////////////////////////////////////////////////////////
 
   RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
 
-  const uint32_t light_id = light_tree_query(data, light_tree_random, pixel, reservoir);
-
-  // This happens if no light with non zero importance was found.
-  if (light_id == 0xFFFFFFFF)
-    return triangle_handle_get(LIGHT_ID_NONE, 0);
+  const uint32_t light_id = light_linked_list_resample(data, stack, num_references, reservoir);
 
   const float light_tree_sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 

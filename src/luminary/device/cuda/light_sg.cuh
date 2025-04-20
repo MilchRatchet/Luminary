@@ -175,8 +175,7 @@ __device__ LightSGData light_sg_prepare(const GBufferData data) {
 
 // In our case, all light clusters are considered omnidirectional, i.e. sharpness = 0.
 __device__ float light_sg_evaluate(
-  const LightSGData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power,
-  const vec3 light_normal, const bool is_leaf, float& uncertainty) {
+  const LightSGData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power) {
   const vec3 light_vec    = sub_vector(mean, position);
   const float distance_sq = dot_product(light_vec, light_vec);
   const vec3 light_dir    = scale_vector(light_vec, rsqrt(distance_sq));
@@ -186,10 +185,6 @@ __device__ float light_sg_evaluate(
 
   float emissive_diffuse = power / light_variance;
 
-  if (is_leaf) {
-    emissive_diffuse *= fabsf(dot_product(light_normal, light_dir));
-  }
-
 #ifdef LIGHT_TREE_NO_MICROFACET_VARIANCE_FACTOR
   const float emissive_microfacet = power;
 #else
@@ -198,12 +193,6 @@ __device__ float light_sg_evaluate(
 
   // Compute SG sharpness for a light distribution viewed from the shading point.
   const float light_sharpness = distance_sq / light_variance;
-
-#if 0
-  uncertainty = expf(-light_sharpness * LIGHT_SG_UNCERTAINTY_AGGRESSIVENESS);
-#else
-  uncertainty = 0.0f;
-#endif
 
   // Axis of the SG product lobe.
   const vec3 product_vec          = add_vector(data.reflection_vec, scale_vector(light_dir, light_sharpness));

@@ -254,6 +254,33 @@ struct DeviceLightTreeNode {
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
 
+struct DeviceLightLinkedListHeader {
+  uint32_t light_id;
+  uint16_t x;
+  uint16_t y;
+  uint16_t z;
+  uint16_t padding;
+  uint8_t exp_x;
+  uint8_t exp_y;
+  uint8_t exp_z;
+  uint8_t meta;
+} typedef DeviceLightLinkedListHeader;
+LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListHeader, 0x10);
+
+struct DeviceLightLinkedListData {
+  uint16_t v0_x[4];
+  uint16_t v0_y[4];
+  uint16_t v0_z[4];
+  uint16_t v1_x[4];
+  uint16_t v1_y[4];
+  uint16_t v1_z[4];
+  uint16_t v2_x[4];
+  uint16_t v2_y[4];
+  uint16_t v2_z[4];
+  uint16_t intensity[4];
+} typedef DeviceLightLinkedListData;
+LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListData, 0x50);
+
 struct DeviceLightTreeLeaf {
   float power;
   uint32_t packed_normal;
