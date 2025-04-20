@@ -3,8 +3,8 @@
 #include <optix_function_table_definition.h>
 
 #include "camera.h"
-#include "ceb.h"
 #include "cloud.h"
+#include "device_embedded.h"
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_texture.h"
@@ -352,23 +352,13 @@ static LuminaryResult _device_update_constant_memory(Device* device) {
 static LuminaryResult _device_load_moon_textures(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  uint64_t info = 0;
-
   void* moon_albedo_data;
   int64_t moon_albedo_data_length;
-  ceb_access("moon_albedo.png", &moon_albedo_data, &moon_albedo_data_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load moon_albedo texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_MOON_ALBEDO, &moon_albedo_data, &moon_albedo_data_length));
 
   void* moon_normal_data;
   int64_t moon_normal_data_length;
-  ceb_access("moon_normal.png", &moon_normal_data, &moon_normal_data_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load moon_normal texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_MOON_NORMAL, &moon_normal_data, &moon_normal_data_length));
 
   Texture* moon_albedo_tex;
   __FAILURE_HANDLE(png_load(&moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
@@ -395,23 +385,13 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
 static LuminaryResult _device_load_bluenoise_texture(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  uint64_t info = 0;
-
   void* bluenoise_1D_data;
   int64_t bluenoise_1D_data_length;
-  ceb_access("bluenoise_1D.bin", &bluenoise_1D_data, &bluenoise_1D_data_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load bluenoise_1D texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_BLUENOISE1D, &bluenoise_1D_data, &bluenoise_1D_data_length));
 
   void* bluenoise_2D_data;
   int64_t bluenoise_2D_data_length;
-  ceb_access("bluenoise_2D.bin", &bluenoise_2D_data, &bluenoise_2D_data_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load bluenoise_2D texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_BLUENOISE2D, &bluenoise_2D_data, &bluenoise_2D_data_length));
 
   __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_1D, bluenoise_1D_data_length));
   __FAILURE_HANDLE(
@@ -430,15 +410,9 @@ static LuminaryResult _device_load_bluenoise_texture(Device* device) {
 static LuminaryResult _device_load_light_bridge_lut(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  uint64_t info = 0;
-
   void* lut_data;
   int64_t lut_length;
-  ceb_access("bridge_lut.bin", &lut_data, &lut_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load bridge_lut texture.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_BRIDGE_LUT, &lut_data, &lut_length));
 
   __FAILURE_HANDLE(device_malloc(&device->buffers.bridge_lut, lut_length));
   __FAILURE_HANDLE(device_upload((void*) device->buffers.bridge_lut, lut_data, 0, lut_length, device->stream_main));
@@ -453,98 +427,17 @@ static LuminaryResult _device_load_light_bridge_lut(Device* device) {
 static LuminaryResult _device_load_light_ltc_lut(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-#if 0
-#include "ltc_amplitude.h"
-#include "ltc_m_reparam.h"
-
-  float* data0;
-  __FAILURE_HANDLE(host_malloc(&data0, sizeof(float) * 8 * 8 * 8 * 8 * 4));
-
-  float* data1;
-  __FAILURE_HANDLE(host_malloc(&data1, sizeof(float) * 8 * 8 * 8 * 8 * 4));
-
-  float* data2;
-  __FAILURE_HANDLE(host_malloc(&data2, sizeof(float) * 8 * 8 * 8 * 8 * 2));
-
-  for (int i4 = 0; i4 < 8; ++i4) {
-    for (int i3 = 0; i3 < 8; ++i3) {
-      for (int i2 = 0; i2 < 8; ++i2) {
-        for (int i1 = 0; i1 < 8; ++i1) {
-          data0[0 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[0 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data0[1 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[1 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data0[2 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[2 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data0[3 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[3 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-        }
-      }
-    }
-  }
-
-  for (int i4 = 0; i4 < 8; ++i4) {
-    for (int i3 = 0; i3 < 8; ++i3) {
-      for (int i2 = 0; i2 < 8; ++i2) {
-        for (int i1 = 0; i1 < 8; ++i1) {
-          data1[0 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[4 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data1[1 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[5 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data1[2 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[6 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data1[3 + 4 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[7 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-        }
-      }
-    }
-  }
-
-  for (int i4 = 0; i4 < 8; ++i4) {
-    for (int i3 = 0; i3 < 8; ++i3) {
-      for (int i2 = 0; i2 < 8; ++i2) {
-        for (int i1 = 0; i1 < 8; ++i1) {
-          data2[0 + 2 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (anisomats))[8 + 9 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))];
-          data2[1 + 2 * (i1 + 8 * (i2 + 8 * (i3 + 8 * i4)))] = ((float*) (ltcamp))[i1 + 8 * (i2 + 8 * (i3 + 8 * i4))];
-        }
-      }
-    }
-  }
-
-  FILE* file0 = fopen("ltc_tex0.bin", "wb");
-  FILE* file1 = fopen("ltc_tex1.bin", "wb");
-  FILE* file2 = fopen("ltc_tex2.bin", "wb");
-
-  fwrite(data0, sizeof(float), 8 * 8 * 8 * 8 * 4, file0);
-  fwrite(data1, sizeof(float), 8 * 8 * 8 * 8 * 4, file1);
-  fwrite(data2, sizeof(float), 8 * 8 * 8 * 8 * 2, file2);
-
-  fclose(file0);
-  fclose(file1);
-  fclose(file2);
-
-  __FAILURE_HANDLE(host_free(&data0));
-  __FAILURE_HANDLE(host_free(&data1));
-  __FAILURE_HANDLE(host_free(&data2));
-#endif
-
-  uint64_t info = 0;
-
   void* ltc_tex_data0;
   int64_t ltc_tex_data0_length;
-  ceb_access("ltc_tex0.bin", &ltc_tex_data0, &ltc_tex_data0_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load LTC texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_LTC0, &ltc_tex_data0, &ltc_tex_data0_length));
 
   void* ltc_tex_data1;
   int64_t ltc_tex_data1_length;
-  ceb_access("ltc_tex1.bin", &ltc_tex_data1, &ltc_tex_data1_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load LTC texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_LTC1, &ltc_tex_data1, &ltc_tex_data1_length));
 
   void* ltc_tex_data2;
   int64_t ltc_tex_data2_length;
-  ceb_access("ltc_tex2.bin", &ltc_tex_data2, &ltc_tex_data2_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load LTC texture. Luminary was not compiled correctly.");
-  }
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_LTC2, &ltc_tex_data2, &ltc_tex_data2_length));
 
   __DEBUG_ASSERT(ltc_tex_data0_length == (sizeof(float) * 8 * 8 * 8 * 8 * 4));
   __DEBUG_ASSERT(ltc_tex_data1_length == (sizeof(float) * 8 * 8 * 8 * 8 * 4));
