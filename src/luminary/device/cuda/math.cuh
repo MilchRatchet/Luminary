@@ -568,6 +568,67 @@ __device__ vec3 mat3_mul_vec(const mat3 a, const vec3 b) {
   return result;
 }
 
+__device__ mat3 mat3_mul_mat(const mat3 a, const mat3 b) {
+  mat3 result;
+
+  result.col0 = mat3_mul_vec(a, b.col0);
+  result.col1 = mat3_mul_vec(a, b.col1);
+  result.col2 = mat3_mul_vec(a, b.col2);
+
+  return result;
+}
+
+__device__ mat3 mat3_identity() {
+  mat3 result;
+
+  result.col0 = get_vector(1.0f, 0.0f, 0.0f);
+  result.col1 = get_vector(0.0f, 1.0f, 0.0f);
+  result.col2 = get_vector(0.0f, 0.0f, 1.0f);
+
+  return result;
+}
+
+__device__ mat3 mat3_scale(const mat3 mat, const float scale) {
+  mat3 result;
+
+  result.col0 = scale_vector(mat.col0, scale);
+  result.col1 = scale_vector(mat.col1, scale);
+  result.col2 = scale_vector(mat.col2, scale);
+
+  return result;
+}
+
+__device__ float mat3_determinant(const mat3 mat) {
+  float det = 0.0f;
+
+  det += mat.col0.x * (mat.col1.y * mat.col2.z - mat.col2.y * mat.col1.z);
+  det -= mat.col1.x * (mat.col0.y * mat.col2.z - mat.col2.y * mat.col0.z);
+  det += mat.col2.x * (mat.col0.y * mat.col1.z - mat.col1.y * mat.col0.z);
+
+  return det;
+}
+
+__device__ mat3 mat3_inverse(const mat3 mat) {
+  const float determinant = mat3_determinant(mat);
+
+  if (determinant == 0.0f)
+    return mat3_identity();
+
+  mat3 result;
+
+  result.col0.x = mat.col1.y * mat.col2.z - mat.col2.y * mat.col1.z;
+  result.col0.y = mat.col2.y * mat.col0.z - mat.col0.y * mat.col2.z;
+  result.col0.z = mat.col0.y * mat.col1.z - mat.col1.y * mat.col0.z;
+  result.col1.x = mat.col2.x * mat.col1.z - mat.col1.x * mat.col2.z;
+  result.col1.y = mat.col0.x * mat.col2.z - mat.col2.x * mat.col0.z;
+  result.col1.z = mat.col1.x * mat.col0.z - mat.col0.x * mat.col1.z;
+  result.col2.x = mat.col1.x * mat.col2.y - mat.col2.x * mat.col1.y;
+  result.col2.y = mat.col2.x * mat.col0.y - mat.col0.x * mat.col2.y;
+  result.col2.z = mat.col0.x * mat.col1.y - mat.col1.x * mat.col0.y;
+
+  return mat3_scale(result, 1.0f / determinant);
+}
+
 /*
  * Computes the distance to the first intersection of a ray with a sphere. To check for any hit use sphere_ray_hit.
  * This implementation is based on Chapter 7 in Ray Tracing Gems I, "Precision Improvements for Ray/Sphere Intersection".

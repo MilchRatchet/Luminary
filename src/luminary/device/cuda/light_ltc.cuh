@@ -32,8 +32,8 @@ __device__ mat3 light_ltc_fetch(const float3 u, float& normalization) {
 __device__ mat3 light_ltc_fetch_and_interpolate(const float4 u, float& normalization) {
   const float ws   = u.w * 7.0f;
   const float ws_f = floorf(ws);
-  const float ws_c = fminf(floorf(ws + 1.0f), 7.0f);
-  const float w    = fractf(ws);
+  const float ws_c = fminf(ws_f + 1.0f, 7.0f);
+  const float w    = ws - ws_f;
 
 #if 1
   const float x = (u.x * 7.0 + 0.5) / 8.0;
@@ -70,50 +70,60 @@ __device__ LTCMatrix light_ltc_load(const vec3 V, const float roughness_u, const
 
   if (phi_o < 0.5f * PI) {
     const float u3 = phi_o / (PI * 0.5f);
-    const float4 u = make_float4(u3 / 1.0f, u2, u1, u0);
+    const float4 u = make_float4(u3, u2, u1, u0);
 
     ltc_invert_winding = true;
     ltc_matrix         = light_ltc_fetch_and_interpolate(u, ltc_normalization);
   }
   else if (phi_o >= PI * 0.5f && phi_o < PI) {
     const float u3 = (PI - phi_o) / (PI * 0.5f);
-    const float4 u = make_float4(u3 / 1.0f, u2, u1, u0);
+    const float4 u = make_float4(u3, u2, u1, u0);
 
     ltc_invert_winding = false;
     ltc_matrix         = light_ltc_fetch_and_interpolate(u, ltc_normalization);
 
-    ltc_matrix.col0 = scale_vector(ltc_matrix.col0, -1.0f);
+    ltc_matrix.col0.x = -ltc_matrix.col0.x;
+    ltc_matrix.col1.x = -ltc_matrix.col1.x;
+    ltc_matrix.col2.x = -ltc_matrix.col2.x;
   }
   else if (phi_o >= PI && phi_o < 1.5f * PI) {
     const float u3 = (phi_o - PI) / (PI * 0.5f);
-    const float4 u = make_float4(u3 / 1.0f, u2, u1, u0);
+    const float4 u = make_float4(u3, u2, u1, u0);
 
     ltc_invert_winding = true;
     ltc_matrix         = light_ltc_fetch_and_interpolate(u, ltc_normalization);
 
-    ltc_matrix.col0 = scale_vector(ltc_matrix.col0, -1.0f);
-    ltc_matrix.col1 = scale_vector(ltc_matrix.col1, -1.0f);
+    ltc_matrix.col0.x = -ltc_matrix.col0.x;
+    ltc_matrix.col1.x = -ltc_matrix.col1.x;
+    ltc_matrix.col2.x = -ltc_matrix.col2.x;
+    ltc_matrix.col0.y = -ltc_matrix.col0.y;
+    ltc_matrix.col1.y = -ltc_matrix.col1.y;
+    ltc_matrix.col2.y = -ltc_matrix.col2.y;
   }
-  else if (phi_o >= 1.5f * PI && phi_o < 2.0f * PI) {
+  else if (phi_o >= 1.5f * PI && phi_o <= 2.0f * PI) {
     const float u3 = (2.0f * PI - phi_o) / (PI * 0.5f);
-    const float4 u = make_float4(u3 / 1.0f, u2, u1, u0);
+    const float4 u = make_float4(u3, u2, u1, u0);
 
     ltc_invert_winding = false;
     ltc_matrix         = light_ltc_fetch_and_interpolate(u, ltc_normalization);
 
-    ltc_matrix.col1 = scale_vector(ltc_matrix.col1, -1.0f);
+    ltc_matrix.col0.y = -ltc_matrix.col0.y;
+    ltc_matrix.col1.y = -ltc_matrix.col1.y;
+    ltc_matrix.col2.y = -ltc_matrix.col2.y;
   }
   else {
     printf("This shouldn't happen: %f\n", phi_o);
   }
 
   if (flip_config) {
-    ltc_invert_winding = true;
+    ltc_invert_winding = !ltc_invert_winding;
 
     const vec3 temp = ltc_matrix.col0;
     ltc_matrix.col0 = ltc_matrix.col1;
     ltc_matrix.col1 = temp;
   }
+
+  ltc_matrix = mat3_inverse(ltc_matrix);
 
   LTCMatrix result;
   result.mat            = ltc_matrix;
@@ -158,8 +168,6 @@ __device__ float light_ltc_triangle_integral(
   sum += light_ltc_edge_integral(v1, v2);
   sum += light_ltc_edge_integral(v2, v0);
 
-  // TODO: If I only use this for resampling, I will only need relative approximations, so the scaling introduced by the normalization is
-  // not necessary.
   return fabsf(sum) * ltc_matrix.normalization;
 }
 
