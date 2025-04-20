@@ -11,7 +11,7 @@
 struct SubwindowDropdownData {
   uint32_t selected_index;
   uint32_t num_strings;
-  char strings[SUBWINDOW_DROPDOWN_MAX_STRING_LENGTH][SUBWINDOW_DROPDOWN_MAX_NUM_STRINGS];
+  char strings[SUBWINDOW_DROPDOWN_MAX_NUM_STRINGS][SUBWINDOW_DROPDOWN_MAX_STRING_LENGTH];
 } typedef SubwindowDropdownData;
 static_assert(sizeof(SubwindowDropdownData) <= WINDOW_DATA_SECTION_SIZE, "Window data exceeds allocated size.");
 
