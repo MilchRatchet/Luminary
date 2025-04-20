@@ -13,14 +13,12 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "About", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "About", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Mandarin Duck - CPU Graphical User Interface for Luminary",
                        .center_x     = false,
                        .center_y     = true,
@@ -32,7 +30,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Copyright(C) 2024 - 2025 Max Jenke",
                        .center_x     = false,
                        .center_y     = true,
@@ -44,7 +42,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Licensed under the GNU Affero General Public Licence",
                        .center_x     = false,
                        .center_y     = true,
@@ -58,7 +56,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Luminary - Path Tracing Renderer",
                        .center_x     = false,
                        .center_y     = true,
@@ -70,7 +68,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Copyright(C) 2021 - 2025 Max Jenke",
                        .center_x     = false,
                        .center_y     = true,
@@ -82,7 +80,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Licensed under the GNU Affero General Public Licence",
                        .center_x     = false,
                        .center_y     = true,
@@ -92,40 +90,36 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
                        .is_clickable = false});
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Current Render",
-                            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Current Render", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   window_push_section(window, 32, 4);
   {
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.85f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = "Sample Count",
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.85f, .rel_height = 1.0f},
+                         .text         = "Sample Count",
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     char string[256];
     sprintf(string, "%5u", display->current_render_meta_data.sample_count);
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = string,
-        .center_x = true,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = false,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.15f, .rel_height = 1.0f},
+                         .text         = string,
+                         .center_x     = true,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = false,
+                         .auto_size    = false,
+                         .is_clickable = false});
   }
   window_pop_section(window);
 
@@ -133,38 +127,35 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   {
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.85f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = "Elapsed Time",
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.85f, .rel_height = 1.0f},
+                         .text         = "Elapsed Time",
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     char string[256];
     sprintf(string, "%7.1fs", display->current_render_meta_data.elapsed_time);
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = string,
-        .center_x = true,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = false,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.15f, .rel_height = 1.0f},
+                         .text         = string,
+                         .center_x     = true,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = false,
+                         .auto_size    = false,
+                         .is_clickable = false});
   }
   window_pop_section(window);
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Devices", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Devices", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   uint32_t device_count;
   LUM_FAILURE_HANDLE(luminary_host_get_device_count(host, &device_count));
@@ -197,16 +188,15 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.7f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-          .text     = device_info.name,
-          .center_x = false,
-          .center_y = true,
-          .highlighting = false,
-          .cache_text   = true,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.rel_width = 0.7f, .rel_height = 1.0f},
+                           .text         = device_info.name,
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = true,
+                           .auto_size    = false,
+                           .is_clickable = false});
 
       char memory_string[64];
 
@@ -221,29 +211,26 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {
-          .color    = 0xFFFFFFFF,
-          .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.25f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-          .text     = memory_string,
-          .center_x = false,
-          .center_y = true,
-          .highlighting = false,
-          .cache_text   = true,
-          .auto_size    = false,
-          .is_clickable = false});
+        (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                           .size         = (ElementSize) {.rel_width = 0.25f, .rel_height = 1.0f},
+                           .text         = memory_string,
+                           .center_x     = false,
+                           .center_y     = true,
+                           .highlighting = false,
+                           .cache_text   = true,
+                           .auto_size    = false,
+                           .is_clickable = false});
     }
     window_pop_section(window);
   }
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Third Party Licences",
-                            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Third Party Licences", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Simple DirectMedia Layer (SDL) Version 3.0",
                        .center_x     = false,
                        .center_y     = true,
@@ -255,7 +242,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   if (element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                            .text         = "https://github.com/libsdl-org/SDL",
                            .center_x     = false,
                            .center_y     = true,
@@ -269,7 +256,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
                        .center_x     = false,
                        .center_y     = true,
@@ -281,7 +268,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Licensed under the Zlib Licence",
                        .center_x     = false,
                        .center_y     = true,
@@ -295,7 +282,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "SDL_ttf Version 3.0",
                        .center_x     = false,
                        .center_y     = true,
@@ -307,7 +294,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   if (element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                            .text         = "https://github.com/libsdl-org/SDL_ttf",
                            .center_x     = false,
                            .center_y     = true,
@@ -321,7 +308,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
                        .center_x     = false,
                        .center_y     = true,
@@ -333,7 +320,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Licensed under the Zlib Licence",
                        .center_x     = false,
                        .center_y     = true,
@@ -347,7 +334,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Freetype",
                        .center_x     = false,
                        .center_y     = true,
@@ -359,7 +346,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   if (element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                            .text         = "https://github.com/freetype/freetype",
                            .center_x     = false,
                            .center_y     = true,
@@ -373,7 +360,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Licensed under the Freetype Licence",
                        .center_x     = false,
                        .center_y     = true,
@@ -387,7 +374,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Material Symbols",
                        .center_x     = false,
                        .center_y     = true,
@@ -399,7 +386,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   if (element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                            .text         = "https://github.com/google/material-design-icons",
                            .center_x     = false,
                            .center_y     = true,
@@ -413,7 +400,7 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   element_text(
     window, display, mouse_state,
     (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .text         = "Licensed under the Apache Version 2.0 Licence",
                        .center_x     = false,
                        .center_y     = true,

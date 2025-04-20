@@ -26,7 +26,7 @@ static void _subwindow_dropdown_action(Window* window, Display* display, Luminar
     window_margin(window, 4);
     if (element_text(
           window, display, mouse_state,
-          (ElementTextArgs) {.size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+          (ElementTextArgs) {.size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                              .color        = 0xFFFFFFFF,
                              .text         = data->strings[string_id],
                              .center_x     = true,

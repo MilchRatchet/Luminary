@@ -9,7 +9,8 @@ struct Window typedef Window;
 #include "utils.h"
 #include "window.h"
 
-#define ELEMENT_SIZE_INVALID 0xFFFFFFFF
+// This must be zero so we can make use of the fact that in C initializer lists automatically initialize data to 0.
+#define ELEMENT_SIZE_INVALID 0
 
 struct ElementSize {
   float rel_width;

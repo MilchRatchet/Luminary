@@ -22,7 +22,7 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 0.15f, .height = 24},
                            .text         = "Host:",
                            .center_x     = false,
                            .center_y     = true,
@@ -34,7 +34,7 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 0.65f, .height = 24},
                            .text         = string,
                            .center_x     = false,
                            .center_y     = true,
@@ -53,7 +53,7 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 0.2f, .height = 24},
                            .text         = text,
                            .center_x     = false,
                            .center_y     = true,
@@ -75,7 +75,7 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.15f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 0.15f, .height = 24},
                            .text         = "Device:",
                            .center_x     = false,
                            .center_y     = true,
@@ -87,7 +87,7 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.65f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 0.65f, .height = 24},
                            .text         = string,
                            .center_x     = false,
                            .center_y     = true,
@@ -106,7 +106,7 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
       element_text(
         window, display, mouse_state,
         (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.2f, .height = 24},
+                           .size         = (ElementSize) {.rel_width = 0.2f, .height = 24},
                            .text         = text,
                            .center_x     = false,
                            .center_y     = true,

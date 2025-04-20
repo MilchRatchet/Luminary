@@ -32,16 +32,15 @@ static bool _window_entity_properties_add_slider(
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
       LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
@@ -60,19 +59,18 @@ static bool _window_entity_properties_add_slider(
 
     if (element_slider(
           data.window, data.display, data.mouse_state, data.keyboard_state,
-          (ElementSliderArgs) {
-            .identifier = text,
-            .type       = data_type,
-            .color      = 0xFFFFFFFF,
-            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
-            .data_binding      = data_binding,
-            .min               = min,
-            .max               = max,
-            .change_rate       = change_rate,
-            .component_padding = 4,
-            .margins           = 4,
-            .center_x          = true,
-            .center_y          = true})) {
+          (ElementSliderArgs) {.identifier        = text,
+                               .type              = data_type,
+                               .color             = 0xFFFFFFFF,
+                               .size              = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+                               .data_binding      = data_binding,
+                               .min               = min,
+                               .max               = max,
+                               .change_rate       = change_rate,
+                               .component_padding = 4,
+                               .margins           = 4,
+                               .center_x          = true,
+                               .center_y          = true})) {
       update_data = true;
     }
   }
@@ -88,16 +86,15 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     if (element_checkbox(
           data.window, data.display, data.mouse_state,
@@ -117,16 +114,15 @@ static bool _window_entity_properties_add_button(WindowEntityPropertiesPassingDa
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     if (element_button(
           data.window, data.display, data.mouse_state,
@@ -153,25 +149,23 @@ static bool _window_entity_properties_add_dropdown(
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.4f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     if (element_dropdown(
           data.window, data.display, data.mouse_state,
-          (ElementDropdownArgs) {
-            .identifier = text,
-            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = ELEMENT_SIZE_INVALID, .rel_height = 0.75f},
-            .selected_index = selected_index,
-            .num_strings    = num_strings,
-            .strings        = strings})) {
+          (ElementDropdownArgs) {.identifier     = text,
+                                 .size           = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+                                 .selected_index = selected_index,
+                                 .num_strings    = num_strings,
+                                 .strings        = strings})) {
       update_data = true;
     }
   }
@@ -195,9 +189,7 @@ static void _window_entity_properties_renderer_settings_action(
   uint32_t shading_mode = (uint32_t) settings.shading_mode;
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Renderer Settings",
-                            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Renderer Settings", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -242,8 +234,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Camera", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Camera", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -275,9 +266,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
     data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Post Process",
-                            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   update_data |=
     _window_entity_properties_add_dropdown(data, "Tonemap", LUMINARY_TONEMAP_COUNT, (char**) luminary_strings_tonemap, &tonemap);
@@ -344,9 +333,7 @@ static void _window_entity_properties_ocean_action(Window* window, Display* disp
 
   uint32_t water_type = (uint32_t) ocean.water_type;
 
-  element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Ocean", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Ocean", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -397,9 +384,7 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
 
   uint32_t mode = (uint32_t) sky.mode;
 
-  element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Sky", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Sky", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -408,9 +393,7 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
   switch ((LuminarySkyMode) mode) {
     case LUMINARY_SKY_MODE_HDRI:
       element_separator(
-        window, mouse_state,
-        (ElementSeparatorArgs) {.text = "HDRI Settings",
-                                .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+        window, mouse_state, (ElementSeparatorArgs) {.text = "HDRI Settings", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
       update_data |=
         _window_entity_properties_add_slider(data, "Origin", &sky.hdri_origin, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
@@ -425,8 +408,7 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
     default:
       element_separator(
         window, mouse_state,
-        (ElementSeparatorArgs) {.text = "Atmosphere and Celestials",
-                                .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+        (ElementSeparatorArgs) {.text = "Atmosphere and Celestials", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
       update_data |= _window_entity_properties_add_slider(
         data, "Geometry Offset", &sky.geometry_offset, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
@@ -545,9 +527,7 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
   LUM_FAILURE_HANDLE(luminary_host_get_cloud(host, &cloud));
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Procedural Clouds",
-                            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Procedural Clouds", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -572,19 +552,15 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
       data, "Weather Scale", &cloud.noise_weather_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
     element_separator(
-      window, mouse_state,
-      (ElementSeparatorArgs) {.text = "Top Layer", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+      window, mouse_state, (ElementSeparatorArgs) {.text = "Top Layer", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
     update_data |= _window_entity_properties_cloud_layer_action(window, display, host, &cloud.top, mouse_state);
 
     element_separator(
-      window, mouse_state,
-      (ElementSeparatorArgs) {.text = "Mid Layer", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+      window, mouse_state, (ElementSeparatorArgs) {.text = "Mid Layer", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
     update_data |= _window_entity_properties_cloud_layer_action(window, display, host, &cloud.mid, mouse_state);
 
     element_separator(
-      window, mouse_state,
-      (ElementSeparatorArgs) {.text = "Bottom Layer",
-                              .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+      window, mouse_state, (ElementSeparatorArgs) {.text = "Bottom Layer", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
     update_data |= _window_entity_properties_cloud_layer_action(window, display, host, &cloud.low, mouse_state);
   }
 
@@ -604,9 +580,7 @@ static void _window_entity_properties_fog_action(Window* window, Display* displa
   LuminaryFog fog;
   LUM_FAILURE_HANDLE(luminary_host_get_fog(host, &fog));
 
-  element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Fog", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Fog", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -639,9 +613,7 @@ static void _window_entity_properties_particles_action(
   LUM_FAILURE_HANDLE(luminary_host_get_particles(host, &particles));
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Procedural Particles",
-                            .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Procedural Particles", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
@@ -681,8 +653,7 @@ static void _window_entity_properties_material_action(Window* window, Display* d
     .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Material", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Material", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   const bool material_is_selected = display->select_pixel_data.pixel_query_is_valid && display->select_pixel_data.material_id != 0xFFFF;
 
@@ -690,7 +661,7 @@ static void _window_entity_properties_material_action(Window* window, Display* d
     element_text(
       window, display, mouse_state,
       (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                         .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                          .text         = "No material is selected.",
                          .center_x     = true,
                          .center_y     = true,
@@ -771,8 +742,7 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
     .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
 
   element_separator(
-    window, mouse_state,
-    (ElementSeparatorArgs) {.text = "Instance", .size = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 32}});
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Instance", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   const bool instance_is_selected = display->select_pixel_data.pixel_query_is_valid && display->select_pixel_data.instance_id != 0xFFFFFFFF;
 
@@ -780,7 +750,7 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
     element_text(
       window, display, mouse_state,
       (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+                         .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                          .text         = "No instance is selected.",
                          .center_x     = true,
                          .center_y     = true,
