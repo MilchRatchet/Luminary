@@ -487,7 +487,7 @@ __device__ TriangleHandle light_sample(
 
   const uint32_t light_id = light_linked_list_resample(data, stack, num_references, reservoir);
 
-  const float light_tree_sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
+  const float linked_list_sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
   // This happens if no light with non zero importance was found.
   if (light_id == 0xFFFFFFFF)
@@ -539,7 +539,7 @@ __device__ TriangleHandle light_sample(
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   ////////////////////////////////////////////////////////////////////
 
-  selected_light_color = scale_color(selected_light_color, direction_sampling_weight * light_tree_sampling_weight);
+  selected_light_color = scale_color(selected_light_color, direction_sampling_weight * linked_list_sampling_weight);
 
   UTILS_CHECK_NANS(pixel, selected_light_color);
 

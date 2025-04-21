@@ -708,15 +708,15 @@ static LuminaryResult _light_tree_create_new_linked_list(
     for (uint32_t triangle_id = 0; triangle_id < triangles_this_section; triangle_id++) {
       const LightTreeFragment fragment = work->fragments[node.ptr + section_id * 4 + triangle_id];
 
-      section.v0_x[triangle_id] = (uint16_t) floorf((fragment.v0.x - header.x) * compression_x);
-      section.v0_y[triangle_id] = (uint16_t) floorf((fragment.v0.y - header.y) * compression_y);
-      section.v0_z[triangle_id] = (uint16_t) floorf((fragment.v0.z - header.z) * compression_z);
-      section.v1_x[triangle_id] = (uint16_t) floorf((fragment.v1.x - header.x) * compression_x);
-      section.v1_y[triangle_id] = (uint16_t) floorf((fragment.v1.y - header.y) * compression_y);
-      section.v1_z[triangle_id] = (uint16_t) floorf((fragment.v1.z - header.z) * compression_z);
-      section.v2_x[triangle_id] = (uint16_t) floorf((fragment.v2.x - header.x) * compression_x);
-      section.v2_y[triangle_id] = (uint16_t) floorf((fragment.v2.y - header.y) * compression_y);
-      section.v2_z[triangle_id] = (uint16_t) floorf((fragment.v2.z - header.z) * compression_z);
+      section.v0_x[triangle_id] = (uint16_t) floorf((fragment.v0.x - min_bound.x) * compression_x);
+      section.v0_y[triangle_id] = (uint16_t) floorf((fragment.v0.y - min_bound.y) * compression_y);
+      section.v0_z[triangle_id] = (uint16_t) floorf((fragment.v0.z - min_bound.z) * compression_z);
+      section.v1_x[triangle_id] = (uint16_t) floorf((fragment.v1.x - min_bound.x) * compression_x);
+      section.v1_y[triangle_id] = (uint16_t) floorf((fragment.v1.y - min_bound.y) * compression_y);
+      section.v1_z[triangle_id] = (uint16_t) floorf((fragment.v1.z - min_bound.z) * compression_z);
+      section.v2_x[triangle_id] = (uint16_t) floorf((fragment.v2.x - min_bound.x) * compression_x);
+      section.v2_y[triangle_id] = (uint16_t) floorf((fragment.v2.y - min_bound.y) * compression_y);
+      section.v2_z[triangle_id] = (uint16_t) floorf((fragment.v2.z - min_bound.z) * compression_z);
 
       section.intensity[triangle_id] = max((uint16_t) ((fragment.intensity / max_intensity) * 65535.0f), 1);
 
@@ -741,7 +741,7 @@ static LuminaryResult _light_tree_create_new_linked_list(
     converter.section = section;
 
     for (uint32_t proxy_id = 0; proxy_id < sizeof(DeviceLightLinkedListSection) / sizeof(DeviceLightLinkedListHeader); proxy_id++) {
-      __FAILURE_HANDLE(array_push(&cwork->linked_lists, &header));
+      __FAILURE_HANDLE(array_push(&cwork->linked_lists, &converter.proxy[proxy_id]));
     }
 
     cwork->triangles_ptr += triangles_this_section;

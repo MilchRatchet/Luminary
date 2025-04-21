@@ -46,6 +46,8 @@ __device__ uint32_t light_linked_list_resample(
   bool reached_end = false;
 
   DeviceLightLinkedListHeader header;
+  header.meta = 0;
+
   vec3 base_point;
   vec3 exp;
   float max_intensity;
@@ -73,11 +75,11 @@ __device__ uint32_t light_linked_list_resample(
       base_point    = get_vector(_bfloat_to_float(header.x), _bfloat_to_float(header.y), _bfloat_to_float(header.z));
       exp           = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
       max_intensity = _bfloat_to_float(header.intensity);
+      section_id    = 0;
     }
 
     const DeviceLightLinkedListSection section = load_light_linked_list_section(linked_list_ptr);
     linked_list_ptr += (sizeof(DeviceLightLinkedListSection) / sizeof(float4));
-    section_id++;
 
 #pragma unroll
     for (uint32_t tri_id = 0; tri_id < 4; tri_id++) {
@@ -97,8 +99,12 @@ __device__ uint32_t light_linked_list_resample(
 
       intensity *= light_ltc_triangle_integral(ltc_matrix, include_diffuse, data.position, local_space, v0, v1, v2);
 
-      ris_reservoir_add_sample(reservoir, intensity, linked_list_sampling_weight);
+      if (ris_reservoir_add_sample(reservoir, intensity, linked_list_sampling_weight)) {
+        selected_light_id = header.light_id + section_id * 4 + tri_id;
+      }
     }
+
+    section_id++;
   }
 
   return selected_light_id;
