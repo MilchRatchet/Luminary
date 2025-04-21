@@ -20,7 +20,7 @@ struct LightTreeFragment {
   uint32_t material_tri_id;
   float power;
   uint32_t instance_cache_tri_id;
-  uint32_t padding0;
+  float intensity;
   uint32_t padding1;
   uint32_t padding2;
 } typedef LightTreeFragment;

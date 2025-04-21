@@ -24,6 +24,8 @@
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
+#define LIGHT_TREE_LINKED_LIST_NULL 0xFFFFFFFF
+#define LIGHT_LINKED_LIST_META_HAS_NEXT (0x80)
 #define LIGHT_NUM_MICROTRIANGLES 64
 
 #define UNDERSAMPLING_FIRST_SAMPLE_MASK 0x80
@@ -259,10 +261,10 @@ struct DeviceLightLinkedListHeader {
   uint16_t x;
   uint16_t y;
   uint16_t z;
-  uint16_t padding;
-  uint8_t exp_x;
-  uint8_t exp_y;
-  uint8_t exp_z;
+  uint16_t intensity;
+  int8_t exp_x;
+  int8_t exp_y;
+  int8_t exp_z;
   uint8_t meta;
 } typedef DeviceLightLinkedListHeader;
 LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListHeader, 0x10);

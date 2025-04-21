@@ -14,8 +14,12 @@
 #include "texture.h"
 #include "utils.h"
 
-// #define LIGHT_TREE_DEBUG_OUTPUT
+#define LIGHT_TREE_DEBUG_OUTPUT
 // #define LIGHT_COMPUTE_VMF_DISTRIBUTIONS
+
+#define LIGHT_TREE_MAX_LEAF_DIMENSION (128.0f)
+#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (16)
+#define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
 
 enum LightTreeSweepAxis {
   LIGHT_TREE_SWEEP_AXIS_X = 0,
@@ -295,9 +299,8 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       const uint32_t fragments_count = node.triangle_count;
 
       // Node has few enough triangles, finalize it as a leaf node.
-      if (fragments_count <= 1) {
+      if (fragments_count <= 1)
         continue;
-      }
 
       // Compute surface area of current node.
       Vec128 high_parent, low_parent;
@@ -306,6 +309,9 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       const Vec128 diff               = vec128_set_w_to_0(vec128_sub(high_parent, low_parent));
       const float max_axis_interval   = vec128_hmax(diff);
       const float parent_surface_area = vec128_box_area(diff);
+
+      if (max_axis_interval <= LIGHT_TREE_MAX_LEAF_DIMENSION && fragments_count <= LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT)
+        continue;
 
       Vec128 high, low;
       double optimal_cost = DBL_MAX;
@@ -594,6 +600,155 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
   return LUMINARY_SUCCESS;
 }
 
+struct LightTreeCollapseWork {
+  DeviceLightTreeNode* nodes;
+  uint64_t* node_paths;
+  uint32_t* node_depths;
+  uint32_t* new_fragments;
+  uint64_t* fragment_paths;
+  ARRAY DeviceLightLinkedListHeader* linked_lists;
+  uint32_t triangles_ptr;
+} typedef LightTreeCollapseWork;
+
+static uint16_t _light_tree_float_to_bfloat16(const float val, const bool round_up) {
+  union {
+    float a;
+    uint32_t b;
+  } converter;
+  converter.a = val;
+
+  if (round_up) {
+    converter.b += (1 << 16) - 1;
+  }
+
+  return (converter.b >> 16);
+}
+
+static float _light_tree_bfloat16_to_float(const uint16_t val) {
+  union {
+    float a;
+    uint32_t b;
+  } converter;
+  converter.b = val;
+
+  converter.b <<= 16;
+
+  return converter.a;
+}
+
+static LuminaryResult _light_tree_create_new_linked_list(
+  const LightTreeWork* work, LightTreeCollapseWork* cwork, const LightTreeNode node, uint32_t* list_index) {
+  __CHECK_NULL_ARGUMENT(work);
+  __CHECK_NULL_ARGUMENT(cwork);
+
+  __FAILURE_HANDLE(array_get_num_elements(cwork->linked_lists, list_index));
+
+  Vec128 min_bound    = vec128_set_1(MAX_VALUE);
+  Vec128 max_bound    = vec128_set_1(-MAX_VALUE);
+  float max_intensity = 0.0f;
+
+  // Compute bounds
+  for (uint32_t i = 0; i < node.light_count; i++) {
+    const LightTreeFragment fragment = work->fragments[node.ptr + i];
+
+    min_bound = vec128_min(min_bound, fragment.low);
+    max_bound = vec128_max(max_bound, fragment.high);
+
+    max_intensity = fmaxf(max_intensity, fragment.intensity);
+  }
+
+  const uint32_t section_count = (node.light_count + 3) / 4;
+
+  __DEBUG_ASSERT(section_count > 0);
+
+  DeviceLightLinkedListHeader header;
+  header.light_id  = cwork->triangles_ptr;
+  header.x         = _light_tree_float_to_bfloat16(min_bound.x, false);
+  header.y         = _light_tree_float_to_bfloat16(min_bound.y, false);
+  header.z         = _light_tree_float_to_bfloat16(min_bound.z, false);
+  header.intensity = _light_tree_float_to_bfloat16(max_intensity, true);
+  header.meta      = section_count;
+
+  // Reconstruct bounds after compression
+  min_bound.x   = _light_tree_bfloat16_to_float(header.x);
+  min_bound.y   = _light_tree_bfloat16_to_float(header.y);
+  min_bound.z   = _light_tree_bfloat16_to_float(header.z);
+  max_intensity = _light_tree_bfloat16_to_float(header.intensity);
+
+  header.exp_x = (int8_t) (max_bound.x != min_bound.x) ? ceilf(log2f((max_bound.x - min_bound.x) * 1.0f / 65535.0f)) : 0;
+  header.exp_y = (int8_t) (max_bound.y != min_bound.y) ? ceilf(log2f((max_bound.y - min_bound.y) * 1.0f / 65535.0f)) : 0;
+  header.exp_z = (int8_t) (max_bound.z != min_bound.z) ? ceilf(log2f((max_bound.z - min_bound.z) * 1.0f / 65535.0f)) : 0;
+
+  __FAILURE_HANDLE(array_push(&cwork->linked_lists, &header));
+
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+  info_message("======= 0x%08X LinkedListHeader =======", *list_index);
+  info_message("MinBound: %f %f %f (%X %X %X)", min_bound.x, min_bound.y, min_bound.z, header.x, header.y, header.z);
+  info_message("Exp: %u %u %u", header.exp_x, header.exp_y, header.exp_z);
+  info_message("Intensity: %f (%X)", max_intensity, header.intensity);
+  info_message("Light ID: %u", header.light_id);
+  info_message("Meta: %u", header.meta);
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
+
+  const float compression_x = 1.0f / exp2f(header.exp_x);
+  const float compression_y = 1.0f / exp2f(header.exp_y);
+  const float compression_z = 1.0f / exp2f(header.exp_z);
+
+  for (uint32_t section_id = 0; section_id < section_count; section_id++) {
+    DeviceLightLinkedListData data;
+    memset(&data, 0, sizeof(DeviceLightLinkedListData));
+
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+    info_message("======= 0x%08X LinkedListSection =======", (*list_index) + 1 + section_id * 4);
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
+
+    uint32_t triangles_this_section = min(node.light_count - section_id * 4, 4);
+
+    for (uint32_t triangle_id = 0; triangle_id < triangles_this_section; triangle_id++) {
+      const LightTreeFragment fragment = work->fragments[node.ptr + section_id * 4 + triangle_id];
+
+      data.v0_x[triangle_id] = (uint16_t) floorf((fragment.v0.x - header.x) * compression_x);
+      data.v0_y[triangle_id] = (uint16_t) floorf((fragment.v0.y - header.y) * compression_y);
+      data.v0_z[triangle_id] = (uint16_t) floorf((fragment.v0.z - header.z) * compression_z);
+      data.v1_x[triangle_id] = (uint16_t) floorf((fragment.v1.x - header.x) * compression_x);
+      data.v1_y[triangle_id] = (uint16_t) floorf((fragment.v1.y - header.y) * compression_y);
+      data.v1_z[triangle_id] = (uint16_t) floorf((fragment.v1.z - header.z) * compression_z);
+      data.v2_x[triangle_id] = (uint16_t) floorf((fragment.v2.x - header.x) * compression_x);
+      data.v2_y[triangle_id] = (uint16_t) floorf((fragment.v2.y - header.y) * compression_y);
+      data.v2_z[triangle_id] = (uint16_t) floorf((fragment.v2.z - header.z) * compression_z);
+
+      data.intensity[triangle_id] = max((uint16_t) ((fragment.intensity / max_intensity) * 65535.0f), 1);
+
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+      info_message("v0: %04X %04X %04X", data.v0_x[triangle_id], data.v0_y[triangle_id], data.v0_z[triangle_id]);
+      info_message("v1: %04X %04X %04X", data.v1_x[triangle_id], data.v1_y[triangle_id], data.v1_z[triangle_id]);
+      info_message("v2: %04X %04X %04X", data.v2_x[triangle_id], data.v2_y[triangle_id], data.v2_z[triangle_id]);
+      info_message("Intensity:  %X", data.intensity[triangle_id]);
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
+
+      cwork->new_fragments[cwork->triangles_ptr + triangle_id] = node.ptr + section_id * 4 + triangle_id;
+    }
+
+    // Store
+    union {
+      DeviceLightLinkedListData data;
+      struct {
+        DeviceLightLinkedListHeader proxy[sizeof(DeviceLightLinkedListData) / sizeof(DeviceLightLinkedListHeader)];
+      };
+    } converter;
+
+    converter.data = data;
+
+    for (uint32_t proxy_id = 0; proxy_id < sizeof(DeviceLightLinkedListData) / sizeof(DeviceLightLinkedListHeader); proxy_id++) {
+      __FAILURE_HANDLE(array_push(&cwork->linked_lists, &header));
+    }
+
+    cwork->triangles_ptr += triangles_this_section;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
@@ -611,63 +766,56 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   uint32_t node_count = binary_nodes_count;
 
-  DeviceLightTreeNode* nodes;
-  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(DeviceLightTreeNode) * node_count));
+  LightTreeCollapseWork cwork;
+  __FAILURE_HANDLE(host_malloc(&cwork.nodes, sizeof(DeviceLightTreeNode) * node_count));
+  __FAILURE_HANDLE(host_malloc(&cwork.node_paths, sizeof(uint64_t) * node_count));
+  __FAILURE_HANDLE(host_malloc(&cwork.node_depths, sizeof(uint32_t) * node_count));
+  __FAILURE_HANDLE(host_malloc(&cwork.new_fragments, sizeof(uint32_t) * fragments_count));
+  __FAILURE_HANDLE(host_malloc(&cwork.fragment_paths, sizeof(uint64_t) * fragments_count));
+  __FAILURE_HANDLE(array_create(&cwork.linked_lists, sizeof(DeviceLightLinkedListHeader), 32));
 
-  uint64_t* node_paths;
-  __FAILURE_HANDLE(host_malloc(&node_paths, sizeof(uint64_t) * node_count));
+  memset(cwork.new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
+  memset(cwork.fragment_paths, 0xFF, sizeof(uint64_t) * fragments_count);
 
-  uint32_t* node_depths;
-  __FAILURE_HANDLE(host_malloc(&node_depths, sizeof(uint32_t) * node_count));
+  cwork.nodes[0].child_ptr = 0;
+  cwork.nodes[0].light_ptr = LIGHT_TREE_LINKED_LIST_NULL;
 
-  uint32_t* new_fragments;
-  __FAILURE_HANDLE(host_malloc(&new_fragments, sizeof(uint32_t) * fragments_count));
+  cwork.node_paths[0]  = 0;
+  cwork.node_depths[0] = 0;
 
-  uint64_t* fragment_paths;
-  __FAILURE_HANDLE(host_malloc(&fragment_paths, sizeof(uint64_t) * fragments_count));
-
-  memset(new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
-  memset(fragment_paths, 0xFF, sizeof(uint64_t) * fragments_count);
-
-  nodes[0].child_ptr = 0;
-  nodes[0].light_ptr = 0;
-
-  node_paths[0]  = 0;
-  node_depths[0] = 0;
+  cwork.triangles_ptr = 0;
 
   uint32_t begin_of_current_nodes = 0;
   uint32_t end_of_current_nodes   = 1;
   uint32_t write_ptr              = 1;
-  uint32_t triangles_ptr          = 0;
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
-      DeviceLightTreeNode node = nodes[node_ptr];
+      DeviceLightTreeNode node = cwork.nodes[node_ptr];
 
       const uint32_t binary_index = node.child_ptr;
 
-      if (binary_index == 0xFFFFFFFF)
+      if (binary_index == LIGHT_TREE_BINARY_INDEX_NULL)
         continue;
 
-      const uint64_t current_node_path  = node_paths[node_ptr];
-      const uint32_t current_node_depth = node_depths[node_ptr];
+      const uint64_t current_node_path  = cwork.node_paths[node_ptr];
+      const uint32_t current_node_depth = cwork.node_depths[node_ptr];
 
       node.child_ptr = write_ptr;
-      node.light_ptr = triangles_ptr;
+      node.light_ptr = LIGHT_TREE_LINKED_LIST_NULL;
+
+      uint32_t last_linked_list_index = LIGHT_TREE_LINKED_LIST_NULL;
 
       LightTreeChildNode children[8];
       uint32_t child_binary_index[8];
-      uint32_t child_leaf_light_ptr[8];
-      uint32_t child_leaf_light_count[8];
 
       for (uint32_t i = 0; i < 8; i++) {
-        child_binary_index[i]     = 0xFFFFFFFF;
-        child_leaf_light_ptr[i]   = 0xFFFFFFFF;
-        child_leaf_light_count[i] = 0;
+        child_binary_index[i] = LIGHT_TREE_BINARY_INDEX_NULL;
       }
 
-      uint32_t child_count      = 0;
-      uint32_t child_leaf_count = 0;
+      uint32_t child_count = 0;
+
+      bool children_require_work = false;
 
       if (binary_nodes[binary_index].light_count == 0) {
         const LightTreeNode binary_node = binary_nodes[binary_index];
@@ -693,36 +841,44 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         child_binary_index[child_count] = binary_node.ptr + 1;
 
         children[child_count++] = right_child;
+
+        children_require_work = true;
       }
       else {
         // This case implies that the whole tree was just a leaf.
         // Hence we fill in some basic information and that is it.
-        LightTreeChildNode child;
-        memset(&child, 0, sizeof(LightTreeChildNode));
+        uint32_t linked_list_index;
+        __FAILURE_HANDLE(_light_tree_create_new_linked_list(work, &cwork, binary_nodes[binary_index], &linked_list_index));
 
-        child.power = 1.0f;
+        if (node.light_ptr == LIGHT_TREE_LINKED_LIST_NULL) {
+          node.light_ptr = linked_list_index;
+        }
+        else {
+          cwork.linked_lists[last_linked_list_index].meta |= LIGHT_LINKED_LIST_META_HAS_NEXT;
+        }
 
-        child_leaf_light_ptr[child_count]   = binary_nodes[binary_index].ptr;
-        child_leaf_light_count[child_count] = binary_nodes[binary_index].light_count;
-
-        children[child_count++] = child;
-
-        child_leaf_count++;
+        last_linked_list_index = linked_list_index;
       }
 
-      while (child_count < 8 && child_count > child_leaf_count) {
+      while (children_require_work) {
         uint32_t loop_end = child_count;
+
+        children_require_work = false;
 
         for (uint64_t child_ptr = 0; child_ptr < loop_end; child_ptr++) {
           const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
           // If this child does not point to another binary node, then skip.
-          if (binary_index_of_child == 0xFFFFFFFF)
+          if (binary_index_of_child == LIGHT_TREE_BINARY_INDEX_NULL)
             continue;
 
           const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
 
           if (binary_node.light_count == 0) {
+            // We are full, skip
+            if (child_count == 8)
+              continue;
+
             LightTreeChildNode left_child;
             memset(&left_child, 0, sizeof(LightTreeChildNode));
 
@@ -730,9 +886,14 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             left_child.variance = binary_node.left_variance;
             left_child.power    = binary_node.left_power;
 
-            child_binary_index[child_ptr] = binary_node.ptr;
+            uint32_t child_slot = 0;
+            for (; child_slot < 8; child_slot++) {
+              if (child_binary_index[child_slot] == LIGHT_TREE_BINARY_INDEX_NULL)
+                break;
+            }
 
-            children[child_ptr] = left_child;
+            child_binary_index[child_slot] = binary_node.ptr;
+            children[child_slot]           = left_child;
 
             LightTreeChildNode right_child;
             memset(&right_child, 0, sizeof(LightTreeChildNode));
@@ -741,58 +902,51 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             right_child.variance = binary_node.right_variance;
             right_child.power    = binary_node.right_power;
 
-            child_binary_index[child_count] = binary_node.ptr + 1;
+            child_slot = 0;
+            for (; child_slot < 8; child_slot++) {
+              if (child_binary_index[child_slot] == LIGHT_TREE_BINARY_INDEX_NULL)
+                break;
+            }
 
-            children[child_count++] = right_child;
+            child_binary_index[child_slot] = binary_node.ptr + 1;
+            children[child_slot]           = right_child;
+
+            child_count++;
+            children_require_work = true;
           }
           else {
-            child_leaf_light_ptr[child_ptr]   = binary_node.ptr;
-            child_leaf_light_count[child_ptr] = binary_node.light_count;
-            child_binary_index[child_ptr]     = 0xFFFFFFFF;
-            child_leaf_count++;
+            // TODO: There is a degenerate case where we end up flattening the whole tree into just one linked list
+            uint32_t linked_list_index;
+            __FAILURE_HANDLE(_light_tree_create_new_linked_list(work, &cwork, binary_node, &linked_list_index));
+
+            if (node.light_ptr == LIGHT_TREE_LINKED_LIST_NULL) {
+              node.light_ptr = linked_list_index;
+            }
+            else {
+              cwork.linked_lists[last_linked_list_index].meta |= LIGHT_LINKED_LIST_META_HAS_NEXT;
+            }
+
+            last_linked_list_index = linked_list_index;
+
+            child_binary_index[child_ptr] = LIGHT_TREE_BINARY_INDEX_NULL;
+            child_count--;
+            children_require_work = true;
           }
-
-          // Child list may have run full, terminate early.
-          if (child_count == 8)
-            break;
-        }
-      }
-
-      // The above logic has a flaw in that that leaf nodes that were inserted during the last
-      // loop would not be identified as such. Hence I loop again through the children to mark
-      // all children correctly as leaves.
-      for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
-        const uint32_t binary_index_of_child = child_binary_index[child_ptr];
-
-        // If this child does not point to another binary node, then skip.
-        if (binary_index_of_child == 0xFFFFFFFF)
-          continue;
-
-        const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
-
-        if (binary_node.light_count > 0) {
-          child_leaf_light_ptr[child_ptr]   = binary_node.ptr;
-          child_leaf_light_count[child_ptr] = binary_node.light_count;
-          child_binary_index[child_ptr]     = 0xFFFFFFFF;
-          child_leaf_count++;
         }
       }
 
       uint32_t child_light_ptr = 0;
 
-      if (child_leaf_count > 0) {
-        // The non-leaf nodes must come first, so we partition the children by swapping the non-leaf
-        // nodes to the beginning.
-        for (uint32_t child_ptr = 0; child_ptr < child_count - child_leaf_count; child_ptr++) {
-          const uint32_t child_light_count = child_leaf_light_count[child_ptr];
+      if (child_count < 8) {
+        // The non-null children must come first
+        for (uint32_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
+          const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
-          // Child is a leaf in the non-leaf section of the children, find a mis-positioned non-leaf child.
-          if (child_light_count > 0) {
-            uint32_t child_swap_ptr;
-            for (child_swap_ptr = child_count - child_leaf_count; child_swap_ptr < child_count; child_swap_ptr++) {
-              const uint32_t child_swap_light_count = child_leaf_light_count[child_swap_ptr];
-
-              if (child_swap_light_count == 0)
+          // Child is null node, search for a mis-positioned non-null node and swap
+          if (binary_index_of_child == LIGHT_TREE_BINARY_INDEX_NULL) {
+            uint32_t child_swap_ptr = child_count;
+            for (; child_swap_ptr < 8; child_swap_ptr++) {
+              if (child_binary_index[child_swap_ptr] != LIGHT_TREE_BINARY_INDEX_NULL)
                 break;
             }
 
@@ -803,34 +957,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             uint32_t child_binary_index_swap   = child_binary_index[child_ptr];
             child_binary_index[child_ptr]      = child_binary_index[child_swap_ptr];
             child_binary_index[child_swap_ptr] = child_binary_index_swap;
-
-            uint32_t child_leaf_light_ptr_swap   = child_leaf_light_ptr[child_ptr];
-            child_leaf_light_ptr[child_ptr]      = child_leaf_light_ptr[child_swap_ptr];
-            child_leaf_light_ptr[child_swap_ptr] = child_leaf_light_ptr_swap;
-
-            uint32_t child_leaf_light_count_swap   = child_leaf_light_count[child_ptr];
-            child_leaf_light_count[child_ptr]      = child_leaf_light_count[child_swap_ptr];
-            child_leaf_light_count[child_swap_ptr] = child_leaf_light_count_swap;
           }
-        }
-
-        // Now we copy the triangles for all of our leaf child nodes.
-        for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
-          const uint32_t light_ptr   = child_leaf_light_ptr[child_ptr];
-          const uint32_t light_count = child_leaf_light_count[child_ptr];
-
-          // If this child is not a leaf, then skip.
-          if (light_count == 0)
-            continue;
-
-          for (uint32_t i = 0; i < light_count; i++) {
-            new_fragments[triangles_ptr + child_light_ptr + i]  = light_ptr + i;
-            fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
-          }
-
-          children[child_ptr].light_count = light_count;
-
-          child_light_ptr += light_count;
         }
       }
 
@@ -874,7 +1001,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       info_message(
         "Exponents: %d %d %d => %f %f %f | %d => %f", node.exp_x, node.exp_y, node.exp_z, 1.0f / compression_x, 1.0f / compression_y,
         1.0f / compression_z, node.exp_variance, 1.0f / compression_v);
-#endif
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
       uint64_t rel_mean_x        = 0;
       uint64_t rel_mean_y        = 0;
@@ -899,8 +1026,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Value exceeded bit limit.");
         }
 
-        // Power may not be zero
-        // TODO: Consider doing this implicitly, i.e. imply power = 1 + stored_power
+        // Power may not be zero as zero implies NULL node and a node with 0 power cannot be sampled.
         child_rel_power = max(1, child_rel_power);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
@@ -939,7 +1065,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
           info_message("    %f => %f [Err: %f]", child_node.variance, decompressed_variance, child_node.variance - decompressed_variance);
         }
-#endif
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
         rel_mean_x |= child_rel_mean_x << (i * 8);
         rel_mean_y |= child_rel_mean_y << (i * 8);
@@ -965,14 +1091,14 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         if (child_binary_index[i] == 0xFFFFFFFF)
           continue;
 
-        node_paths[write_ptr]        = current_node_path | (i << (3 * current_node_depth));
-        node_depths[write_ptr]       = current_node_depth + 1;
-        nodes[write_ptr++].child_ptr = child_binary_index[i];
+        cwork.node_paths[write_ptr]        = current_node_path | (i << (3 * current_node_depth));
+        cwork.node_depths[write_ptr]       = current_node_depth + 1;
+        cwork.nodes[write_ptr++].child_ptr = child_binary_index[i];
       }
 
-      triangles_ptr += child_light_ptr;
+      cwork.triangles_ptr += child_light_ptr;
 
-      nodes[node_ptr] = node;
+      cwork.nodes[node_ptr] = node;
     }
 
     begin_of_current_nodes = end_of_current_nodes;
@@ -981,7 +1107,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   // Check
   for (uint32_t i = 0; i < fragments_count; i++) {
-    if (new_fragments[i] == 0xFFFFFFFF || fragment_paths[i] == 0xFFFFFFFFFFFFFFFF) {
+    if (cwork.new_fragments[i] == 0xFFFFFFFF) {
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Light was lost.");
     }
   }
@@ -994,29 +1120,21 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __FAILURE_HANDLE(host_malloc(&work->paths, sizeof(uint2) * fragments_count));
 
   for (uint32_t i = 0; i < fragments_count; i++) {
-    work->fragments[i] = fragments_swap[new_fragments[i]];
-
-    uint64_t fragment_path = fragment_paths[i];
-
-    uint2 light_path;
-
-    light_path.x = (uint32_t) ((fragment_path >> 0) & 0x3FFFFFFF);
-    light_path.y = (uint32_t) ((fragment_path >> 30) & 0x3FFFFFFF);
-
-    work->paths[i] = light_path;
+    work->fragments[i] = fragments_swap[cwork.new_fragments[i]];
   }
 
-  __FAILURE_HANDLE(host_free(&node_paths));
-  __FAILURE_HANDLE(host_free(&node_depths));
-  __FAILURE_HANDLE(host_free(&fragments_swap));
-  __FAILURE_HANDLE(host_free(&new_fragments));
-  __FAILURE_HANDLE(host_free(&fragment_paths));
+  __FAILURE_HANDLE(host_free(&cwork.node_paths));
+  __FAILURE_HANDLE(host_free(&cwork.node_depths));
+  __FAILURE_HANDLE(host_free(&cwork.new_fragments));
+  __FAILURE_HANDLE(host_free(&cwork.fragment_paths));
+
+  __FAILURE_HANDLE(array_destroy(&cwork.linked_lists));
 
   node_count = write_ptr;
 
-  __FAILURE_HANDLE(host_realloc(&nodes, sizeof(DeviceLightTreeNode) * node_count));
+  __FAILURE_HANDLE(host_realloc(&cwork.nodes, sizeof(DeviceLightTreeNode) * node_count));
 
-  work->nodes8_packed = nodes;
+  work->nodes8_packed = cwork.nodes;
   work->nodes_8_count = node_count;
 
   return LUMINARY_SUCCESS;
@@ -1761,6 +1879,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.v1                = vertex1;
       fragment.v2                = vertex2;
       fragment.power             = material->constant_emission_intensity * area * triangle->average_intensity;
+      fragment.intensity         = material->constant_emission_intensity * triangle->average_intensity;
       fragment.instance_id       = instance_id;
       fragment.material_slot_id  = material_slot_id;
       fragment.material_tri_id   = tri_id;
