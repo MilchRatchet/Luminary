@@ -89,6 +89,7 @@ struct LightTreeWork {
   DeviceLightTreeNode* nodes8_packed;
   uint32_t nodes_count;
   uint32_t nodes_8_count;
+  ARRAY DeviceLightLinkedListHeader* linked_lists;
 } typedef LightTreeWork;
 
 struct Bin {
@@ -695,8 +696,8 @@ static LuminaryResult _light_tree_create_new_linked_list(
   const float compression_z = 1.0f / exp2f(header.exp_z);
 
   for (uint32_t section_id = 0; section_id < section_count; section_id++) {
-    DeviceLightLinkedListData data;
-    memset(&data, 0, sizeof(DeviceLightLinkedListData));
+    DeviceLightLinkedListSection section;
+    memset(&section, 0, sizeof(DeviceLightLinkedListSection));
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
     info_message("======= 0x%08X LinkedListSection =======", (*list_index) + 1 + section_id * 4);
@@ -707,23 +708,23 @@ static LuminaryResult _light_tree_create_new_linked_list(
     for (uint32_t triangle_id = 0; triangle_id < triangles_this_section; triangle_id++) {
       const LightTreeFragment fragment = work->fragments[node.ptr + section_id * 4 + triangle_id];
 
-      data.v0_x[triangle_id] = (uint16_t) floorf((fragment.v0.x - header.x) * compression_x);
-      data.v0_y[triangle_id] = (uint16_t) floorf((fragment.v0.y - header.y) * compression_y);
-      data.v0_z[triangle_id] = (uint16_t) floorf((fragment.v0.z - header.z) * compression_z);
-      data.v1_x[triangle_id] = (uint16_t) floorf((fragment.v1.x - header.x) * compression_x);
-      data.v1_y[triangle_id] = (uint16_t) floorf((fragment.v1.y - header.y) * compression_y);
-      data.v1_z[triangle_id] = (uint16_t) floorf((fragment.v1.z - header.z) * compression_z);
-      data.v2_x[triangle_id] = (uint16_t) floorf((fragment.v2.x - header.x) * compression_x);
-      data.v2_y[triangle_id] = (uint16_t) floorf((fragment.v2.y - header.y) * compression_y);
-      data.v2_z[triangle_id] = (uint16_t) floorf((fragment.v2.z - header.z) * compression_z);
+      section.v0_x[triangle_id] = (uint16_t) floorf((fragment.v0.x - header.x) * compression_x);
+      section.v0_y[triangle_id] = (uint16_t) floorf((fragment.v0.y - header.y) * compression_y);
+      section.v0_z[triangle_id] = (uint16_t) floorf((fragment.v0.z - header.z) * compression_z);
+      section.v1_x[triangle_id] = (uint16_t) floorf((fragment.v1.x - header.x) * compression_x);
+      section.v1_y[triangle_id] = (uint16_t) floorf((fragment.v1.y - header.y) * compression_y);
+      section.v1_z[triangle_id] = (uint16_t) floorf((fragment.v1.z - header.z) * compression_z);
+      section.v2_x[triangle_id] = (uint16_t) floorf((fragment.v2.x - header.x) * compression_x);
+      section.v2_y[triangle_id] = (uint16_t) floorf((fragment.v2.y - header.y) * compression_y);
+      section.v2_z[triangle_id] = (uint16_t) floorf((fragment.v2.z - header.z) * compression_z);
 
-      data.intensity[triangle_id] = max((uint16_t) ((fragment.intensity / max_intensity) * 65535.0f), 1);
+      section.intensity[triangle_id] = max((uint16_t) ((fragment.intensity / max_intensity) * 65535.0f), 1);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
-      info_message("v0: %04X %04X %04X", data.v0_x[triangle_id], data.v0_y[triangle_id], data.v0_z[triangle_id]);
-      info_message("v1: %04X %04X %04X", data.v1_x[triangle_id], data.v1_y[triangle_id], data.v1_z[triangle_id]);
-      info_message("v2: %04X %04X %04X", data.v2_x[triangle_id], data.v2_y[triangle_id], data.v2_z[triangle_id]);
-      info_message("Intensity:  %X", data.intensity[triangle_id]);
+      info_message("v0: %04X %04X %04X", section.v0_x[triangle_id], section.v0_y[triangle_id], section.v0_z[triangle_id]);
+      info_message("v1: %04X %04X %04X", section.v1_x[triangle_id], section.v1_y[triangle_id], section.v1_z[triangle_id]);
+      info_message("v2: %04X %04X %04X", section.v2_x[triangle_id], section.v2_y[triangle_id], section.v2_z[triangle_id]);
+      info_message("Intensity:  %X", section.intensity[triangle_id]);
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
       cwork->new_fragments[cwork->triangles_ptr + triangle_id] = node.ptr + section_id * 4 + triangle_id;
@@ -731,15 +732,15 @@ static LuminaryResult _light_tree_create_new_linked_list(
 
     // Store
     union {
-      DeviceLightLinkedListData data;
+      DeviceLightLinkedListSection section;
       struct {
-        DeviceLightLinkedListHeader proxy[sizeof(DeviceLightLinkedListData) / sizeof(DeviceLightLinkedListHeader)];
+        DeviceLightLinkedListHeader proxy[sizeof(DeviceLightLinkedListSection) / sizeof(DeviceLightLinkedListHeader)];
       };
     } converter;
 
-    converter.data = data;
+    converter.section = section;
 
-    for (uint32_t proxy_id = 0; proxy_id < sizeof(DeviceLightLinkedListData) / sizeof(DeviceLightLinkedListHeader); proxy_id++) {
+    for (uint32_t proxy_id = 0; proxy_id < sizeof(DeviceLightLinkedListSection) / sizeof(DeviceLightLinkedListHeader); proxy_id++) {
       __FAILURE_HANDLE(array_push(&cwork->linked_lists, &header));
     }
 
@@ -755,6 +756,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   if (work->nodes_count == 0) {
     __FAILURE_HANDLE(host_malloc(&work->paths, 0));
     __FAILURE_HANDLE(host_malloc(&work->nodes8_packed, 0));
+    __FAILURE_HANDLE(array_create(&work->linked_lists, sizeof(DeviceLightLinkedListHeader), 0));
     work->nodes_8_count = 0;
     return LUMINARY_SUCCESS;
   }
@@ -1128,14 +1130,13 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __FAILURE_HANDLE(host_free(&cwork.new_fragments));
   __FAILURE_HANDLE(host_free(&cwork.fragment_paths));
 
-  __FAILURE_HANDLE(array_destroy(&cwork.linked_lists));
-
   node_count = write_ptr;
 
   __FAILURE_HANDLE(host_realloc(&cwork.nodes, sizeof(DeviceLightTreeNode) * node_count));
 
   work->nodes8_packed = cwork.nodes;
   work->nodes_8_count = node_count;
+  work->linked_lists  = cwork.linked_lists;
 
   return LUMINARY_SUCCESS;
 }
@@ -1190,6 +1191,15 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
     memcpy(microtriangles + id, &triangle->microtriangle_importance, sizeof(DeviceLightMicroTriangleImportance));
   }
 
+  // TODO: This is inefficient, I take the array data and turn it into generic memory.
+  uint32_t num_linked_lists_as_16bytes;
+  __FAILURE_HANDLE(array_get_num_elements(work->linked_lists, &num_linked_lists_as_16bytes));
+
+  DeviceLightLinkedListHeader* linked_lists;
+  __FAILURE_HANDLE(host_malloc(&linked_lists, sizeof(DeviceLightLinkedListHeader) * num_linked_lists_as_16bytes));
+
+  memcpy(linked_lists, work->linked_lists, sizeof(DeviceLightLinkedListHeader) * num_linked_lists_as_16bytes);
+
   ////////////////////////////////////////////////////////////////////
   // Assign light tree data
   ////////////////////////////////////////////////////////////////////
@@ -1214,6 +1224,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   tree->microtriangle_size = sizeof(DeviceLightMicroTriangleImportance) * work->fragments_count;
   tree->microtriangle_data = (void*) microtriangles;
 
+  tree->linked_lists_size = sizeof(DeviceLightLinkedListHeader) * num_linked_lists_as_16bytes;
+  tree->linked_lists_data = (void*) linked_lists;
+
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
   tree->light_count            = work->fragments_count;
 
@@ -1229,6 +1242,7 @@ static LuminaryResult _light_tree_clear_work(LightTreeWork* work) {
   __FAILURE_HANDLE(host_free(&work->fragments));
   __FAILURE_HANDLE(array_destroy(&work->binary_nodes));
   __FAILURE_HANDLE(host_free(&work->nodes));
+  __FAILURE_HANDLE(array_destroy(&work->linked_lists));
 
   return LUMINARY_SUCCESS;
 }
@@ -2029,6 +2043,11 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
   if (tree->microtriangle_data) {
     __FAILURE_HANDLE(host_free(&tree->microtriangle_data));
     tree->microtriangle_size = 0;
+  }
+
+  if (tree->linked_lists_data) {
+    __FAILURE_HANDLE(host_free(&tree->linked_lists_data));
+    tree->linked_lists_size = 0;
   }
 
   if (tree->bvh_vertex_buffer_data) {

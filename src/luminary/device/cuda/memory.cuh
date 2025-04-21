@@ -391,6 +391,44 @@ __device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
   return node;
 }
 
+__device__ DeviceLightLinkedListHeader load_light_linked_list_header(const uint32_t offset) {
+  const float4* ptr = (float4*) (device.ptrs.light_linked_lists + offset);
+
+  union {
+    DeviceLightLinkedListHeader header;
+    struct {
+      float4 data;
+    };
+  } converter;
+
+  converter.data = __ldg(ptr + 0);
+
+  return converter.header;
+}
+
+__device__ DeviceLightLinkedListSection load_light_linked_list_section(const uint32_t offset) {
+  const float4* ptr = (float4*) (device.ptrs.light_linked_lists + offset);
+
+  union {
+    DeviceLightLinkedListSection section;
+    struct {
+      float4 data0;
+      float4 data1;
+      float4 data2;
+      float4 data3;
+      float4 data4;
+    };
+  } converter;
+
+  converter.data0 = __ldg(ptr + 0);
+  converter.data1 = __ldg(ptr + 1);
+  converter.data2 = __ldg(ptr + 2);
+  converter.data3 = __ldg(ptr + 3);
+  converter.data4 = __ldg(ptr + 4);
+
+  return converter.section;
+}
+
 __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
   const float4* ptr = (float4*) (device.ptrs.textures + offset);
   const float4 v0   = __ldg(ptr + 0);

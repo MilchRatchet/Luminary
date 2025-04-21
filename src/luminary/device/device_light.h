@@ -117,6 +117,8 @@ struct LightTree {
   size_t importance_normalization_size;
   void* microtriangle_data;
   size_t microtriangle_size;
+  void* linked_lists_data;
+  size_t linked_lists_size;
   void* bvh_vertex_buffer_data;
   uint32_t light_count;
 } typedef LightTree;

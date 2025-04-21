@@ -269,7 +269,7 @@ struct DeviceLightLinkedListHeader {
 } typedef DeviceLightLinkedListHeader;
 LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListHeader, 0x10);
 
-struct DeviceLightLinkedListData {
+struct DeviceLightLinkedListSection {
   uint16_t v0_x[4];
   uint16_t v0_y[4];
   uint16_t v0_z[4];
@@ -280,8 +280,8 @@ struct DeviceLightLinkedListData {
   uint16_t v2_y[4];
   uint16_t v2_z[4];
   uint16_t intensity[4];
-} typedef DeviceLightLinkedListData;
-LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListData, 0x50);
+} typedef DeviceLightLinkedListSection;
+LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListSection, 0x50);
 
 struct DeviceLightTreeLeaf {
   float power;
@@ -330,6 +330,7 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
   DEVICE const float* LUM_RESTRICT light_importance_normalization;
   DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;
+  DEVICE const DeviceLightLinkedListHeader* LUM_RESTRICT light_linked_lists;
   DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const Quad* LUM_RESTRICT particle_quads;

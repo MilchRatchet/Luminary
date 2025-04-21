@@ -475,7 +475,7 @@ __device__ TriangleHandle light_sample(
   LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES];
   const uint32_t num_references = light_tree_query(data, light_tree_random, pixel, stack);
 
-  // This happens if no light with non zero importance was found.
+  // This happens if no linked list with non zero importance was found.
   if (num_references == 0)
     return triangle_handle_get(LIGHT_ID_NONE, 0);
 
@@ -488,6 +488,10 @@ __device__ TriangleHandle light_sample(
   const uint32_t light_id = light_linked_list_resample(data, stack, num_references, reservoir);
 
   const float light_tree_sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
+
+  // This happens if no light with non zero importance was found.
+  if (light_id == 0xFFFFFFFF)
+    return triangle_handle_get(LIGHT_ID_NONE, 0);
 
   ////////////////////////////////////////////////////////////////////
   // Sample direction

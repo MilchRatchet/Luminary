@@ -9,7 +9,6 @@
 #include "utils.cuh"
 
 typedef uint16_t PackedProb;
-typedef uint16_t BFloat16;
 
 __device__ float light_tree_unpack_probability(const PackedProb p) {
   const uint32_t data = p;
@@ -25,19 +24,6 @@ __device__ PackedProb light_tree_pack_probability(const float p) {
 
   // The 2 bits in the exponent will automatically be truncated
   return (PackedProb) (data >> 12);
-}
-
-__device__ float light_tree_bfloat_to_float(const BFloat16 val) {
-  const uint32_t data = val;
-
-  return __uint_as_float(data << 16);
-}
-
-__device__ BFloat16 light_tree_float_to_bfloat(const float val) {
-  // Add this term to round to nearest
-  const uint32_t data = __float_as_uint(val) + (1u << 15);
-
-  return (BFloat16) (data >> 16);
 }
 
 __device__ void light_tree_child_importance(
