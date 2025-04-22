@@ -888,14 +888,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             left_child.variance = binary_node.left_variance;
             left_child.power    = binary_node.left_power;
 
-            uint32_t child_slot = 0;
-            for (; child_slot < 8; child_slot++) {
-              if (child_binary_index[child_slot] == LIGHT_TREE_BINARY_INDEX_NULL)
-                break;
-            }
-
-            child_binary_index[child_slot] = binary_node.ptr;
-            children[child_slot]           = left_child;
+            child_binary_index[child_ptr] = binary_node.ptr;
+            children[child_ptr]           = left_child;
 
             LightTreeChildNode right_child;
             memset(&right_child, 0, sizeof(LightTreeChildNode));
@@ -904,7 +898,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             right_child.variance = binary_node.right_variance;
             right_child.power    = binary_node.right_power;
 
-            child_slot = 0;
+            uint32_t child_slot = 0;
             for (; child_slot < 8; child_slot++) {
               if (child_binary_index[child_slot] == LIGHT_TREE_BINARY_INDEX_NULL)
                 break;
@@ -989,7 +983,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       node.exp_y = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
       node.exp_z = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
 
-      node.exp_variance = ((int8_t) ceilf(log2f(max_variance * 1.0f / 127.0f)));
+      node.exp_variance = ((int8_t) ceilf(log2f(max_variance * 1.0f / 255.0f)));
 
       const float compression_x = 1.0f / exp2f(node.exp_x);
       const float compression_y = 1.0f / exp2f(node.exp_y);
@@ -1018,18 +1012,26 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Leaf node contained multiple lights.");
         }
 
-        uint64_t child_rel_mean_x   = (uint64_t) floorf((child_node.mean.x - node.base_mean.x) * compression_x);
-        uint64_t child_rel_mean_y   = (uint64_t) floorf((child_node.mean.y - node.base_mean.y) * compression_y);
-        uint64_t child_rel_mean_z   = (uint64_t) floorf((child_node.mean.z - node.base_mean.z) * compression_z);
-        uint64_t child_rel_variance = (uint64_t) (child_node.variance * compression_v);
-        uint64_t child_rel_power    = (uint64_t) floorf(255.0f * child_node.power / max_power);
+        uint64_t child_rel_mean_x   = (uint64_t) floorf((child_node.mean.x - node.base_mean.x) * compression_x + 0.5f);
+        uint64_t child_rel_mean_y   = (uint64_t) floorf((child_node.mean.y - node.base_mean.y) * compression_y + 0.5f);
+        uint64_t child_rel_mean_z   = (uint64_t) floorf((child_node.mean.z - node.base_mean.z) * compression_z + 0.5f);
+        uint64_t child_rel_variance = (uint64_t) (child_node.variance * compression_v + 0.5f);
+        uint64_t child_rel_power    = (uint64_t) floorf(255.0f * child_node.power / max_power + 0.5f);
 
-        if (child_rel_mean_x > 255 || child_rel_mean_y > 255 || child_rel_mean_z > 255 || child_rel_variance > 255) {
+        if (child_rel_mean_x > 256 || child_rel_mean_y > 256 || child_rel_mean_z > 256 || child_rel_variance > 256) {
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Value exceeded bit limit.");
         }
 
+        child_rel_mean_x   = min(child_rel_mean_x, 255);
+        child_rel_mean_y   = min(child_rel_mean_y, 255);
+        child_rel_mean_z   = min(child_rel_mean_z, 255);
+        child_rel_variance = min(child_rel_variance, 255);
+        child_rel_power    = min(child_rel_power, 255);
+
+        child_rel_variance = max(child_rel_variance, 1);
+
         // Power may not be zero as zero implies NULL node and a node with 0 power cannot be sampled.
-        child_rel_power = max(1, child_rel_power);
+        child_rel_power = max(child_rel_power, 1);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
         info_message(
