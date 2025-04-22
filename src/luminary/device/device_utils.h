@@ -251,7 +251,7 @@ struct DeviceLightTreeNode {
   uint32_t rel_mean_x[2];
   uint32_t rel_mean_y[2];
   uint32_t rel_mean_z[2];
-  uint32_t rel_variance_leaf[2];
+  uint32_t rel_variance[2];
   uint32_t rel_power[2];
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);

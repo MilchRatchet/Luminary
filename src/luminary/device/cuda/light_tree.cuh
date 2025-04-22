@@ -42,7 +42,7 @@ __device__ void light_tree_child_importance(
     return;
   }
 
-  const uint32_t rel_variance = lower_data ? node.rel_variance_leaf[0] : node.rel_variance_leaf[1];
+  const uint32_t rel_variance = lower_data ? node.rel_variance[0] : node.rel_variance[1];
 
   float variance;
   variance = (rel_variance >> shift) & 0xFF;

@@ -383,10 +383,10 @@ __device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
   node.rel_mean_z[0] = __float_as_uint(v2.z);
   node.rel_mean_z[1] = __float_as_uint(v2.w);
 
-  node.rel_variance_leaf[0] = __float_as_uint(v3.x);
-  node.rel_variance_leaf[1] = __float_as_uint(v3.y);
-  node.rel_power[0]         = __float_as_uint(v3.z);
-  node.rel_power[1]         = __float_as_uint(v3.w);
+  node.rel_variance[0] = __float_as_uint(v3.x);
+  node.rel_variance[1] = __float_as_uint(v3.y);
+  node.rel_power[0]    = __float_as_uint(v3.z);
+  node.rel_power[1]    = __float_as_uint(v3.w);
 
   return node;
 }
