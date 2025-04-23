@@ -618,7 +618,7 @@ static uint16_t _light_tree_float_to_bfloat16(const float val, const bool round_
   } converter;
   converter.a = val;
 
-  if (round_up) {
+  if ((round_up && (val >= 0.0f)) || (!round_up && (val < 0.0f))) {
     converter.b += (1 << 16) - 1;
   }
 
@@ -685,7 +685,7 @@ static LuminaryResult _light_tree_create_new_linked_list(
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   info_message("======= 0x%08X LinkedListHeader =======", *list_index);
   info_message("MinBound: %f %f %f (%X %X %X)", min_bound.x, min_bound.y, min_bound.z, header.x, header.y, header.z);
-  info_message("Exp: %u %u %u", header.exp_x, header.exp_y, header.exp_z);
+  info_message("Exp: %d %d %d", header.exp_x, header.exp_y, header.exp_z);
   info_message("Intensity: %f (%X)", max_intensity, header.intensity);
   info_message("Light ID: %u", header.light_id);
   info_message("Meta: %u", header.meta);
@@ -725,6 +725,30 @@ static LuminaryResult _light_tree_create_new_linked_list(
       info_message("v1: %04X %04X %04X", section.v1_x[triangle_id], section.v1_y[triangle_id], section.v1_z[triangle_id]);
       info_message("v2: %04X %04X %04X", section.v2_x[triangle_id], section.v2_y[triangle_id], section.v2_z[triangle_id]);
       info_message("Intensity:  %X", section.intensity[triangle_id]);
+
+      {
+        const vec3 exp = {.x = exp2f(header.exp_x), .y = exp2f(header.exp_y), .z = exp2f(header.exp_z)};
+
+        const vec3 v0 = {
+          .x = section.v0_x[triangle_id] * exp.x + min_bound.x,
+          .y = section.v0_y[triangle_id] * exp.y + min_bound.y,
+          .z = section.v0_z[triangle_id] * exp.z + min_bound.z};
+
+        const vec3 v1 = {
+          .x = section.v1_x[triangle_id] * exp.x + min_bound.x,
+          .y = section.v1_y[triangle_id] * exp.y + min_bound.y,
+          .z = section.v1_z[triangle_id] * exp.z + min_bound.z};
+
+        const vec3 v2 = {
+          .x = section.v2_x[triangle_id] * exp.x + min_bound.x,
+          .y = section.v2_y[triangle_id] * exp.y + min_bound.y,
+          .z = section.v2_z[triangle_id] * exp.z + min_bound.z};
+
+        info_message("v0: (%f, %f, %f) => (%f, %f, %f)", fragment.v0.x, fragment.v0.y, fragment.v0.z, v0.x, v0.y, v0.z);
+        info_message("v1: (%f, %f, %f) => (%f, %f, %f)", fragment.v1.x, fragment.v1.y, fragment.v1.z, v1.x, v1.y, v1.z);
+        info_message("v2: (%f, %f, %f) => (%f, %f, %f)", fragment.v2.x, fragment.v2.y, fragment.v2.z, v2.x, v2.y, v2.z);
+      }
+
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
       cwork->new_fragments[cwork->triangles_ptr + triangle_id] = node.ptr + section_id * 4 + triangle_id;
