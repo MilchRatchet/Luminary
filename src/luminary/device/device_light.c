@@ -1301,9 +1301,91 @@ static void _light_tree_debug_output_export_binary_node(
   *vertex_offset = v_offset;
 }
 
-static void _light_tree_debug_output(LightTreeWork* work) {
+static LuminaryResult _light_tree_debug_output_export_lights(FILE* obj_file, FILE* mtl_file, LightTreeWork* work, uint32_t* vertex_offset) {
+  uint32_t num_chunks;
+  __FAILURE_HANDLE(array_get_num_elements(work->linked_lists, &num_chunks));
+
+  uint32_t linked_list_ptr = 0;
+
+  while (linked_list_ptr < num_chunks) {
+    const DeviceLightLinkedListHeader header = work->linked_lists[linked_list_ptr];
+    linked_list_ptr += (sizeof(DeviceLightLinkedListHeader) / sizeof(*work->linked_lists));
+
+    const vec3 base_point = {
+      .x = _light_tree_bfloat16_to_float(header.x),
+      .y = _light_tree_bfloat16_to_float(header.y),
+      .z = _light_tree_bfloat16_to_float(header.z)};
+    const vec3 exp = {.x = exp2f(header.exp_x), .y = exp2f(header.exp_y), .z = exp2f(header.exp_z)};
+
+    for (uint32_t section_id = 0; section_id < (header.meta & LIGHT_LINKED_LIST_META_NUM_SECTION); section_id++) {
+      const DeviceLightLinkedListSection section = *((DeviceLightLinkedListSection*) &(work->linked_lists[linked_list_ptr]));
+      linked_list_ptr += (sizeof(DeviceLightLinkedListSection) / sizeof(*work->linked_lists));
+
+      for (uint32_t tri_id = 0; tri_id < 4; tri_id++) {
+        const vec3 v0 = {
+          .x = section.v0_x[tri_id] * exp.x + base_point.x,
+          .y = section.v0_y[tri_id] * exp.y + base_point.y,
+          .z = section.v0_z[tri_id] * exp.z + base_point.z};
+
+        const vec3 v1 = {
+          .x = section.v1_x[tri_id] * exp.x + base_point.x,
+          .y = section.v1_y[tri_id] * exp.y + base_point.y,
+          .z = section.v1_z[tri_id] * exp.z + base_point.z};
+
+        const vec3 v2 = {
+          .x = section.v2_x[tri_id] * exp.x + base_point.x,
+          .y = section.v2_y[tri_id] * exp.y + base_point.y,
+          .z = section.v2_z[tri_id] * exp.z + base_point.z};
+
+        char buffer[4096];
+        int buffer_offset = 0;
+
+        uint32_t v_offset = *vertex_offset;
+
+        buffer_offset += sprintf(buffer + buffer_offset, "o Tri%u_%u\n", header.light_id, section_id * 4 + tri_id);
+
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", v0.x, v0.y, v0.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", v1.x, v1.y, v1.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", v2.x, v2.y, v2.z);
+
+        buffer_offset += sprintf(buffer + buffer_offset, "usemtl TriMTL%u\n", header.light_id);
+
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
+
+        fwrite(buffer, buffer_offset, 1, obj_file);
+
+        buffer_offset = 0;
+
+        buffer_offset += sprintf(buffer + buffer_offset, "newmtl TriMTL%u\n", header.light_id);
+        buffer_offset += sprintf(
+          buffer + buffer_offset, "Kd %f %f %f\n", (header.light_id & 0b100) ? 1.0f : 0.0f, (header.light_id & 0b10) ? 1.0f : 0.0f,
+          (header.light_id & 0b1) ? 1.0f : 0.0f);
+        buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 0.1f);
+
+        fwrite(buffer, buffer_offset, 1, mtl_file);
+
+        v_offset += 3;
+
+        *vertex_offset = v_offset;
+      }
+    }
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _light_tree_debug_output(LightTreeWork* work) {
   FILE* obj_file = fopen("LuminaryLightTree.obj", "wb");
+
+  if (!obj_file) {
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file LuminaryLightTree.obj.");
+  }
+
   FILE* mtl_file = fopen("LuminaryLightTree.mtl", "wb");
+
+  if (!mtl_file) {
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file LuminaryLightTree.mtl.");
+  }
 
   fwrite("LuminaryLightTree.mtl\n", 22, 1, mtl_file);
 
@@ -1313,8 +1395,12 @@ static void _light_tree_debug_output(LightTreeWork* work) {
     _light_tree_debug_output_export_binary_node(obj_file, mtl_file, work, i, &vertex_offset);
   }
 
+  __FAILURE_HANDLE(_light_tree_debug_output_export_lights(obj_file, mtl_file, work, &vertex_offset));
+
   fclose(obj_file);
   fclose(mtl_file);
+
+  return LUMINARY_SUCCESS;
 }
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
@@ -2080,7 +2166,7 @@ LuminaryResult light_tree_build(LightTree* tree, Device* device) {
   __FAILURE_HANDLE(_light_tree_collapse(&work));
   __FAILURE_HANDLE(_light_tree_finalize(tree, &work));
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
-  _light_tree_debug_output(&work);
+  __FAILURE_HANDLE(_light_tree_debug_output(&work));
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
   __FAILURE_HANDLE(_light_tree_clear_work(&work));
 

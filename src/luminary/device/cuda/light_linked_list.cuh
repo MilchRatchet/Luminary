@@ -55,7 +55,7 @@ __device__ uint32_t light_linked_list_resample(
   uint32_t selected_light_id = 0xFFFFFFFF;
 
   while (!reached_end) {
-    if (section_id >= (header.meta & (LIGHT_LINKED_LIST_META_HAS_NEXT - 1))) {
+    if (section_id >= (header.meta & LIGHT_LINKED_LIST_META_NUM_SECTION)) {
       if ((header.meta & LIGHT_LINKED_LIST_META_HAS_NEXT) == 0) {
         if (reference_ptr < num_references) {
           const LightLinkedListReference reference = stack[reference_ptr++];
