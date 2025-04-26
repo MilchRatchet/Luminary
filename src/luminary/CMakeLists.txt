@@ -239,6 +239,8 @@ endif()
 # Configure
 #=============================================================
 
+add_dependencies(Luminary GIT_STATE_HEADER)
+
 configure_file("${CMAKE_SOURCE_DIR}/src/luminary/config.h.in" "${CMAKE_SOURCE_DIR}/src/luminary/config.h")
 
 #=============================================================

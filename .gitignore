@@ -62,6 +62,7 @@ cachegrind.out.*
 
 # no cmake generated config.h file
 config.h
+git_state.h
 
 # no output from coverage analysis
 coverage

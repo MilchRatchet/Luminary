@@ -94,9 +94,9 @@ message("C Compiler:                    ||  ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COM
 message("C Flags:                       ||  ${CMAKE_C_FLAGS}")
 
 if (DEBUG)
-    message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
+  message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
 else()
-    message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
+  message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
 endif()
 
 #=============================================================
@@ -109,41 +109,27 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # Configure build information for executable
 #=============================================================
 
-set(GIT_COMMIT_DATE "Unknown")
-set(GIT_BRANCH_NAME "Unknown")
-set(GIT_COMMIT_HASH "Unknown")
+message(HALLO ${CMAKE_SOURCE_DIR})
 
-find_package(Git QUIET)
-if(GIT_FOUND)
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} log -1 --format=%cd
-        RESULT_VARIABLE RESULT
-        OUTPUT_VARIABLE GIT_COMMIT_DATE)
+ADD_CUSTOM_COMMAND(
+  OUTPUT ${CMAKE_SOURCE_DIR}/git_state.h
+         ${CMAKE_SOURCE_DIR}/git_state_cmake_dummy.h # Never actually produced which causes this to always run on every build
+  COMMAND ${CMAKE_COMMAND} -DGIT_STATE_TARGET_DIR="${CMAKE_SOURCE_DIR}" -P ${CMAKE_SOURCE_DIR}/cmake/QueryGitState.cmake
+)
 
-    string (REGEX REPLACE "\n" ""  GIT_COMMIT_DATE ${GIT_COMMIT_DATE})
-
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
-        RESULT_VARIABLE RESULT
-        OUTPUT_VARIABLE GIT_BRANCH_NAME)
-
-    string (REGEX REPLACE "\n" ""  GIT_BRANCH_NAME ${GIT_BRANCH_NAME})
-
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
-        RESULT_VARIABLE RESULT
-        OUTPUT_VARIABLE GIT_COMMIT_HASH)
-
-    string (REGEX REPLACE "\n" ""  GIT_COMMIT_HASH ${GIT_COMMIT_HASH})
-else()
-    message(SEND_ERROR "Failed to find git.")
-endif()
+add_custom_target(
+  GIT_STATE_HEADER
+  DEPENDS
+    ${CMAKE_SOURCE_DIR}/git_state.h
+    ${CMAKE_SOURCE_DIR}/git_state_cmake_dummy.h
+  COMMENT
+    "Target for Git State Header."
+)
 
 #=============================================================
 # Compile modules
 #=============================================================
 
 add_subdirectory(src)
-
 
 message("===================================================================")

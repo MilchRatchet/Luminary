@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 
+#include "../../git_state.h"
+
 ////////////////////////////////////////////////////////////////////
 // Luminary
 ////////////////////////////////////////////////////////////////////
@@ -15,11 +17,11 @@
   "${CMAKE_SYSTEM_NAME}" \
   " "                    \
   "${CMAKE_SYSTEM_VERSION}"
-#define LUMINARY_VERSION_DATE "${GIT_COMMIT_DATE}"
-#define LUMINARY_BRANCH_NAME "${GIT_BRANCH_NAME}"
+#define LUMINARY_VERSION_DATE GIT_COMMIT_DATE
+#define LUMINARY_BRANCH_NAME GIT_BRANCH_NAME
+#define LUMINARY_VERSION_HASH GIT_COMMIT_HASH
+#define LUMINARY_VERSION "${PROJECT_VERSION}"
 #define LUMINARY_CUDA_VERSION "${LUMINARY_CUDA_VERSION}"
 #define LUMINARY_OPTIX_VERSION "${LUMINARY_OPTIX_VERSION}"
-#define LUMINARY_VERSION_HASH "${GIT_COMMIT_HASH}"
-#define LUMINARY_VERSION "${PROJECT_VERSION}"
 
 #endif /* CONFIG_H */

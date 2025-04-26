@@ -39,6 +39,7 @@ target_link_libraries(LuminaryMD PRIVATE Luminary::Library)
 #=============================================================
 # Configure
 #=============================================================
+add_dependencies(LuminaryMD GIT_STATE_HEADER)
 
 configure_file("${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h.in" "${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h")
 
