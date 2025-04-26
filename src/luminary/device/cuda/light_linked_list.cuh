@@ -45,18 +45,18 @@ __device__ uint32_t light_linked_list_resample(
 
   bool reached_end = false;
 
-  DeviceLightLinkedListHeader header;
-  header.meta = 0;
-
-  vec3 base_point;
-  vec3 exp;
-  float max_intensity;
+  vec3 base_point      = get_vector(0.0f, 0.0f, 0.0f);
+  vec3 exp             = get_vector(0.0f, 0.0f, 0.0f);
+  float max_intensity  = 0.0f;
+  uint32_t light_id    = 0xFFFFFFFF;
+  uint32_t num_section = 0;
+  bool has_next        = false;
 
   uint32_t selected_light_id = 0xFFFFFFFF;
 
   while (!reached_end) {
-    if (section_id >= (header.meta & LIGHT_LINKED_LIST_META_NUM_SECTION)) {
-      if ((header.meta & LIGHT_LINKED_LIST_META_HAS_NEXT) == 0) {
+    if (section_id >= num_section) {
+      if (has_next == false) {
         if (reference_ptr < num_references) {
           const LightLinkedListReference reference = stack[reference_ptr++];
 
@@ -69,12 +69,15 @@ __device__ uint32_t light_linked_list_resample(
         }
       }
 
-      header = load_light_linked_list_header(linked_list_ptr);
+      const DeviceLightLinkedListHeader header = load_light_linked_list_header(linked_list_ptr);
       linked_list_ptr += (sizeof(DeviceLightLinkedListHeader) / sizeof(float4));
 
       base_point    = get_vector(_bfloat_to_float(header.x), _bfloat_to_float(header.y), _bfloat_to_float(header.z));
       exp           = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
       max_intensity = _bfloat_to_float(header.intensity);
+      light_id      = header.light_id;
+      num_section   = header.meta & LIGHT_LINKED_LIST_META_NUM_SECTIONS;
+      has_next      = (header.meta & LIGHT_LINKED_LIST_META_HAS_NEXT) != 0;
       section_id    = 0;
     }
 
@@ -83,24 +86,23 @@ __device__ uint32_t light_linked_list_resample(
 
 #pragma unroll
     for (uint32_t tri_id = 0; tri_id < 4; tri_id++) {
-      if (section.intensity == 0)
-        continue;
+      float intensity = 0.0f;
+      if (section.intensity[tri_id] > 0) {
+        vec3 v0 = get_vector(section.v0_x[tri_id], section.v0_y[tri_id], section.v0_z[tri_id]);
+        v0      = add_vector(mul_vector(v0, exp), base_point);
 
-      vec3 v0 = get_vector(section.v0_x[tri_id], section.v0_y[tri_id], section.v0_z[tri_id]);
-      v0      = add_vector(mul_vector(v0, exp), base_point);
+        vec3 v1 = get_vector(section.v1_x[tri_id], section.v1_y[tri_id], section.v1_z[tri_id]);
+        v1      = add_vector(mul_vector(v1, exp), base_point);
 
-      vec3 v1 = get_vector(section.v1_x[tri_id], section.v1_y[tri_id], section.v1_z[tri_id]);
-      v1      = add_vector(mul_vector(v1, exp), base_point);
+        vec3 v2 = get_vector(section.v2_x[tri_id], section.v2_y[tri_id], section.v2_z[tri_id]);
+        v2      = add_vector(mul_vector(v2, exp), base_point);
 
-      vec3 v2 = get_vector(section.v2_x[tri_id], section.v2_y[tri_id], section.v2_z[tri_id]);
-      v2      = add_vector(mul_vector(v2, exp), base_point);
-
-      float intensity = section.intensity[tri_id] * max_intensity;
-
-      intensity *= light_ltc_triangle_integral(ltc_matrix, include_diffuse, data.position, local_space, v0, v1, v2);
+        intensity = section.intensity[tri_id] * max_intensity;
+        intensity *= light_ltc_triangle_integral(ltc_matrix, include_diffuse, data.position, local_space, v0, v1, v2);
+      }
 
       if (ris_reservoir_add_sample(reservoir, intensity, linked_list_sampling_weight)) {
-        selected_light_id = header.light_id + section_id * 4 + tri_id;
+        selected_light_id = light_id + section_id * 4 + tri_id;
       }
     }
 

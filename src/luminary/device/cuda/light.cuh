@@ -238,7 +238,7 @@ __device__ float light_tree_traverse_pdf(
 
       if ((current_light_path & 0x7) == i) {
         selected_child         = i;
-        selected_child_is_leaf = ((i < 4) ? (node.rel_variance_leaf[0] >> (i * 8)) : (node.rel_variance_leaf[1] >> ((i - 4) * 8))) & 0x1;
+        selected_child_is_leaf = ((i < 4) ? (node.rel_variance[0] >> (i * 8)) : (node.rel_variance[1] >> ((i - 4) * 8))) & 0x1;
         child_pdf              = child_importance * one_over_sum;
       }
     }

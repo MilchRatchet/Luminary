@@ -661,6 +661,7 @@ static LuminaryResult _light_tree_create_new_linked_list(
   const uint32_t section_count = (node.light_count + 3) / 4;
 
   __DEBUG_ASSERT(section_count > 0);
+  __DEBUG_ASSERT(section_count == (section_count & LIGHT_LINKED_LIST_META_NUM_SECTIONS));
 
   DeviceLightLinkedListHeader header;
   header.light_id  = cwork->triangles_ptr;
@@ -1341,7 +1342,7 @@ static LuminaryResult _light_tree_debug_output_export_lights(FILE* obj_file, FIL
       .z = _light_tree_bfloat16_to_float(header.z)};
     const vec3 exp = {.x = exp2f(header.exp_x), .y = exp2f(header.exp_y), .z = exp2f(header.exp_z)};
 
-    for (uint32_t section_id = 0; section_id < (header.meta & LIGHT_LINKED_LIST_META_NUM_SECTION); section_id++) {
+    for (uint32_t section_id = 0; section_id < (header.meta & LIGHT_LINKED_LIST_META_NUM_SECTIONS); section_id++) {
       const DeviceLightLinkedListSection section = *((DeviceLightLinkedListSection*) &(work->linked_lists[linked_list_ptr]));
       linked_list_ptr += (sizeof(DeviceLightLinkedListSection) / sizeof(*work->linked_lists));
 

@@ -60,7 +60,7 @@ __device__ LTCMatrix light_ltc_load(const vec3 V, const float roughness_u, const
   const float phi_o_tmp  = atan2f(V.y, V.x);
   const float phi_o_tmp2 = flip_config ? (PI / 2.0f - phi_o_tmp) : phi_o_tmp;
   const float phi_o      = phi_o_tmp2 >= 0.0f ? phi_o_tmp2 : phi_o_tmp2 + 2.0f * PI;
-  const float u0         = ((flip_config ? roughness_v : roughness_u) - 1e-3f) / (1.0f - 1e-3);
+  const float u0         = ((flip_config ? roughness_v : roughness_u) - 1e-3f) / (1.0f - 1e-3f);
   const float u1         = flip_config ? roughness_u / roughness_v : roughness_v / roughness_u;
   const float u2         = theta_o / PI * 2.0f;
 
@@ -147,11 +147,11 @@ __device__ vec3 light_ltc_clip_edge(const vec3 a, const vec3 b) {
 
 __device__ void light_ltc_clip_triangle(vec3 v[4], uint32_t& n) {
   int config = 0;
-  if (v[0].z > 0.0)
+  if (v[0].z >= -eps)
     config += 1;
-  if (v[1].z > 0.0)
+  if (v[1].z >= -eps)
     config += 2;
-  if (v[2].z > 0.0)
+  if (v[2].z >= -eps)
     config += 4;
 
   // clip
