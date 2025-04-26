@@ -41,6 +41,8 @@ struct DeviceProperties {
   size_t memory_size;
   uint32_t major;
   uint32_t minor;
+  uint32_t sm_count;
+  size_t l2_cache_size;
 } typedef DeviceProperties;
 
 struct DeviceConstantMemoryDirtyProperties {

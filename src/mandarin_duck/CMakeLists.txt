@@ -37,6 +37,12 @@ target_link_libraries(LuminaryMD PRIVATE SDL3_ttf::SDL3_ttf)
 target_link_libraries(LuminaryMD PRIVATE Luminary::Library)
 
 #=============================================================
+# Configure
+#=============================================================
+
+configure_file("${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h.in" "${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h")
+
+#=============================================================
 # Print summary
 #=============================================================
 

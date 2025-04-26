@@ -3,6 +3,10 @@
 
 #include <stdlib.h>
 
+////////////////////////////////////////////////////////////////////
+// Luminary
+////////////////////////////////////////////////////////////////////
+
 #define LUMINARY_COMPILER  \
   "${CMAKE_C_COMPILER_ID}" \
   " "                      \
@@ -13,11 +17,9 @@
   "${CMAKE_SYSTEM_VERSION}"
 #define LUMINARY_VERSION_DATE "${GIT_COMMIT_DATE}"
 #define LUMINARY_BRANCH_NAME "${GIT_BRANCH_NAME}"
-#define LUMINARY_CUDA_VERSION    \
-  "${CUDAToolkit_VERSION_MAJOR}" \
-  "."                            \
-  "${CUDAToolkit_VERSION_MINOR}"
-#define LUMINARY_OPTIX_VERSION "${OptiX_VERSION}"
-#define LUMINARY_VERSION_HASH (uint64_t)(strtol("${GIT_COMMIT_HASH}", (char**) 0, 16))
+#define LUMINARY_CUDA_VERSION "${LUMINARY_CUDA_VERSION}"
+#define LUMINARY_OPTIX_VERSION "${LUMINARY_OPTIX_VERSION}"
+#define LUMINARY_VERSION_HASH "${GIT_COMMIT_HASH}"
+#define LUMINARY_VERSION "${PROJECT_VERSION}"
 
 #endif /* CONFIG_H */

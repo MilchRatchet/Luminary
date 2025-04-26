@@ -4,12 +4,11 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # Find packages
 #=============================================================
 
-find_package(CUDAToolkit 12.8 REQUIRED QUIET)
-find_package(Optix 8.0 REQUIRED QUIET)
+set(LUMINARY_CUDA_VERSION 12.8 CACHE INTERNAL "CUDA Version")
+set(LUMINARY_OPTIX_VERSION 8.0 CACHE INTERNAL "OptiX Version")
 
-if(NOT OptiX_VERSION)
-  set(OptiX_VERSION "8.0")
-endif()
+find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED QUIET)
+find_package(Optix ${LUMINARY_OPTIX_VERSION} REQUIRED QUIET)
 
 #=============================================================
 # Get source files
@@ -237,6 +236,12 @@ if(LUMINARY_MEMORY_DEBUG)
 endif()
 
 #=============================================================
+# Configure
+#=============================================================
+
+configure_file("${CMAKE_SOURCE_DIR}/src/luminary/config.h.in" "${CMAKE_SOURCE_DIR}/src/luminary/config.h")
+
+#=============================================================
 # Print summary
 #=============================================================
 
@@ -244,7 +249,9 @@ message("============================= Luminary ============================")
 message("CUDA Kernel Architectures      ||  ${kernel_archs}")
 message("Show CUDA Kernel Stats         ||  ${SHOW_KERNEL_STATS}")
 message("Verbose Memory Checking        ||  ${LUMINARY_MEMORY_DEBUG}")
+message("CUDA Toolkit Version:          ||  ${LUMINARY_CUDA_VERSION}")
 message("CUDA Toolkit Libraries:        ||  ${CUDAToolkit_LIBRARY_DIR}")
 message("CUDA Toolkit NVCC:             ||  ${CUDAToolkit_NVCC_EXECUTABLE}")
-message("Optix Include:                 ||  ${OptiX_INCLUDE}")
+message("OptiX Version:                 ||  ${LUMINARY_OPTIX_VERSION}")
+message("OptiX Include:                 ||  ${OptiX_INCLUDE}")
 message("CUDA Flags:                    ||  ${CUDA_KERNEL_FLAGS}")

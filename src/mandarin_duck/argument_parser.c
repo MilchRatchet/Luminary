@@ -32,25 +32,25 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
   uint32_t num_available_arguments;
   LUM_FAILURE_HANDLE(array_get_num_elements(parser->descriptors, &num_available_arguments));
 
-  printf("OVERVIEW: Mandarin Duck Frontend for Luminary\n\n");
+  info_message("OVERVIEW: Mandarin Duck Frontend for Luminary\n\n");
 
 #ifdef _WIN32
-  printf("USAGE: MandarinDuck.exe [options] file...\n\n");
+  info_message("USAGE: MandarinDuck.exe [options] file...\n\n");
 #else
-  printf("USAGE: MandarinDuck [options] file...\n\n");
+  info_message("USAGE: MandarinDuck [options] file...\n\n");
 #endif
 
-  printf("OPTIONS:\n");
+  info_message("OPTIONS:\n");
 
   for (uint32_t argument_id = 0; argument_id < num_available_arguments; argument_id++) {
     const ArgumentDescriptor* argument = parser->descriptors + argument_id;
 
-    printf("\t--%s", argument->long_name);
+    info_message("\t--%s", argument->long_name);
     if (argument->short_name) {
-      printf(", -%s", argument->short_name);
+      info_message(", -%s", argument->short_name);
     }
 
-    printf("\n\t\t%s\n", argument->description);
+    info_message("\n\t\t%s\n", argument->description);
   }
 
   parser->results.dry_run_requested = true;
@@ -73,9 +73,8 @@ static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHo
   UNUSED_ARG(num_arguments);
   UNUSED_ARG(arguments);
 
-  printf("Mandarin Duck Frontend\n");
-  printf("Luminary %s (Branch: %s)\n", LUMINARY_VERSION_DATE, LUMINARY_BRANCH_NAME);
-  printf("(%s, %s, CUDA %s, OptiX %s)\n", LUMINARY_COMPILER, LUMINARY_OS, LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
+  info_message("Mandarin Duck for Luminary %s", MANDARIN_DUCK_VERSION);
+  info_message("Build: %s (%s) - %s", MANDARIN_DUCK_BRANCH_NAME, MANDARIN_DUCK_VERSION_HASH, MANDARIN_DUCK_VERSION_DATE);
 
   parser->results.dry_run_requested = true;
 }

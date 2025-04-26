@@ -4,7 +4,7 @@ IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 ENDIF()
 
-project("Luminary" LANGUAGES C)
+project("Luminary" LANGUAGES C VERSION 1.0)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -106,12 +106,6 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 #=============================================================
-# Compile modules
-#=============================================================
-
-add_subdirectory(src)
-
-#=============================================================
 # Configure build information for executable
 #=============================================================
 
@@ -145,6 +139,11 @@ else()
     message(SEND_ERROR "Failed to find git.")
 endif()
 
-configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h")
+#=============================================================
+# Compile modules
+#=============================================================
+
+add_subdirectory(src)
+
 
 message("===================================================================")

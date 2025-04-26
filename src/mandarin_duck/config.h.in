@@ -1,0 +1,15 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include <stdlib.h>
+
+////////////////////////////////////////////////////////////////////
+// Mandarin Duck
+////////////////////////////////////////////////////////////////////
+
+#define MANDARIN_DUCK_VERSION_DATE "${GIT_COMMIT_DATE}"
+#define MANDARIN_DUCK_BRANCH_NAME "${GIT_BRANCH_NAME}"
+#define MANDARIN_DUCK_VERSION_HASH "${GIT_COMMIT_HASH}"
+#define MANDARIN_DUCK_VERSION "${PROJECT_VERSION}"
+
+#endif /* CONFIG_H */

@@ -100,8 +100,6 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 
   rect.w = rect.h * aspect_ratio;
 
-  info_message("Size: %d %d", rect.w, rect.h);
-
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetStringProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "MandarinDuck - Using Luminary");
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);

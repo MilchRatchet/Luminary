@@ -4,6 +4,7 @@
 
 #include "camera.h"
 #include "cloud.h"
+#include "config.h"
 #include "device_embedded.h"
 #include "device_light.h"
 #include "device_memory.h"
@@ -94,11 +95,15 @@ void _device_init(void) {
     crash_message("Failed to initialize CUDA.");
   }
 
+  info_message("Initialized CUDA %s", LUMINARY_CUDA_VERSION);
+
   OptixResult optix_result = optixInit();
 
   if (optix_result != OPTIX_SUCCESS) {
     crash_message("Failed to initialize OptiX.");
   }
+
+  info_message("Initialized OptiX %s", LUMINARY_OPTIX_VERSION);
 
   _device_memory_init();
 
@@ -159,8 +164,16 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   int minor;
   CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device->cuda_device));
 
-  props->major = (uint32_t) major;
-  props->minor = (uint32_t) minor;
+  int sm_count;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&sm_count, CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, device->cuda_device));
+
+  int l2_cache_size;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&l2_cache_size, CU_DEVICE_ATTRIBUTE_L2_CACHE_SIZE, device->cuda_device));
+
+  props->major         = (uint32_t) major;
+  props->minor         = (uint32_t) minor;
+  props->sm_count      = (uint32_t) sm_count;
+  props->l2_cache_size = (size_t) l2_cache_size;
 
   CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
 
@@ -295,6 +308,18 @@ static LuminaryResult _device_get_optix_properties(Device* device) {
   OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
     device->optix_ctx, OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING, &device->optix_properties.shader_execution_reordering,
     sizeof(device->optix_properties.shader_execution_reordering)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_print_info(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  info_message("[Device %u] %s", device->index, device->properties.name);
+  info_message(
+    "           sm_%u%u | %u SMs | %.1f GB VRAM | %.1f MB L2", device->properties.major, device->properties.minor,
+    device->properties.sm_count, device->properties.memory_size / (1024.0f * 1024.0f * 1024.0f),
+    device->properties.l2_cache_size / (1024.0f * 1024.0f));
 
   return LUMINARY_SUCCESS;
 }
@@ -763,6 +788,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  __FAILURE_HANDLE(_device_print_info(device));
 
   *_device = device;
 
