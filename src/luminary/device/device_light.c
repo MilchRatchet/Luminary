@@ -888,11 +888,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       }
 
       while (children_require_work) {
-        uint32_t loop_end = child_count;
-
         children_require_work = false;
 
-        for (uint64_t child_ptr = 0; child_ptr < loop_end; child_ptr++) {
+        for (uint64_t child_ptr = 0; child_ptr < 8; child_ptr++) {
           const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
           // If this child does not point to another binary node, then skip.
