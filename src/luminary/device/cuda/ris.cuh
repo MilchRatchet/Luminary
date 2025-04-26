@@ -60,9 +60,12 @@ __device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float ta
   reservoir.num_samples++;
 #endif  // RIS_COLLECT_SAMPLE_COUNT
 
+  if (weight == 0.0f)
+    return false;
+
   const float resampling_probability = weight / reservoir.sum_weight;
 
-  const bool sample_accepted = (reservoir.random <= resampling_probability);
+  const bool sample_accepted = (reservoir.random < resampling_probability);
 
   reservoir.selected_target = (sample_accepted) ? target : reservoir.selected_target;
   const float random_shift  = (sample_accepted) ? 0.0f : resampling_probability;
