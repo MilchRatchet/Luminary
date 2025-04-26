@@ -1452,17 +1452,6 @@ LuminaryResult light_tree_create(LightTree** tree) {
   ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(array_create(&(*tree)->integrator.tasks, sizeof(LightTreeIntegratorTask), 1024));
-  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.mesh_ids, sizeof(uint32_t) * 1024));
-  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.triangle_ids, sizeof(uint32_t) * 1024));
-  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.microtriangle_importance, sizeof(uint8_t) * 1024 * LIGHT_NUM_MICROTRIANGLES));
-  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.importance_normalization, sizeof(float) * 1024));
-  __FAILURE_HANDLE(host_malloc(&(*tree)->integrator.intensities, sizeof(float) * 1024));
-  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_mesh_ids, sizeof(uint32_t) * 1024));
-  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_triangle_ids, sizeof(uint32_t) * 1024));
-  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_microtriangle_importance, sizeof(uint8_t) * 1024 * LIGHT_NUM_MICROTRIANGLES));
-  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_importance_normalization, sizeof(float) * 1024));
-  __FAILURE_HANDLE(device_malloc(&(*tree)->integrator.device_intensities, sizeof(float) * 1024));
-  (*tree)->integrator.allocated_tasks = 1024;
 
   return LUMINARY_SUCCESS;
 }
@@ -1846,23 +1835,25 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
   // TODO: Optimize, this will only rarely run so it does not really matter for now
 
   if (num_tasks > tree->integrator.allocated_tasks) {
-    __FAILURE_HANDLE(host_free(&tree->integrator.mesh_ids));
-    __FAILURE_HANDLE(host_free(&tree->integrator.triangle_ids));
-    __FAILURE_HANDLE(host_free(&tree->integrator.microtriangle_importance));
-    __FAILURE_HANDLE(host_free(&tree->integrator.importance_normalization));
-    __FAILURE_HANDLE(host_free(&tree->integrator.intensities));
+    if (tree->integrator.allocated_tasks > 0) {
+      __FAILURE_HANDLE(host_free(&tree->integrator.mesh_ids));
+      __FAILURE_HANDLE(host_free(&tree->integrator.triangle_ids));
+      __FAILURE_HANDLE(host_free(&tree->integrator.microtriangle_importance));
+      __FAILURE_HANDLE(host_free(&tree->integrator.importance_normalization));
+      __FAILURE_HANDLE(host_free(&tree->integrator.intensities));
+
+      __FAILURE_HANDLE(device_free(&tree->integrator.device_mesh_ids));
+      __FAILURE_HANDLE(device_free(&tree->integrator.device_triangle_ids));
+      __FAILURE_HANDLE(device_free(&tree->integrator.device_microtriangle_importance));
+      __FAILURE_HANDLE(device_free(&tree->integrator.device_importance_normalization));
+      __FAILURE_HANDLE(device_free(&tree->integrator.device_intensities));
+    }
 
     __FAILURE_HANDLE(host_malloc(&tree->integrator.mesh_ids, sizeof(uint32_t) * num_tasks));
     __FAILURE_HANDLE(host_malloc(&tree->integrator.triangle_ids, sizeof(uint32_t) * num_tasks));
     __FAILURE_HANDLE(host_malloc(&tree->integrator.microtriangle_importance, sizeof(uint8_t) * num_tasks * LIGHT_NUM_MICROTRIANGLES));
     __FAILURE_HANDLE(host_malloc(&tree->integrator.importance_normalization, sizeof(float) * num_tasks));
     __FAILURE_HANDLE(host_malloc(&tree->integrator.intensities, sizeof(float) * num_tasks));
-
-    __FAILURE_HANDLE(device_free(&tree->integrator.device_mesh_ids));
-    __FAILURE_HANDLE(device_free(&tree->integrator.device_triangle_ids));
-    __FAILURE_HANDLE(device_free(&tree->integrator.device_microtriangle_importance));
-    __FAILURE_HANDLE(device_free(&tree->integrator.device_importance_normalization));
-    __FAILURE_HANDLE(device_free(&tree->integrator.device_intensities));
 
     __FAILURE_HANDLE(device_malloc(&tree->integrator.device_mesh_ids, sizeof(uint32_t) * num_tasks));
     __FAILURE_HANDLE(device_malloc(&tree->integrator.device_triangle_ids, sizeof(uint32_t) * num_tasks));
