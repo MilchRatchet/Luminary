@@ -56,6 +56,41 @@ static bool _device_manager_queue_entry_equal_operator(QueueEntry* left, QueueEn
 // Internal utility functions
 ////////////////////////////////////////////////////////////////////
 
+static LuminaryResult _device_manager_select_main_device(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
+
+  DeviceArch max_arch      = DEVICE_ARCH_UNKNOWN;
+  size_t max_memory        = 0;
+  uint32_t selected_device = 0xFFFFFFFF;
+
+  for (uint32_t device_id = 0; device_id < num_devices; device_id++) {
+    const Device* device = device_manager->devices[device_id];
+
+    if (device->state != DEVICE_STATE_ENABLED)
+      continue;
+
+    if ((device->properties.arch > max_arch) || (device->properties.arch == max_arch && device->properties.memory_size > max_memory)) {
+      max_arch   = device->properties.arch;
+      max_memory = device->properties.memory_size;
+
+      selected_device = device_id;
+    }
+  }
+
+  if (selected_device == 0xFFFFFFFF) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "No device could be selected as the main device.");
+  }
+
+  device_manager->main_device_index = selected_device;
+
+  __FAILURE_HANDLE(device_register_as_main(device_manager->devices[device_manager->main_device_index]));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManager* device_manager, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(object);
@@ -429,6 +464,64 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
   return LUMINARY_SUCCESS;
 }
 
+struct DeviceManagerEnableDeviceArgs {
+  uint32_t device_id;
+  bool enable;
+} typedef DeviceManagerEnableDeviceArgs;
+
+static LuminaryResult _device_manager_enable_device_clear_work(DeviceManager* device_manager, DeviceManagerEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerEnableDeviceArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_enable_device_queue_work(DeviceManager* device_manager, DeviceManagerEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  Device* device = device_manager->devices[args->device_id];
+
+  if (device->state == DEVICE_STATE_UNAVAILABLE && args->enable) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Tried to enable an unavailable device.");
+  }
+
+  const bool integration_dirty = ((device->state == DEVICE_STATE_ENABLED) == args->enable);
+
+  bool select_new_main_device = false;
+
+  if (device->is_main_device && args->enable == false) {
+    __FAILURE_HANDLE(device_unregister_as_main(device));
+    select_new_main_device = true;
+  }
+
+  __FAILURE_HANDLE(device_set_enable(device, args->enable));
+
+  if (select_new_main_device) {
+    __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
+  }
+
+  if (integration_dirty == false)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(scene_set_dirty_flags(device_manager->scene_device, SCENE_DIRTY_FLAG_INTEGRATION));
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name              = "Update device scene";
+  entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = true;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 struct DeviceManagerSetOutputPropertiesArgs {
   uint32_t width;
   uint32_t height;
@@ -628,34 +721,6 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_select_main_device(DeviceManager* device_manager) {
-  __CHECK_NULL_ARGUMENT(device_manager);
-
-  uint32_t num_devices;
-  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
-
-  DeviceArch max_arch      = DEVICE_ARCH_UNKNOWN;
-  size_t max_memory        = 0;
-  uint32_t selected_device = 0;
-
-  for (uint32_t device_id = 0; device_id < num_devices; device_id++) {
-    const Device* device = device_manager->devices[device_id];
-
-    if ((device->properties.arch > max_arch) || (device->properties.arch == max_arch && device->properties.memory_size > max_memory)) {
-      max_arch   = device->properties.arch;
-      max_memory = device->properties.memory_size;
-
-      selected_device = device_id;
-    }
-  }
-
-  device_manager->main_device_index = selected_device;
-
-  __FAILURE_HANDLE(device_register_as_main(device_manager->devices[device_manager->main_device_index]));
-
-  return LUMINARY_SUCCESS;
-}
-
 ////////////////////////////////////////////////////////////////////
 // API functions
 ////////////////////////////////////////////////////////////////////
@@ -812,6 +877,28 @@ LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
 
   // There could still be some unfinished work that was queued during shutdown, so execute that now.
   __FAILURE_HANDLE(_device_manager_queue_worker(device_manager));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_enable_device(DeviceManager* device_manager, uint32_t device_id, bool enable) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerEnableDeviceArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerEnableDeviceArgs), (void**) &args));
+
+  args->device_id = device_id;
+  args->enable    = enable;
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Enable device";
+  entry.function   = (QueueEntryFunction) _device_manager_enable_device_queue_work;
+  entry.clear_func = (QueueEntryFunction) _device_manager_enable_device_clear_work;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
   return LUMINARY_SUCCESS;
 }

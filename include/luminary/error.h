@@ -89,6 +89,11 @@ typedef uint64_t LuminaryResult;
 #define LUMINARY_ERROR_MISSING_DATA (12ull)
 
 /*
+ * Error due to specifying an invalid device.
+ */
+#define LUMINARY_ERROR_INVALID_DEVICE (13ull)
+
+/*
  * Error was propagated from an internal function returning an error.
  */
 #define LUMINARY_ERROR_PROPAGATED (0x8000000000000000ull)

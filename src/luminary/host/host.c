@@ -230,6 +230,29 @@ static LuminaryResult _host_save_png_queue_work(Host* host, HostSavePNGArgs* arg
   return LUMINARY_SUCCESS;
 }
 
+struct HostEnableDeviceArgs {
+  bool enable;
+  uint32_t device_id;
+} typedef HostEnableDeviceArgs;
+
+static LuminaryResult _host_enable_device_clear_work(Host* host, HostEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostEnableDeviceArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _host_enable_device_queue_work(Host* host, HostEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(device_manager_enable_device(host->device_manager, args->device_id, args->enable));
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
@@ -393,7 +416,7 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
   __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, &num_devices));
 
   if (device_id >= num_devices) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device ID exceeds number of devices.");
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Device ID exceeds number of devices.");
   }
 
   Device* device = host->device_manager->devices[device_id];
@@ -411,7 +434,52 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t device_id, bool enable) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, &num_devices));
+
+  if (device_id >= num_devices) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Device ID exceeds number of devices.");
+  }
+
+  Device* device = host->device_manager->devices[device_id];
+
+  // Device is already in the requested state
+  if ((device->state == DEVICE_STATE_ENABLED) == enable)
+    return LUMINARY_SUCCESS;
+
+  if (device->state == DEVICE_STATE_UNAVAILABLE) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Device is not available.");
+  }
+
+  // TODO: This needs to do the following: Queue a job that sets the state and then sets the Integration dirty flag.
+  device->state = (enable) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
+
+  HostEnableDeviceArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
+
+  args->enable    = enable;
+  args->device_id = device_id;
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Enabling device";
+  entry.function   = (QueueEntryFunction) _host_enable_device_queue_work;
+  entry.clear_func = (QueueEntryFunction) _host_enable_device_clear_work;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments wavefront_args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
   HostLoadObjArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
 

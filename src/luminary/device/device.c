@@ -682,6 +682,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   device->optix_callback_error = false;
   device->exit_requested       = false;
   device->is_main_device       = false;
+  device->state                = DEVICE_STATE_ENABLED;
 
   __FAILURE_HANDLE(_device_reset_constant_memory_dirty(device));
 
@@ -804,8 +805,12 @@ LuminaryResult device_register_as_main(Device* device) {
       LUMINARY_ERROR_API_EXCEPTION, "Device %s was registered as the main device but it is not available.", device->properties.name);
   }
 
+  if (device->state == DEVICE_STATE_DISABLED) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Device %s was registered as the main device but it is not enabled.", device->properties.name);
+  }
+
   device->is_main_device = true;
-  device->state          = DEVICE_STATE_ENABLED;
 
   return LUMINARY_SUCCESS;
 }
@@ -814,6 +819,18 @@ LuminaryResult device_unregister_as_main(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   device->is_main_device = false;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_set_enable(Device* device, bool enable) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  if (device->state == DEVICE_STATE_UNAVAILABLE && enable) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Tried to enable device %s but is is not available.", device->properties.name);
+  }
+
+  device->state = (enable) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
 
   return LUMINARY_SUCCESS;
 }

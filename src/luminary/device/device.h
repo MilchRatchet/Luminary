@@ -134,6 +134,7 @@ void _device_shutdown(void);
 LuminaryResult device_create(Device** device, uint32_t index);
 LuminaryResult device_register_as_main(Device* device);
 LuminaryResult device_unregister_as_main(Device* device);
+LuminaryResult device_set_enable(Device* device, bool enable);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);

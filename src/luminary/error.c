@@ -28,6 +28,8 @@ const char* luminary_result_to_string(LuminaryResult result) {
       return "Encountered an invalid state during debugging";
     case LUMINARY_ERROR_MISSING_DATA:
       return "Missing necessary embedded data";
+    case LUMINARY_ERROR_INVALID_DEVICE:
+      return "Specified invalid device";
     default:
       return "Unknown";
   }

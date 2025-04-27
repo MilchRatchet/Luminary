@@ -222,6 +222,10 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
                            .is_clickable = false});
     }
     window_pop_section(window);
+
+    if (device_info.is_unavailable == false && device_active != device_info.is_enabled) {
+      LUM_FAILURE_HANDLE(luminary_host_set_device_enable(host, device_id, device_active));
+    }
   }
 
   element_separator(

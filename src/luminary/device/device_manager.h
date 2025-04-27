@@ -50,6 +50,7 @@ struct DeviceManager {
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
+LuminaryResult device_manager_enable_device(DeviceManager* device_manager, uint32_t device_id, bool enable);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
 LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height);
 LuminaryResult device_manager_add_output_request(DeviceManager* device_manager, OutputRequestProperties properties);
