@@ -57,7 +57,6 @@ string(REPLACE "," ";" user_specified_archs ${LUMINARY_KERNEL_ARCHS})
 
 set(kernel_archs)
 foreach(user_specified_arch ${user_specified_archs})
-message(${user_specified_arch})
   if(${user_specified_arch} MATCHES "^sm_[0-9]+a?")
     list(APPEND kernel_archs ${user_specified_arch})
   else()

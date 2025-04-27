@@ -1149,6 +1149,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     work->fragments[i] = fragments_swap[cwork.new_fragments[i]];
   }
 
+  __FAILURE_HANDLE(host_free(&fragments_swap));
+
   __FAILURE_HANDLE(host_free(&cwork.node_paths));
   __FAILURE_HANDLE(host_free(&cwork.node_depths));
   __FAILURE_HANDLE(host_free(&cwork.new_fragments));

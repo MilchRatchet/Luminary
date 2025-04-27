@@ -109,8 +109,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # Configure build information for executable
 #=============================================================
 
-message(HALLO ${CMAKE_SOURCE_DIR})
-
 ADD_CUSTOM_COMMAND(
   OUTPUT ${CMAKE_SOURCE_DIR}/git_state.h
          ${CMAKE_SOURCE_DIR}/git_state_cmake_dummy.h # Never actually produced which causes this to always run on every build
