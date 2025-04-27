@@ -11,13 +11,20 @@ LuminaryResult sample_time_create(SampleTime** sample_time) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult sample_time_reset(SampleTime* sample_time) {
+  __CHECK_NULL_ARGUMENT(sample_time);
+
+  memset(sample_time->time, 0, sizeof(sample_time->time));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult sample_time_set_time(SampleTime* sample_time, uint32_t device_id, double time) {
   __CHECK_NULL_ARGUMENT(sample_time);
 
-  LUM_UNUSED(device_id);
+  __DEBUG_ASSERT(device_id < LUMINARY_MAX_NUM_DEVICES);
 
-  // TODO: Implement proper time keeping based on devices
-  sample_time->time = time;
+  sample_time->time[device_id] = time;
 
   return LUMINARY_SUCCESS;
 }
@@ -25,7 +32,13 @@ LuminaryResult sample_time_set_time(SampleTime* sample_time, uint32_t device_id,
 LuminaryResult sample_time_get_time(SampleTime* sample_time, double* time) {
   __CHECK_NULL_ARGUMENT(sample_time);
 
-  *time = sample_time->time;
+  double samples_per_ms = 0.0;
+
+  for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
+    samples_per_ms += (sample_time->time[device_id] > 0.0) ? 1.0 / sample_time->time[device_id] : 0.0;
+  }
+
+  *time = (samples_per_ms > 0.0) ? 1.0 / samples_per_ms : 0.0;
 
   return LUMINARY_SUCCESS;
 }

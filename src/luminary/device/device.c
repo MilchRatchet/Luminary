@@ -1607,6 +1607,9 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
 
   DEVICE_ASSERT_AVAILABLE
 
+  if (device->state != DEVICE_STATE_ENABLED)
+    return LUMINARY_SUCCESS;
+
   bool continuation_is_valid;
   __FAILURE_HANDLE(device_renderer_handle_callback(device->renderer, callback_data, &continuation_is_valid));
 
