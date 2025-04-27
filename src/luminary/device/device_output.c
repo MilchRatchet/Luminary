@@ -186,7 +186,7 @@ LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, b
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(does_output);
 
-  const uint32_t current_sample_count = device->sample_count.current_sample_count;
+  const uint32_t current_sample_count = device->aggregate_sample_count;
 
   bool generate_output = output->output_is_dirty;
 
@@ -225,7 +225,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   output->output_is_dirty = false;
 
-  const uint32_t current_sample_count = device->sample_count.current_sample_count;
+  const uint32_t current_sample_count = device->aggregate_sample_count;
 
   KernelArgsGenerateFinalImage generate_final_image_args;
 

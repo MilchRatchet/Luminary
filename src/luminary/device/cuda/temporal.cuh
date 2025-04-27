@@ -99,18 +99,14 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
 
   const float2 jitter = camera_get_jitter();
 
-  const float prev_scale     = device.state.sample_id;
-  const float curr_inv_scale = 1.0f / (device.state.sample_id + 1);
-
   const uint32_t bucket_sample_count = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
   const uint32_t bucket_id           = device.state.sample_id - bucket_sample_count * MAX_NUM_INDIRECT_BUCKETS;
+
+  const bool load_indirect_bucket = device.state.aggregate_sample_count >= MAX_NUM_INDIRECT_BUCKETS;
 
   float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
   float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
   float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
-
-  const float prev_indirect_scale     = bucket_sample_count;
-  const float curr_indirect_inv_scale = 1.0f / (bucket_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = device.settings.window_y + offset / width;
@@ -129,9 +125,7 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
       device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + pixel_id);
 
-    direct_output = scale_color(direct_output, prev_scale);
     direct_output = add_color(direct_output, direct_buffer);
-    direct_output = scale_color(direct_output, curr_inv_scale);
 
     store_RGBF(device.ptrs.frame_direct_accumulate, pixel_id, direct_output);
 
@@ -139,14 +133,14 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
     RGBF indirect_buffer = temporal_gather_pixel(
       device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
 
-    RGBF indirect_output;
-    indirect_output.r = __ldcs(indirect_bucket_ptr_red + pixel_id);
-    indirect_output.g = __ldcs(indirect_bucket_ptr_green + pixel_id);
-    indirect_output.b = __ldcs(indirect_bucket_ptr_blue + pixel_id);
+    RGBF indirect_output = splat_color(0.0f);
+    if (load_indirect_bucket) {
+      indirect_output.r = __ldcs(indirect_bucket_ptr_red + pixel_id);
+      indirect_output.g = __ldcs(indirect_bucket_ptr_green + pixel_id);
+      indirect_output.b = __ldcs(indirect_bucket_ptr_blue + pixel_id);
+    }
 
-    indirect_output = scale_color(indirect_output, prev_indirect_scale);
     indirect_output = add_color(indirect_output, indirect_buffer);
-    indirect_output = scale_color(indirect_output, curr_indirect_inv_scale);
 
     __stcs(indirect_bucket_ptr_red + pixel_id, indirect_output.r);
     __stcs(indirect_bucket_ptr_green + pixel_id, indirect_output.g);
@@ -259,7 +253,9 @@ LUMINARY_KERNEL void temporal_accumulation_output() {
   const uint32_t amount = width * height;
 
   float values[9 * MAX_NUM_INDIRECT_BUCKETS];
-  const uint32_t num_buckets_to_load = min(MAX_NUM_INDIRECT_BUCKETS, device.state.sample_id + 1);
+  const uint32_t num_buckets_to_load = min(MAX_NUM_INDIRECT_BUCKETS, device.state.aggregate_sample_count + 1);
+
+  const float normalization = 1.0f / (device.state.aggregate_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = device.settings.window_y + offset / width;
@@ -292,6 +288,8 @@ LUMINARY_KERNEL void temporal_accumulation_output() {
       output = add_color(output, direct);
     }
 
+    output = scale_color(output, normalization);
+
     store_RGBF(device.ptrs.frame_current_result, x + y * device.settings.width, output);
   }
 }
@@ -304,8 +302,8 @@ LUMINARY_KERNEL void temporal_accumulation_output_raw() {
 
   const uint32_t amount = width * height;
 
-  const uint32_t num_buckets = min(MAX_NUM_INDIRECT_BUCKETS, device.state.sample_id + 1);
-  const float bucket_norm    = 1.0f / num_buckets;
+  const uint32_t num_buckets = min(MAX_NUM_INDIRECT_BUCKETS, device.state.aggregate_sample_count + 1);
+  const float normalization  = 1.0f / (device.state.aggregate_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = device.settings.window_y + offset / width;
@@ -324,13 +322,13 @@ LUMINARY_KERNEL void temporal_accumulation_output_raw() {
       output = add_color(output, indirect_output);
     }
 
-    output = scale_color(output, bucket_norm);
-
     if (device.camera.indirect_only == false) {
       const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + pixel_id);
 
       output = add_color(output, direct);
     }
+
+    output = scale_color(output, normalization);
 
     store_RGBF(device.ptrs.frame_current_result, pixel_id, output);
   }
@@ -346,8 +344,8 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
 
   const float2 jitter = camera_get_jitter();
 
-  const float prev_scale     = device.state.sample_id;
-  const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
+  const float prev_scale     = device.state.aggregate_sample_count;
+  const float curr_inv_scale = 1.0f / (device.state.aggregate_sample_count + 1.0f);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = device.settings.window_y + offset / width;

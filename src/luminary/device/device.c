@@ -936,6 +936,9 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.undersampling), device->undersampling_state, 1,
     device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.aggregate_sample_count), device->aggregate_sample_count, 1,
+    device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1586,7 +1589,8 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
-  device->gbuffer_meta_state = GBUFFER_META_STATE_NOT_READY;
+  device->aggregate_sample_count = 0;
+  device->gbuffer_meta_state     = GBUFFER_META_STATE_NOT_READY;
   uint32_t renderer_event_id;
 
   __FAILURE_HANDLE(device_sync_constant_memory(device));
@@ -1595,7 +1599,7 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
   __FAILURE_HANDLE(device_post_apply(device->post, device));
   __FAILURE_HANDLE(device_renderer_get_latest_event_id(device->renderer, &renderer_event_id));
-  __FAILURE_HANDLE(device_output_generate_output(device->output, device, renderer_event_id))
+  __FAILURE_HANDLE(device_output_generate_output(device->output, device, renderer_event_id));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1622,16 +1626,15 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
   uint32_t new_undersampling_state;
   __FAILURE_HANDLE(_device_update_get_next_undersampling_state(device, &new_undersampling_state));
 
-  // If undersampling state is now 0, we thus have now exactly one sample per pixel, we must increment sample id, else
-  // we would recompute this sample now.
-  if ((new_undersampling_state == 0) && ((device->undersampling_state & ~UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0)) {
+  if (new_undersampling_state == 0) {
     device->sample_count.current_sample_count++;
+    device->aggregate_sample_count++;
   }
 
   __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
 
   // The first sample output is always queued directly, don't queue again.
-  if ((device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0) {
+  if ((device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0 && device->is_main_device) {
     bool does_output;
     __FAILURE_HANDLE(device_output_will_output(device->output, device, &does_output));
 

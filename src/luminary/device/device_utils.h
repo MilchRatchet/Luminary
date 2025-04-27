@@ -347,6 +347,7 @@ struct DeviceExecutionState {
   uint16_t user_selected_y;
   uint8_t depth;
   uint8_t undersampling;
+  uint32_t aggregate_sample_count;
 } typedef DeviceExecutionState;
 
 enum DeviceConstantMemoryMember {

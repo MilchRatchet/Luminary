@@ -75,6 +75,7 @@ struct Device {
   DeviceOptixProperties optix_properties;
   SampleCountSlice sample_count;
   uint32_t undersampling_state;
+  uint32_t aggregate_sample_count;
   bool exit_requested;
   bool optix_callback_error;
   bool is_main_device;
