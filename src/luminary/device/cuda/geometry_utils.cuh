@@ -20,16 +20,17 @@ __device__ vec3 geometry_compute_normal(
     face_normal = scale_vector(face_normal, -1.0f);
 
   if (normal_tex != TEXTURE_NONE) {
-    const float4 normal_f = texture_load(load_texture_object(normal_tex), tex_coords);
+    // TODO: Flip V based on a material flag that specifies if the texture is OpenGL or DirectX format.
+    const float4 normal_f = texture_load(load_texture_object(normal_tex), get_uv(tex_coords.u, 1.0f - tex_coords.v), true, false);
 
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
     map_normal = scale_vector(map_normal, 2.0f);
     map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
 
-    Mat3x3 tangent_space = cotangent_frame(normal, e1, e2, e1_tex, e2_tex);
+    const Quaternion q = quaternion_rotation_to_z_canonical(normal);
 
-    normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+    normal = quaternion_apply(quaternion_inverse(q), map_normal);
   }
 
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
