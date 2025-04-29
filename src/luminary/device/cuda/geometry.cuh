@@ -15,6 +15,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t offset          = get_task_address(task_offset + i);
     DeviceTask task                = task_load(offset);
     TriangleHandle triangle_handle = triangle_handle_load(offset);
@@ -98,6 +100,8 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
   const int task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t offset          = get_task_address(i);
     DeviceTask task                = task_load(offset);
     TriangleHandle triangle_handle = triangle_handle_load(offset);

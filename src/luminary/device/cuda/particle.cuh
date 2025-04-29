@@ -13,6 +13,8 @@ LUMINARY_KERNEL void particle_process_tasks() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t offset       = get_task_address(task_offset + i);
     DeviceTask task             = task_load(offset);
     const TriangleHandle handle = triangle_handle_load(offset);
@@ -54,6 +56,8 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
   const uint16_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_PARTICLE];
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t offset       = get_task_address(task_offset + i);
     DeviceTask task             = task_load(offset);
     const TriangleHandle handle = triangle_handle_load(offset);

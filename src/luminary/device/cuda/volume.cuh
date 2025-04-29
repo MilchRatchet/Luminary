@@ -39,6 +39,8 @@ LUMINARY_KERNEL void volume_process_events() {
   uint16_t sky_task_count      = 0;
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const int offset      = get_task_address(i);
     DeviceTask task       = task_load(offset);
     float depth           = trace_depth_load(offset);
@@ -179,6 +181,8 @@ LUMINARY_KERNEL void volume_process_tasks() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t offset       = get_task_address(task_offset + i);
     DeviceTask task             = task_load(offset);
     const TriangleHandle handle = triangle_handle_load(offset);

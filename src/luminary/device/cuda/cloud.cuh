@@ -317,6 +317,8 @@ LUMINARY_KERNEL void cloud_process_tasks() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const int offset         = get_task_address(i);
     DeviceTask task          = task_load(offset);
     float depth              = trace_depth_load(offset);

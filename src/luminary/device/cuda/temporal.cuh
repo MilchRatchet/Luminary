@@ -58,6 +58,8 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
   float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
@@ -109,6 +111,8 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
@@ -258,6 +262,8 @@ LUMINARY_KERNEL void temporal_accumulation_output() {
   const float normalization = 1.0f / (device.state.aggregate_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
@@ -306,6 +312,8 @@ LUMINARY_KERNEL void temporal_accumulation_output_raw() {
   const float normalization  = 1.0f / (device.state.aggregate_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
@@ -348,6 +356,8 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
   const float curr_inv_scale = 1.0f / (device.state.aggregate_sample_count + 1.0f);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
