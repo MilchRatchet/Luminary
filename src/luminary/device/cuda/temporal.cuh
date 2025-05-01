@@ -289,6 +289,9 @@ LUMINARY_KERNEL void temporal_accumulation_output() {
     }
     output.b = temporal_apply_median_of_means(values, num_buckets);
 
+    // We have a mean estimate of the buckets, but the buckets are a partition of the samples so we need to scale the result.
+    output = scale_color(output, MAX_NUM_INDIRECT_BUCKETS);
+
     if (device.camera.indirect_only == false) {
       const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + x + y * device.settings.width);
 
