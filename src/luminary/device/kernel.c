@@ -59,11 +59,11 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "camera_post_lens_flare_ghosts", .param_size = sizeof(KernelArgsCameraPostLensFlareGhosts)},
   [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO] =
     {.name = "camera_post_lens_flare_halo", .param_size = sizeof(KernelArgsCameraPostLensFlareHalo)},
-  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4]      = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
-  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]       = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
-  [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] = {
-    .name       = "omm_gather_array_format_4",
-    .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)}};
+  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4] = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
+  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]  = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
+  [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] =
+    {.name = "omm_gather_array_format_4", .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)},
+  [CUDA_KERNEL_TYPE_BUFFER_ADD] = {.name = "buffer_add", .param_size = sizeof(KernelArgsBufferAdd)}};
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 
 LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type) {

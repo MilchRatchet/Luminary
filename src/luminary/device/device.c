@@ -170,10 +170,14 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   int l2_cache_size;
   CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&l2_cache_size, CU_DEVICE_ATTRIBUTE_L2_CACHE_SIZE, device->cuda_device));
 
-  props->major         = (uint32_t) major;
-  props->minor         = (uint32_t) minor;
-  props->sm_count      = (uint32_t) sm_count;
-  props->l2_cache_size = (size_t) l2_cache_size;
+  int max_block_count;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&max_block_count, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X, device->cuda_device));
+
+  props->major           = (uint32_t) major;
+  props->minor           = (uint32_t) minor;
+  props->sm_count        = (uint32_t) sm_count;
+  props->l2_cache_size   = (size_t) l2_cache_size;
+  props->max_block_count = (uint32_t) max_block_count;
 
   CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
 
@@ -889,6 +893,17 @@ LuminaryResult device_load_embedded_data(Device* device) {
   __FAILURE_HANDLE(_device_load_moon_textures(device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_get_internal_resolution(Device* device, uint32_t* width, uint32_t* height) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(width);
+  __CHECK_NULL_ARGUMENT(height);
+
+  *width  = device->constant_memory->settings.width;
+  *height = device->constant_memory->settings.height;
 
   return LUMINARY_SUCCESS;
 }
@@ -1662,6 +1677,26 @@ LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackDat
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_renderer_update_render_time(device->renderer, callback_data->render_event_id));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(interface);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  if (device->is_main_device) {
+    __FAILURE_HANDLE(device_result_interface_gather_results(interface, device));
+  }
+  else {
+    __FAILURE_HANDLE(device_result_interface_queue_result(interface, device));
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

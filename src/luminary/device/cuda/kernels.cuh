@@ -453,4 +453,35 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
   }
 }
 
+LUMINARY_KERNEL void buffer_add(const KernelArgsBufferAdd args) {
+  static_assert(THREADS_PER_BLOCK == 128, "This assumes this threads per blocks value.");
+  uint32_t offset = args.base_offset + THREAD_ID * 4;
+
+  if (offset >= args.num_elements)
+    return;
+
+  if (offset + 4 >= args.num_elements) {
+    for (; offset < args.num_elements; offset++) {
+      const float src_data = __ldcs(args.src + offset);
+      float dst_data       = __ldcs(args.dst + offset);
+
+      dst_data += src_data;
+
+      __stwt(args.dst + offset, dst_data);
+    }
+
+    return;
+  }
+
+  const float4 src_data = __ldcs((float4*) (args.src + offset));
+  float4 dst_data       = __ldcs((float4*) (args.dst + offset));
+
+  dst_data.x += src_data.x;
+  dst_data.y += src_data.y;
+  dst_data.z += src_data.z;
+  dst_data.w += src_data.w;
+
+  __stwt((float4*) (args.dst + offset), dst_data);
+}
+
 #endif /* CU_KERNELS_H */

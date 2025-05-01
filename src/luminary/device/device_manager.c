@@ -175,6 +175,7 @@ static LuminaryResult _device_manager_handle_device_render_continue(DeviceManage
 
   Device* device = device_manager->devices[data->common.device_index];
 
+  __FAILURE_HANDLE(device_handle_result_sharing(device, device_manager->result_interface));
   __FAILURE_HANDLE(device_continue_render(device, &device_manager->sample_count, data));
 
   return LUMINARY_SUCCESS;
@@ -405,7 +406,11 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       __FAILURE_HANDLE_CRITICAL(device_allocate_work_buffers(device));
     }
 
-    // TODO: Reallocate buffers on all devices
+    uint32_t width;
+    uint32_t height;
+    __FAILURE_HANDLE(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
+
+    __FAILURE_HANDLE(device_result_interface_set_pixel_count(device_manager->result_interface, width, height))
   }
 
   if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
@@ -758,6 +763,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
 
+  __FAILURE_HANDLE(device_result_interface_create(&device_manager->result_interface));
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
   __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
@@ -1050,6 +1056,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
+
+  __FAILURE_HANDLE(device_result_interface_destroy(&(*device_manager)->result_interface));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));

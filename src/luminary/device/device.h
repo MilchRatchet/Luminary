@@ -11,6 +11,7 @@
 #include "device_particle.h"
 #include "device_post.h"
 #include "device_renderer.h"
+#include "device_result_interface.h"
 #include "device_sky.h"
 #include "device_staging_manager.h"
 #include "device_utils.h"
@@ -43,6 +44,7 @@ struct DeviceProperties {
   uint32_t minor;
   uint32_t sm_count;
   size_t l2_cache_size;
+  uint32_t max_block_count;
 } typedef DeviceProperties;
 
 struct DeviceConstantMemoryDirtyProperties {
@@ -138,6 +140,7 @@ LuminaryResult device_unregister_as_main(Device* device);
 LuminaryResult device_set_enable(Device* device, bool enable);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
+LuminaryResult device_get_internal_resolution(Device* device, uint32_t* width, uint32_t* height);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
 LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y);
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
@@ -171,6 +174,7 @@ LuminaryResult device_add_output_request(Device* device, OutputRequestProperties
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
 LuminaryResult device_query_gbuffer_meta(Device* device);

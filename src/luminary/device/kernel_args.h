@@ -3,6 +3,13 @@
 
 #include "device_utils.h"
 
+struct KernelArgsBufferAdd {
+  float* dst;
+  const float* src;
+  uint32_t base_offset;
+  uint32_t num_elements;
+} typedef KernelArgsBufferAdd;
+
 struct KernelArgsBSDFGenerateSSLUT {
   uint16_t* dst;
 } typedef KernelArgsBSDFGenerateSSLUT;
