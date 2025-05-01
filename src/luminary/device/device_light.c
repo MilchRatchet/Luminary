@@ -2237,16 +2237,19 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
-  __FAILURE_HANDLE(host_free(&(*tree)->integrator.mesh_ids));
-  __FAILURE_HANDLE(host_free(&(*tree)->integrator.triangle_ids));
-  __FAILURE_HANDLE(host_free(&(*tree)->integrator.microtriangle_importance));
-  __FAILURE_HANDLE(host_free(&(*tree)->integrator.importance_normalization));
-  __FAILURE_HANDLE(host_free(&(*tree)->integrator.intensities));
-  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_mesh_ids));
-  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_triangle_ids));
-  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_microtriangle_importance));
-  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_importance_normalization));
-  __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_intensities));
+
+  if ((*tree)->integrator.allocated_tasks > 0) {
+    __FAILURE_HANDLE(host_free(&(*tree)->integrator.mesh_ids));
+    __FAILURE_HANDLE(host_free(&(*tree)->integrator.triangle_ids));
+    __FAILURE_HANDLE(host_free(&(*tree)->integrator.microtriangle_importance));
+    __FAILURE_HANDLE(host_free(&(*tree)->integrator.importance_normalization));
+    __FAILURE_HANDLE(host_free(&(*tree)->integrator.intensities));
+    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_mesh_ids));
+    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_triangle_ids));
+    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_microtriangle_importance));
+    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_importance_normalization));
+    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_intensities));
+  }
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.meshes));
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.instances));
