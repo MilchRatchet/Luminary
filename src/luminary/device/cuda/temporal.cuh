@@ -51,7 +51,8 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const float2 jitter = camera_get_jitter();
 
-  const uint32_t bucket_id = 0;
+  const uint32_t bucket_sample_count = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
+  const uint32_t bucket_id           = device.state.sample_id - bucket_sample_count * MAX_NUM_INDIRECT_BUCKETS;
 
   float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
   float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];

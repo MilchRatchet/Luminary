@@ -1499,13 +1499,9 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
 
   DEVICE_ASSERT_AVAILABLE
 
-  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
   if (device->sample_count.current_sample_count == device->sample_count.end_sample_count) {
     __FAILURE_HANDLE(sample_count_get_slice(sample_count, 32, &device->sample_count));
   }
-
-  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
 }
@@ -1621,10 +1617,13 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data) {
+LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid) {
   __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(callback_data);
 
   DEVICE_ASSERT_AVAILABLE
+
+  *is_valid = false;
 
   if (device->state != DEVICE_STATE_ENABLED)
     return LUMINARY_SUCCESS;
@@ -1632,9 +1631,20 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
   bool continuation_is_valid;
   __FAILURE_HANDLE(device_renderer_handle_callback(device->renderer, callback_data, &continuation_is_valid));
 
-  if (!continuation_is_valid) {
+  if (!continuation_is_valid)
     return LUMINARY_SUCCESS;
-  }
+
+  *is_valid = true;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sample_count);
+  __CHECK_NULL_ARGUMENT(callback_data);
+
+  DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
@@ -1660,6 +1670,18 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
   }
 
   device->undersampling_state = new_undersampling_state;
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_continue_render(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
 

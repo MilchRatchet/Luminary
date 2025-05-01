@@ -172,7 +172,9 @@ LuminaryResult device_update_output_properties(Device* device, uint32_t width, u
 LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera);
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
-LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid);
+LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);
 LuminaryResult device_set_abort(Device* device);

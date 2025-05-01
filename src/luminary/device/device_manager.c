@@ -175,8 +175,15 @@ static LuminaryResult _device_manager_handle_device_render_continue(DeviceManage
 
   Device* device = device_manager->devices[data->common.device_index];
 
+  bool callback_is_valid = false;
+  __FAILURE_HANDLE(device_validate_render_callback(device, data, &callback_is_valid));
+
+  if (callback_is_valid == false)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(device_finish_render_iteration(device, &device_manager->sample_count, data));
   __FAILURE_HANDLE(device_handle_result_sharing(device, device_manager->result_interface));
-  __FAILURE_HANDLE(device_continue_render(device, &device_manager->sample_count, data));
+  __FAILURE_HANDLE(device_continue_render(device));
 
   return LUMINARY_SUCCESS;
 }

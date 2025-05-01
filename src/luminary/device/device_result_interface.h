@@ -13,8 +13,8 @@ struct DeviceResultEntry {
   STAGING void* indirect_lighting_results_red[MAX_NUM_INDIRECT_BUCKETS];
   STAGING void* indirect_lighting_results_green[MAX_NUM_INDIRECT_BUCKETS];
   STAGING void* indirect_lighting_results_blue[MAX_NUM_INDIRECT_BUCKETS];
-  CUevent download_event;
-  CUevent upload_event;
+  CUevent available_event;
+  uint32_t consumer_event_id;
   bool queued;
 } typedef DeviceResultEntry;
 
@@ -23,11 +23,17 @@ struct DeviceResultMap {
   uint32_t allocation_id;
 } typedef DeviceResultMap;
 
+struct DeviceResultEvent {
+  CUevent event;
+  bool assigned;
+} typedef DeviceResultEvent;
+
 struct DeviceResultInterface {
   Mutex* mutex;
   uint32_t pixel_count;
   ARRAY DeviceResultMap* queued_results;
   ARRAY DeviceResultEntry* allocated_results[LUMINARY_MAX_NUM_DEVICES];
+  ARRAY DeviceResultEvent* allocated_events;
 } typedef DeviceResultInterface;
 
 LuminaryResult device_result_interface_create(DeviceResultInterface** interface);
