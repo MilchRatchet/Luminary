@@ -27,6 +27,9 @@
 #define LIGHT_TREE_LINKED_LIST_NULL 0xFFFFFFFF
 #define LIGHT_LINKED_LIST_META_HAS_NEXT (0x80)
 #define LIGHT_LINKED_LIST_META_NUM_SECTIONS (LIGHT_LINKED_LIST_META_HAS_NEXT - 1)
+#define LIGHT_TREE_META_HAS_NEXT (0x80)
+#define LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG (2)
+#define LIGHT_TREE_CHILD_OFFSET_STRIDE (1 << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG)
 #define LIGHT_NUM_MICROTRIANGLES 64
 
 #define UNDERSAMPLING_FIRST_SAMPLE_MASK 0x80
@@ -257,6 +260,28 @@ struct DeviceLightTreeNode {
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
 
+struct DeviceLightTreeNodeHeader {
+  uint16_t child_and_light_ptr[3];  // First 3 bytes is relative child ptr and second 3 bytes is light ptr
+  uint16_t x;
+  uint16_t y;
+  uint16_t z;
+  int8_t exp_x;
+  int8_t exp_y;
+  int8_t exp_z;
+  int8_t exp_variance;
+} typedef DeviceLightTreeNodeHeader;
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeHeader, 0x10);
+
+struct DeviceLightTreeNodeSection {
+  uint8_t meta;
+  uint8_t rel_mean_x[3];
+  uint8_t rel_mean_y[3];
+  uint8_t rel_mean_z[3];
+  uint8_t rel_variance[3];
+  uint8_t rel_power[3];
+} typedef DeviceLightTreeNodeSection;
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeSection, 0x10);
+
 struct DeviceLightLinkedListHeader {
   uint32_t light_id;
   uint16_t x;
@@ -327,7 +352,7 @@ struct DevicePointers {
   DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
   DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
   DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
-  DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
+  DEVICE const DeviceLightTreeNodeHeader* LUM_RESTRICT light_tree_nodes;
   DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
   DEVICE const float* LUM_RESTRICT light_importance_normalization;
   DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;

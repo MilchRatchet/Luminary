@@ -26,37 +26,15 @@ __device__ PackedProb light_tree_pack_probability(const float p) {
   return (PackedProb) (data >> 12);
 }
 
-__device__ void light_tree_child_importance(
-  const LightSGData data, const vec3 position, const vec3 normal, const DeviceLightTreeNode node, const vec3 exp, const float exp_v,
-  float importance[8], const uint32_t i) {
-  const bool lower_data = (i < 4);
-  const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
+__device__ float light_tree_child_importance(
+  const LightSGData data, const vec3 position, const vec3 normal, const DeviceLightTreeNodeSection section, const vec3 base, const vec3 exp,
+  const float exp_v, const uint32_t i) {
+  const float power    = (float) section.rel_power[i];
+  const float variance = section.rel_variance[i] * exp_v;
 
-  const uint32_t rel_power = lower_data ? node.rel_power[0] : node.rel_power[1];
+  const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
 
-  float power = (float) ((rel_power >> shift) & 0xFF);
-
-  // This means this is a NULL node.
-  if (power == 0.0f) {
-    importance[i] = 0.0f;
-    return;
-  }
-
-  const uint32_t rel_variance = lower_data ? node.rel_variance[0] : node.rel_variance[1];
-
-  float variance;
-  variance = (rel_variance >> shift) & 0xFF;
-  variance = variance * exp_v;
-
-  const uint32_t rel_mean_x = lower_data ? node.rel_mean_x[0] : node.rel_mean_x[1];
-  const uint32_t rel_mean_y = lower_data ? node.rel_mean_y[0] : node.rel_mean_y[1];
-  const uint32_t rel_mean_z = lower_data ? node.rel_mean_z[0] : node.rel_mean_z[1];
-
-  vec3 mean;
-  mean = get_vector((rel_mean_x >> shift) & 0xFF, (rel_mean_y >> shift) & 0xFF, (rel_mean_z >> shift) & 0xFF);
-  mean = add_vector(mul_vector(mean, exp), node.base_mean);
-
-  importance[i] = fmaxf(light_sg_evaluate(data, position, normal, mean, variance, power), 0.0f);
+  return fmaxf(light_sg_evaluate(data, position, normal, mean, variance, power), 0.0f);
 }
 
 __device__ void light_tree_traverse(
@@ -64,72 +42,90 @@ __device__ void light_tree_traverse(
   LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES], uint32_t& stack_ptr) {
   random = random_saturate(random);
 
-  float importance[8];
+  uint32_t node_ptr     = 0xFFFFFFFF;
+  uint32_t section_id   = 0;
+  uint32_t light_ptr    = 0xFFFFFFFF;
+  uint32_t child_ptr    = 0xFFFFFFFF;
+  uint32_t selected_ptr = 0;
 
-  DeviceLightTreeNode node = load_light_tree_node(0);
-  float probability        = 1.0f;
+  vec3 base   = get_vector(0.0f, 0.0f, 0.0f);
+  vec3 exp    = get_vector(0.0f, 0.0f, 0.0f);
+  float exp_v = 0.0f;
 
-  while (node.child_ptr != 0xFFFFFFFF) {
-    // Only push if this node references a valid light list
-    if (node.light_ptr != 0xFFFFFFFF) {
+  float sampling_weight = 1.0f;
+
+  bool has_next = false;
+
+  bool has_reached_end = false;
+
+  RISReservoir reservoir = ris_reservoir_init(random);
+
+  while (!has_reached_end) {
+    if (has_next == false) {
+      if (selected_ptr != 0xFFFFFFFF) {
+        node_ptr = selected_ptr;
+
+        selected_ptr = 0xFFFFFFFF;
+
+        sampling_weight *= ris_reservoir_get_sampling_weight(reservoir);
+        ris_reservoir_reset(reservoir);
+      }
+      else {
+        has_reached_end = true;
+        break;
+      }
+
+      if (node_ptr == 0xFFFFFFFF) {
+        has_reached_end = true;
+        break;
+      }
+
+      const DeviceLightTreeNodeHeader header = device.ptrs.light_tree_nodes[node_ptr];
+
+      base       = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
+      exp        = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
+      exp_v      = exp2f(header.exp_variance);
+      child_ptr  = ((uint32_t) header.child_and_light_ptr[0]) | (((uint32_t) header.child_and_light_ptr[1] & 0x00FF) << 16);
+      light_ptr  = ((uint32_t) header.child_and_light_ptr[2]) | (((uint32_t) header.child_and_light_ptr[1] & 0xFF00) << 8);
+      section_id = 0;
+    }
+
+    if (light_ptr != 0xFFFFFFFF) {
       LightLinkedListReference ref;
-      ref.id          = node.light_ptr;
-      ref.probability = probability;
+      ref.id              = light_ptr;
+      ref.sampling_weight = sampling_weight;
 
       stack[stack_ptr++] = ref;
+
+      light_ptr = 0xFFFFFFFF;
     }
 
-    const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_v = exp2f(node.exp_variance);
-
-    float sum_importance = 0.0f;
-
-#pragma unroll
-    for (uint32_t i = 0; i < 8; i++) {
-      light_tree_child_importance(data, position, normal, node, exp, exp_v, importance, i);
-      sum_importance += importance[i];
-    }
-
-    float accumulated_importance = 0.0f;
-
-    uint32_t selected_child   = 0xFFFFFFFF;
-    float selected_importance = 0.0f;
-    float random_shift        = 0.0f;
-
-    const float importance_target = random * sum_importance;
-
-#pragma unroll
-    for (uint32_t i = 0; i < 8; i++) {
-      const float child_importance = importance[i];
-
-      accumulated_importance += child_importance;
-
-      // Select node, never select nodes with 0 importance (this is also important for NULL nodes)
-      if (child_importance > 0.0f && accumulated_importance >= importance_target) {
-        selected_child      = i;
-        selected_importance = child_importance;
-
-        random_shift = accumulated_importance - child_importance;
-
-        // No control flow, we always loop over all children.
-        accumulated_importance = -FLT_MAX;
-      }
-    }
-
-    // This can only happen if all children were leaves
-    if (selected_child == 0xFFFFFFFF) {
-      node.child_ptr = 0xFFFFFFFF;
+    // This indicates that we have no children
+    if (child_ptr == 0) {
+      has_reached_end = true;
       break;
     }
 
-    const float selection_probability = selected_importance / sum_importance;
+    // TODO: Apply a prefetch hint based on LIGHT_TREE_CHILD_OFFSET_STRIDE
+    const DeviceLightTreeNodeSection section = ((DeviceLightTreeNodeSection*) device.ptrs.light_tree_nodes)[node_ptr + 1 + section_id];
+    section_id++;
 
-    // Rescale random number
-    random = (sum_importance > 0.0f) ? random_saturate((random * sum_importance - random_shift) / selected_importance) : random;
+    has_next = (section.meta & LIGHT_TREE_META_HAS_NEXT) != 0;
 
-    probability *= selection_probability;
+#pragma unroll
+    for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
+      float target = 0.0f;
 
-    node = load_light_tree_node(node.child_ptr + selected_child);
+      if (section.rel_power[rel_child_id] > 0) {
+        target = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
+      }
+
+      if (ris_reservoir_add_sample(reservoir, target, 1.0f)) {
+        selected_ptr = child_ptr;
+      }
+
+      child_ptr += (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
+    }
   }
 }
 

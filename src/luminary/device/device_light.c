@@ -19,9 +19,9 @@
 // #define LIGHT_TREE_ALTERNATIVE_BUILD_HEURISTIC
 
 #define LIGHT_TREE_MAX_LEAF_DIMENSION (128.0f)
-#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (4)
+#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (1)
 #define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
-#define LIGHT_TREE_MAX_CHILD_COUNT 32
+#define LIGHT_TREE_MAX_CHILD_COUNT 36
 
 enum LightTreeSweepAxis {
   LIGHT_TREE_SWEEP_AXIS_X = 0,
@@ -88,9 +88,8 @@ struct LightTreeWork {
   uint2* paths;
   ARRAY LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
-  DeviceLightTreeNode* nodes8_packed;
   uint32_t nodes_count;
-  uint32_t nodes_8_count;
+  ARRAY DeviceLightTreeNodeHeader* nodes8_packed;
   ARRAY DeviceLightLinkedListHeader* linked_lists;
 } typedef LightTreeWork;
 
@@ -765,9 +764,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   if (work->nodes_count == 0) {
     __FAILURE_HANDLE(host_malloc(&work->paths, 0));
-    __FAILURE_HANDLE(host_malloc(&work->nodes8_packed, 0));
+    __FAILURE_HANDLE(array_create(&work->nodes8_packed, sizeof(DeviceLightTreeNodeHeader), 0));
     __FAILURE_HANDLE(array_create(&work->linked_lists, sizeof(DeviceLightLinkedListHeader), 0));
-    work->nodes_8_count = 0;
+
     return LUMINARY_SUCCESS;
   }
 
@@ -986,7 +985,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     __DEBUG_ASSERT((num_nodes & 0xFFFFFF) == num_nodes);
 
     // Mark a node with no children by not giving it a valid child base ID
-    uint32_t child_base_id = (child_count > 0) ? num_nodes : 0;
+    const uint32_t child_base_id = (child_count > 0) ? num_nodes : 0;
 
     DeviceLightTreeNodeHeader header;
     header.child_and_light_ptr[0] = child_base_id & 0xFFFF;
@@ -1026,11 +1025,11 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
     num_nodes += child_count;
 
-    uint32_t num_sections = (child_count + 2) / 3;
+    const uint32_t num_sections = (child_count + 2) / 3;
 
     for (uint32_t section_id = 0; section_id < num_sections; section_id++) {
       DeviceLightTreeNodeSection section;
-      section.meta = (section_id + 1 < num_sections) ? 1 : 0;
+      section.meta = (section_id + 1 < num_sections) ? LIGHT_TREE_META_HAS_NEXT : 0;
 
       // TODO: The error in the variance can get quite large, sort the children by variance and then encode another factor
       // for the variance in each section to further improve precision
@@ -1109,6 +1108,19 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       write_ptr++;
     }
 
+    const uint32_t strided_num_section = ((num_sections + 3) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
+
+    // Add zero padding
+    for (uint32_t section_id = num_sections; section_id < strided_num_section; section_id++) {
+      DeviceLightTreeNodeSection section;
+      memset(&section, 0, sizeof(DeviceLightTreeNodeSection));
+
+      __DEBUG_ASSERT(sizeof(DeviceLightTreeNodeHeader) == sizeof(DeviceLightTreeNodeSection));
+
+      __FAILURE_HANDLE(array_push(&cwork.nodes, (DeviceLightTreeNodeHeader*) &section));
+      write_ptr++;
+    }
+
     // Prepare the next nodes to be constructed from the respective binary nodes.
     for (uint32_t i = 0; i < child_count; i++) {
       // There is nothing left to construct if this is a empty child.
@@ -1129,6 +1141,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   }
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
+  // We still need to patch the offsets
   for (uint32_t node_id = 0; node_id < num_nodes; node_id++) {
     const uint32_t offset = cwork.node_offset[node_id];
 
@@ -1144,6 +1157,40 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
     header->child_and_light_ptr[0] = child_base_offset & 0xFFFF;
     header->child_and_light_ptr[1] = (child_base_offset >> 16) | (header->child_and_light_ptr[1] & 0xFF00);
+
+    // This must be the case because we have children
+    __DEBUG_ASSERT(node_id + 1 < num_nodes);
+
+    const uint32_t offset_next_node       = cwork.node_offset[node_id + 1];
+    const uint32_t num_sections_this_node = offset_next_node - offset - 1;
+
+    uint32_t child_id = child_base_id;
+
+    for (uint32_t section_id = 0; section_id < num_sections_this_node; section_id++) {
+      DeviceLightTreeNodeSection* section = (DeviceLightTreeNodeSection*) (cwork.nodes + offset + 1 + section_id);
+
+      uint8_t meta = 0;
+      for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
+        const uint32_t child_offset      = cwork.node_offset[child_id];
+        const uint32_t next_child_offset = (child_id + 1 < num_nodes) ? cwork.node_offset[child_id + 1] : child_offset + 1;
+
+        // Offset should be a multiple of LIGHT_TREE_CHILD_OFFSET_STRIDE
+        __DEBUG_ASSERT((((next_child_offset - child_offset) - 1) & (LIGHT_TREE_CHILD_OFFSET_STRIDE - 1)) == 0);
+
+        const uint32_t packed_rel_offset = (((next_child_offset - child_offset) - 1) + 3) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
+
+        // 3 bits available
+        __DEBUG_ASSERT((packed_rel_offset & 0x3) == packed_rel_offset);
+
+        meta = (meta << 2) | packed_rel_offset;
+
+        child_id++;
+      }
+
+      meta |= section->meta & LIGHT_TREE_META_HAS_NEXT;
+
+      section->meta = meta;
+    }
   }
 
   LightTreeFragment* fragments_swap;
@@ -1166,10 +1213,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   node_count = write_ptr;
 
-  __FAILURE_HANDLE(host_realloc(&cwork.nodes, sizeof(DeviceLightTreeNode) * node_count));
-
   work->nodes8_packed = cwork.nodes;
-  work->nodes_8_count = node_count;
   work->linked_lists  = cwork.linked_lists;
 
   return LUMINARY_SUCCESS;
@@ -1234,13 +1278,14 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
   memcpy(linked_lists, work->linked_lists, sizeof(DeviceLightLinkedListHeader) * num_linked_lists_as_16bytes);
 
+  uint32_t num_nodes_as_16bytes;
+  __FAILURE_HANDLE(array_get_num_elements(work->nodes8_packed, &num_nodes_as_16bytes));
+
   ////////////////////////////////////////////////////////////////////
   // Assign light tree data
   ////////////////////////////////////////////////////////////////////
 
-  info_message("Nodes: %u", work->nodes_8_count);
-
-  tree->nodes_size = sizeof(DeviceLightTreeNode) * work->nodes_8_count;
+  tree->nodes_size = sizeof(DeviceLightTreeNodeHeader) * num_nodes_as_16bytes;
   tree->nodes_data = (void*) work->nodes8_packed;
 
   tree->paths_size = sizeof(uint2) * work->fragments_count;
@@ -1264,7 +1309,7 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
   tree->light_count            = work->fragments_count;
 
-  work->nodes8_packed = (DeviceLightTreeNode*) 0;
+  work->nodes8_packed = (DeviceLightTreeNodeHeader*) 0;
   work->paths         = (uint2*) 0;
 
   return LUMINARY_SUCCESS;

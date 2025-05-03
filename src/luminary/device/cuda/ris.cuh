@@ -37,16 +37,21 @@ struct RISReservoir {
 #endif  // RIS_COLLECT_SAMPLE_COUNT
 } typedef RISReservoir;
 
-__device__ RISReservoir ris_reservoir_init(const float random) {
-  RISReservoir reservoir;
-
+__device__ void ris_reservoir_reset(RISReservoir& reservoir) {
   reservoir.sum_weight      = 0.0f;
   reservoir.selected_target = 0.0f;
-  reservoir.random          = random;
 
 #ifdef RIS_COLLECT_SAMPLE_COUNT
   reservoir.num_samples = 0;
 #endif  // RIS_COLLECT_SAMPLE_COUNT
+}
+
+__device__ RISReservoir ris_reservoir_init(const float random) {
+  RISReservoir reservoir;
+
+  reservoir.random = random;
+
+  ris_reservoir_reset(reservoir);
 
   return reservoir;
 }
@@ -77,7 +82,7 @@ __device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float ta
 }
 
 __device__ float ris_reservoir_get_sampling_weight(const RISReservoir reservoir) {
-  return (reservoir.selected_target > 0.0f) ? reservoir.sum_weight / reservoir.selected_target : 0.0f;
+  return (reservoir.selected_target > 0.0f) ? reservoir.sum_weight / reservoir.selected_target : 1.0f;
 }
 
 #endif /* CU_RIS_H */

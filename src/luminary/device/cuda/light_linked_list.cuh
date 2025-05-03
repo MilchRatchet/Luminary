@@ -9,11 +9,9 @@
 
 struct LightLinkedListReference {
   uint32_t id;
-  float probability;
+  float sampling_weight;
 } typedef LightLinkedListReference;
 LUM_STATIC_SIZE_ASSERT(LightLinkedListReference, 0x08);
-
-typedef uint16_t BFloat16;
 
 __device__ float _bfloat_to_float(const BFloat16 val) {
   const uint32_t data = val;
@@ -61,7 +59,7 @@ __device__ uint32_t light_linked_list_resample(
           const LightLinkedListReference reference = stack[reference_ptr++];
 
           linked_list_ptr             = reference.id;
-          linked_list_sampling_weight = 1.0f / reference.probability;
+          linked_list_sampling_weight = reference.sampling_weight;
         }
         else {
           reached_end = true;

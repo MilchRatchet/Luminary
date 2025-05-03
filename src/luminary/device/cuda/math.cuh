@@ -7,6 +7,14 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+typedef uint16_t BFloat16;
+
+__device__ float bfloat_unpack(BFloat16 val) {
+  const uint32_t data = val;
+
+  return __uint_as_float(data << 16);
+}
+
 __device__ float difference_of_products(const float a, const float b, const float c, const float d) {
   const float cd = c * d;
 
