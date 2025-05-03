@@ -611,32 +611,6 @@ struct LightTreeCollapseWork {
   uint32_t triangles_ptr;
 } typedef LightTreeCollapseWork;
 
-static uint16_t _light_tree_float_to_bfloat16(const float val, const bool round_up) {
-  union {
-    float a;
-    uint32_t b;
-  } converter;
-  converter.a = val;
-
-  if ((round_up && (val >= 0.0f)) || (!round_up && (val < 0.0f))) {
-    converter.b += (1 << 16) - 1;
-  }
-
-  return (converter.b >> 16);
-}
-
-static float _light_tree_bfloat16_to_float(const uint16_t val) {
-  union {
-    float a;
-    uint32_t b;
-  } converter;
-  converter.b = val;
-
-  converter.b <<= 16;
-
-  return converter.a;
-}
-
 static LuminaryResult _light_tree_create_new_linked_list(
   const LightTreeWork* work, LightTreeCollapseWork* cwork, const LightTreeNode node, uint32_t* list_index) {
   __CHECK_NULL_ARGUMENT(work);
@@ -665,17 +639,17 @@ static LuminaryResult _light_tree_create_new_linked_list(
 
   DeviceLightLinkedListHeader header;
   header.light_id  = cwork->triangles_ptr;
-  header.x         = _light_tree_float_to_bfloat16(min_bound.x, false);
-  header.y         = _light_tree_float_to_bfloat16(min_bound.y, false);
-  header.z         = _light_tree_float_to_bfloat16(min_bound.z, false);
-  header.intensity = _light_tree_float_to_bfloat16(max_intensity, true);
+  header.x         = device_pack_float(min_bound.x, DEVICE_PACK_FLOAT_ROUNDING_MODE_FLOOR);
+  header.y         = device_pack_float(min_bound.y, DEVICE_PACK_FLOAT_ROUNDING_MODE_FLOOR);
+  header.z         = device_pack_float(min_bound.z, DEVICE_PACK_FLOAT_ROUNDING_MODE_FLOOR);
+  header.intensity = device_pack_float(max_intensity, DEVICE_PACK_FLOAT_ROUNDING_MODE_CEIL);
   header.meta      = section_count;
 
   // Reconstruct bounds after compression
-  min_bound.x   = _light_tree_bfloat16_to_float(header.x);
-  min_bound.y   = _light_tree_bfloat16_to_float(header.y);
-  min_bound.z   = _light_tree_bfloat16_to_float(header.z);
-  max_intensity = _light_tree_bfloat16_to_float(header.intensity);
+  min_bound.x   = device_unpack_float(header.x);
+  min_bound.y   = device_unpack_float(header.y);
+  min_bound.z   = device_unpack_float(header.z);
+  max_intensity = device_unpack_float(header.intensity);
 
   header.exp_x = (int8_t) (max_bound.x != min_bound.x) ? ceilf(log2f((max_bound.x - min_bound.x) * 1.0f / 65535.0f)) : 0;
   header.exp_y = (int8_t) (max_bound.y != min_bound.y) ? ceilf(log2f((max_bound.y - min_bound.y) * 1.0f / 65535.0f)) : 0;

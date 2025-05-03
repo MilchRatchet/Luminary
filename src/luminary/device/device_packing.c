@@ -42,3 +42,41 @@ uint32_t device_pack_uv(const UV uv) {
 
   return compressed;
 }
+
+uint16_t device_pack_float(const float val, const DevicePackFloatRoundingMode mode) {
+  union {
+    float a;
+    uint32_t b;
+  } converter;
+  converter.a = val;
+
+  switch (mode) {
+    case DEVICE_PACK_FLOAT_ROUNDING_MODE_ROUND:
+      converter.b += (1 << 15);
+      break;
+    case DEVICE_PACK_FLOAT_ROUNDING_MODE_CEIL:
+      if (val >= 0.0f)
+        converter.b += (1 << 16) - 1;
+      break;
+    case DEVICE_PACK_FLOAT_ROUNDING_MODE_FLOOR:
+      if (val < 0.0f)
+        converter.b += (1 << 16) - 1;
+      break;
+    default:
+      break;
+  }
+
+  return (converter.b >> 16);
+}
+
+float device_unpack_float(const uint16_t val) {
+  union {
+    float a;
+    uint32_t b;
+  } converter;
+  converter.b = val;
+
+  converter.b <<= 16;
+
+  return converter.a;
+}
