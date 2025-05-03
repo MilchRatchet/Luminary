@@ -44,7 +44,7 @@ __device__ void light_tree_traverse(
 
   uint32_t node_ptr     = 0xFFFFFFFF;
   uint32_t section_id   = 0;
-  uint32_t light_ptr    = 0xFFFFFFFF;
+  uint32_t light_ptr    = LIGHT_TREE_LINKED_LIST_NULL;
   uint32_t child_ptr    = 0xFFFFFFFF;
   uint32_t selected_ptr = 0;
 
@@ -90,14 +90,14 @@ __device__ void light_tree_traverse(
       section_id = 0;
     }
 
-    if (light_ptr != 0xFFFFFFFF) {
+    if (light_ptr != LIGHT_TREE_LINKED_LIST_NULL) {
       LightLinkedListReference ref;
       ref.id              = light_ptr;
       ref.sampling_weight = sampling_weight;
 
       stack[stack_ptr++] = ref;
 
-      light_ptr = 0xFFFFFFFF;
+      light_ptr = LIGHT_TREE_LINKED_LIST_NULL;
     }
 
     // This indicates that we have no children

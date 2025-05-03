@@ -936,7 +936,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       }
     }
 
-    __DEBUG_ASSERT(light_ptr == LIGHT_TREE_LINKED_LIST_NULL || ((light_ptr & 0xFFFFFF) == light_ptr));
+    __DEBUG_ASSERT((light_ptr & 0xFFFFFF) == light_ptr);
 
     if (child_count < LIGHT_TREE_MAX_CHILD_COUNT) {
       // The non-null children must come first
@@ -1169,7 +1169,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     for (uint32_t section_id = 0; section_id < num_sections_this_node; section_id++) {
       DeviceLightTreeNodeSection* section = (DeviceLightTreeNodeSection*) (cwork.nodes + offset + 1 + section_id);
 
-      uint8_t meta = 0;
+      uint8_t meta = section->meta;
       for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
         const uint32_t child_offset      = cwork.node_offset[child_id];
         const uint32_t next_child_offset = (child_id + 1 < num_nodes) ? cwork.node_offset[child_id + 1] : child_offset + 1;
@@ -1182,16 +1182,43 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         // 3 bits available
         __DEBUG_ASSERT((packed_rel_offset & 0x3) == packed_rel_offset);
 
-        meta = (meta << 2) | packed_rel_offset;
+        meta = meta | (packed_rel_offset << (2 * rel_child_id));
 
         child_id++;
       }
 
-      meta |= section->meta & LIGHT_TREE_META_HAS_NEXT;
-
       section->meta = meta;
     }
   }
+
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+  for (uint32_t node_id = 0; node_id + 1 < num_nodes; node_id++) {
+    const uint32_t offset           = cwork.node_offset[node_id];
+    const uint32_t offset_next_node = cwork.node_offset[node_id + 1];
+
+    DeviceLightTreeNodeHeader* header      = cwork.nodes + offset;
+    DeviceLightTreeNodeHeader* header_next = cwork.nodes + offset_next_node;
+
+    const uint32_t num_sections_this_node = offset_next_node - offset - 1;
+
+    uint32_t running_offset = header->child_and_light_ptr[0] | (((uint32_t) (header->child_and_light_ptr[1] & 0xFF)) << 16);
+
+    if (running_offset == 0)
+      continue;
+
+    for (uint32_t section_id = 0; section_id < num_sections_this_node; section_id++) {
+      DeviceLightTreeNodeSection* section = (DeviceLightTreeNodeSection*) (cwork.nodes + offset + 1 + section_id);
+
+      for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
+        running_offset += (((section->meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
+      }
+    }
+
+    uint32_t target_offset = header_next->child_and_light_ptr[0] | (((uint32_t) (header_next->child_and_light_ptr[1] & 0xFF)) << 16);
+
+    __DEBUG_ASSERT(running_offset == target_offset || target_offset == 0);
+  }
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
   LightTreeFragment* fragments_swap;
   __FAILURE_HANDLE(host_malloc(&fragments_swap, sizeof(LightTreeFragment) * fragments_count));
