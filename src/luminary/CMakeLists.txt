@@ -4,7 +4,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # Find packages
 #=============================================================
 
-set(LUMINARY_CUDA_VERSION 12.8 CACHE INTERNAL "CUDA Version")
+set(LUMINARY_CUDA_VERSION 12.9 CACHE INTERNAL "CUDA Version")
 set(LUMINARY_OPTIX_VERSION 8.0 CACHE INTERNAL "OptiX Version")
 
 find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED QUIET)
@@ -43,10 +43,16 @@ include_directories(${CEB_INCLUDE_DIR})
 # Gather flags
 #=============================================================
 
-set(CUDA_KERNEL_FLAGS --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true)
+set(CUDA_KERNEL_FLAGS --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --extra-device-vectorization --ptxas-options=-allow-expensive-optimizations=true)
 
 if(SHOW_KERNEL_STATS)
   set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} --ptxas-options=-v)
+endif()
+
+if(LUMINARY_FAST_KERNEL_COMPILE)
+  set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} --Ofast-compile=min)
+else()
+  set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} --ptxas-options=-O3)
 endif()
 
 #=============================================================

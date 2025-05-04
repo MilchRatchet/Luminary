@@ -11,6 +11,7 @@ set(CMAKE_C_STANDARD 11)
 option(DEBUG "Debug Mode" OFF)
 option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
 option(LUMINARY_KERNEL_ARCHS "Architecture to build" "")
+option(LUMINARY_FAST_KERNEL_COMPILE "Use fast Kernel compilation" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
 option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
 
