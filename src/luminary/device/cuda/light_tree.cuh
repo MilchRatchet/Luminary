@@ -1,12 +1,19 @@
 #ifndef CU_LUMINARY_LIGHT_TREE_H
 #define CU_LUMINARY_LIGHT_TREE_H
 
-#include "light_linked_list.cuh"
 #include "light_sg.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "ris.cuh"
 #include "utils.cuh"
+
+struct LightSubsetReference {
+  uint32_t subset_id;
+  float sampling_weight;
+} typedef LightSubsetReference;
+LUM_STATIC_SIZE_ASSERT(LightSubsetReference, 0x08);
+
+#define LIGHT_TREE_MAX_SUBSET_REFERENCES 32
 
 typedef uint16_t PackedProb;
 
@@ -39,12 +46,12 @@ __device__ float light_tree_child_importance(
 
 __device__ void light_tree_traverse(
   const LightSGData data, const vec3 position, const vec3 normal, const ushort2 pixel, float random,
-  LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES], uint32_t& stack_ptr) {
+  LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES], uint32_t& stack_ptr) {
   random = random_saturate(random);
 
   uint32_t node_ptr     = 0xFFFFFFFF;
   uint32_t section_id   = 0;
-  uint32_t light_ptr    = LIGHT_TREE_LINKED_LIST_NULL;
+  uint32_t light_ptr    = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
   uint32_t child_ptr    = 0xFFFFFFFF;
   uint32_t selected_ptr = 0;
 
@@ -90,14 +97,14 @@ __device__ void light_tree_traverse(
       section_id = 0;
     }
 
-    if (light_ptr != LIGHT_TREE_LINKED_LIST_NULL) {
-      LightLinkedListReference ref;
-      ref.id              = light_ptr;
+    if (light_ptr != LIGHT_TREE_LIGHT_SUBSET_ID_NULL) {
+      LightSubsetReference ref;
+      ref.subset_id       = light_ptr;
       ref.sampling_weight = sampling_weight;
 
       stack[stack_ptr++] = ref;
 
-      light_ptr = LIGHT_TREE_LINKED_LIST_NULL;
+      light_ptr = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
     }
 
     // This indicates that we have no children
@@ -131,7 +138,7 @@ __device__ void light_tree_traverse(
 }
 
 __device__ uint32_t light_tree_query(
-  const GBufferData data, const float random, const ushort2 pixel, LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES]) {
+  const GBufferData data, const float random, const ushort2 pixel, LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES]) {
   const LightSGData sg_data = light_sg_prepare(data);
 
   uint32_t num_lists = 0;

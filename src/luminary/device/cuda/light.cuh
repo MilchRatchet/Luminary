@@ -4,7 +4,6 @@
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
-#include "light_linked_list.cuh"
 #include "light_ltc.cuh"
 #include "light_microtriangle.cuh"
 #include "light_tree.cuh"
@@ -341,65 +340,48 @@ __device__ void light_sample_bsdf(
 }
 
 __device__ void light_linked_list_resample_brute_force(
-  const GBufferData data, const LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES], const uint32_t num_references,
-  ushort2 pixel, const TriangleHandle blocked_handle, RISReservoir& reservoir, LightSampleWorkData& work) {
-  uint32_t reference_ptr   = 0;
-  uint32_t linked_list_ptr = 0;
-  uint32_t section_id      = 0;
+  const GBufferData data, const LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES], const uint32_t num_references, ushort2 pixel,
+  const TriangleHandle blocked_handle, RISReservoir& reservoir, LightSampleWorkData& work) {
+  uint32_t reference_ptr = 0;
+  uint32_t subset_id     = 0;
 
   bool reached_end = false;
 
-  uint32_t light_id    = 0xFFFFFFFF;
-  uint32_t num_section = 0;
-  bool has_next        = false;
+  DeviceLightSubset subset;
+  subset.index = 0;
+  subset.count = 0;
 
   while (!reached_end) {
-    if (section_id >= num_section) {
-      if (has_next == false) {
-        if (reference_ptr < num_references) {
-          const LightLinkedListReference reference = stack[reference_ptr++];
+    if (subset.count == 0) {
+      if (reference_ptr < num_references) {
+        const LightSubsetReference reference = stack[reference_ptr++];
 
-          linked_list_ptr           = reference.id;
-          work.tree_sampling_weight = reference.sampling_weight;
-        }
-        else {
-          reached_end = true;
-          break;
-        }
+        subset_id                 = reference.subset_id;
+        work.tree_sampling_weight = reference.sampling_weight;
+      }
+      else {
+        reached_end = true;
+        break;
       }
 
-      const DeviceLightLinkedListHeader header = load_light_linked_list_header(linked_list_ptr);
-      linked_list_ptr += (sizeof(DeviceLightLinkedListHeader) / sizeof(float4));
-
-      light_id    = header.light_id;
-      num_section = header.meta & LIGHT_LINKED_LIST_META_NUM_SECTIONS;
-      has_next    = (header.meta & LIGHT_LINKED_LIST_META_HAS_NEXT) != 0;
-      section_id  = 0;
+      subset = load_light_subset(subset_id);
     }
 
-    const DeviceLightLinkedListSection section = load_light_linked_list_section(linked_list_ptr);
-    linked_list_ptr += (sizeof(DeviceLightLinkedListSection) / sizeof(float4));
+    const uint32_t light_id = subset.index;
 
-#pragma unroll
-    for (uint32_t tri_id = 0; tri_id < 4; tri_id++) {
-      if (section.intensity[tri_id] > 0) {
-        const uint32_t this_light_id = light_id + section_id * 4 + tri_id;
+    DeviceTransform trans;
+    const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
 
-        DeviceTransform trans;
-        const TriangleHandle light_handle = light_tree_get_light(this_light_id, trans);
+    if (triangle_handle_equal(light_handle, blocked_handle) == false) {
+      uint3 light_uv_packed;
+      TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-        if (triangle_handle_equal(light_handle, blocked_handle))
-          continue;
-
-        uint3 light_uv_packed;
-        TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
-
-        light_sample_solid_angle(data, this_light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
-        light_sample_bsdf(data, this_light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
-      }
+      light_sample_solid_angle(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
+      light_sample_bsdf(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
     }
 
-    section_id++;
+    subset.index++;
+    subset.count--;
   }
 }
 
@@ -420,7 +402,7 @@ __device__ TriangleHandle light_sample(
 
   const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
 
-  LightLinkedListReference stack[LIGHT_LINKED_LIST_MAX_REFERENCES];
+  LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES];
   const uint32_t num_references = light_tree_query(data, light_tree_random, pixel, stack);
 
   // This happens if no linked list with non zero importance was found.

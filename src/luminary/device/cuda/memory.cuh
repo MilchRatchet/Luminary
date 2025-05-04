@@ -51,27 +51,29 @@ __device__ T warp_reduce_max(T max_value) {
 // Generic Scene Data IO
 ////////////////////////////////////////////////////////////////////
 
-template <typename T>
-__device__ T load_generic(const void* src, uint32_t offset) {
-  static_assert((sizeof(T) / sizeof(float4)) * sizeof(float4) == sizeof(T), "Type must be a multiple of 16 bytes in size.");
-  const float4* ptr = (const float4*) (((const T*) src) + offset);
+template <typename DATA_TYPE, typename LOAD_TYPE>
+__device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
+  static_assert(
+    (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)) * sizeof(LOAD_TYPE) == sizeof(DATA_TYPE), "DATA_TYPE must be a multiple of LOAD_TYPE in size.");
+  const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const DATA_TYPE*) src) + offset);
 
   union {
-    T dst_type;
+    DATA_TYPE dst_type;
     struct {
-      float4 data[sizeof(T) / sizeof(float4)];
+      LOAD_TYPE data[sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)];
     };
   } converter;
 
-  for (uint32_t i = 0; i < (sizeof(T) / sizeof(float4)); i++) {
+  for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)); i++) {
     converter.data[i] = __ldg(ptr + i);
   }
 
   return converter.dst_type;
 }
 
-#define load_light_tree_node_header(offset) load_generic<DeviceLightTreeNodeHeader>(device.ptrs.light_tree_nodes, offset)
-#define load_light_tree_node_section(offset) load_generic<DeviceLightTreeNodeSection>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_node_header(offset) load_generic<DeviceLightTreeNodeHeader, float4>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_node_section(offset) load_generic<DeviceLightTreeNodeSection, float4>(device.ptrs.light_tree_nodes, offset)
+#define load_light_subset(offset) load_generic<DeviceLightSubset, float2>(device.ptrs.light_subsets, offset)
 
 ////////////////////////////////////////////////////////////////////
 // Task IO
@@ -415,44 +417,6 @@ __device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
   node.rel_power[1]    = __float_as_uint(v3.w);
 
   return node;
-}
-
-__device__ DeviceLightLinkedListHeader load_light_linked_list_header(const uint32_t offset) {
-  const float4* ptr = (float4*) (device.ptrs.light_linked_lists + offset);
-
-  union {
-    DeviceLightLinkedListHeader header;
-    struct {
-      float4 data;
-    };
-  } converter;
-
-  converter.data = __ldg(ptr + 0);
-
-  return converter.header;
-}
-
-__device__ DeviceLightLinkedListSection load_light_linked_list_section(const uint32_t offset) {
-  const float4* ptr = (float4*) (device.ptrs.light_linked_lists + offset);
-
-  union {
-    DeviceLightLinkedListSection section;
-    struct {
-      float4 data0;
-      float4 data1;
-      float4 data2;
-      float4 data3;
-      float4 data4;
-    };
-  } converter;
-
-  converter.data0 = __ldg(ptr + 0);
-  converter.data1 = __ldg(ptr + 1);
-  converter.data2 = __ldg(ptr + 2);
-  converter.data3 = __ldg(ptr + 3);
-  converter.data4 = __ldg(ptr + 4);
-
-  return converter.section;
 }
 
 __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {

@@ -24,9 +24,7 @@
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
-#define LIGHT_TREE_LINKED_LIST_NULL (0xFFFFFF)
-#define LIGHT_LINKED_LIST_META_HAS_NEXT (0x80)
-#define LIGHT_LINKED_LIST_META_NUM_SECTIONS (LIGHT_LINKED_LIST_META_HAS_NEXT - 1)
+#define LIGHT_TREE_LIGHT_SUBSET_ID_NULL (0xFFFFFF)
 #define LIGHT_TREE_META_HAS_NEXT (0x80)
 #define LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG (2)
 #define LIGHT_TREE_CHILD_OFFSET_STRIDE (1 << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG)
@@ -282,32 +280,11 @@ struct DeviceLightTreeNodeSection {
 } typedef DeviceLightTreeNodeSection;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeSection, 0x10);
 
-struct DeviceLightLinkedListHeader {
-  uint32_t light_id;
-  uint16_t x;
-  uint16_t y;
-  uint16_t z;
-  uint16_t intensity;
-  int8_t exp_x;
-  int8_t exp_y;
-  int8_t exp_z;
-  uint8_t meta;
-} typedef DeviceLightLinkedListHeader;
-LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListHeader, 0x10);
-
-struct DeviceLightLinkedListSection {
-  uint16_t v0_x[4];
-  uint16_t v0_y[4];
-  uint16_t v0_z[4];
-  uint16_t v1_x[4];
-  uint16_t v1_y[4];
-  uint16_t v1_z[4];
-  uint16_t v2_x[4];
-  uint16_t v2_y[4];
-  uint16_t v2_z[4];
-  uint16_t intensity[4];
-} typedef DeviceLightLinkedListSection;
-LUM_STATIC_SIZE_ASSERT(DeviceLightLinkedListSection, 0x50);
+struct DeviceLightSubset {
+  uint32_t index;
+  uint32_t count;
+} typedef DeviceLightSubset;
+LUM_STATIC_SIZE_ASSERT(DeviceLightSubset, 0x08);
 
 struct DeviceLightTreeLeaf {
   float power;
@@ -356,7 +333,7 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
   DEVICE const float* LUM_RESTRICT light_importance_normalization;
   DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;
-  DEVICE const DeviceLightLinkedListHeader* LUM_RESTRICT light_linked_lists;
+  DEVICE const DeviceLightSubset* LUM_RESTRICT light_subsets;
   DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
