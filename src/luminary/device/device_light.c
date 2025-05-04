@@ -1117,7 +1117,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       write_ptr++;
     }
 
-    const uint32_t strided_num_section = ((num_sections + 3) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
+    const uint32_t strided_num_section = ((num_sections + LIGHT_TREE_CHILD_OFFSET_STRIDE - 1) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG)
+                                         << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
 
     // Add zero padding
     for (uint32_t section_id = num_sections; section_id < strided_num_section; section_id++) {
@@ -1186,7 +1187,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         // Offset should be a multiple of LIGHT_TREE_CHILD_OFFSET_STRIDE
         __DEBUG_ASSERT((((next_child_offset - child_offset) - 1) & (LIGHT_TREE_CHILD_OFFSET_STRIDE - 1)) == 0);
 
-        const uint32_t packed_rel_offset = (((next_child_offset - child_offset) - 1) + 3) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
+        const uint32_t packed_rel_offset =
+          (((next_child_offset - child_offset) - 1) + LIGHT_TREE_CHILD_OFFSET_STRIDE - 1) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
 
         // 3 bits available
         __DEBUG_ASSERT((packed_rel_offset & 0x3) == packed_rel_offset);
