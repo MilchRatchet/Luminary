@@ -14,6 +14,8 @@
 #include "sky.cuh"
 #include "utils.cuh"
 
+// #define DIRECT_LIGHTING_NO_SHADOW
+
 struct DirectLightingShadowTask {
   OptixTraceStatus trace_status;
   vec3 origin;
@@ -41,6 +43,7 @@ __device__ bool direct_lighting_geometry_is_valid(const DeviceTask task) {
 ////////////////////////////////////////////////////////////////////
 
 __device__ RGBF direct_lighting_sun_shadowing(const DirectLightingShadowTask task) {
+#ifndef DIRECT_LIGHTING_NO_SHADOW
   RGBF visibility = optix_sun_shadowing(task.origin, task.ray, task.limit, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
@@ -52,9 +55,13 @@ __device__ RGBF direct_lighting_sun_shadowing(const DirectLightingShadowTask tas
   visibility = mul_color(visibility, volume_integrate_transmittance(task.origin, task.ray, task.limit));
 
   return visibility;
+#else  /* !DIRECT_LIGHTING_NO_SHADOW */
+  return splat_color(1.0f);
+#endif /* DIRECT_LIGHTING_NO_SHADOW */
 }
 
 __device__ RGBF direct_lighting_shadowing(const DirectLightingShadowTask task) {
+#ifndef DIRECT_LIGHTING_NO_SHADOW
   RGBF visibility = optix_geometry_shadowing(task.origin, task.ray, task.limit, task.target_light, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
@@ -66,6 +73,9 @@ __device__ RGBF direct_lighting_shadowing(const DirectLightingShadowTask task) {
   visibility = mul_color(visibility, volume_integrate_transmittance(task.origin, task.ray, task.limit));
 
   return visibility;
+#else  /* !DIRECT_LIGHTING_NO_SHADOW */
+  return splat_color(1.0f);
+#endif /* DIRECT_LIGHTING_NO_SHADOW */
 }
 
 ////////////////////////////////////////////////////////////////////

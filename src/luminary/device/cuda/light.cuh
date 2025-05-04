@@ -16,8 +16,6 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
-// #define LIGHT_VISUALIZE_IMPORTANCE
-
 ////////////////////////////////////////////////////////////////////
 // Literature
 ////////////////////////////////////////////////////////////////////
@@ -351,8 +349,6 @@ __device__ void light_linked_list_resample_brute_force(
 
   bool reached_end = false;
 
-  vec3 base_point      = get_vector(0.0f, 0.0f, 0.0f);
-  vec3 exp             = get_vector(0.0f, 0.0f, 0.0f);
   uint32_t light_id    = 0xFFFFFFFF;
   uint32_t num_section = 0;
   bool has_next        = false;
@@ -375,8 +371,6 @@ __device__ void light_linked_list_resample_brute_force(
       const DeviceLightLinkedListHeader header = load_light_linked_list_header(linked_list_ptr);
       linked_list_ptr += (sizeof(DeviceLightLinkedListHeader) / sizeof(float4));
 
-      base_point  = get_vector(_bfloat_to_float(header.x), _bfloat_to_float(header.y), _bfloat_to_float(header.z));
-      exp         = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
       light_id    = header.light_id;
       num_section = header.meta & LIGHT_LINKED_LIST_META_NUM_SECTIONS;
       has_next    = (header.meta & LIGHT_LINKED_LIST_META_HAS_NEXT) != 0;
@@ -445,15 +439,6 @@ __device__ TriangleHandle light_sample(
   light_linked_list_resample_brute_force(data, stack, num_references, pixel, blocked_handle, reservoir, work);
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
-
-#ifdef LIGHT_VISUALIZE_IMPORTANCE
-  selected_light_color   = splat_color(reservoir.selected_target);
-  selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
-  selected_dist          = 1.0f;
-  selected_is_refraction = false;
-
-  return triangle_handle_get(0, 0);
-#endif /* LIGHT_VISUALIZE_IMPORTANCE */
 
   // This happens if no light with non zero importance was found.
   if (work.light_id == 0xFFFFFFFF)
