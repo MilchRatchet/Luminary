@@ -103,8 +103,8 @@ struct Bin {
   uint32_t padding;
 } typedef Bin;
 
-#define OBJECT_SPLIT_BIN_COUNT_LOG (5)
-#define OBJECT_SPLIT_BIN_COUNT (1 << 5)
+#define OBJECT_SPLIT_BIN_COUNT_LOG (6)
+#define OBJECT_SPLIT_BIN_COUNT (1 << OBJECT_SPLIT_BIN_COUNT_LOG)
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
@@ -305,17 +305,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       if (fragments_count <= 1)
         continue;
 
-      // Compute surface area of current node.
-      Vec128 high_parent, low_parent;
-      _light_tree_fit_bounds(fragments + fragments_ptr, fragments_count, &high_parent, &low_parent);
-
-      const Vec128 diff               = vec128_set_w_to_0(vec128_sub(high_parent, low_parent));
-      const float max_axis_interval   = vec128_hmax(diff);
-      const float parent_surface_area = vec128_box_area(diff);
-
-      if (max_axis_interval <= LIGHT_TREE_MAX_LEAF_DIMENSION && fragments_count <= LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT)
-        continue;
-
       Vec128 high, low;
       double optimal_cost = DBL_MAX;
       LightTreeSweepAxis axis;
@@ -332,8 +321,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
         if (interval == 0.0)
           continue;
-
-        const double interval_cost = max_axis_interval / interval;
 
         uint32_t left = 0;
 
@@ -368,7 +355,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
           const float left_area  = vec128_box_area(vec128_set_w_to_0(diff_left));
           const float right_area = vec128_box_area(vec128_set_w_to_0(diff_right));
 
-          const double total_cost = interval_cost * (left_power * left_area + right_power * right_area) / parent_surface_area;
+          const double total_cost = left_power * left_area + right_power * right_area;
 #endif /* !LIGHT_TREE_ALTERNATIVE_BUILD_HEURISTIC */
 
           left += bins[k - 1].entry;
