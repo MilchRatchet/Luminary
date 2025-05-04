@@ -80,7 +80,7 @@ __device__ void light_tree_traverse(
         break;
       }
 
-      const DeviceLightTreeNodeHeader header = device.ptrs.light_tree_nodes[node_ptr];
+      const DeviceLightTreeNodeHeader header = load_light_tree_node_header(node_ptr);
 
       base       = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
       exp        = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
@@ -106,8 +106,7 @@ __device__ void light_tree_traverse(
       break;
     }
 
-    // TODO: Apply a prefetch hint based on LIGHT_TREE_CHILD_OFFSET_STRIDE
-    const DeviceLightTreeNodeSection section = ((DeviceLightTreeNodeSection*) device.ptrs.light_tree_nodes)[node_ptr + 1 + section_id];
+    const DeviceLightTreeNodeSection section = load_light_tree_node_section(node_ptr + 1 + section_id);
     section_id++;
 
     has_next = (section.meta & LIGHT_TREE_META_HAS_NEXT) != 0;

@@ -48,6 +48,32 @@ __device__ T warp_reduce_max(T max_value) {
 }
 
 ////////////////////////////////////////////////////////////////////
+// Generic Scene Data IO
+////////////////////////////////////////////////////////////////////
+
+template <typename T>
+__device__ T load_generic(const void* src, uint32_t offset) {
+  static_assert((sizeof(T) / sizeof(float4)) * sizeof(float4) == sizeof(T), "Type must be a multiple of 16 bytes in size.");
+  const float4* ptr = (const float4*) (((const T*) src) + offset);
+
+  union {
+    T dst_type;
+    struct {
+      float4 data[sizeof(T) / sizeof(float4)];
+    };
+  } converter;
+
+  for (uint32_t i = 0; i < (sizeof(T) / sizeof(float4)); i++) {
+    converter.data[i] = __ldg(ptr + i);
+  }
+
+  return converter.dst_type;
+}
+
+#define load_light_tree_node_header(offset) load_generic<DeviceLightTreeNodeHeader>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_node_section(offset) load_generic<DeviceLightTreeNodeSection>(device.ptrs.light_tree_nodes, offset)
+
+////////////////////////////////////////////////////////////////////
 // Task IO
 ////////////////////////////////////////////////////////////////////
 
