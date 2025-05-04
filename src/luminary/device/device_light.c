@@ -1129,6 +1129,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __FAILURE_HANDLE(host_free(&cwork.node_depths));
   __FAILURE_HANDLE(host_free(&cwork.new_fragments));
   __FAILURE_HANDLE(host_free(&cwork.fragment_paths));
+  __FAILURE_HANDLE(array_destroy(&cwork.binary_node_indices));
+  __FAILURE_HANDLE(array_destroy(&cwork.node_offset));
 
   node_count = write_ptr;
 
