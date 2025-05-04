@@ -17,7 +17,6 @@ struct TriangleLight {
   vec3 edge2;
   UV tex_coords;
   uint16_t material_id;
-  bool is_textured;
 } typedef TriangleLight;
 
 __device__ float light_triangle_intersection_uv_generic(
@@ -260,19 +259,16 @@ __device__ bool light_triangle_sample_finalize_bridges(
 __device__ RGBF light_get_color(TriangleLight& triangle) {
   RGBF color = splat_color(0.0f);
 
+  // TODO: Implement a light weight DeviceLightMaterial type
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
   if (mat.luminance_tex != TEXTURE_NONE) {
     const float4 emission = texture_load(load_texture_object(mat.luminance_tex), triangle.tex_coords);
 
     color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
-
-    triangle.is_textured = 1;
   }
   else {
     color = mat.emission;
-
-    triangle.is_textured = 0;
   }
 
   if (color_importance(color) > 0.0f) {

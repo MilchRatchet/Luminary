@@ -286,33 +286,6 @@ struct LightSampleWorkData {
   float tree_sampling_weight;
 } typedef LightSampleWorkData;
 
-__device__ float light_sample_microtriangle_pdf(
-  const vec3 origin, TriangleLight light, const uint32_t microtriangle_id, const uint32_t light_id) {
-  const float importance_normalization = __ldg(device.ptrs.light_importance_normalization + light_id) * 15.0f;
-
-  const uint8_t* data_ptr = (uint8_t*) (device.ptrs.light_microtriangles + light_id);
-
-  const uint8_t data = __ldg(data_ptr + (microtriangle_id >> 1));
-
-  const float value = (microtriangle_id & 0b1) ? data >> 4 : data & 0xF;
-
-  const float selection_pdf = value / importance_normalization;
-
-  float2 bary0, bary1, bary2;
-  light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
-
-  const vec3 v0 = add_vector(light.vertex, add_vector(scale_vector(light.edge1, bary0.x), scale_vector(light.edge2, bary0.y)));
-  const vec3 v1 = add_vector(light.vertex, add_vector(scale_vector(light.edge1, bary1.x), scale_vector(light.edge2, bary1.y)));
-  const vec3 v2 = add_vector(light.vertex, add_vector(scale_vector(light.edge1, bary2.x), scale_vector(light.edge2, bary2.y)));
-
-  const vec3 edge1 = sub_vector(v1, v0);
-  const vec3 edge2 = sub_vector(v2, v0);
-
-  const float solid_angle = light_triangle_get_solid_angle_generic(origin, v0, edge1, edge2);
-
-  return (solid_angle > eps) ? selection_pdf / solid_angle : 0.0f;
-}
-
 __device__ void light_sample_common(
   const GBufferData data, const uint32_t light_id, const vec3 ray, const float dist, TriangleLight& light, RISReservoir& reservoir,
   LightSampleWorkData& work) {
@@ -328,17 +301,7 @@ __device__ void light_sample_common(
   const float one_over_solid_angle_pdf = work.solid_angle;
   const float bsdf_pdf                 = bsdf_sample_for_light_pdf(data, ray);
 
-  float microtriangle_pdf;
-  if (light.is_textured) {
-    const uint32_t microtriangle_id = light_microtriangle_bary_to_id(work.hit_coords);
-    microtriangle_pdf               = light_sample_microtriangle_pdf(data.position, light, microtriangle_id, light_id);
-  }
-  else {
-    microtriangle_pdf = 0.0f;
-  }
-
-  const float sampling_weight = work.tree_sampling_weight * one_over_solid_angle_pdf
-                                / (1.0f + bsdf_pdf * one_over_solid_angle_pdf + microtriangle_pdf * one_over_solid_angle_pdf);
+  const float sampling_weight = work.tree_sampling_weight * one_over_solid_angle_pdf / (1.0f + bsdf_pdf * one_over_solid_angle_pdf);
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
     work.light_id      = light_id;
@@ -377,87 +340,6 @@ __device__ void light_sample_bsdf(
     return;
 
   light_sample_common(data, light_id, ray, dist, triangle_light, reservoir, work);
-}
-
-__device__ bool light_sample_microtriangle_iterate(
-  const uint32_t data, const float target_importance, const uint32_t result_offset, float& running_sum_importance, uint32_t& result) {
-  for (uint32_t microtriangle_id = 0; microtriangle_id < 8; microtriangle_id++) {
-    const uint8_t value = (data >> (microtriangle_id * 4)) & 0xF;
-
-    running_sum_importance += value;
-
-    if (running_sum_importance > target_importance) {
-      result = result_offset + microtriangle_id;
-      return true;
-    }
-  }
-
-  return false;
-}
-
-__device__ void light_sample_microtriangle(
-  const GBufferData data, const uint32_t light_id, const ushort2 pixel, TriangleLight& light, const uint3 light_uv_packed,
-  RISReservoir& reservoir, LightSampleWorkData& work) {
-  const float microtriangle_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_MICROTRIANGLE, pixel);
-
-  const float importance_normalization = __ldg(device.ptrs.light_importance_normalization + light_id);
-
-  const uint4* data_ptr = (uint4*) (device.ptrs.light_microtriangles + light_id);
-
-  const uint4 data0 = __ldg(data_ptr + 0);
-  const uint4 data1 = __ldg(data_ptr + 1);
-
-  const float target_importance = microtriangle_random * importance_normalization;
-
-  // TODO: I could in theory implement this through a binary search
-
-  uint32_t microtriangle_id    = 0;
-  float running_sum_importance = 0.0f;
-  bool found                   = false;
-
-  found |= light_sample_microtriangle_iterate(data0.x, target_importance, 0, running_sum_importance, microtriangle_id);
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data0.y, target_importance, 8, running_sum_importance, microtriangle_id);
-  }
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data0.z, target_importance, 16, running_sum_importance, microtriangle_id);
-  }
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data0.w, target_importance, 24, running_sum_importance, microtriangle_id);
-  }
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data1.x, target_importance, 32, running_sum_importance, microtriangle_id);
-  }
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data1.y, target_importance, 40, running_sum_importance, microtriangle_id);
-  }
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data1.z, target_importance, 48, running_sum_importance, microtriangle_id);
-  }
-
-  if (!found) {
-    found |= light_sample_microtriangle_iterate(data1.w, target_importance, 56, running_sum_importance, microtriangle_id);
-  }
-
-  float2 bary0, bary1, bary2;
-  light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
-
-  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_MICROTRIANGLE_DIR, pixel);
-
-  vec3 ray;
-  float dist;
-  float solid_angle;
-  if (!light_triangle_sample_microtriangle_finalize(
-        light, bary0, bary1, bary2, light_uv_packed, data.position, ray_random, ray, dist, solid_angle, work.hit_coords))
-    return;
-
-  light_sample_common(data, light_id, ray, dist, light, reservoir, work);
 }
 
 __device__ void light_linked_list_resample_brute_force(
@@ -520,9 +402,6 @@ __device__ void light_linked_list_resample_brute_force(
 
         light_sample_solid_angle(data, this_light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
         light_sample_bsdf(data, this_light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
-        if (triangle_light.is_textured) {
-          light_sample_microtriangle(data, this_light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
-        }
       }
     }
 
