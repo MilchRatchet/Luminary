@@ -22,6 +22,7 @@
 #define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (1)
 #define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
 #define LIGHT_TREE_MAX_CHILD_COUNT 36
+#define LIGHT_TREE_MAX_LIGHT_COUNT 16
 
 enum LightTreeSweepAxis {
   LIGHT_TREE_SWEEP_AXIS_X = 0,
@@ -854,8 +855,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       children_require_work = true;
     }
     else {
-      // This case implies that the whole tree was just a leaf.
-      // Hence we fill in some basic information and that is it.
+      // This node only contains lights, no children.
+      // This can happen if the parent ran full on lights or if the whole tree is just a single node.
       uint32_t linked_list_index;
       __FAILURE_HANDLE(_light_tree_create_new_linked_list(work, &cwork, binary_nodes[binary_index], &linked_list_index));
 
@@ -868,6 +869,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       last_linked_list_index = linked_list_index;
     }
+
+    uint32_t num_lights_this_node = 0;
 
     while (children_require_work) {
       children_require_work = false;
@@ -916,7 +919,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
           children_require_work = true;
         }
         else {
-          // TODO: There is a degenerate case where we end up flattening the whole tree into just one linked list
+          if (num_lights_this_node + binary_node.light_count > LIGHT_TREE_MAX_LIGHT_COUNT)
+            continue;
+
           uint32_t linked_list_index;
           __FAILURE_HANDLE(_light_tree_create_new_linked_list(work, &cwork, binary_node, &linked_list_index));
 
@@ -928,6 +933,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
           }
 
           last_linked_list_index = linked_list_index;
+
+          num_lights_this_node += binary_node.light_count;
 
           child_binary_index[child_ptr] = LIGHT_TREE_BINARY_INDEX_NULL;
           child_count--;
@@ -1029,6 +1036,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
     for (uint32_t section_id = 0; section_id < num_sections; section_id++) {
       DeviceLightTreeNodeSection section;
+      memset(&section, 0, sizeof(DeviceLightTreeNodeSection));
+
       section.meta = (section_id + 1 < num_sections) ? LIGHT_TREE_META_HAS_NEXT : 0;
 
       // TODO: The error in the variance can get quite large, sort the children by variance and then encode another factor
@@ -1188,6 +1197,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       }
 
       section->meta = meta;
+
+      if ((section->meta & LIGHT_TREE_META_HAS_NEXT) == 0)
+        break;
     }
   }
 
@@ -1210,8 +1222,14 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       DeviceLightTreeNodeSection* section = (DeviceLightTreeNodeSection*) (cwork.nodes + offset + 1 + section_id);
 
       for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
+        if (section->rel_power[rel_child_id] == 0)
+          continue;
+
         running_offset += (((section->meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
       }
+
+      if ((section->meta & LIGHT_TREE_META_HAS_NEXT) == 0)
+        break;
     }
 
     uint32_t target_offset = header_next->child_and_light_ptr[0] | (((uint32_t) (header_next->child_and_light_ptr[1] & 0xFF)) << 16);

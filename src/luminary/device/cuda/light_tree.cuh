@@ -114,17 +114,19 @@ __device__ void light_tree_traverse(
 
 #pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
-      float target = 0.0f;
+      float target               = 0.0f;
+      uint32_t offset_this_child = 0;
 
       if (section.rel_power[rel_child_id] > 0) {
-        target = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
+        target            = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
+        offset_this_child = (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
       }
 
       if (ris_reservoir_add_sample(reservoir, target, 1.0f)) {
         selected_ptr = child_ptr;
       }
 
-      child_ptr += (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
+      child_ptr += offset_this_child;
     }
   }
 }
