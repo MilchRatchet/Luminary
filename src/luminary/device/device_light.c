@@ -16,11 +16,11 @@
 
 // #define LIGHT_TREE_DEBUG_OUTPUT
 // #define LIGHT_COMPUTE_VMF_DISTRIBUTIONS
-// #define LIGHT_TREE_ALTERNATIVE_BUILD_HEURISTIC
 
-#define LIGHT_TREE_MAX_LEAF_DIMENSION (128.0f)
-#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (1)
+#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (4)
 #define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
+#define LIGHT_TREE_MAX_CHILD_COUNT 72
+#define LIGHT_TREE_MAX_LIGHT_COUNT 16
 
 // Every light tree node section has 2 bits per child to give a relative offset. We multiply this value by LIGHT_TREE_CHILD_OFFSET_STRIDE to
 // achieve a larger range. Further, each section can hold up to 3 children. This means to be able to correctly address consecutive child
@@ -352,17 +352,10 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
           const Vec128 diff_left  = vec128_sub(high_left, low_left);
           const Vec128 diff_right = vec128_sub(high_right, low_right);
 
-#ifdef LIGHT_TREE_ALTERNATIVE_BUILD_HEURISTIC
-          const float left_size  = vec128_hmax(vec128_set_w_to_0(diff_left));
-          const float right_size = vec128_hmax(vec128_set_w_to_0(diff_right));
-
-          const float total_cost = left_size + right_size;
-#else  /* LIGHT_TREE_ALTERNATIVE_BUILD_HEURISTIC */
           const float left_area  = vec128_box_area(vec128_set_w_to_0(diff_left));
           const float right_area = vec128_box_area(vec128_set_w_to_0(diff_right));
 
           const double total_cost = left_power * left_area + right_power * right_area;
-#endif /* !LIGHT_TREE_ALTERNATIVE_BUILD_HEURISTIC */
 
           left += bins[k - 1].entry;
 
