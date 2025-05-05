@@ -109,7 +109,7 @@ struct Bin {
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
 
-#define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
+#define FRAGMENT_ERROR_COMP (FLT_EPSILON * 16.0f)
 
 inline void _light_tree_fit_bounds(
   const LightTreeFragment* fragments, const uint32_t fragments_count, Vec128* restrict high_out, Vec128* restrict low_out) {
@@ -301,8 +301,10 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       const uint32_t fragments_ptr   = node.triangles_address;
       const uint32_t fragments_count = node.triangle_count;
 
+      __DEBUG_ASSERT(fragments_count > 0);
+
       // Node has few enough triangles, finalize it as a leaf node.
-      if (fragments_count <= 1)
+      if (fragments_count == 1)
         continue;
 
       Vec128 high, low;
@@ -375,26 +377,11 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
         }
       }
 
-      if (found_split) {
-        _light_tree_divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
-      }
-      else {
-        // We didn't find a split but we have too many triangles so we need to do a simply list split.
-        optimal_split = fragments_count / 2;
+      // If we were unable to find any valid split, just leave the node as is.
+      if (found_split == false)
+        continue;
 
-        optimal_left_power  = 0.0f;
-        optimal_right_power = 0.0f;
-
-        uint32_t frag_id = 0;
-
-        for (; frag_id < optimal_split; frag_id++) {
-          optimal_left_power += fragments[fragments_ptr + frag_id].power;
-        }
-
-        for (; frag_id < fragments_count; frag_id++) {
-          optimal_right_power += fragments[fragments_ptr + frag_id].power;
-        }
-      }
+      _light_tree_divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
 
       node.left_power  = optimal_left_power;
       node.right_power = optimal_right_power;
