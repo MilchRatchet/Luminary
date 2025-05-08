@@ -17,10 +17,11 @@
 // #define LIGHT_TREE_DEBUG_OUTPUT
 // #define LIGHT_COMPUTE_VMF_DISTRIBUTIONS
 
-#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (4)
+#define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (1)
 #define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
-#define LIGHT_TREE_MAX_CHILD_COUNT 72
-#define LIGHT_TREE_MAX_LIGHT_COUNT 16
+#define LIGHT_TREE_MAX_CHILD_COUNT 36
+#define LIGHT_TREE_MAX_LIGHT_COUNT 4
+#define LIGHT_TREE_FLATTENING_OPTIMIZATION
 
 // Every light tree node section has 2 bits per child to give a relative offset. We multiply this value by LIGHT_TREE_CHILD_OFFSET_STRIDE to
 // achieve a larger range. Further, each section can hold up to 3 children. This means to be able to correctly address consecutive child
@@ -727,6 +728,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
     uint32_t num_lights_this_node = 0;
 
+#ifdef LIGHT_TREE_FLATTENING_OPTIMIZATION
     while (children_require_work) {
       children_require_work = false;
 
@@ -800,6 +802,69 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         child_count--;
       }
     }
+
+#else  /* LIGHT_TREE_FLATTENING_OPTIMIZATION */
+    while (children_require_work) {
+      children_require_work = false;
+
+      for (uint64_t child_ptr = 0; child_ptr < LIGHT_TREE_MAX_CHILD_COUNT; child_ptr++) {
+        const uint32_t binary_index_of_child = child_binary_index[child_ptr];
+
+        // If this child does not point to another binary node, then skip.
+        if (binary_index_of_child == LIGHT_TREE_BINARY_INDEX_NULL)
+          continue;
+
+        const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
+
+        if (binary_node.light_count == 0) {
+          // We are full, skip
+          if (child_count == LIGHT_TREE_MAX_CHILD_COUNT)
+            continue;
+
+          LightTreeChildNode left_child;
+          memset(&left_child, 0, sizeof(LightTreeChildNode));
+
+          left_child.mean     = binary_node.left_mean;
+          left_child.variance = binary_node.left_variance;
+          left_child.power    = binary_node.left_power;
+
+          child_binary_index[child_ptr] = binary_node.ptr;
+          children[child_ptr]           = left_child;
+
+          LightTreeChildNode right_child;
+          memset(&right_child, 0, sizeof(LightTreeChildNode));
+
+          right_child.mean     = binary_node.right_mean;
+          right_child.variance = binary_node.right_variance;
+          right_child.power    = binary_node.right_power;
+
+          uint32_t child_slot = 0;
+          for (; child_slot < LIGHT_TREE_MAX_CHILD_COUNT; child_slot++) {
+            if (child_binary_index[child_slot] == LIGHT_TREE_BINARY_INDEX_NULL)
+              break;
+          }
+
+          child_binary_index[child_slot] = binary_node.ptr + 1;
+          children[child_slot]           = right_child;
+
+          child_count++;
+          children_require_work = true;
+        }
+        else {
+          if (num_lights_this_node + binary_node.light_count > LIGHT_TREE_MAX_LIGHT_COUNT)
+            continue;
+
+          __FAILURE_HANDLE(_light_tree_subset_append(&cwork, binary_node, &light_ptr));
+
+          num_lights_this_node += binary_node.light_count;
+
+          child_binary_index[child_ptr] = LIGHT_TREE_BINARY_INDEX_NULL;
+          child_count--;
+          children_require_work = true;
+        }
+      }
+    }
+#endif /* !LIGHT_TREE_FLATTENING_OPTIMIZATION */
 
     __DEBUG_ASSERT((light_ptr & 0xFFFFFF) == light_ptr);
 
