@@ -17,6 +17,9 @@
 // #define LIGHT_TREE_DEBUG_OUTPUT
 // #define LIGHT_COMPUTE_VMF_DISTRIBUTIONS
 
+// #define LIGHT_TREE_UNIFORM_WEIGHTING
+#define LIGHT_TREE_USE_BOUND_AS_VARIANCE
+
 #define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (1)
 #define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
 #define LIGHT_TREE_MAX_CHILD_COUNT 36
@@ -455,9 +458,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
   return LUMINARY_SUCCESS;
 }
-
-// #define LIGHT_TREE_UNIFORM_WEIGHTING
-// #define LIGHT_TREE_USE_BOUND_AS_VARIANCE
 
 static void _lights_get_vmf_and_mean_and_variance(
   const LightTreeWork* work, const LightTreeBinaryNode node, const float power, vec3* mean, float* variance) {
@@ -1355,72 +1355,143 @@ static void _light_tree_debug_output_export_binary_node(
   *vertex_offset = v_offset;
 }
 
-static LuminaryResult _light_tree_debug_output_export_lights(FILE* obj_file, FILE* mtl_file, LightTreeWork* work, uint32_t* vertex_offset) {
-  uint32_t num_chunks;
-  __FAILURE_HANDLE(array_get_num_elements(work->linked_lists, &num_chunks));
+static LuminaryResult _light_tree_debug_output_export_device_node(
+  FILE* obj_file, FILE* mtl_file, LightTreeWork* work, uint32_t* node_offset, uint32_t* vertex_offset) {
+  const uint32_t offset = *node_offset;
 
-  uint32_t linked_list_ptr = 0;
+  const DeviceLightTreeNodeHeader header = work->nodes8_packed[offset];
 
-  while (linked_list_ptr < num_chunks) {
-    const DeviceLightLinkedListHeader header = work->linked_lists[linked_list_ptr];
-    linked_list_ptr += (sizeof(DeviceLightLinkedListHeader) / sizeof(*work->linked_lists));
+  const uint32_t child_ptr = ((uint32_t) header.child_and_light_ptr[0]) | (((uint32_t) header.child_and_light_ptr[1] & 0x00FF) << 16);
+  const uint32_t light_ptr = ((uint32_t) header.child_and_light_ptr[2]) | (((uint32_t) header.child_and_light_ptr[1] & 0xFF00) << 8);
 
-    const vec3 base_point = {.x = device_unpack_float(header.x), .y = device_unpack_float(header.y), .z = device_unpack_float(header.z)};
-    const vec3 exp        = {.x = exp2f(header.exp_x), .y = exp2f(header.exp_y), .z = exp2f(header.exp_z)};
+  char* buffer;
+  __FAILURE_HANDLE(host_malloc(&buffer, 1024 * 1024));
 
-    for (uint32_t section_id = 0; section_id < (header.meta & LIGHT_LINKED_LIST_META_NUM_SECTIONS); section_id++) {
-      const DeviceLightLinkedListSection section = *((DeviceLightLinkedListSection*) &(work->linked_lists[linked_list_ptr]));
-      linked_list_ptr += (sizeof(DeviceLightLinkedListSection) / sizeof(*work->linked_lists));
+  int buffer_offset = 0;
 
-      for (uint32_t tri_id = 0; tri_id < 4; tri_id++) {
-        const vec3 v0 = {
-          .x = section.v0_x[tri_id] * exp.x + base_point.x,
-          .y = section.v0_y[tri_id] * exp.y + base_point.y,
-          .z = section.v0_z[tri_id] * exp.z + base_point.z};
+  buffer_offset += sprintf(buffer + buffer_offset, "o Node_0x%08X\n", offset);
+  buffer_offset += sprintf(buffer + buffer_offset, "usemtl NodeMTL_0x%08X\n", offset);
 
-        const vec3 v1 = {
-          .x = section.v1_x[tri_id] * exp.x + base_point.x,
-          .y = section.v1_y[tri_id] * exp.y + base_point.y,
-          .z = section.v1_z[tri_id] * exp.z + base_point.z};
+  uint32_t section_offset = offset + 1;
 
-        const vec3 v2 = {
-          .x = section.v2_x[tri_id] * exp.x + base_point.x,
-          .y = section.v2_y[tri_id] * exp.y + base_point.y,
-          .z = section.v2_z[tri_id] * exp.z + base_point.z};
+  if (child_ptr != 0) {
+    vec3 base;
+    base.x = device_unpack_float(header.x);
+    base.y = device_unpack_float(header.y);
+    base.z = device_unpack_float(header.z);
 
-        char buffer[4096];
-        int buffer_offset = 0;
+    vec3 exp;
+    exp.x = exp2f(header.exp_x);
+    exp.y = exp2f(header.exp_y);
+    exp.z = exp2f(header.exp_z);
+
+    float exp_v;
+    exp_v = exp2f(header.exp_variance);
+
+    bool has_next = true;
+
+    while (has_next) {
+      const DeviceLightTreeNodeSection section = ((const DeviceLightTreeNodeSection*) (work->nodes8_packed))[section_offset++];
+
+      has_next = (section.meta & LIGHT_TREE_META_HAS_NEXT) != 0;
+
+      for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
+        if (section.rel_power[rel_child_id] == 0)
+          continue;
+
+        const float variance = section.rel_variance[rel_child_id] * exp_v;
+
+        vec3 mean;
+        mean.x = section.rel_mean_x[rel_child_id] * exp.x + base.x;
+        mean.y = section.rel_mean_y[rel_child_id] * exp.y + base.y;
+        mean.z = section.rel_mean_z[rel_child_id] * exp.z + base.z;
+
+        vec3 low;
+        low.x = mean.x - 2.0f * variance;
+        low.y = mean.y - 2.0f * variance;
+        low.z = mean.z - 2.0f * variance;
+
+        vec3 high;
+        high.x = mean.x + 2.0f * variance;
+        high.y = mean.y + 2.0f * variance;
+        high.z = mean.z + 2.0f * variance;
 
         uint32_t v_offset = *vertex_offset;
 
-        buffer_offset += sprintf(buffer + buffer_offset, "o Tri%u_%u\n", header.light_id, section_id * 4 + tri_id);
-
-        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", v0.x, v0.y, v0.z);
-        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", v1.x, v1.y, v1.z);
-        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", v2.x, v2.y, v2.z);
-
-        buffer_offset += sprintf(buffer + buffer_offset, "usemtl TriMTL%u\n", header.light_id);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", low.x, low.y, low.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", low.x, low.y, high.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", low.x, high.y, low.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", low.x, high.y, high.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", high.x, low.y, low.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", high.x, low.y, high.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", high.x, high.y, low.z);
+        buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", high.x, high.y, high.z);
 
         buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 3, v_offset + 1, v_offset + 2);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 4, v_offset + 1);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 5, v_offset + 4, v_offset + 1);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 4, v_offset + 2);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 6, v_offset + 4, v_offset + 2);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 1, v_offset + 5, v_offset + 3);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 5, v_offset + 3);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 2, v_offset + 6, v_offset + 3);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 6, v_offset + 3);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 4, v_offset + 5, v_offset + 6);
+        buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 5, v_offset + 6);
 
-        fwrite(buffer, buffer_offset, 1, obj_file);
-
-        buffer_offset = 0;
-
-        buffer_offset += sprintf(buffer + buffer_offset, "newmtl TriMTL%u\n", header.light_id);
-        buffer_offset += sprintf(
-          buffer + buffer_offset, "Kd %f %f %f\n", (header.light_id & 0b100) ? 1.0f : 0.0f, (header.light_id & 0b10) ? 1.0f : 0.0f,
-          (header.light_id & 0b1) ? 1.0f : 0.0f);
-        buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 0.1f);
-
-        fwrite(buffer, buffer_offset, 1, mtl_file);
-
-        v_offset += 3;
+        v_offset += 8;
 
         *vertex_offset = v_offset;
       }
+
+      __DEBUG_ASSERT(buffer_offset < 1024 * 1024);
+      fwrite(buffer, buffer_offset, 1, obj_file);
+      buffer_offset = 0;
     }
+
+    const uint32_t num_sections        = section_offset - offset - 1;
+    const uint32_t strided_num_section = ((num_sections + LIGHT_TREE_CHILD_OFFSET_STRIDE - 1) >> LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG)
+                                         << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG;
+
+    section_offset = offset + 1 + strided_num_section;
   }
+
+  *node_offset = section_offset;
+
+  if (light_ptr != LIGHT_TREE_LIGHT_SUBSET_ID_NULL) {
+    DeviceLightSubset subset = work->subsets[light_ptr];
+
+    for (uint32_t light_id = subset.index; light_id < subset.index + subset.count; light_id++) {
+      LightTreeFragment fragment = work->fragments[light_id];
+
+      uint32_t v_offset = *vertex_offset;
+
+      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", fragment.v0.x, fragment.v0.y, fragment.v0.z);
+      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", fragment.v1.x, fragment.v1.y, fragment.v1.z);
+      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", fragment.v2.x, fragment.v2.y, fragment.v2.z);
+
+      buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
+
+      v_offset += 3;
+
+      *vertex_offset = v_offset;
+    }
+
+    __DEBUG_ASSERT(buffer_offset < 1024 * 1024);
+    fwrite(buffer, buffer_offset, 1, obj_file);
+    buffer_offset = 0;
+  }
+
+  buffer_offset += sprintf(buffer + buffer_offset, "newmtl NodeMTL_0x%08X\n", offset);
+  buffer_offset += sprintf(
+    buffer + buffer_offset, "Kd %f %f %f\n", (offset & 0b100) ? 1.0f : 0.0f, (offset & 0b10) ? 1.0f : 0.0f, (offset & 0b1) ? 1.0f : 0.0f);
+  buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 0.1f);
+
+  __DEBUG_ASSERT(buffer_offset < 1024 * 1024);
+  fwrite(buffer, buffer_offset, 1, mtl_file);
+
+  __FAILURE_HANDLE(host_free(&buffer));
 
   return LUMINARY_SUCCESS;
 }
@@ -1446,7 +1517,30 @@ static LuminaryResult _light_tree_debug_output(LightTreeWork* work) {
     _light_tree_debug_output_export_binary_node(obj_file, mtl_file, work, i, &vertex_offset);
   }
 
-  __FAILURE_HANDLE(_light_tree_debug_output_export_lights(obj_file, mtl_file, work, &vertex_offset));
+  fclose(obj_file);
+  fclose(mtl_file);
+
+  obj_file = fopen("LuminaryDeviceLightTree.obj", "wb");
+
+  if (!obj_file) {
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file LuminaryDeviceLightTree.obj.");
+  }
+
+  mtl_file = fopen("LuminaryDeviceLightTree.mtl", "wb");
+
+  if (!mtl_file) {
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file LuminaryDeviceLightTree.mtl.");
+  }
+
+  uint32_t num_nodes_as_16bytes;
+  __FAILURE_HANDLE(array_get_num_elements(work->nodes8_packed, &num_nodes_as_16bytes));
+
+  vertex_offset        = 1;
+  uint32_t node_offset = 0;
+
+  while (node_offset < num_nodes_as_16bytes) {
+    __FAILURE_HANDLE(_light_tree_debug_output_export_device_node(obj_file, mtl_file, work, &node_offset, &vertex_offset))
+  }
 
   fclose(obj_file);
   fclose(mtl_file);
