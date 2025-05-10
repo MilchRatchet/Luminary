@@ -54,6 +54,8 @@ struct LightTreeBinaryNode {
   LightTreeNodeType type;
   float left_power;
   float right_power;
+  float left_area;
+  float right_area;
   uint32_t path;
   uint32_t depth;
 } typedef LightTreeBinaryNode;
@@ -71,21 +73,16 @@ struct LightTreeNode {
   float right_variance;
   float left_power;
   float right_power;
-  uint32_t ptr;
+  uint32_t child_ptr;
+  uint32_t light_ptr;
   uint32_t light_count;
   float cost;
 } typedef LightTreeNode;
-#ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
-static_assert(sizeof(LightTreeNode) == 0x54, "Incorrect packing size.");
-#else  /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
-static_assert(sizeof(LightTreeNode) == 0x34, "Incorrect packing size.");
-#endif /* !LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
 
 struct LightTreeChildNode {
   vec3 mean;
   float variance;
   float power;
-  uint32_t light_count;
 } typedef LightTreeChildNode;
 
 struct LightTreeWork {
@@ -392,6 +389,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       node.left_low.x  = low.x;
       node.left_low.y  = low.y;
       node.left_low.z  = low.z;
+      node.left_area   = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
 
       __FAILURE_HANDLE(array_get_num_elements(nodes, &node.child_address));
 
@@ -399,15 +397,15 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
         .triangle_count    = optimal_split,
         .triangles_address = fragments_ptr,
         .type              = LIGHT_TREE_NODE_TYPE_LEAF,
-        .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
-        .self_high.x  = high.x,
-        .self_high.y  = high.y,
-        .self_high.z  = high.z,
-        .self_low.x   = low.x,
-        .self_low.y   = low.y,
-        .self_low.z   = low.z,
-        .path         = node.path | (1 << node.depth),
-        .depth        = node.depth + 1,
+        .surface_area      = node.left_area,
+        .self_high.x       = high.x,
+        .self_high.y       = high.y,
+        .self_high.z       = high.z,
+        .self_low.x        = low.x,
+        .self_low.y        = low.y,
+        .self_low.z        = low.z,
+        .path              = node.path | (1 << node.depth),
+        .depth             = node.depth + 1,
       };
 
       __FAILURE_HANDLE(array_push(&nodes, &node_left));
@@ -420,20 +418,21 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       node.right_low.x  = low.x;
       node.right_low.y  = low.y;
       node.right_low.z  = low.z;
+      node.right_area   = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
 
       LightTreeBinaryNode node_right = {
         .triangle_count    = node.triangle_count - optimal_split,
         .triangles_address = fragments_ptr + optimal_split,
         .type              = LIGHT_TREE_NODE_TYPE_LEAF,
-        .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
-        .self_high.x  = high.x,
-        .self_high.y  = high.y,
-        .self_high.z  = high.z,
-        .self_low.x   = low.x,
-        .self_low.y   = low.y,
-        .self_low.z   = low.z,
-        .path         = node.path,
-        .depth        = node.depth + 1,
+        .surface_area      = node.right_area,
+        .self_high.x       = high.x,
+        .self_high.y       = high.y,
+        .self_high.z       = high.z,
+        .self_low.x        = low.x,
+        .self_low.y        = low.y,
+        .self_low.z        = low.z,
+        .path              = node.path,
+        .depth             = node.depth + 1,
       };
 
       __FAILURE_HANDLE(array_push(&nodes, &node_right));
@@ -550,11 +549,14 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
 
     node.left_power  = binary_node.left_power;
     node.right_power = binary_node.right_power;
+    node.light_count = binary_node.triangle_count;
+    node.light_ptr   = binary_node.triangles_address;
+
+    __DEBUG_ASSERT(node.light_count > 0);
 
     switch (binary_node.type) {
       case LIGHT_TREE_NODE_TYPE_INTERNAL:
-        node.light_count = 0;
-        node.ptr         = binary_node.child_address;
+        node.child_ptr = binary_node.child_address;
 
 #ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
         _lights_get_vmf_and_mean_and_variance(
@@ -567,8 +569,7 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
 #endif /* !LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
-        node.light_count = binary_node.triangle_count;
-        node.ptr         = binary_node.triangles_address;
+        node.child_ptr = LIGHT_TREE_BINARY_INDEX_NULL;
         break;
       default:
         __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Encountered illegal node type!");
@@ -619,7 +620,7 @@ static LuminaryResult _light_tree_subset_append(LightTreeCollapseWork* cwork, co
   subset->count += node.light_count;
 
   for (uint32_t light_id = 0; light_id < node.light_count; light_id++) {
-    cwork->new_fragments[cwork->triangles_ptr + light_id] = node.ptr + light_id;
+    cwork->new_fragments[cwork->triangles_ptr + light_id] = node.light_ptr + light_id;
   }
 
   cwork->triangles_ptr += node.light_count;
@@ -693,7 +694,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
     bool children_require_work = false;
 
-    if (binary_nodes[binary_index].light_count == 0) {
+    if (binary_nodes[binary_index].child_ptr != LIGHT_TREE_BINARY_INDEX_NULL) {
       const LightTreeNode binary_node = binary_nodes[binary_index];
 
       LightTreeChildNode left_child;
@@ -703,7 +704,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       left_child.variance = binary_node.left_variance;
       left_child.power    = binary_node.left_power;
 
-      child_binary_index[child_count] = binary_node.ptr;
+      child_binary_index[child_count] = binary_node.child_ptr;
 
       children[child_count++] = left_child;
 
@@ -714,7 +715,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       right_child.variance = binary_node.right_variance;
       right_child.power    = binary_node.right_power;
 
-      child_binary_index[child_count] = binary_node.ptr + 1;
+      child_binary_index[child_count] = binary_node.child_ptr + 1;
 
       children[child_count++] = right_child;
 
@@ -764,7 +765,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       const LightTreeNode binary_node = binary_nodes[child_binary_index[selected_child]];
 
-      if (binary_node.light_count == 0) {
+      if (binary_node.child_ptr != LIGHT_TREE_BINARY_INDEX_NULL) {
         LightTreeChildNode left_child;
         memset(&left_child, 0, sizeof(LightTreeChildNode));
 
@@ -772,7 +773,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
         left_child.variance = binary_node.left_variance;
         left_child.power    = binary_node.left_power;
 
-        child_binary_index[selected_child] = binary_node.ptr;
+        child_binary_index[selected_child] = binary_node.child_ptr;
         children[selected_child]           = left_child;
 
         LightTreeChildNode right_child;
@@ -788,7 +789,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
             break;
         }
 
-        child_binary_index[child_slot] = binary_node.ptr + 1;
+        child_binary_index[child_slot] = binary_node.child_ptr + 1;
         children[child_slot]           = right_child;
 
         child_count++;
@@ -816,7 +817,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
         const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
 
-        if (binary_node.light_count == 0) {
+        if (binary_node.child_ptr != LIGHT_TREE_BINARY_INDEX_NULL) {
           // We are full, skip
           if (child_count == LIGHT_TREE_MAX_CHILD_COUNT)
             continue;
@@ -828,7 +829,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
           left_child.variance = binary_node.left_variance;
           left_child.power    = binary_node.left_power;
 
-          child_binary_index[child_ptr] = binary_node.ptr;
+          child_binary_index[child_ptr] = binary_node.child_ptr;
           children[child_ptr]           = left_child;
 
           LightTreeChildNode right_child;
@@ -844,7 +845,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
               break;
           }
 
-          child_binary_index[child_slot] = binary_node.ptr + 1;
+          child_binary_index[child_slot] = binary_node.child_ptr + 1;
           children[child_slot]           = right_child;
 
           child_count++;
@@ -968,8 +969,6 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       for (uint32_t child_id = section_id * 3; child_id < min(child_count, (section_id + 1) * 3); child_id++) {
         const LightTreeChildNode child_node = children[child_id];
-
-        __DEBUG_ASSERT(child_node.light_count == 0);
 
         uint64_t child_rel_mean_x   = (uint64_t) floorf((child_node.mean.x - min_mean.x) * compression_x + 0.5f);
         uint64_t child_rel_mean_y   = (uint64_t) floorf((child_node.mean.y - min_mean.y) * compression_y + 0.5f);
