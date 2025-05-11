@@ -23,7 +23,7 @@ struct LightTreeNodeReference {
 } typedef LightTreeNodeReference;
 LUM_STATIC_SIZE_ASSERT(LightTreeNodeReference, 0x08);
 
-#define LIGHT_TREE_MAX_SUBSET_REFERENCES 32
+#define LIGHT_TREE_MAX_SUBSET_REFERENCES 96
 #define LIGHT_TREE_MAX_NODE_REFERENCES 32
 
 typedef uint16_t PackedProb;
@@ -88,7 +88,7 @@ __device__ void light_tree_traverse(
 
   const uint32_t num_lanes[LIGHT_TREE_NUM_TARGETS] = {LIGHT_TREE_NUM_STD_SAMPLES, LIGHT_TREE_NUM_DEFENSIVE_SAMPLES};
 
-  while (stack_ptr) {
+  while (node_stack_ptr) {
     const LightTreeNodeReference node_reference = node_stack[--node_stack_ptr];
 
     uint32_t node_ptr   = 0xFFFFFFFF;
@@ -116,7 +116,8 @@ __device__ void light_tree_traverse(
 
     // TODO: Hack
     for (uint32_t target_id = 0; target_id < LIGHT_TREE_NUM_TARGETS; target_id++) {
-      aggregator.sum_weight[target_id] = 1.0f;
+      lanes_std->selected_target[target_id] = 1.0f;
+      aggregator.sum_weight[target_id]      = 1.0f;
     }
 
     bool has_next = false;
@@ -131,7 +132,8 @@ __device__ void light_tree_traverse(
           for (uint32_t lane_id = 1; lane_id < LIGHT_TREE_NUM_STD_SAMPLES; lane_id++) {
             const uint32_t selected_ptr = selected_ptr_std[lane_id];
 
-            bool already_selected = false;
+            // Ignore cases where no child was selected.
+            bool already_selected = (selected_ptr == 0xFFFFFFFF);
 
 #pragma unroll
             for (uint32_t previous_lane_id = 0; previous_lane_id < lane_id; previous_lane_id++) {
@@ -152,7 +154,8 @@ __device__ void light_tree_traverse(
           for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_DEFENSIVE_SAMPLES; lane_id++) {
             const uint32_t selected_ptr = selected_ptr_defensive[lane_id];
 
-            bool already_selected = false;
+            // Ignore cases where no child was selected.
+            bool already_selected = (selected_ptr == 0xFFFFFFFF);
 
 #pragma unroll
             for (uint32_t previous_lane_id = 0; previous_lane_id < LIGHT_TREE_NUM_STD_SAMPLES; previous_lane_id++) {
