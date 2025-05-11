@@ -157,7 +157,7 @@ __device__ LightSGData light_sg_prepare(const GBufferData data) {
 
   LightSGData sg_data;
   sg_data.diffuse_weight    = (GBUFFER_IS_SUBSTRATE_TRANSLUCENT(data.flags) || (data.flags & G_BUFFER_FLAG_METALLIC)) ? 0.0f : 1.0f;
-  sg_data.reflection_weight = (GBUFFER_IS_SUBSTRATE_OPAQUE(data.flags)) ? 1.0f - roughness_max2 : 1.0f;
+  sg_data.reflection_weight = 1.0f;
   sg_data.rotation_to_z     = rotation_to_z;
   sg_data.proj_roughness_u2 = proj_roughness_u2;
   sg_data.proj_roughness_v2 = proj_roughness_v2;
@@ -175,7 +175,8 @@ __device__ LightSGData light_sg_prepare(const GBufferData data) {
 
 // In our case, all light clusters are considered omnidirectional, i.e. sharpness = 0.
 __device__ float light_sg_evaluate(
-  const LightSGData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power) {
+  const LightSGData data, const vec3 position, const vec3 normal, const vec3 mean, const float variance, const float power,
+  float& secondary_value) {
   const vec3 light_vec    = sub_vector(mean, position);
   const float distance_sq = dot_product(light_vec, light_vec);
   const vec3 light_dir    = scale_vector(light_vec, rsqrt(distance_sq));
@@ -193,6 +194,8 @@ __device__ float light_sg_evaluate(
 
   // Compute SG sharpness for a light distribution viewed from the shading point.
   const float light_sharpness = distance_sq / light_variance;
+
+  secondary_value = (distance_sq < light_variance) ? 1.0f : 0.0f;
 
   // Axis of the SG product lobe.
   const vec3 product_vec          = add_vector(data.reflection_vec, scale_vector(light_dir, light_sharpness));

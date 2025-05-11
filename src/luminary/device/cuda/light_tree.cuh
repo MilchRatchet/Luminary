@@ -8,7 +8,7 @@
 #include "utils.cuh"
 
 #define LIGHT_TREE_NUM_TARGETS 2
-#define LIGHT_TREE_NUM_STD_SAMPLES 3
+#define LIGHT_TREE_NUM_STD_SAMPLES 2
 #define LIGHT_TREE_NUM_DEFENSIVE_SAMPLES 1
 
 struct LightSubsetReference {
@@ -28,7 +28,7 @@ struct LightTreeOutput {
   uint32_t light_id;
 } typedef LightTreeOutput;
 
-#define LIGHT_TREE_NUM_OUTPUTS 16
+#define LIGHT_TREE_NUM_OUTPUTS 32
 #define LIGHT_TREE_MAX_NODE_REFERENCES 64
 
 typedef uint16_t PackedProb;
@@ -57,8 +57,7 @@ __device__ void light_tree_child_importance(
 
   const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
 
-  target[0] = fmaxf(light_sg_evaluate(data, position, normal, mean, variance, power), 0.0f);
-  target[1] = 1.0f;  // TODO
+  target[0] = fmaxf(light_sg_evaluate(data, position, normal, mean, variance, power, target[1]), 0.0f);
 }
 
 __device__ void light_tree_traverse(
