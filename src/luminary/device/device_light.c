@@ -930,8 +930,11 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     float max_variance = 0.0f;
     float max_power    = 0.0f;
 
-    for (uint32_t i = 0; i < child_count; i++) {
-      const vec3 mean = children[i].mean;
+    for (uint32_t child_ptr = 0; child_ptr < LIGHT_TREE_MAX_CHILD_COUNT; child_ptr++) {
+      if (child_binary_index[child_ptr] == LIGHT_TREE_BINARY_INDEX_NULL)
+        continue;
+
+      const vec3 mean = children[child_ptr].mean;
 
       min_mean.x = fminf(min_mean.x, mean.x);
       min_mean.y = fminf(min_mean.y, mean.y);
@@ -941,8 +944,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       max_mean.y = fmaxf(max_mean.y, mean.y);
       max_mean.z = fmaxf(max_mean.z, mean.z);
 
-      max_variance = fmaxf(max_variance, children[i].variance);
-      max_power    = fmaxf(max_power, children[i].power);
+      max_variance = fmaxf(max_variance, children[child_ptr].variance);
+      max_power    = fmaxf(max_power, children[child_ptr].power);
     }
 
     __DEBUG_ASSERT((num_nodes & 0xFFFFFF) == num_nodes);
