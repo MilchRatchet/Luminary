@@ -575,7 +575,18 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
         __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Encountered illegal node type!");
     }
 
-    node.cost = node.left_power * node.left_variance * node.left_variance + node.right_power * node.right_variance * node.right_variance;
+    const float mean_dist = (node.left_mean.x - node.right_mean.x) * (node.left_mean.x - node.right_mean.x)
+                            + (node.left_mean.y - node.right_mean.y) * (node.left_mean.y - node.right_mean.y)
+                            + (node.left_mean.z - node.right_mean.z) * (node.left_mean.z - node.right_mean.z);
+    const float left_weight  = node.left_power / (node.left_power + node.right_power);
+    const float right_weight = node.right_power / (node.left_power + node.right_power);
+
+    const float self_variance =
+      left_weight * node.left_variance + right_weight * node.right_variance + left_weight * right_weight * mean_dist;
+
+    const float variance_reduction = (node.left_variance + node.right_variance) / self_variance;
+
+    node.cost = 1.0f / variance_reduction;
 
     nodes[i] = node;
   }
@@ -733,30 +744,49 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     while (children_require_work) {
       children_require_work = false;
 
-      float max_cost          = 0.0f;
-      uint32_t selected_child = 0;
+      float optimal_cost           = 0.0f;
+      bool selected_is_flattenable = false;
+      uint32_t selected_child      = 0;
 
       for (uint32_t child_ptr = 0; child_ptr < LIGHT_TREE_MAX_CHILD_COUNT; child_ptr++) {
         const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
-        // If this child does not point to another binary node, then skip.
         if (binary_index_of_child == LIGHT_TREE_BINARY_INDEX_NULL)
           continue;
 
         const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
 
-        // Leaf nodes that would make us exceed the light count limit cannot be considered
-        if (num_lights_this_node + binary_node.light_count > LIGHT_TREE_MAX_LIGHT_COUNT)
+        const bool node_is_flattenable = (num_lights_this_node + binary_node.light_count <= LIGHT_TREE_MAX_LIGHT_COUNT);
+
+        // if (node_is_flattenable == false && selected_is_flattenable)
+        //   continue;
+
+        if (node_is_flattenable == false && child_count == LIGHT_TREE_MAX_CHILD_COUNT)
           continue;
 
-        // Internal nodes cannot be considered if we have no child slots available
-        if (binary_node.light_count == 0 && child_count == LIGHT_TREE_MAX_CHILD_COUNT)
-          continue;
+        // Prefer flattening nodes
+        if (node_is_flattenable) {
+          const float cost_this_node = binary_node.left_power + binary_node.right_power;
 
-        if (binary_node.cost > max_cost) {
-          max_cost              = binary_node.cost;
-          selected_child        = child_ptr;
-          children_require_work = true;
+          // if (selected_is_flattenable == false)
+          //   optimal_cost = 0.0f;
+
+          if (cost_this_node > optimal_cost) {
+            optimal_cost            = cost_this_node;
+            selected_child          = child_ptr;
+            children_require_work   = true;
+            selected_is_flattenable = node_is_flattenable;
+          }
+        }
+        else if (binary_node.child_ptr != LIGHT_TREE_BINARY_INDEX_NULL) {
+          const float cost_this_node = (binary_node.left_power + binary_node.right_power) * binary_node.cost;
+
+          if (cost_this_node > optimal_cost) {
+            optimal_cost            = cost_this_node;
+            selected_child          = child_ptr;
+            children_require_work   = true;
+            selected_is_flattenable = node_is_flattenable;
+          }
         }
       }
 
@@ -765,7 +795,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       const LightTreeNode binary_node = binary_nodes[child_binary_index[selected_child]];
 
-      if (binary_node.child_ptr != LIGHT_TREE_BINARY_INDEX_NULL) {
+      if (selected_is_flattenable == false) {
+        __DEBUG_ASSERT(binary_node.child_ptr != LIGHT_TREE_BINARY_INDEX_NULL);
+
         LightTreeChildNode left_child;
         memset(&left_child, 0, sizeof(LightTreeChildNode));
 
