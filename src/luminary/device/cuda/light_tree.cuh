@@ -23,8 +23,13 @@ struct LightTreeNodeReference {
 } typedef LightTreeNodeReference;
 LUM_STATIC_SIZE_ASSERT(LightTreeNodeReference, 0x08);
 
-#define LIGHT_TREE_MAX_SUBSET_REFERENCES 96
-#define LIGHT_TREE_MAX_NODE_REFERENCES 32
+struct LightTreeOutput {
+  RISReservoir reservoir;
+  uint32_t light_id;
+} typedef LightTreeOutput;
+
+#define LIGHT_TREE_NUM_OUTPUTS 16
+#define LIGHT_TREE_MAX_NODE_REFERENCES 64
 
 typedef uint16_t PackedProb;
 
@@ -57,10 +62,7 @@ __device__ void light_tree_child_importance(
 }
 
 __device__ void light_tree_traverse(
-  const LightSGData data, const vec3 position, const vec3 normal, const ushort2 pixel, float random,
-  LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES], uint32_t& stack_ptr) {
-  random = random_saturate(random);
-
+  const LightSGData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeOutput outputs[LIGHT_TREE_NUM_OUTPUTS]) {
   MultiRISAggregator<LIGHT_TREE_NUM_TARGETS> aggregator = multi_ris_aggregator_init<LIGHT_TREE_NUM_TARGETS>();
 
   // TODO: Fix random targets
@@ -75,6 +77,8 @@ __device__ void light_tree_traverse(
     const float lane_random  = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + lane_id, pixel);
     lanes_defensive[lane_id] = multi_ris_lane_init<LIGHT_TREE_NUM_TARGETS, 1>(lane_random);
   }
+
+  uint32_t output_ptr = 0;
 
   // TODO: Turn this into a queue to better handle degenerate tree where we would easily overrun memory (i.e. completely unbalanced tree)
   LightTreeNodeReference node_stack[LIGHT_TREE_MAX_NODE_REFERENCES];
@@ -216,13 +220,12 @@ __device__ void light_tree_traverse(
       }
 
       if (light_ptr != LIGHT_TREE_LIGHT_SUBSET_ID_NULL) {
-        LightSubsetReference ref;
-        ref.subset_id       = light_ptr;
-        ref.sampling_weight = sampling_weight;
+        if (ris_reservoir_add_sample(outputs[output_ptr].reservoir, 1.0f, sampling_weight)) {
+          outputs[output_ptr].light_id = light_ptr;
+        }
 
-        stack[stack_ptr++] = ref;
-
-        light_ptr = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
+        output_ptr = (output_ptr + 1) & (LIGHT_TREE_NUM_OUTPUTS - 1);
+        light_ptr  = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
       }
 
       // This indicates that we have no children
@@ -268,14 +271,10 @@ __device__ void light_tree_traverse(
   }
 }
 
-__device__ uint32_t light_tree_query(
-  const GBufferData data, const float random, const ushort2 pixel, LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES]) {
+__device__ void light_tree_query(const GBufferData data, const ushort2 pixel, LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS]) {
   const LightSGData sg_data = light_sg_prepare(data);
 
-  uint32_t num_lists = 0;
-  light_tree_traverse(sg_data, data.position, data.normal, pixel, random, stack, num_lists);
-
-  return num_lists;
+  light_tree_traverse(sg_data, data.position, data.normal, pixel, light_tree_outputs);
 }
 
 __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {

@@ -349,10 +349,10 @@ __device__ void light_sample_bsdf(
 }
 
 __device__ void light_linked_list_resample_brute_force(
-  const GBufferData data, const LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES], const uint32_t num_references, ushort2 pixel,
+  const GBufferData data, const LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS], ushort2 pixel,
   const TriangleHandle blocked_handle, RISReservoir& reservoir, LightSampleWorkData& work) {
-  uint32_t reference_ptr = 0;
-  uint32_t subset_id     = 0;
+  uint32_t output_ptr = 0;
+  uint32_t subset_id  = 0;
 
   bool reached_end = false;
 
@@ -362,16 +362,19 @@ __device__ void light_linked_list_resample_brute_force(
 
   while (!reached_end) {
     if (subset.count == 0) {
-      if (reference_ptr < num_references) {
-        const LightSubsetReference reference = stack[reference_ptr++];
+      if (output_ptr < LIGHT_TREE_NUM_OUTPUTS) {
+        const LightTreeOutput output = light_tree_outputs[output_ptr++];
 
-        subset_id                 = reference.subset_id;
-        work.tree_sampling_weight = reference.sampling_weight;
+        subset_id                 = output.light_id;
+        work.tree_sampling_weight = ris_reservoir_get_sampling_weight(output.reservoir);
       }
       else {
         reached_end = true;
         break;
       }
+
+      if (subset_id == 0xFFFFFFFF)
+        continue;
 
       subset = load_light_subset(subset_id);
     }
@@ -411,14 +414,15 @@ __device__ TriangleHandle light_sample(
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
+  LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS];
 
-  LightSubsetReference stack[LIGHT_TREE_MAX_SUBSET_REFERENCES];
-  const uint32_t num_references = light_tree_query(data, light_tree_random, pixel, stack);
+  for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
+    const float output_random               = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + output_id, pixel);
+    light_tree_outputs[output_id].reservoir = ris_reservoir_init(output_random);
+    light_tree_outputs[output_id].light_id  = 0xFFFFFFFF;
+  }
 
-  // This happens if no linked list with non zero importance was found.
-  if (num_references == 0)
-    return triangle_handle_get(LIGHT_ID_NONE, 0);
+  light_tree_query(data, pixel, light_tree_outputs);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of linked lists
@@ -430,7 +434,7 @@ __device__ TriangleHandle light_sample(
   LightSampleWorkData work;
   work.sum_colors = splat_color(0.0f);
 
-  light_linked_list_resample_brute_force(data, stack, num_references, pixel, blocked_handle, reservoir, work);
+  light_linked_list_resample_brute_force(data, light_tree_outputs, pixel, blocked_handle, reservoir, work);
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
