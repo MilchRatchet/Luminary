@@ -9,6 +9,7 @@
 #include "light_tree.cuh"
 #include "light_triangle.cuh"
 #include "memory.cuh"
+#include "optix_common.cuh"
 #include "ris.cuh"
 #include "sky_utils.cuh"
 #include "texture_utils.cuh"
@@ -281,6 +282,9 @@ struct LightSampleWorkData {
   float solid_angle;
   float2 hit_coords;
   float tree_sampling_weight;
+  TriangleHandle handle;
+  // Test
+  RGBF sum_colors;
 } typedef LightSampleWorkData;
 
 __device__ void light_sample_common(
@@ -293,12 +297,17 @@ __device__ void light_sample_common(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
   light_color            = mul_color(light_color, bsdf_weight);
-  const float target     = color_importance(light_color);
+  light_color            = mul_color(
+    light_color, optix_geometry_shadowing(
+                   shift_origin_vector(data.position, data.V, ray, is_refraction), ray, dist, work.handle, OPTIX_TRACE_STATUS_EXECUTE));
+  const float target = color_importance(light_color);
 
   const float one_over_solid_angle_pdf = work.solid_angle;
   const float bsdf_pdf                 = bsdf_sample_for_light_pdf(data, ray);
 
   const float sampling_weight = work.tree_sampling_weight * one_over_solid_angle_pdf / (1.0f + bsdf_pdf * one_over_solid_angle_pdf);
+
+  work.sum_colors = add_color(scale_color(light_color, sampling_weight), work.sum_colors);
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
     work.light_id      = light_id;
@@ -376,6 +385,8 @@ __device__ void light_linked_list_resample_brute_force(
       uint3 light_uv_packed;
       TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
+      work.handle = light_handle;
+
       light_sample_solid_angle(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
       light_sample_bsdf(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
     }
@@ -417,6 +428,7 @@ __device__ TriangleHandle light_sample(
 
   // We don't need to initialize it. It will end up uninitialized if and only if ris_reservoir.target is 0.
   LightSampleWorkData work;
+  work.sum_colors = splat_color(0.0f);
 
   light_linked_list_resample_brute_force(data, stack, num_references, pixel, blocked_handle, reservoir, work);
 
@@ -446,7 +458,7 @@ __device__ TriangleHandle light_sample(
   // }
 
   selected_ray           = work.ray;
-  selected_light_color   = work.light_color;
+  selected_light_color   = work.sum_colors;
   selected_dist          = work.dist;
   selected_is_refraction = work.is_refraction;
 
@@ -454,7 +466,7 @@ __device__ TriangleHandle light_sample(
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   ////////////////////////////////////////////////////////////////////
 
-  selected_light_color = scale_color(selected_light_color, sampling_weight);
+  // selected_light_color = scale_color(selected_light_color, sampling_weight);
 
   UTILS_CHECK_NANS(pixel, selected_light_color);
 

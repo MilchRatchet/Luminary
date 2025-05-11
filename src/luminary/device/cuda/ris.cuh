@@ -182,7 +182,7 @@ __device__ float multi_ris_lane_get_sampling_weight(
     probability_not_sampling *= powf(anti_probability, num_lanes[target_id]);
   }
 
-  return 1.0f / (1.0f - probability_not_sampling);
+  return (probability_not_sampling < 1.0f) ? 1.0f / (1.0f - probability_not_sampling) : 0.0f;
 }
 
 #endif /* CU_RIS_H */
