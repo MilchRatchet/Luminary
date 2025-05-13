@@ -365,8 +365,8 @@ __device__ void light_linked_list_resample_brute_force(
       if (output_ptr < LIGHT_TREE_NUM_OUTPUTS) {
         const LightTreeOutput output = light_tree_outputs[output_ptr++];
 
+        work.tree_sampling_weight = output.sampling_weight;
         subset_id                 = output.light_id;
-        work.tree_sampling_weight = ris_reservoir_get_sampling_weight(output.reservoir);
       }
       else {
         reached_end = true;
@@ -417,9 +417,11 @@ __device__ TriangleHandle light_sample(
   LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS];
 
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
-    const float output_random               = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + output_id, pixel);
-    light_tree_outputs[output_id].reservoir = ris_reservoir_init(output_random);
-    light_tree_outputs[output_id].light_id  = 0xFFFFFFFF;
+    LightTreeOutput output;
+    output.sampling_weight = 0.0f;
+    output.light_id        = 0xFFFFFFFF;
+
+    light_tree_outputs[output_id] = output;
   }
 
   light_tree_query(data, pixel, light_tree_outputs);

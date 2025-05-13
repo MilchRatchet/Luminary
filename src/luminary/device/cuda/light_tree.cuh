@@ -23,8 +23,11 @@ struct LightTreeNodeReference {
 } typedef LightTreeNodeReference;
 LUM_STATIC_SIZE_ASSERT(LightTreeNodeReference, 0x08);
 
+#define LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT 24
+#define LIGHT_TREE_NODE_REFERENCE_OFFSET_MASK ((1 << LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT) - 1)
+
 struct LightTreeOutput {
-  RISReservoir reservoir;
+  float sampling_weight;
   uint32_t light_id;
 } typedef LightTreeOutput;
 
@@ -62,20 +65,8 @@ __device__ void light_tree_child_importance(
 
 __device__ void light_tree_traverse(
   const LightSGData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeOutput outputs[LIGHT_TREE_NUM_OUTPUTS]) {
-  MultiRISAggregator<LIGHT_TREE_NUM_TARGETS> aggregator = multi_ris_aggregator_init<LIGHT_TREE_NUM_TARGETS>();
-
-  // TODO: Fix random targets
-  MultiRISLane<LIGHT_TREE_NUM_TARGETS, 0> lanes_std[LIGHT_TREE_NUM_STD_SAMPLES];
-  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_STD_SAMPLES; lane_id++) {
-    const float lane_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + lane_id, pixel);
-    lanes_std[lane_id]      = multi_ris_lane_init<LIGHT_TREE_NUM_TARGETS, 0>(lane_random);
-  }
-
-  MultiRISLane<LIGHT_TREE_NUM_TARGETS, 1> lanes_defensive[LIGHT_TREE_NUM_DEFENSIVE_SAMPLES];
-  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_DEFENSIVE_SAMPLES; lane_id++) {
-    const float lane_random  = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + lane_id, pixel);
-    lanes_defensive[lane_id] = multi_ris_lane_init<LIGHT_TREE_NUM_TARGETS, 1>(lane_random);
-  }
+  RISReservoir reservoir1 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 0, pixel));
+  RISReservoir reservoir2 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 1, pixel));
 
   uint32_t output_ptr = 0;
 
@@ -84,7 +75,7 @@ __device__ void light_tree_traverse(
   uint32_t node_stack_ptr = 0;
 
   LightTreeNodeReference root_node;
-  root_node.ptr             = 0;
+  root_node.ptr             = 0 | (LIGHT_TREE_NUM_OUTPUTS << LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT);
   root_node.sampling_weight = 1.0f;
 
   node_stack[node_stack_ptr++] = root_node;
@@ -94,22 +85,18 @@ __device__ void light_tree_traverse(
   while (node_stack_ptr) {
     const LightTreeNodeReference node_reference = node_stack[--node_stack_ptr];
 
-    uint32_t node_ptr   = 0xFFFFFFFF;
-    uint32_t section_id = 0;
-    uint32_t light_ptr  = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
-    uint32_t child_ptr  = 0xFFFFFFFF;
+    // if (is_center_pixel(pixel)) {
+    //   printf("POP: %u %f\n", node_reference.ptr, node_reference.sampling_weight);
+    // }
 
-    uint32_t selected_ptr_std[LIGHT_TREE_NUM_STD_SAMPLES];
-    for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_STD_SAMPLES; lane_id++) {
-      selected_ptr_std[lane_id] = 0xFFFFFFFF;
-    }
+    uint32_t node_ptr     = 0xFFFFFFFF;
+    uint32_t section_id   = 0;
+    uint32_t light_ptr    = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
+    uint32_t child_ptr    = 0xFFFFFFFF;
+    uint32_t split_budget = node_reference.ptr >> LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT;
 
-    uint32_t selected_ptr_defensive[LIGHT_TREE_NUM_DEFENSIVE_SAMPLES];
-    for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_DEFENSIVE_SAMPLES; lane_id++) {
-      selected_ptr_defensive[lane_id] = 0xFFFFFFFF;
-    }
-
-    selected_ptr_std[0] = node_reference.ptr;
+    uint32_t selected1 = node_reference.ptr & LIGHT_TREE_NODE_REFERENCE_OFFSET_MASK;
+    uint32_t selected2 = 0xFFFFFFFF;
 
     vec3 base   = get_vector(0.0f, 0.0f, 0.0f);
     vec3 exp    = get_vector(0.0f, 0.0f, 0.0f);
@@ -117,11 +104,8 @@ __device__ void light_tree_traverse(
 
     float sampling_weight = node_reference.sampling_weight;
 
-    // TODO: Hack
-    for (uint32_t target_id = 0; target_id < LIGHT_TREE_NUM_TARGETS; target_id++) {
-      lanes_std->selected_target[target_id] = 1.0f;
-      aggregator.sum_weight[target_id]      = 1.0f;
-    }
+    reservoir1.selected_target = 1.0f;
+    reservoir1.sum_weight      = 1.0f;
 
     bool has_next = false;
 
@@ -129,74 +113,44 @@ __device__ void light_tree_traverse(
 
     while (!has_reached_end) {
       if (has_next == false) {
-        if (selected_ptr_std[0] != 0xFFFFFFFF) {
-          // Push all non-active nodes onto the stack
-#pragma unroll
-          for (uint32_t lane_id = 1; lane_id < LIGHT_TREE_NUM_STD_SAMPLES; lane_id++) {
-            const uint32_t selected_ptr = selected_ptr_std[lane_id];
+        if (selected1 != 0xFFFFFFFF || selected2 != 0xFFFFFFFF) {
+          uint32_t split_factor = 0;
+          split_factor += (selected1 != 0xFFFFFFFF) ? 1 : 0;
+          split_factor += (selected2 != 0xFFFFFFFF && selected2 != selected1) ? 1 : 0;
 
-            // Ignore cases where no child was selected.
-            bool already_selected = (selected_ptr == 0xFFFFFFFF);
+          LightTreeNodeReference new_node;
 
-#pragma unroll
-            for (uint32_t previous_lane_id = 0; previous_lane_id < lane_id; previous_lane_id++) {
-              already_selected |= (selected_ptr == selected_ptr_std[previous_lane_id]);
+          if (selected2 != 0xFFFFFFFF && selected2 != selected1) {
+            uint32_t budget_this_node = (selected1 != 0xFFFFFFFF) ? split_budget >> 1 : split_budget;
+
+            split_budget -= budget_this_node;
+
+            new_node.ptr             = selected2 | (budget_this_node << LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT);
+            new_node.sampling_weight = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2) * (1.0f / split_factor);
+
+            if (selected1 != 0xFFFFFFFF) {
+              node_stack[node_stack_ptr++] = new_node;
             }
-
-            if (already_selected)
-              continue;
-
-            LightTreeNodeReference deferred_node;
-            deferred_node.ptr             = selected_ptr;
-            deferred_node.sampling_weight = sampling_weight * multi_ris_lane_get_sampling_weight(lanes_std[lane_id], aggregator, num_lanes);
-
-            node_stack[node_stack_ptr++] = deferred_node;
           }
 
-#pragma unroll
-          for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_DEFENSIVE_SAMPLES; lane_id++) {
-            const uint32_t selected_ptr = selected_ptr_defensive[lane_id];
+          if (selected1 != 0xFFFFFFFF) {
+            uint32_t budget_this_node = split_budget;
 
-            // Ignore cases where no child was selected.
-            bool already_selected = (selected_ptr == 0xFFFFFFFF);
+            split_budget -= budget_this_node;
 
-#pragma unroll
-            for (uint32_t previous_lane_id = 0; previous_lane_id < LIGHT_TREE_NUM_STD_SAMPLES; previous_lane_id++) {
-              already_selected |= (selected_ptr == selected_ptr_std[previous_lane_id]);
-            }
-
-#pragma unroll
-            for (uint32_t previous_lane_id = 0; previous_lane_id < lane_id; previous_lane_id++) {
-              already_selected |= (selected_ptr == selected_ptr_defensive[previous_lane_id]);
-            }
-
-            if (already_selected)
-              continue;
-
-            LightTreeNodeReference deferred_node;
-            deferred_node.ptr = selected_ptr;
-            deferred_node.sampling_weight =
-              sampling_weight * multi_ris_lane_get_sampling_weight(lanes_defensive[lane_id], aggregator, num_lanes);
-
-            node_stack[node_stack_ptr++] = deferred_node;
+            new_node.ptr             = selected1 | (budget_this_node << LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT);
+            new_node.sampling_weight = sampling_weight * ris_reservoir_get_sampling_weight(reservoir1) * (1.0f / split_factor);
           }
 
-          // Update active node
-          node_ptr = selected_ptr_std[0];
-          sampling_weight *= multi_ris_lane_get_sampling_weight(lanes_std[0], aggregator, num_lanes);
+          node_ptr        = new_node.ptr & LIGHT_TREE_NODE_REFERENCE_OFFSET_MASK;
+          split_budget    = new_node.ptr >> LIGHT_TREE_NODE_REFERENCE_BUDGET_SHIFT;
+          sampling_weight = new_node.sampling_weight;
 
-          // Reset aggregator and lanes
-          for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_STD_SAMPLES; lane_id++) {
-            selected_ptr_std[lane_id] = 0xFFFFFFFF;
-            multi_ris_lane_reset(lanes_std[lane_id]);
-          }
+          ris_reservoir_reset(reservoir1);
+          ris_reservoir_reset(reservoir2);
 
-          for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_DEFENSIVE_SAMPLES; lane_id++) {
-            selected_ptr_defensive[lane_id] = 0xFFFFFFFF;
-            multi_ris_lane_reset(lanes_defensive[lane_id]);
-          }
-
-          multi_ris_aggregator_reset(aggregator);
+          selected1 = 0xFFFFFFFF;
+          selected2 = 0xFFFFFFFF;
         }
         else {
           has_reached_end = true;
@@ -219,12 +173,12 @@ __device__ void light_tree_traverse(
       }
 
       if (light_ptr != LIGHT_TREE_LIGHT_SUBSET_ID_NULL) {
-        if (ris_reservoir_add_sample(outputs[output_ptr].reservoir, 1.0f, sampling_weight)) {
-          outputs[output_ptr].light_id = light_ptr;
-        }
+        LightTreeOutput output;
+        output.sampling_weight = sampling_weight;
+        output.light_id        = light_ptr;
 
-        output_ptr = (output_ptr + 1) & (LIGHT_TREE_NUM_OUTPUTS - 1);
-        light_ptr  = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
+        outputs[output_ptr++] = output;
+        light_ptr             = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
       }
 
       // This indicates that we have no children
@@ -248,20 +202,12 @@ __device__ void light_tree_traverse(
           offset_this_child = (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
         }
 
-        multi_ris_aggregator_add_sample(aggregator, target, 1.0f);
-
-#pragma unroll
-        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_STD_SAMPLES; lane_id++) {
-          if (multi_ris_lane_add_sample(lanes_std[lane_id], aggregator, target)) {
-            selected_ptr_std[lane_id] = child_ptr;
-          }
+        if (ris_reservoir_add_sample(reservoir1, target[0], 1.0f)) {
+          selected1 = child_ptr;
         }
 
-#pragma unroll
-        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_DEFENSIVE_SAMPLES; lane_id++) {
-          if (multi_ris_lane_add_sample(lanes_defensive[lane_id], aggregator, target)) {
-            selected_ptr_defensive[lane_id] = child_ptr;
-          }
+        if (split_budget > 1 && ris_reservoir_add_sample(reservoir2, target[0], 1.0f)) {
+          selected2 = child_ptr;
         }
 
         child_ptr += offset_this_child;
