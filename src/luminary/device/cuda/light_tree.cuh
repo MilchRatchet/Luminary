@@ -7,7 +7,6 @@
 #include "ris.cuh"
 #include "utils.cuh"
 
-#define LIGHT_TREE_NUM_TARGETS 2
 #define LIGHT_TREE_NUM_STD_SAMPLES 2
 #define LIGHT_TREE_NUM_DEFENSIVE_SAMPLES 1
 
@@ -52,19 +51,70 @@ __device__ PackedProb light_tree_pack_probability(const float p) {
   return (PackedProb) (data >> 12);
 }
 
-__device__ void light_tree_child_importance(
-  const LightSGData data, const vec3 position, const vec3 normal, const DeviceLightTreeNodeSection section, const vec3 base, const vec3 exp,
-  const float exp_v, const uint32_t i, float target[LIGHT_TREE_NUM_TARGETS]) {
+__device__ float light_tree_child_importance_diffuse(const GBufferData data, const float power, const vec3 mean, const float variance) {
+  const vec3 PO = sub_vector(mean, data.position);
+
+#if 0
+  const vec3 D      = normalize_vector(cross_product(cross_product(PO, data.normal), PO));
+  const vec3 v      = normalize_vector(PO);
+  const float theta = fminf(asinf(variance / get_length(PO)), acosf(dot_product(data.normal, v)));
+  const vec3 L = normalize_vector(add_vector(scale_vector(v, cosf(theta)), scale_vector(D, sinf(theta))));
+#else
+  const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(data.normal, variance)), data.position));
+#endif
+
+  const float dist_sq = fmaxf(dot_product(PO, PO), variance * variance);
+
+  return power * __saturatef(dot_product(L, data.normal)) / dist_sq;
+}
+
+__device__ float light_tree_child_importance_microfacet_reflection(
+  const GBufferData data, const float power, const vec3 mean, const float variance) {
+  const vec3 PO = sub_vector(mean, data.position);
+
+  const vec3 R          = reflect_vector(data.V, data.normal);
+  const vec3 target_dir = normalize_vector(add_vector(scale_vector(data.normal, data.roughness), scale_vector(R, 1.0f - data.roughness)));
+  const vec3 v          = normalize_vector(PO);
+  const float length_PO = get_length(PO);
+  const float R_dot_V   = dot_product(target_dir, v);
+
+  float N_dot_H;
+  if (R_dot_V > 1.0f - eps || length_PO < variance) {
+    N_dot_H = 1.0f;
+  }
+  else {
+    const vec3 D      = normalize_vector(cross_product(cross_product(PO, target_dir), PO));
+    const float theta = fminf(asinf(variance / length_PO), acosf(R_dot_V));
+    const vec3 u      = normalize_vector(add_vector(scale_vector(v, cosf(theta)), scale_vector(D, sinf(theta))));
+    const vec3 H      = normalize_vector(add_vector(data.V, u));
+
+    N_dot_H = dot_product(data.normal, H);
+  }
+
+  const float roughness2 = data.roughness * data.roughness;
+  const float roughness4 = roughness2 * roughness2;
+  // TODO: Why is roughness2 giving correct values? This seems like there is something wrong in the evaluation but I can't find anything.
+  const float D = bsdf_microfacet_evaluate_D_GGX(N_dot_H, roughness2);
+
+  const float dist_sq    = fmaxf(dot_product(PO, PO), variance * variance);
+  const float power_term = lerp(1.0f, power / dist_sq, data.roughness);
+
+  return power_term * fmaxf(D, 0.0f);
+}
+
+__device__ float light_tree_child_importance(
+  const GBufferData data, const vec3 position, const vec3 normal, const DeviceLightTreeNodeSection section, const vec3 base, const vec3 exp,
+  const float exp_v, const uint32_t i) {
   const float power    = (float) section.rel_power[i];
   const float variance = section.rel_variance[i] * exp_v;
 
   const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
 
-  target[0] = fmaxf(light_sg_evaluate(data, position, normal, mean, variance, power, target[1]), 0.0f);
+  return fmaxf(light_tree_child_importance_diffuse(data, power, mean, variance), 0.0f);
 }
 
 __device__ void light_tree_traverse(
-  const LightSGData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeOutput outputs[LIGHT_TREE_NUM_OUTPUTS]) {
+  const GBufferData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeOutput outputs[LIGHT_TREE_NUM_OUTPUTS]) {
   RISReservoir reservoir1 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 0, pixel));
   RISReservoir reservoir2 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 1, pixel));
 
@@ -79,8 +129,6 @@ __device__ void light_tree_traverse(
   root_node.sampling_weight = 1.0f;
 
   node_stack[node_stack_ptr++] = root_node;
-
-  const uint32_t num_lanes[LIGHT_TREE_NUM_TARGETS] = {LIGHT_TREE_NUM_STD_SAMPLES, LIGHT_TREE_NUM_DEFENSIVE_SAMPLES};
 
   while (node_stack_ptr) {
     const LightTreeNodeReference node_reference = node_stack[--node_stack_ptr];
@@ -194,19 +242,19 @@ __device__ void light_tree_traverse(
 
 #pragma unroll
       for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
-        float target[LIGHT_TREE_NUM_TARGETS] = {0.0f, 0.0f};
-        uint32_t offset_this_child           = 0;
+        float target               = 0.0f;
+        uint32_t offset_this_child = 0;
 
         if (section.rel_power[rel_child_id] > 0) {
-          light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id, target);
+          target            = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
           offset_this_child = (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
         }
 
-        if (ris_reservoir_add_sample(reservoir1, target[0], 1.0f)) {
+        if (ris_reservoir_add_sample(reservoir1, target, 1.0f)) {
           selected1 = child_ptr;
         }
 
-        if (split_budget > 1 && ris_reservoir_add_sample(reservoir2, target[0], 1.0f)) {
+        if (split_budget > 1 && ris_reservoir_add_sample(reservoir2, target, 1.0f)) {
           selected2 = child_ptr;
         }
 
@@ -219,7 +267,7 @@ __device__ void light_tree_traverse(
 __device__ void light_tree_query(const GBufferData data, const ushort2 pixel, LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS]) {
   const LightSGData sg_data = light_sg_prepare(data);
 
-  light_tree_traverse(sg_data, data.position, data.normal, pixel, light_tree_outputs);
+  light_tree_traverse(data, data.position, data.normal, pixel, light_tree_outputs);
 }
 
 __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {
