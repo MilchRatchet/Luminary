@@ -349,8 +349,8 @@ __device__ void light_sample_bsdf(
 }
 
 __device__ void light_linked_list_resample_brute_force(
-  const GBufferData data, const LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS], ushort2 pixel,
-  const TriangleHandle blocked_handle, RISReservoir& reservoir, LightSampleWorkData& work) {
+  const GBufferData data, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle, RISReservoir& reservoir,
+  LightSampleWorkData& work) {
   uint32_t output_ptr = 0;
   uint32_t subset_id  = 0;
 
@@ -362,18 +362,18 @@ __device__ void light_linked_list_resample_brute_force(
 
   while (!reached_end) {
     if (subset.count == 0) {
-      if (output_ptr < LIGHT_TREE_NUM_OUTPUTS) {
-        const LightTreeOutput output = light_tree_outputs[output_ptr++];
+      if (output_ptr < light_tree_work.num_outputs) {
+        const LightTreeWorkEntry output = light_tree_work.data[output_ptr++];
 
-        work.tree_sampling_weight = output.sampling_weight;
-        subset_id                 = output.light_id;
+        work.tree_sampling_weight = output.weight;
+        subset_id                 = output.light_ptr;
       }
       else {
         reached_end = true;
         break;
       }
 
-      if (subset_id == 0xFFFFFFFF)
+      if (subset_id == 0xFFFFFF)
         continue;
 
       subset = load_light_subset(subset_id);
@@ -414,17 +414,9 @@ __device__ TriangleHandle light_sample(
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  LightTreeOutput light_tree_outputs[LIGHT_TREE_NUM_OUTPUTS];
-
-  for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
-    LightTreeOutput output;
-    output.sampling_weight = 0.0f;
-    output.light_id        = 0xFFFFFFFF;
-
-    light_tree_outputs[output_id] = output;
-  }
-
-  light_tree_query(data, pixel, light_tree_outputs);
+  LightTreeWork light_tree_work;
+  light_tree_work_init(light_tree_work);
+  light_tree_query(data, pixel, light_tree_work);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of linked lists
@@ -436,7 +428,7 @@ __device__ TriangleHandle light_sample(
   LightSampleWorkData work;
   work.sum_colors = splat_color(0.0f);
 
-  light_linked_list_resample_brute_force(data, light_tree_outputs, pixel, blocked_handle, reservoir, work);
+  light_linked_list_resample_brute_force(data, light_tree_work, pixel, blocked_handle, reservoir, work);
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
