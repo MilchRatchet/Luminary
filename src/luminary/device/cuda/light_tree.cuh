@@ -9,6 +9,8 @@
 
 #define LIGHT_TREE_NUM_OUTPUTS 32
 #define LIGHT_TREE_INVALID_NODE 0xFFFFFF
+#define LIGHT_TREE_SELECTED_IS_LIGHT 0x80000000
+#define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
 
 struct LightTreeWorkEntry {
   union {
@@ -114,7 +116,7 @@ __device__ void light_tree_traverse(
 
     uint32_t node_ptr     = LIGHT_TREE_INVALID_NODE;
     uint32_t section_id   = 0;
-    uint32_t light_ptr    = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
+    uint32_t light_ptr    = LIGHT_TREE_LIGHT_ID_NULL;
     uint32_t child_ptr    = LIGHT_TREE_INVALID_NODE;
     uint32_t split_budget = entry.num_samples;
     uint32_t selected1    = entry.node_ptr;
@@ -135,6 +137,28 @@ __device__ void light_tree_traverse(
 
     while (!has_reached_end) {
       if (has_next == false) {
+        if (selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) {
+          LightTreeWorkEntry output_entry;
+          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir1);
+          output_entry.light_ptr           = selected1 & LIGHT_TREE_SELECTED_PTR_MASK;
+          output_entry.material_layer_mask = 0xFF;
+
+          work.data[work.num_outputs++] = output_entry;
+
+          selected1 = LIGHT_TREE_INVALID_NODE;
+        }
+
+        if (selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) {
+          LightTreeWorkEntry output_entry;
+          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2);
+          output_entry.light_ptr           = selected2 & LIGHT_TREE_SELECTED_PTR_MASK;
+          output_entry.material_layer_mask = 0xFF;
+
+          work.data[work.num_outputs++] = output_entry;
+
+          selected2 = LIGHT_TREE_INVALID_NODE;
+        }
+
         if (selected1 != LIGHT_TREE_INVALID_NODE || selected2 != LIGHT_TREE_INVALID_NODE) {
           uint32_t split_factor = 0;
           split_factor += (selected1 != LIGHT_TREE_INVALID_NODE) ? 1 : 0;
@@ -194,48 +218,38 @@ __device__ void light_tree_traverse(
         child_ptr  = ((uint32_t) header.child_and_light_ptr[0]) | (((uint32_t) header.child_and_light_ptr[1] & 0x00FF) << 16);
         light_ptr  = ((uint32_t) header.child_and_light_ptr[2]) | (((uint32_t) header.child_and_light_ptr[1] & 0xFF00) << 8);
         section_id = 0;
+
+        light_ptr |= LIGHT_TREE_SELECTED_IS_LIGHT;
       }
 
-      if (light_ptr != LIGHT_TREE_LIGHT_SUBSET_ID_NULL) {
-        LightTreeWorkEntry output_entry;
-        output_entry.weight              = sampling_weight;
-        output_entry.light_ptr           = light_ptr;
-        output_entry.material_layer_mask = 0xFF;
-
-        work.data[work.num_outputs++] = output_entry;
-        light_ptr                     = LIGHT_TREE_LIGHT_SUBSET_ID_NULL;
-      }
-
-      // This indicates that we have no children
-      if (child_ptr == 0) {
-        has_reached_end = true;
-        break;
-      }
-
-      const DeviceLightTreeNodeSection section = load_light_tree_node_section(node_ptr + 1 + section_id);
+      const DeviceLightTreeNodeSection section = load_light_tree_node_section(node_ptr + 1 + section_id * 2);
       section_id++;
 
       has_next = (section.meta & LIGHT_TREE_META_HAS_NEXT) != 0;
 
 #pragma unroll
-      for (uint32_t rel_child_id = 0; rel_child_id < 3; rel_child_id++) {
+      for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
         float target               = 0.0f;
         uint32_t offset_this_child = 0;
 
+        const bool is_light = ((section.meta >> LIGHT_TREE_META_LIGHT_COUNT_SHIFT) & LIGHT_TREE_META_LIGHT_COUNT_MASK) > rel_child_id;
+
         if (section.rel_power[rel_child_id] > 0) {
-          target            = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
-          offset_this_child = (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) + 1;
+          target = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
+          offset_this_child =
+            (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) * LIGHT_TREE_NODE_SECTION_REL_SIZE + 1;
         }
 
         if (ris_reservoir_add_sample(reservoir1, target, 1.0f)) {
-          selected1 = child_ptr;
+          selected1 = is_light ? light_ptr : child_ptr;
         }
 
         if (split_budget > 1 && ris_reservoir_add_sample(reservoir2, target, 1.0f)) {
-          selected2 = child_ptr;
+          selected2 = is_light ? light_ptr : child_ptr;
         }
 
-        child_ptr += offset_this_child;
+        child_ptr += is_light ? 0 : offset_this_child;
+        light_ptr += is_light ? 1 : 0;
       }
     }
   }

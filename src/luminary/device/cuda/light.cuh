@@ -351,35 +351,11 @@ __device__ void light_sample_bsdf(
 __device__ void light_linked_list_resample_brute_force(
   const GBufferData data, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle, RISReservoir& reservoir,
   LightSampleWorkData& work) {
-  uint32_t output_ptr = 0;
-  uint32_t subset_id  = 0;
+  for (uint32_t output_id = 0; output_id < light_tree_work.num_outputs; output_id++) {
+    const LightTreeWorkEntry output = light_tree_work.data[output_id];
 
-  bool reached_end = false;
-
-  DeviceLightSubset subset;
-  subset.index = 0;
-  subset.count = 0;
-
-  while (!reached_end) {
-    if (subset.count == 0) {
-      if (output_ptr < light_tree_work.num_outputs) {
-        const LightTreeWorkEntry output = light_tree_work.data[output_ptr++];
-
-        work.tree_sampling_weight = output.weight;
-        subset_id                 = output.light_ptr;
-      }
-      else {
-        reached_end = true;
-        break;
-      }
-
-      if (subset_id == 0xFFFFFF)
-        continue;
-
-      subset = load_light_subset(subset_id);
-    }
-
-    const uint32_t light_id = subset.index;
+    const uint32_t light_id   = output.light_ptr;
+    work.tree_sampling_weight = output.weight;
 
     DeviceTransform trans;
     const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
@@ -393,9 +369,6 @@ __device__ void light_linked_list_resample_brute_force(
       light_sample_solid_angle(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
       light_sample_bsdf(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
     }
-
-    subset.index++;
-    subset.count--;
   }
 }
 

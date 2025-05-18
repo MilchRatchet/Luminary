@@ -73,7 +73,6 @@ __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
 
 #define load_light_tree_node_header(offset) load_generic<DeviceLightTreeNodeHeader, float4>(device.ptrs.light_tree_nodes, offset)
 #define load_light_tree_node_section(offset) load_generic<DeviceLightTreeNodeSection, float4>(device.ptrs.light_tree_nodes, offset)
-#define load_light_subset(offset) load_generic<DeviceLightSubset, float2>(device.ptrs.light_subsets, offset)
 
 ////////////////////////////////////////////////////////////////////
 // Task IO

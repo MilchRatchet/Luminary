@@ -24,10 +24,14 @@
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
-#define LIGHT_TREE_LIGHT_SUBSET_ID_NULL (0xFFFFFF)
-#define LIGHT_TREE_META_HAS_NEXT (0x80)
+#define LIGHT_TREE_LIGHT_ID_NULL (0xFFFFFF)
 #define LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG (2)
 #define LIGHT_TREE_CHILD_OFFSET_STRIDE (1 << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG)
+#define LIGHT_TREE_MAX_CHILDREN_PER_SECTION 6
+#define LIGHT_TREE_META_HAS_NEXT (0x8000)
+#define LIGHT_TREE_META_LIGHT_COUNT_SHIFT (LIGHT_TREE_MAX_CHILDREN_PER_SECTION * 2)
+#define LIGHT_TREE_META_LIGHT_COUNT_MASK 0x7
+#define LIGHT_TREE_NODE_SECTION_REL_SIZE (sizeof(DeviceLightTreeNodeSection) / sizeof(DeviceLightTreeNodeHeader))
 #define LIGHT_NUM_MICROTRIANGLES 64
 
 #define UNDERSAMPLING_FIRST_SAMPLE_MASK 0x80
@@ -271,20 +275,14 @@ struct DeviceLightTreeNodeHeader {
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeHeader, 0x10);
 
 struct DeviceLightTreeNodeSection {
-  uint8_t meta;
-  uint8_t rel_mean_x[3];
-  uint8_t rel_mean_y[3];
-  uint8_t rel_mean_z[3];
-  uint8_t rel_variance[3];
-  uint8_t rel_power[3];
+  uint16_t meta;  // 1 has_next, 3 num_leaf_nodes, 12 child offsets
+  uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_variance[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
 } typedef DeviceLightTreeNodeSection;
-LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeSection, 0x10);
-
-struct DeviceLightSubset {
-  uint32_t index;
-  uint32_t count;
-} typedef DeviceLightSubset;
-LUM_STATIC_SIZE_ASSERT(DeviceLightSubset, 0x08);
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeSection, 0x20);
 
 struct DeviceLightTreeLeaf {
   float power;
@@ -333,7 +331,6 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
   DEVICE const float* LUM_RESTRICT light_importance_normalization;
   DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;
-  DEVICE const DeviceLightSubset* LUM_RESTRICT light_subsets;
   DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
