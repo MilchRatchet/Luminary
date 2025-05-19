@@ -841,11 +841,10 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     uint32_t num_leaf_nodes = 0;
 
     // Mark all leaf nodes
-    for (uint32_t child_ptr = 0; child_ptr < LIGHT_TREE_MAX_CHILD_COUNT; child_ptr++) {
+    for (uint32_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
       const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
-      if (binary_index_of_child == LIGHT_TREE_BINARY_INDEX_NULL)
-        continue;
+      __DEBUG_ASSERT(binary_index_of_child != LIGHT_TREE_BINARY_INDEX_NULL);
 
       const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
 
@@ -859,7 +858,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
     __DEBUG_ASSERT((light_ptr & LIGHT_TREE_LIGHT_ID_NULL) == light_ptr);
 
-    // Sort children so that leaf ndoes come first
+    // Sort children so that leaf nodes come first
     for (uint32_t child_ptr = 0; child_ptr < num_leaf_nodes; child_ptr++) {
       const LightTreeChildNode child = children[child_ptr];
 
@@ -1095,8 +1094,14 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       uint16_t meta = section->meta;
       for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
+        if (section->rel_power[rel_child_id] == 0)
+          continue;
+
+        if (((section->meta >> LIGHT_TREE_META_LIGHT_COUNT_SHIFT) & LIGHT_TREE_META_LIGHT_COUNT_MASK) > rel_child_id)
+          continue;
+
         const uint32_t child_offset      = cwork.node_offset[child_id];
-        const uint32_t next_child_offset = (child_id + 1 < num_nodes) ? cwork.node_offset[child_id + 1] : child_offset + 1;
+        const uint32_t next_child_offset = cwork.node_offset[child_id + 1];
 
         const uint32_t child_num_sections = (next_child_offset - child_offset - 1) / LIGHT_TREE_NODE_SECTION_REL_SIZE;
 
