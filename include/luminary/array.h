@@ -22,14 +22,14 @@
 #include <luminary/error.h>
 
 #define array_create(array, size_of_element, num_elements) \
-  _array_create((void**) array, size_of_element, num_elements, (const char*) #array, (const char*) __func__, __LINE__)
-#define array_resize(array, size) _array_resize((void**) array, size, (const char*) #array, (const char*) __func__, __LINE__)
-#define array_push(array, object) _array_push((void**) array, (void*) object, (const char*) #array, (const char*) __func__, __LINE__)
-#define array_copy(dst, src) _array_copy((void**) dst, (void**) src, (const char*) #dst, (const char*) __func__, __LINE__)
-#define array_append(dst, src) _array_append((void**) dst, (const void*) src, (const char*) #dst, (const char*) __func__, __LINE__)
+  _array_create((void**) (array), (size_of_element), (num_elements), (const char*) #array, (const char*) __func__, __LINE__)
+#define array_resize(array, size) _array_resize((void**) (array), (size), (const char*) #array, (const char*) __func__, __LINE__)
+#define array_push(array, object) _array_push((void**) (array), (void*) (object), (const char*) #array, (const char*) __func__, __LINE__)
+#define array_copy(dst, src) _array_copy((void**) (dst), (void**) (src), (const char*) #dst, (const char*) __func__, __LINE__)
+#define array_append(dst, src) _array_append((void**) (dst), (const void*) (src), (const char*) #dst, (const char*) __func__, __LINE__)
 #define array_set_num_elements(array, num_elements) \
-  _array_set_num_elements((void**) array, num_elements, (const char*) #array, (const char*) __func__, __LINE__)
-#define array_destroy(array) _array_destroy((void**) array, (const char*) #array, (const char*) __func__, __LINE__)
+  _array_set_num_elements((void**) (array), (num_elements), (const char*) #array, (const char*) __func__, __LINE__)
+#define array_destroy(array) _array_destroy((void**) (array), (const char*) #array, (const char*) __func__, __LINE__)
 
 LUMINARY_API LuminaryResult
   _array_create(void** array, size_t size_of_element, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line);

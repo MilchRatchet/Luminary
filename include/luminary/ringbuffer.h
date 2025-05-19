@@ -24,8 +24,8 @@
 struct LuminaryRingBuffer;
 typedef struct LuminaryRingBuffer LuminaryRingBuffer;
 
-#define ringbuffer_create(buffer, size) _ringbuffer_create(buffer, size, (const char*) #buffer, (const char*) __func__, __LINE__)
-#define ringbuffer_destroy(buffer) _ringbuffer_destroy(buffer, (const char*) #buffer, (const char*) __func__, __LINE__)
+#define ringbuffer_create(buffer, size) _ringbuffer_create((buffer), (size), (const char*) #buffer, (const char*) __func__, __LINE__)
+#define ringbuffer_destroy(buffer) _ringbuffer_destroy((buffer), (const char*) #buffer, (const char*) __func__, __LINE__)
 
 LUMINARY_API LuminaryResult
   _ringbuffer_create(LuminaryRingBuffer** buffer, size_t size, const char* buf_name, const char* func, uint32_t line);
