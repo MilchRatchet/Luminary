@@ -160,13 +160,21 @@ __device__ void light_tree_traverse(
 
     while (!has_reached_end) {
       if (has_next == false) {
-        uint32_t split_factor = 0;
-        split_factor += (selected1 != LIGHT_TREE_INVALID_NODE) ? 1 : 0;
-        split_factor += (selected2 != LIGHT_TREE_INVALID_NODE && selected2 != selected1) ? 1 : 0;
+        // Check if we are splitting, apply the MIS weight in that case
+        const bool do_splitting =
+          ((selected1 != LIGHT_TREE_INVALID_NODE) && (selected2 != LIGHT_TREE_INVALID_NODE) && (selected1 != selected2));
+        const float mis_weight = do_splitting ? 0.5f : 1.0f;
+        sampling_weight        = sampling_weight * mis_weight;
+
+        const float weight_selected1 = ris_reservoir_get_sampling_weight(reservoir1);
+        const float weight_selected2 = ris_reservoir_get_sampling_weight(reservoir2);
+
+        ris_reservoir_reset(reservoir1);
+        ris_reservoir_reset(reservoir2);
 
         if (((selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) && selected1 != selected2) {
           LightTreeWorkEntry output_entry;
-          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir1) * (1.0f / split_factor);
+          output_entry.weight              = sampling_weight * weight_selected1;
           output_entry.light_ptr           = selected1 & LIGHT_TREE_SELECTED_PTR_MASK;
           output_entry.material_layer_mask = 0xFF;
 
@@ -177,7 +185,7 @@ __device__ void light_tree_traverse(
 
         if ((selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) {
           LightTreeWorkEntry output_entry;
-          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2) * (1.0f / split_factor);
+          output_entry.weight              = sampling_weight * weight_selected2;
           output_entry.light_ptr           = selected2 & LIGHT_TREE_SELECTED_PTR_MASK;
           output_entry.material_layer_mask = 0xFF;
 
@@ -200,7 +208,7 @@ __device__ void light_tree_traverse(
 
             new_entry.num_samples = budget_this_node;
             new_entry.node_ptr    = selected2;
-            new_entry.weight      = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2) * (1.0f / split_factor);
+            new_entry.weight      = sampling_weight * weight_selected2;
 
             if (selected1 != LIGHT_TREE_INVALID_NODE) {
               work_entry_mask |= (1 << queue_write_ptr);
@@ -215,18 +223,12 @@ __device__ void light_tree_traverse(
 
             new_entry.num_samples = budget_this_node;
             new_entry.node_ptr    = selected1;
-            new_entry.weight      = sampling_weight * ris_reservoir_get_sampling_weight(reservoir1) * (1.0f / split_factor);
+            new_entry.weight      = sampling_weight * weight_selected1;
           }
 
           node_ptr        = new_entry.node_ptr;
           split_budget    = new_entry.num_samples;
           sampling_weight = new_entry.weight;
-
-          ris_reservoir_reset(reservoir1);
-          ris_reservoir_reset(reservoir2);
-
-          selected1 = LIGHT_TREE_INVALID_NODE;
-          selected2 = LIGHT_TREE_INVALID_NODE;
         }
         else {
           // If this path has not produced any lights, then we must queue a dummy output so that we have no holes.
@@ -248,6 +250,9 @@ __device__ void light_tree_traverse(
           has_reached_end = true;
           break;
         }
+
+        selected1 = LIGHT_TREE_INVALID_NODE;
+        selected2 = LIGHT_TREE_INVALID_NODE;
 
         const DeviceLightTreeNodeHeader header = load_light_tree_node_header(node_ptr);
 
