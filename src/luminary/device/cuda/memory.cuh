@@ -51,11 +51,11 @@ __device__ T warp_reduce_max(T max_value) {
 // Generic Scene Data IO
 ////////////////////////////////////////////////////////////////////
 
-template <typename DATA_TYPE, typename LOAD_TYPE>
+template <typename DATA_TYPE, typename LOAD_TYPE, typename STRIDE_TYPE = DATA_TYPE>
 __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
   static_assert(
     (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)) * sizeof(LOAD_TYPE) == sizeof(DATA_TYPE), "DATA_TYPE must be a multiple of LOAD_TYPE in size.");
-  const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const DATA_TYPE*) src) + offset);
+  const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const STRIDE_TYPE*) src) + offset);
 
   union {
     DATA_TYPE dst_type;
@@ -72,7 +72,8 @@ __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
 }
 
 #define load_light_tree_node_header(offset) load_generic<DeviceLightTreeNodeHeader, float4>(device.ptrs.light_tree_nodes, offset)
-#define load_light_tree_node_section(offset) load_generic<DeviceLightTreeNodeSection, float4>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_node_section(offset) \
+  load_generic<DeviceLightTreeNodeSection, float4, DeviceLightTreeNodeHeader>(device.ptrs.light_tree_nodes, offset)
 
 ////////////////////////////////////////////////////////////////////
 // Task IO

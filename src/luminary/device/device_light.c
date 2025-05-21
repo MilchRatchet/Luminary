@@ -857,6 +857,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     }
 
     __DEBUG_ASSERT((light_ptr & LIGHT_TREE_LIGHT_ID_NULL) == light_ptr);
+    __DEBUG_ASSERT((light_ptr != LIGHT_TREE_LIGHT_ID_NULL) || (num_leaf_nodes == 0));
 
     // Sort children so that leaf nodes come first
     for (uint32_t child_ptr = 0; child_ptr < num_leaf_nodes; child_ptr++) {
@@ -974,8 +975,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
         info_message(
-          "[%u] %llX %llX %llX %llX %llX", child_id, child_rel_mean_x, child_rel_mean_y, child_rel_mean_z, child_rel_power,
-          child_rel_variance);
+          "[%u] %llX %llX %llX %llX %llX %s", child_id, child_rel_mean_x, child_rel_mean_y, child_rel_mean_z, child_rel_power,
+          child_rel_variance, child_node.is_leaf ? "LEAF" : "");
 
         {
           // Check error of compressed mean
@@ -1381,7 +1382,8 @@ static LuminaryResult _light_tree_debug_output_export_device_node(
     bool has_next = true;
 
     while (has_next) {
-      const DeviceLightTreeNodeSection section = ((const DeviceLightTreeNodeSection*) (work->nodes8_packed))[section_offset++];
+      const DeviceLightTreeNodeSection section = *((const DeviceLightTreeNodeSection*) (work->nodes8_packed + section_offset));
+      section_offset += LIGHT_TREE_NODE_SECTION_REL_SIZE;
 
       has_next = (section.meta & LIGHT_TREE_META_HAS_NEXT) != 0;
 

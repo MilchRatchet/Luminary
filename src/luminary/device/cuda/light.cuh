@@ -357,6 +357,9 @@ __device__ void light_linked_list_resample_brute_force(
     const uint32_t light_id   = output.light_ptr;
     work.tree_sampling_weight = output.weight;
 
+    if (light_id == LIGHT_TREE_LIGHT_ID_NULL)
+      continue;
+
     DeviceTransform trans;
     const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
 

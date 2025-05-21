@@ -92,23 +92,46 @@ __device__ float light_tree_child_importance(
   return fmaxf(light_tree_child_importance_diffuse(data, power, mean, variance), 0.0f);
 }
 
+__device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint32_t& queue_write_ptr) {
+  uint32_t output_ptr;
+  if (inplace_output_ptr != 0xFFFFFFFF) {
+    output_ptr         = inplace_output_ptr;
+    inplace_output_ptr = 0xFFFFFFFF;
+  }
+  else {
+    output_ptr = queue_write_ptr++;
+  }
+
+  return output_ptr;
+}
+
 __device__ void light_tree_traverse(
   const GBufferData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeWork& work) {
   RISReservoir reservoir1 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 0, pixel));
   RISReservoir reservoir2 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 1, pixel));
 
-  uint32_t queue_read_ptr  = work.num_outputs;
   uint32_t queue_write_ptr = work.num_outputs;
+
+  // Each traversal path's first output is placed where the work entry of the start node of this path was stored.
+  // This is required to achieve a memory layout without holes.
+  uint32_t inplace_output_ptr = 0xFFFFFFFF;
 
   LightTreeWorkEntry root_node;
   root_node.num_samples = LIGHT_TREE_NUM_OUTPUTS - work.num_outputs;
   root_node.node_ptr    = 0;
   root_node.weight      = 1.0f;
 
+  static_assert(LIGHT_TREE_NUM_OUTPUTS <= 32, "We can only have as many outputs as there are bits in a uint.");
+  uint32_t work_entry_mask = 1 << queue_write_ptr;
+
   work.data[queue_write_ptr++] = root_node;
 
-  while (queue_read_ptr < queue_write_ptr) {
-    const LightTreeWorkEntry entry = work.data[queue_read_ptr++];
+  while (work_entry_mask) {
+    const uint32_t entry_ptr       = __ffs(work_entry_mask) - 1;
+    inplace_output_ptr             = entry_ptr;
+    const LightTreeWorkEntry entry = work.data[entry_ptr];
+
+    work_entry_mask &= ~(1 << entry_ptr);
 
     // if (is_center_pixel(pixel)) {
     //   printf("POP: %u %f\n", node_reference.ptr, node_reference.sampling_weight);
@@ -137,33 +160,37 @@ __device__ void light_tree_traverse(
 
     while (!has_reached_end) {
       if (has_next == false) {
-        if (selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) {
+        uint32_t split_factor = 0;
+        split_factor += (selected1 != LIGHT_TREE_INVALID_NODE) ? 1 : 0;
+        split_factor += (selected2 != LIGHT_TREE_INVALID_NODE && selected2 != selected1) ? 1 : 0;
+
+        if (((selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) && selected1 != selected2) {
           LightTreeWorkEntry output_entry;
-          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir1);
+          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir1) * (1.0f / split_factor);
           output_entry.light_ptr           = selected1 & LIGHT_TREE_SELECTED_PTR_MASK;
           output_entry.material_layer_mask = 0xFF;
 
-          work.data[work.num_outputs++] = output_entry;
-
-          selected1 = LIGHT_TREE_INVALID_NODE;
+          const uint32_t output_ptr = light_tree_get_write_ptr(inplace_output_ptr, queue_write_ptr);
+          work.data[output_ptr]     = output_entry;
+          work.num_outputs++;
         }
 
-        if (selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) {
+        if ((selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) {
           LightTreeWorkEntry output_entry;
-          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2);
+          output_entry.weight              = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2) * (1.0f / split_factor);
           output_entry.light_ptr           = selected2 & LIGHT_TREE_SELECTED_PTR_MASK;
           output_entry.material_layer_mask = 0xFF;
 
-          work.data[work.num_outputs++] = output_entry;
-
-          selected2 = LIGHT_TREE_INVALID_NODE;
+          const uint32_t output_ptr = light_tree_get_write_ptr(inplace_output_ptr, queue_write_ptr);
+          work.data[output_ptr]     = output_entry;
+          work.num_outputs++;
         }
 
-        if (selected1 != LIGHT_TREE_INVALID_NODE || selected2 != LIGHT_TREE_INVALID_NODE) {
-          uint32_t split_factor = 0;
-          split_factor += (selected1 != LIGHT_TREE_INVALID_NODE) ? 1 : 0;
-          split_factor += (selected2 != LIGHT_TREE_INVALID_NODE && selected2 != selected1) ? 1 : 0;
+        // We need to invalidate the selections if they were lights, any valid selection from here is assumed to be a child node.
+        selected1 = ((selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) ? LIGHT_TREE_INVALID_NODE : selected1;
+        selected2 = ((selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) ? LIGHT_TREE_INVALID_NODE : selected2;
 
+        if (selected1 != LIGHT_TREE_INVALID_NODE || selected2 != LIGHT_TREE_INVALID_NODE) {
           LightTreeWorkEntry new_entry;
 
           if (selected2 != LIGHT_TREE_INVALID_NODE && selected2 != selected1) {
@@ -176,6 +203,7 @@ __device__ void light_tree_traverse(
             new_entry.weight      = sampling_weight * ris_reservoir_get_sampling_weight(reservoir2) * (1.0f / split_factor);
 
             if (selected1 != LIGHT_TREE_INVALID_NODE) {
+              work_entry_mask |= (1 << queue_write_ptr);
               work.data[queue_write_ptr++] = new_entry;
             }
           }
@@ -201,6 +229,17 @@ __device__ void light_tree_traverse(
           selected2 = LIGHT_TREE_INVALID_NODE;
         }
         else {
+          // If this path has not produced any lights, then we must queue a dummy output so that we have no holes.
+          if (inplace_output_ptr != 0xFFFFFFFF) {
+            LightTreeWorkEntry output_entry;
+            output_entry.weight              = 0.0f;
+            output_entry.light_ptr           = LIGHT_TREE_LIGHT_ID_NULL;
+            output_entry.material_layer_mask = 0;
+
+            work.data[inplace_output_ptr] = output_entry;
+            work.num_outputs++;
+          }
+
           has_reached_end = true;
           break;
         }
