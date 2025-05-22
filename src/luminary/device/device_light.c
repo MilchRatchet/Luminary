@@ -747,7 +747,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       child.is_leaf = true;
       child.power   = 1.0f;
 
-      __FAILURE_HANDLE(_light_tree_subset_append(&cwork, binary_nodes[binary_index], &light_ptr));
+      child_binary_index[child_count] = binary_index;
+      children[child_count++]         = child;
     }
 
     while (children_require_work) {
@@ -865,7 +866,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
       // Child is not a leaf but is in the part of the list that contains leaves
       if (child.is_leaf == false) {
-        uint32_t child_swap_ptr = num_leaf_nodes;
+        // It is important that the order of the leaves is not modified, else we would have to apply this reordering to the fragments too
+        uint32_t child_swap_ptr = child_ptr + 1;
         for (; child_swap_ptr < child_count; child_swap_ptr++) {
           if (children[child_swap_ptr].is_leaf)
             break;
