@@ -85,104 +85,77 @@ __device__ float ris_reservoir_get_sampling_weight(const RISReservoir reservoir)
   return (reservoir.selected_target > 0.0f) ? reservoir.sum_weight / reservoir.selected_target : 0.0f;
 }
 
-template <uint32_t NUM_TARGETS>
-struct MultiRISAggregator {
-  float sum_weight[NUM_TARGETS];
-  float resampling_probability[NUM_TARGETS];
-};
+struct RISAggregator {
+  float sum_weight;
+} typedef RISAggregator;
 
-template <uint32_t NUM_TARGETS>
-__device__ void multi_ris_aggregator_reset(MultiRISAggregator<NUM_TARGETS>& aggregator) {
-#pragma unroll
-  for (uint32_t target_id = 0; target_id < NUM_TARGETS; target_id++) {
-    aggregator.sum_weight[target_id]             = 0.0f;
-    aggregator.resampling_probability[target_id] = 0.0f;
-  }
+struct RISSampleHandle {
+  float resampling_probability;
+  float target;
+} typedef RISSampleHandle;
+
+struct RISLane {
+  float selected_target;
+  float random;
+} typedef RISLane;
+
+__device__ void ris_aggregator_reset(RISAggregator& aggregator) {
+  aggregator.sum_weight = 0.0f;
 }
 
-template <uint32_t NUM_TARGETS>
-__device__ MultiRISAggregator<NUM_TARGETS> multi_ris_aggregator_init(void) {
-  MultiRISAggregator<NUM_TARGETS> aggregator;
+__device__ RISAggregator ris_aggregator_init(void) {
+  RISAggregator aggregator;
 
-  multi_ris_aggregator_reset<NUM_TARGETS>(aggregator);
+  ris_aggregator_reset(aggregator);
 
   return aggregator;
 }
 
-template <uint32_t NUM_TARGETS>
-__device__ void multi_ris_aggregator_add_sample(
-  MultiRISAggregator<NUM_TARGETS>& aggregator, const float target[NUM_TARGETS], const float sampling_weight) {
-#pragma unroll
-  for (uint32_t target_id = 0; target_id < NUM_TARGETS; target_id++) {
-    const float weight = target[target_id] * sampling_weight;
+__device__ RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggregator, const float target, const float sampling_weight) {
+  const float weight = target * sampling_weight;
 
-    aggregator.sum_weight[target_id] += weight;
-    aggregator.resampling_probability[target_id] = (weight > 0.0f) ? weight / aggregator.sum_weight[target_id] : 0.0f;
-  }
+  aggregator.sum_weight += weight;
+
+  RISSampleHandle handle;
+  handle.resampling_probability = (weight > 0.0f) ? weight / aggregator.sum_weight : 0.0f;
+  handle.target                 = target;
+
+  return handle;
 }
 
-template <uint32_t NUM_TARGETS, uint32_t TARGET_ID>
-struct MultiRISLane {
-  float selected_target[NUM_TARGETS];
-  float random;
-};
-
-template <uint32_t NUM_TARGETS, uint32_t TARGET_ID>
-__device__ void multi_ris_lane_reset(MultiRISLane<NUM_TARGETS, TARGET_ID>& lane) {
-#pragma unroll
-  for (uint32_t target_id = 0; target_id < NUM_TARGETS; target_id++) {
-    lane.selected_target[target_id] = 0.0f;
-  }
+__device__ void ris_lane_reset(RISLane& lane) {
+  lane.selected_target = 0.0f;
 }
 
-template <uint32_t NUM_TARGETS, uint32_t TARGET_ID>
-__device__ MultiRISLane<NUM_TARGETS, TARGET_ID> multi_ris_lane_init(const float random) {
-  MultiRISLane<NUM_TARGETS, TARGET_ID> lane;
+__device__ RISLane ris_lane_init(const float random) {
+  RISLane lane;
 
   lane.random = random;
 
-  multi_ris_lane_reset<NUM_TARGETS, TARGET_ID>(lane);
+  ris_lane_reset(lane);
 
   return lane;
 }
 
-template <uint32_t NUM_TARGETS, uint32_t TARGET_ID>
-__device__ bool multi_ris_lane_add_sample(
-  MultiRISLane<NUM_TARGETS, TARGET_ID>& lane, const MultiRISAggregator<NUM_TARGETS> aggregator, const float target[NUM_TARGETS]) {
-  const float resampling_probability = aggregator.resampling_probability[TARGET_ID];
-  const bool sample_accepted         = (lane.random < resampling_probability);
+__device__ bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample) {
+  const float resampling_probability = sample.resampling_probability;
 
-  if (sample_accepted) {
-#pragma unroll
-    for (uint32_t target_id = 0; target_id < NUM_TARGETS; target_id++) {
-      lane.selected_target[target_id] = target[target_id];
-    }
-  }
+  if (resampling_probability == 0.0f)
+    return false;
 
+  const bool sample_accepted = (lane.random < resampling_probability);
+
+  lane.selected_target     = (sample_accepted) ? sample.target : lane.selected_target;
   const float random_shift = (sample_accepted) ? 0.0f : resampling_probability;
   const float random_scale = (sample_accepted) ? resampling_probability : 1.0f - resampling_probability;
 
-  lane.random = (lane.random - random_shift) / random_scale;
+  lane.random = random_saturate((lane.random - random_shift) / random_scale);
 
   return sample_accepted;
 }
 
-template <uint32_t NUM_TARGETS, uint32_t TARGET_ID>
-__device__ float multi_ris_lane_get_sampling_weight(
-  MultiRISLane<NUM_TARGETS, TARGET_ID>& lane, const MultiRISAggregator<NUM_TARGETS> aggregator, const uint32_t num_lanes[NUM_TARGETS]) {
-  float probability_not_sampling = 1.0f;
-
-#pragma unroll
-  for (uint32_t target_id = 0; target_id < NUM_TARGETS; target_id++) {
-    const float target             = lane.selected_target[target_id];
-    const float sum_weight         = aggregator.sum_weight[target_id];
-    const float target_probability = (sum_weight > 0.0f) ? target / sum_weight : 0.0f;
-    const float anti_probability   = (1.0f - target_probability);
-
-    probability_not_sampling *= powf(anti_probability, num_lanes[target_id]);
-  }
-
-  return (probability_not_sampling < 1.0f) ? 1.0f / (1.0f - probability_not_sampling) : 0.0f;
+__device__ float ris_lane_get_sampling_weight(const RISLane lane, const RISAggregator aggregator) {
+  return (aggregator.sum_weight > 0.0f) ? aggregator.sum_weight / lane.selected_target : 0.0f;
 }
 
 #endif /* CU_RIS_H */

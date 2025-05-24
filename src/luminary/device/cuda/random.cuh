@@ -146,8 +146,11 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 // Utils
 ////////////////////////////////////////////////////////////////////
 
+#define RANDOM_MAX (__uint_as_float(0x3F7FFFFFu))
+#define RANDOM_MIN (0.0f)
+
 __device__ float random_saturate(const float random) {
-  return fminf(fmaxf(random, 0.0f), 1.0f - 8.0f * eps);
+  return fminf(fmaxf(random, RANDOM_MIN), RANDOM_MAX);
 }
 
 ////////////////////////////////////////////////////////////////////

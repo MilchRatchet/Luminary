@@ -11,6 +11,33 @@
 #define LIGHT_TREE_INVALID_NODE 0xFFFFFF
 #define LIGHT_TREE_SELECTED_IS_LIGHT 0x80000000
 #define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
+#define LIGHT_TREE_NUM_SPLIT_LANES 4
+
+// #define LIGHT_TREE_DEBUG_TRAVERSAL
+
+#ifdef LIGHT_TREE_DEBUG_TRAVERSAL
+#define _LIGHT_TREE_DEBUG_LOAD_NODE_TOKEN(__offset, __entry)                       \
+  if (is_center_pixel(pixel)) {                                                    \
+    printf("   LD.NODE %u [%u %f]\n", __offset, __entry.node_ptr, __entry.weight); \
+  }
+#define _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(__lane_id, __offset, __entry)                                                            \
+  if (is_center_pixel(pixel)) {                                                                                                     \
+    printf("@%u ST.LEAF %u [%u 0x%02X %f]\n", __lane_id, __offset, __entry.light_ptr, __entry.material_layer_mask, __entry.weight); \
+  }
+#define _LIGHT_TREE_DEBUG_STORE_NODE_TOKEN(__lane_id, __offset, __entry)                                               \
+  if (is_center_pixel(pixel)) {                                                                                        \
+    printf("@%u ST.NODE %u [%u %u %f]\n", __lane_id, __offset, __entry.node_ptr, __entry.num_samples, __entry.weight); \
+  }
+#define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target, __meta) \
+  if (is_center_pixel(pixel)) {                                                       \
+    printf("@%u CSEL 0x%08X [%f 0x%04X]\n", __lane_id, __selected, __target, __meta); \
+  }
+#else
+#define _LIGHT_TREE_DEBUG_LOAD_NODE_TOKEN(__offset, __entry)
+#define _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(__lane_id, __offset, __entry)
+#define _LIGHT_TREE_DEBUG_STORE_NODE_TOKEN(__lane_id, __offset, __entry)
+#define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target, __meta)
+#endif /* LIGHT_TREE_DEBUG_TRAVERSAL */
 
 struct LightTreeWorkEntry {
   union {
@@ -107,8 +134,13 @@ __device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint3
 
 __device__ void light_tree_traverse(
   const GBufferData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeWork& work) {
-  RISReservoir reservoir1 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 0, pixel));
-  RISReservoir reservoir2 = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + 1, pixel));
+  RISAggregator ris_aggregator = ris_aggregator_init();
+
+  RISLane ris_lane[LIGHT_TREE_NUM_SPLIT_LANES];
+#pragma unroll
+  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
+    ris_lane[lane_id] = ris_lane_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + lane_id, pixel));
+  }
 
   uint32_t queue_write_ptr = work.num_outputs;
 
@@ -133,17 +165,21 @@ __device__ void light_tree_traverse(
 
     work_entry_mask &= ~(1 << entry_ptr);
 
-    // if (is_center_pixel(pixel)) {
-    //   printf("POP: %u %f\n", node_reference.ptr, node_reference.sampling_weight);
-    // }
+    _LIGHT_TREE_DEBUG_LOAD_NODE_TOKEN(entry_ptr, entry);
 
     uint32_t node_ptr     = LIGHT_TREE_INVALID_NODE;
     uint32_t section_id   = 0;
     uint32_t light_ptr    = LIGHT_TREE_LIGHT_ID_NULL;
     uint32_t child_ptr    = LIGHT_TREE_INVALID_NODE;
     uint32_t split_budget = entry.num_samples;
-    uint32_t selected1    = entry.node_ptr;
-    uint32_t selected2    = LIGHT_TREE_INVALID_NODE;
+
+    uint32_t selected[LIGHT_TREE_NUM_SPLIT_LANES];
+
+    selected[0] = entry.node_ptr;
+#pragma unroll
+    for (uint32_t lane_id = 1; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
+      selected[lane_id] = LIGHT_TREE_INVALID_NODE;
+    }
 
     vec3 base   = get_vector(0.0f, 0.0f, 0.0f);
     vec3 exp    = get_vector(0.0f, 0.0f, 0.0f);
@@ -151,86 +187,67 @@ __device__ void light_tree_traverse(
 
     float sampling_weight = entry.weight;
 
-    reservoir1.selected_target = 1.0f;
-    reservoir1.sum_weight      = 1.0f;
+    // Hack
+    ris_lane[0].selected_target = 1.0f;
+    ris_aggregator.sum_weight   = 1.0f;
 
-    bool has_next = false;
-
+    bool has_next        = false;
     bool has_reached_end = false;
 
     while (!has_reached_end) {
       if (has_next == false) {
-        // Check if we are splitting, apply the MIS weight in that case
-        const bool do_splitting =
-          ((selected1 != LIGHT_TREE_INVALID_NODE) && (selected2 != LIGHT_TREE_INVALID_NODE) && (selected1 != selected2));
-        const float mis_weight = do_splitting ? 0.5f : 1.0f;
-        sampling_weight        = sampling_weight * mis_weight;
-
-        const float weight_selected1 = ris_reservoir_get_sampling_weight(reservoir1);
-        const float weight_selected2 = ris_reservoir_get_sampling_weight(reservoir2);
-
-        ris_reservoir_reset(reservoir1);
-        ris_reservoir_reset(reservoir2);
-
-        if (((selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) && selected1 != selected2) {
-          LightTreeWorkEntry output_entry;
-          output_entry.weight              = sampling_weight * weight_selected1;
-          output_entry.light_ptr           = selected1 & LIGHT_TREE_SELECTED_PTR_MASK;
-          output_entry.material_layer_mask = 0xFF;
-
-          const uint32_t output_ptr = light_tree_get_write_ptr(inplace_output_ptr, queue_write_ptr);
-          work.data[output_ptr]     = output_entry;
-          work.num_outputs++;
+        uint32_t splitting_factor = 0;
+#pragma unroll
+        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
+          splitting_factor += (selected[lane_id] != LIGHT_TREE_INVALID_NODE) ? 1 : 0;
         }
 
-        if ((selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) {
+        // Evenly distribute the samples among the children.
+        const uint32_t samples_per_child = (splitting_factor > 0) ? split_budget / splitting_factor : 0;
+        sampling_weight                  = sampling_weight * (1.0f / splitting_factor);
+
+        LightTreeWorkEntry continuation_entry;
+        continuation_entry.weight = 0.0f;
+
+        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
           LightTreeWorkEntry output_entry;
-          output_entry.weight              = sampling_weight * weight_selected2;
-          output_entry.light_ptr           = selected2 & LIGHT_TREE_SELECTED_PTR_MASK;
-          output_entry.material_layer_mask = 0xFF;
+          output_entry.weight = sampling_weight * ris_lane_get_sampling_weight(ris_lane[lane_id], ris_aggregator);
 
-          const uint32_t output_ptr = light_tree_get_write_ptr(inplace_output_ptr, queue_write_ptr);
-          work.data[output_ptr]     = output_entry;
-          work.num_outputs++;
-        }
+          if ((selected[lane_id] & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) {
+            output_entry.light_ptr           = selected[lane_id] & LIGHT_TREE_SELECTED_PTR_MASK;
+            output_entry.material_layer_mask = 0xFF;
 
-        // We need to invalidate the selections if they were lights, any valid selection from here is assumed to be a child node.
-        selected1 = ((selected1 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) ? LIGHT_TREE_INVALID_NODE : selected1;
-        selected2 = ((selected2 & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) ? LIGHT_TREE_INVALID_NODE : selected2;
+            const uint32_t output_ptr = light_tree_get_write_ptr(inplace_output_ptr, queue_write_ptr);
+            work.data[output_ptr]     = output_entry;
+            work.num_outputs++;
 
-        if (selected1 != LIGHT_TREE_INVALID_NODE || selected2 != LIGHT_TREE_INVALID_NODE) {
-          LightTreeWorkEntry new_entry;
+            _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(lane_id, output_ptr, output_entry);
+          }
+          else if (selected[lane_id] != LIGHT_TREE_INVALID_NODE) {
+            output_entry.node_ptr    = selected[lane_id] & LIGHT_TREE_SELECTED_PTR_MASK;
+            output_entry.num_samples = min(samples_per_child, split_budget);
 
-          if (selected2 != LIGHT_TREE_INVALID_NODE && selected2 != selected1) {
-            uint32_t budget_this_node = (selected1 != LIGHT_TREE_INVALID_NODE) ? split_budget >> 1 : split_budget;
+            split_budget -= output_entry.num_samples;
 
-            split_budget -= budget_this_node;
+            if (continuation_entry.weight != 0.0f) {
+              _LIGHT_TREE_DEBUG_STORE_NODE_TOKEN(lane_id, queue_write_ptr, output_entry);
 
-            new_entry.num_samples = budget_this_node;
-            new_entry.node_ptr    = selected2;
-            new_entry.weight      = sampling_weight * weight_selected2;
-
-            if (selected1 != LIGHT_TREE_INVALID_NODE) {
               work_entry_mask |= (1 << queue_write_ptr);
-              work.data[queue_write_ptr++] = new_entry;
+              work.data[queue_write_ptr++] = output_entry;
+            }
+            else {
+              continuation_entry = output_entry;
             }
           }
 
-          if (selected1 != LIGHT_TREE_INVALID_NODE) {
-            uint32_t budget_this_node = split_budget;
+          selected[lane_id] = LIGHT_TREE_INVALID_NODE;
 
-            split_budget -= budget_this_node;
-
-            new_entry.num_samples = budget_this_node;
-            new_entry.node_ptr    = selected1;
-            new_entry.weight      = sampling_weight * weight_selected1;
-          }
-
-          node_ptr        = new_entry.node_ptr;
-          split_budget    = new_entry.num_samples;
-          sampling_weight = new_entry.weight;
+          ris_lane_reset(ris_lane[lane_id]);
         }
-        else {
+
+        ris_aggregator_reset(ris_aggregator);
+
+        if (continuation_entry.weight == 0.0f) {
           // If this path has not produced any lights, then we must queue a dummy output so that we have no holes.
           if (inplace_output_ptr != 0xFFFFFFFF) {
             LightTreeWorkEntry output_entry;
@@ -240,19 +257,23 @@ __device__ void light_tree_traverse(
 
             work.data[inplace_output_ptr] = output_entry;
             work.num_outputs++;
+
+            _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(0, inplace_output_ptr, output_entry);
           }
 
           has_reached_end = true;
           break;
+        }
+        else {
+          sampling_weight = continuation_entry.weight;
+          node_ptr        = continuation_entry.node_ptr;
+          split_budget    = continuation_entry.num_samples;
         }
 
         if (node_ptr == LIGHT_TREE_INVALID_NODE) {
           has_reached_end = true;
           break;
         }
-
-        selected1 = LIGHT_TREE_INVALID_NODE;
-        selected2 = LIGHT_TREE_INVALID_NODE;
 
         const DeviceLightTreeNodeHeader header = load_light_tree_node_header(node_ptr);
 
@@ -284,12 +305,14 @@ __device__ void light_tree_traverse(
             (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) * LIGHT_TREE_NODE_SECTION_REL_SIZE + 1;
         }
 
-        if (ris_reservoir_add_sample(reservoir1, target, 1.0f)) {
-          selected1 = is_light ? light_ptr : child_ptr;
-        }
+        const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
 
-        if (split_budget > 1 && ris_reservoir_add_sample(reservoir2, target, 1.0f)) {
-          selected2 = is_light ? light_ptr : child_ptr;
+#pragma unroll
+        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
+          if (split_budget > lane_id && ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
+            selected[lane_id] = is_light ? light_ptr : child_ptr;
+            _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(lane_id, selected[lane_id], target, section.meta);
+          }
         }
 
         child_ptr += is_light ? 0 : offset_this_child;
