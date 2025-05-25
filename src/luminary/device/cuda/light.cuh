@@ -347,7 +347,7 @@ __device__ TriangleHandle light_sample(
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  LightTreeWork light_tree_work = light_tree_traverse_prepass(data, pixel);
+  const LightTreeWork light_tree_work = light_tree_traverse_prepass(data, pixel);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of list of candidates

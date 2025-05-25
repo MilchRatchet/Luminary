@@ -163,7 +163,7 @@ __device__ bool is_non_finite(const float a) {
 #endif
 }
 
-#define LIGHTS_ARE_PRESENT (device.ptrs.light_tree_nodes != nullptr)
+#define LIGHTS_ARE_PRESENT (device.ptrs.light_tree_root != nullptr)
 
 #define HANDLE_DEVICE_ABORT()                                                                                         \
   if (__ldcv(device.ptrs.abort_flag) != 0 && ((device.state.undersampling & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0)) { \

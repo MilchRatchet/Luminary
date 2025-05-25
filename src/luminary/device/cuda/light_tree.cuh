@@ -15,27 +15,29 @@
 // #define LIGHT_TREE_DEBUG_TRAVERSAL
 
 #ifdef LIGHT_TREE_DEBUG_TRAVERSAL
-#define _LIGHT_TREE_DEBUG_LOAD_NODE_TOKEN(__offset, __entry)                       \
-  if (is_center_pixel(pixel)) {                                                    \
-    printf("   LD.NODE %u [%u %f]\n", __offset, __entry.node_ptr, __entry.weight); \
+#define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target) \
+  if (is_center_pixel(pixel)) {                                               \
+    printf("@%u CSEL 0x%08X [Weight:%f]\n", __lane_id, __selected, __target); \
   }
-#define _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(__lane_id, __offset, __entry)                                                            \
-  if (is_center_pixel(pixel)) {                                                                                                     \
-    printf("@%u ST.LEAF %u [%u 0x%02X %f]\n", __lane_id, __offset, __entry.light_ptr, __entry.material_layer_mask, __entry.weight); \
+#define _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(__lane_id, __continuation)                                                           \
+  if (is_center_pixel(pixel)) {                                                                                                         \
+    printf(                                                                                                                             \
+      "@%u ST.CONTINUATION.%s 0x%08X [Weight:%f]\n", __lane_id, __continuation.is_light ? "LIGHT" : "NODE", __continuation.child_index, \
+      1.0f / _light_tree_continuation_unpack_prob(__continuation));                                                                     \
   }
-#define _LIGHT_TREE_DEBUG_STORE_NODE_TOKEN(__lane_id, __offset, __entry)                                               \
-  if (is_center_pixel(pixel)) {                                                                                        \
-    printf("@%u ST.NODE %u [%u %u %f]\n", __lane_id, __offset, __entry.node_ptr, __entry.num_samples, __entry.weight); \
+#define _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(__lane_id, __selected, __weight)      \
+  if (is_center_pixel(pixel)) {                                                   \
+    printf("@%u ST.LIGHT 0x%08X [Weight:%f]\n", __lane_id, __selected, __weight); \
   }
-#define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target, __meta) \
-  if (is_center_pixel(pixel)) {                                                       \
-    printf("@%u CSEL 0x%08X [%f 0x%04X]\n", __lane_id, __selected, __target, __meta); \
+#define _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(__lane_id, __selected, __weight)        \
+  if (is_center_pixel(pixel)) {                                                   \
+    printf("@%u JMP.NODE 0x%08X [Weight:%f]\n", __lane_id, __selected, __weight); \
   }
 #else
-#define _LIGHT_TREE_DEBUG_LOAD_NODE_TOKEN(__offset, __entry)
-#define _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(__lane_id, __offset, __entry)
-#define _LIGHT_TREE_DEBUG_STORE_NODE_TOKEN(__lane_id, __offset, __entry)
-#define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target, __meta)
+#define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target)
+#define _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(__lane_id, __continuation)
+#define _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(__lane_id, __selected, __weight)
+#define _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(__lane_id, __selected, __weight)
 #endif /* LIGHT_TREE_DEBUG_TRAVERSAL */
 
 struct LightTreeWorkEntry {
@@ -126,7 +128,7 @@ __device__ float light_tree_child_importance_microfacet_reflection(
 
 __device__ float light_tree_child_importance(
   const GBufferData data, const DeviceLightTreeRootSection section, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
-  if (section.rel_power[i] > 0)
+  if (section.rel_power[i] == 0)
     return 0.0f;
 
   const float power    = (float) section.rel_power[i];
@@ -139,7 +141,7 @@ __device__ float light_tree_child_importance(
 
 __device__ float light_tree_child_importance(
   const GBufferData data, const DeviceLightTreeNode node, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
-  if (node.rel_power[i] > 0)
+  if (node.rel_power[i] == 0)
     return 0.0f;
 
   const float power    = (float) node.rel_power[i];
@@ -174,10 +176,12 @@ __device__ LightTreeContinuation _light_tree_continuation_pack(const uint8_t chi
 }
 
 __device__ float _light_tree_continuation_unpack_prob(const LightTreeContinuation continuation) {
-  return continuation.probability * (1.0f / 0xFFFFF);
+  return continuation.probability * (1.0f / 0xFFFFF) * LIGHT_TREE_NUM_OUTPUTS;
 }
 
 __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, const ushort2 pixel) {
+  const DeviceLightTreeRootHeader header = load_light_tree_root();
+
   RISAggregator ris_aggregator = ris_aggregator_init();
 
   RISLane ris_lane[LIGHT_TREE_NUM_OUTPUTS];
@@ -191,8 +195,6 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
     selected[lane_id] = 0xFF;
   }
-
-  const DeviceLightTreeRootHeader header = load_light_tree_root(0);
 
   const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
   const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
@@ -208,7 +210,8 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
         if (ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
           selected[lane_id] = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
-          _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(lane_id, selected[lane_id], target, section.meta);
+
+          _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(lane_id, selected[lane_id], target);
         }
       }
     }
@@ -218,8 +221,11 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
 
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    work.data[lane_id] = _light_tree_continuation_pack(
-      selected[lane_id], ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), selected[lane_id] < header.num_root_lights);
+    const bool is_light  = selected[lane_id] < header.num_root_lights;
+    const uint32_t index = is_light ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
+    work.data[lane_id]   = _light_tree_continuation_pack(index, ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), is_light);
+
+    _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(lane_id, work.data[lane_id]);
   }
 
   return work;
@@ -270,8 +276,11 @@ __device__ LightTreeResult
 
     if (node.light_mask & (1 << selected_child)) {
       result.light_id = node.light_ptr + selected_child;
+      _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(index, result.light_id, result.weight);
       break;
     }
+
+    _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(index, node.child_ptr + selected_child, result.weight);
 
     node = load_light_tree_node(node.child_ptr + selected_child);
 
