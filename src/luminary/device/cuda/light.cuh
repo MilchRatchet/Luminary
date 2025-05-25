@@ -317,12 +317,12 @@ __device__ float light_list_resample(
   LightSampleWorkData& work) {
   RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
 
-  for (uint32_t output_id = 0; output_id < light_tree_work.num_outputs; output_id++) {
-    const LightTreeWorkEntry output = light_tree_work.data[output_id];
+  for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
+    const LightTreeResult output = light_tree_traverse_postpass(data, pixel, output_id, light_tree_work);
 
-    const uint32_t light_id = output.light_ptr;
+    const uint32_t light_id = output.light_id;
 
-    if (light_id == LIGHT_TREE_LIGHT_ID_NULL)
+    if (light_id == 0xFFFFFFFF)
       continue;
 
     DeviceTransform trans;
@@ -347,9 +347,7 @@ __device__ TriangleHandle light_sample(
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  LightTreeWork light_tree_work;
-  light_tree_work_init(light_tree_work);
-  light_tree_query(data, pixel, light_tree_work);
+  LightTreeWork light_tree_work = light_tree_traverse_prepass(data, pixel);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of list of candidates

@@ -650,6 +650,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(triangle_counts);
   __DEVICE_BUFFER_FREE(instance_mesh_id);
   __DEVICE_BUFFER_FREE(instance_transforms);
+  __DEVICE_BUFFER_FREE(light_tree_root);
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
@@ -1230,6 +1231,7 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  __DEVICE_BUFFER_FREE(light_tree_root);
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
@@ -1237,6 +1239,7 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __DEVICE_BUFFER_FREE(light_importance_normalization);
   __DEVICE_BUFFER_FREE(light_microtriangles);
 
+  __DEVICE_BUFFER_ALLOCATE(light_tree_root, tree->root_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_nodes, tree->nodes_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_paths, tree->paths_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_tri_handle_map, tree->tri_handle_map_size);
@@ -1244,6 +1247,8 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __DEVICE_BUFFER_ALLOCATE(light_importance_normalization, tree->importance_normalization_size);
   __DEVICE_BUFFER_ALLOCATE(light_microtriangles, tree->microtriangle_size);
 
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, tree->root_data, (DEVICE void*) device->buffers.light_tree_root, 0, tree->root_size));
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->nodes_data, (DEVICE void*) device->buffers.light_tree_nodes, 0, tree->nodes_size));
   __FAILURE_HANDLE(device_staging_manager_register(

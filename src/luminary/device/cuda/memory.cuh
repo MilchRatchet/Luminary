@@ -71,9 +71,10 @@ __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
   return converter.dst_type;
 }
 
-#define load_light_tree_node_header(offset) load_generic<DeviceLightTreeNodeHeader, float4>(device.ptrs.light_tree_nodes, offset)
-#define load_light_tree_node_section(offset) \
-  load_generic<DeviceLightTreeNodeSection, float4, DeviceLightTreeNodeHeader>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_node(offset) load_generic<DeviceLightTreeNode, float4>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_root() load_generic<DeviceLightTreeRootHeader, float4>(device.ptrs.light_tree_root, 0)
+#define load_light_tree_root_section(offset) \
+  load_generic<DeviceLightTreeRootSection, float4, DeviceLightTreeRootHeader>(device.ptrs.light_tree_root, offset)
 
 ////////////////////////////////////////////////////////////////////
 // Task IO
@@ -382,41 +383,6 @@ __device__ DeviceTransform load_transform(const uint32_t offset) {
   trans.rotation.w = __float_as_uint(v1.w) >> 16;
 
   return trans;
-}
-
-__device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
-  const float4* ptr = (float4*) (device.ptrs.light_tree_nodes + offset);
-  const float4 v0   = __ldg(ptr + 0);
-  const float4 v1   = __ldg(ptr + 1);
-  const float4 v2   = __ldg(ptr + 2);
-  const float4 v3   = __ldg(ptr + 3);
-
-  DeviceLightTreeNode node;
-
-  node.base_mean.x  = v0.x;
-  node.base_mean.y  = v0.y;
-  node.base_mean.z  = v0.z;
-  node.exp_x        = *((int8_t*) &v0.w + 0);
-  node.exp_y        = *((int8_t*) &v0.w + 1);
-  node.exp_z        = *((int8_t*) &v0.w + 2);
-  node.exp_variance = *((uint8_t*) &v0.w + 3);
-
-  node.child_ptr     = __float_as_uint(v1.x);
-  node.light_ptr     = __float_as_uint(v1.y);
-  node.rel_mean_x[0] = __float_as_uint(v1.z);
-  node.rel_mean_x[1] = __float_as_uint(v1.w);
-
-  node.rel_mean_y[0] = __float_as_uint(v2.x);
-  node.rel_mean_y[1] = __float_as_uint(v2.y);
-  node.rel_mean_z[0] = __float_as_uint(v2.z);
-  node.rel_mean_z[1] = __float_as_uint(v2.w);
-
-  node.rel_variance[0] = __float_as_uint(v3.x);
-  node.rel_variance[1] = __float_as_uint(v3.y);
-  node.rel_power[0]    = __float_as_uint(v3.z);
-  node.rel_power[1]    = __float_as_uint(v3.w);
-
-  return node;
 }
 
 __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {

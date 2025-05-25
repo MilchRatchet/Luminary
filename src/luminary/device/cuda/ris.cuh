@@ -155,7 +155,11 @@ __device__ bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample)
 }
 
 __device__ float ris_lane_get_sampling_weight(const RISLane lane, const RISAggregator aggregator) {
-  return (aggregator.sum_weight > 0.0f) ? aggregator.sum_weight / lane.selected_target : 0.0f;
+  return (lane.selected_target > 0.0f) ? aggregator.sum_weight / lane.selected_target : 0.0f;
+}
+
+__device__ float ris_lane_get_sampling_prob(const RISLane lane, const RISAggregator aggregator) {
+  return (aggregator.sum_weight > 0.0f) ? (lane.selected_target / aggregator.sum_weight) : 0.0f;
 }
 
 #endif /* CU_RIS_H */

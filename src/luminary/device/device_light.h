@@ -105,6 +105,8 @@ struct LightTree {
   uint32_t build_id;
   LightTreeCache cache;
   LightTreeIntegrator integrator;
+  void* root_data;
+  size_t root_size;
   void* nodes_data;
   size_t nodes_size;
   void* paths_data;

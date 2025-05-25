@@ -24,14 +24,10 @@
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
-#define LIGHT_TREE_LIGHT_ID_NULL (0xFFFFFF)
-#define LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG (2)
-#define LIGHT_TREE_CHILD_OFFSET_STRIDE (1 << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG)
-#define LIGHT_TREE_MAX_CHILDREN_PER_SECTION 6
-#define LIGHT_TREE_META_HAS_NEXT (0x8000)
-#define LIGHT_TREE_META_LIGHT_COUNT_SHIFT (LIGHT_TREE_MAX_CHILDREN_PER_SECTION * 2)
-#define LIGHT_TREE_META_LIGHT_COUNT_MASK 0x7
-#define LIGHT_TREE_NODE_SECTION_REL_SIZE (sizeof(DeviceLightTreeNodeSection) / sizeof(DeviceLightTreeNodeHeader))
+#define LIGHT_TREE_LIGHT_ID_NULL (0xFFFFFFFF)
+#define LIGHT_TREE_MAX_CHILDREN_PER_SECTION 8
+#define LIGHT_TREE_CHILDREN_PER_NODE 8
+#define LIGHT_TREE_NODE_SECTION_REL_SIZE (sizeof(DeviceLightTreeRootSection) / sizeof(DeviceLightTreeRootHeader))
 #define LIGHT_NUM_MICROTRIANGLES 64
 
 #define UNDERSAMPLING_FIRST_SAMPLE_MASK 0x80
@@ -247,42 +243,51 @@ LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
 ////////////////////////////////////////////////////////////////////
 
 struct DeviceLightTreeNode {
-  vec3 base_mean;
-  int8_t exp_x;
-  int8_t exp_y;
-  int8_t exp_z;
-  int8_t exp_variance;
-  uint32_t child_ptr;
-  uint32_t light_ptr;
-  uint32_t rel_mean_x[2];
-  uint32_t rel_mean_y[2];
-  uint32_t rel_mean_z[2];
-  uint32_t rel_variance[2];
-  uint32_t rel_power[2];
-} typedef DeviceLightTreeNode;
-LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
-
-struct DeviceLightTreeNodeHeader {
-  uint16_t child_and_light_ptr[3];  // First 3 bytes is relative child ptr and second 3 bytes is light ptr
   uint16_t x;
   uint16_t y;
   uint16_t z;
+  uint16_t padding;
   int8_t exp_x;
   int8_t exp_y;
   int8_t exp_z;
   int8_t exp_variance;
-} typedef DeviceLightTreeNodeHeader;
-LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeHeader, 0x10);
-
-struct DeviceLightTreeNodeSection {
-  uint16_t meta;  // 1 has_next, 3 num_leaf_nodes, 12 child offsets
+  uint8_t light_mask;
+  uint8_t padding1;
+  uint16_t padding2;
+  uint32_t child_ptr;
+  uint32_t light_ptr;
   uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_variance[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-} typedef DeviceLightTreeNodeSection;
-LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNodeSection, 0x20);
+} typedef DeviceLightTreeNode;
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
+static_assert(LIGHT_TREE_MAX_CHILDREN_PER_SECTION <= 8, "Light Mask only has 8 bits.");
+
+struct DeviceLightTreeRootHeader {
+  uint16_t x;
+  uint16_t y;
+  uint16_t z;
+  uint16_t num_root_lights;
+  uint16_t padding;
+  uint8_t num_sections;
+  uint8_t padding1;
+  int8_t exp_x;
+  int8_t exp_y;
+  int8_t exp_z;
+  int8_t exp_variance;
+} typedef DeviceLightTreeRootHeader;
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootHeader, 0x10);
+
+struct DeviceLightTreeRootSection {
+  uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_variance[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint16_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+} typedef DeviceLightTreeRootSection;
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
 struct DeviceLightTreeLeaf {
   float power;
@@ -327,7 +332,8 @@ struct DevicePointers {
   DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
   DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
   DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
-  DEVICE const DeviceLightTreeNodeHeader* LUM_RESTRICT light_tree_nodes;
+  DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
+  DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
   DEVICE const float* LUM_RESTRICT light_importance_normalization;
   DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;

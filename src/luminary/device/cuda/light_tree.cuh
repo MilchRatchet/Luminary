@@ -7,11 +7,10 @@
 #include "ris.cuh"
 #include "utils.cuh"
 
-#define LIGHT_TREE_NUM_OUTPUTS 32
+#define LIGHT_TREE_NUM_OUTPUTS 8
 #define LIGHT_TREE_INVALID_NODE 0xFFFFFF
 #define LIGHT_TREE_SELECTED_IS_LIGHT 0x80000000
 #define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
-#define LIGHT_TREE_NUM_SPLIT_LANES 4
 
 // #define LIGHT_TREE_DEBUG_TRAVERSAL
 
@@ -52,12 +51,24 @@ struct LightTreeWorkEntry {
 } typedef LightTreeWorkEntry;
 LUM_STATIC_SIZE_ASSERT(LightTreeWorkEntry, 0x08);
 
+struct LightTreeContinuation {
+  // 3 bits spare
+  uint32_t is_light : 1, child_index : 8, probability : 20;
+} typedef LightTreeContinuation;
+LUM_STATIC_SIZE_ASSERT(LightTreeContinuation, 0x04);
+
+struct LightTreeResult {
+  uint32_t light_id;
+  float weight;
+} typedef LightTreeResult;
+LUM_STATIC_SIZE_ASSERT(LightTreeResult, 0x08);
+
 struct LightTreeWork {
-  LightTreeWorkEntry data[LIGHT_TREE_NUM_OUTPUTS];
-  uint32_t num_outputs;
+  LightTreeContinuation data[LIGHT_TREE_NUM_OUTPUTS];
 } typedef LightTreeWork;
 
 __device__ float light_tree_child_importance_diffuse(const GBufferData data, const float power, const vec3 mean, const float variance) {
+#if 1
   const vec3 PO = sub_vector(mean, data.position);
 
 #if 0
@@ -72,6 +83,11 @@ __device__ float light_tree_child_importance_diffuse(const GBufferData data, con
   const float dist_sq = fmaxf(dot_product(PO, PO), variance * variance);
 
   return power * __saturatef(dot_product(L, data.normal)) / dist_sq;
+#else
+  const vec3 PO       = sub_vector(mean, data.position);
+  const float dist_sq = fmaxf(dot_product(PO, PO), variance * variance);
+  return power / dist_sq;
+#endif
 }
 
 __device__ float light_tree_child_importance_microfacet_reflection(
@@ -109,12 +125,27 @@ __device__ float light_tree_child_importance_microfacet_reflection(
 }
 
 __device__ float light_tree_child_importance(
-  const GBufferData data, const vec3 position, const vec3 normal, const DeviceLightTreeNodeSection section, const vec3 base, const vec3 exp,
-  const float exp_v, const uint32_t i) {
+  const GBufferData data, const DeviceLightTreeRootSection section, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
+  if (section.rel_power[i] > 0)
+    return 0.0f;
+
   const float power    = (float) section.rel_power[i];
   const float variance = section.rel_variance[i] * exp_v;
 
   const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
+
+  return fmaxf(light_tree_child_importance_diffuse(data, power, mean, variance), 0.0f);
+}
+
+__device__ float light_tree_child_importance(
+  const GBufferData data, const DeviceLightTreeNode node, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
+  if (node.rel_power[i] > 0)
+    return 0.0f;
+
+  const float power    = (float) node.rel_power[i];
+  const float variance = node.rel_variance[i] * exp_v;
+
+  const vec3 mean = add_vector(mul_vector(get_vector(node.rel_mean_x[i], node.rel_mean_y[i], node.rel_mean_z[i]), exp), base);
 
   return fmaxf(light_tree_child_importance_diffuse(data, power, mean, variance), 0.0f);
 }
@@ -132,202 +163,122 @@ __device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint3
   return output_ptr;
 }
 
-__device__ void light_tree_traverse(
-  const GBufferData data, const vec3 position, const vec3 normal, const ushort2 pixel, LightTreeWork& work) {
+__device__ LightTreeContinuation _light_tree_continuation_pack(const uint8_t child_index, const float probability, const bool is_light) {
+  LightTreeContinuation continuation;
+
+  continuation.is_light    = is_light ? 1 : 0;
+  continuation.child_index = child_index;
+  continuation.probability = (uint32_t) ((0xFFFFF * probability) + 0.5f);
+
+  return continuation;
+}
+
+__device__ float _light_tree_continuation_unpack_prob(const LightTreeContinuation continuation) {
+  return continuation.probability * (1.0f / 0xFFFFF);
+}
+
+__device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, const ushort2 pixel) {
   RISAggregator ris_aggregator = ris_aggregator_init();
 
-  RISLane ris_lane[LIGHT_TREE_NUM_SPLIT_LANES];
+  RISLane ris_lane[LIGHT_TREE_NUM_OUTPUTS];
 #pragma unroll
-  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
+  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
     ris_lane[lane_id] = ris_lane_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + lane_id, pixel));
   }
 
-  uint32_t queue_write_ptr = work.num_outputs;
-
-  // Each traversal path's first output is placed where the work entry of the start node of this path was stored.
-  // This is required to achieve a memory layout without holes.
-  uint32_t inplace_output_ptr = 0xFFFFFFFF;
-
-  LightTreeWorkEntry root_node;
-  root_node.num_samples = LIGHT_TREE_NUM_OUTPUTS - work.num_outputs;
-  root_node.node_ptr    = 0;
-  root_node.weight      = 1.0f;
-
-  static_assert(LIGHT_TREE_NUM_OUTPUTS <= 32, "We can only have as many outputs as there are bits in a uint.");
-  uint32_t work_entry_mask = 1 << queue_write_ptr;
-
-  work.data[queue_write_ptr++] = root_node;
-
-  while (work_entry_mask) {
-    const uint32_t entry_ptr       = __ffs(work_entry_mask) - 1;
-    inplace_output_ptr             = entry_ptr;
-    const LightTreeWorkEntry entry = work.data[entry_ptr];
-
-    work_entry_mask &= ~(1 << entry_ptr);
-
-    _LIGHT_TREE_DEBUG_LOAD_NODE_TOKEN(entry_ptr, entry);
-
-    uint32_t node_ptr     = LIGHT_TREE_INVALID_NODE;
-    uint32_t section_id   = 0;
-    uint32_t light_ptr    = LIGHT_TREE_LIGHT_ID_NULL;
-    uint32_t child_ptr    = LIGHT_TREE_INVALID_NODE;
-    uint32_t split_budget = entry.num_samples;
-
-    uint32_t selected[LIGHT_TREE_NUM_SPLIT_LANES];
-
-    selected[0] = entry.node_ptr;
+  uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
 #pragma unroll
-    for (uint32_t lane_id = 1; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
-      selected[lane_id] = LIGHT_TREE_INVALID_NODE;
-    }
+  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
+    selected[lane_id] = 0xFF;
+  }
 
-    vec3 base   = get_vector(0.0f, 0.0f, 0.0f);
-    vec3 exp    = get_vector(0.0f, 0.0f, 0.0f);
-    float exp_v = 0.0f;
+  const DeviceLightTreeRootHeader header = load_light_tree_root(0);
 
-    float sampling_weight = entry.weight;
+  const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
+  const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
+  const float exp_v = exp2f(header.exp_variance);
 
-    // Hack
-    ris_lane[0].selected_target = 1.0f;
-    ris_aggregator.sum_weight   = 1.0f;
+  for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
+    const DeviceLightTreeRootSection section = load_light_tree_root_section(1 + section_id * LIGHT_TREE_NODE_SECTION_REL_SIZE);
 
-    bool has_next        = false;
-    bool has_reached_end = false;
+    for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
+      const float target               = light_tree_child_importance(data, section, base, exp, exp_v, rel_child_id);
+      const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
 
-    while (!has_reached_end) {
-      if (has_next == false) {
-        uint32_t splitting_factor = 0;
-#pragma unroll
-        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
-          splitting_factor += (selected[lane_id] != LIGHT_TREE_INVALID_NODE) ? 1 : 0;
+      for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
+        if (ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
+          selected[lane_id] = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
+          _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(lane_id, selected[lane_id], target, section.meta);
         }
-
-        // Evenly distribute the samples among the children.
-        const uint32_t samples_per_child = (splitting_factor > 0) ? split_budget / splitting_factor : 0;
-        sampling_weight                  = sampling_weight * (1.0f / splitting_factor);
-
-        LightTreeWorkEntry continuation_entry;
-        continuation_entry.weight = 0.0f;
-
-        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
-          LightTreeWorkEntry output_entry;
-          output_entry.weight = sampling_weight * ris_lane_get_sampling_weight(ris_lane[lane_id], ris_aggregator);
-
-          if ((selected[lane_id] & LIGHT_TREE_SELECTED_IS_LIGHT) != 0) {
-            output_entry.light_ptr           = selected[lane_id] & LIGHT_TREE_SELECTED_PTR_MASK;
-            output_entry.material_layer_mask = 0xFF;
-
-            const uint32_t output_ptr = light_tree_get_write_ptr(inplace_output_ptr, queue_write_ptr);
-            work.data[output_ptr]     = output_entry;
-            work.num_outputs++;
-
-            _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(lane_id, output_ptr, output_entry);
-          }
-          else if (selected[lane_id] != LIGHT_TREE_INVALID_NODE) {
-            output_entry.node_ptr    = selected[lane_id] & LIGHT_TREE_SELECTED_PTR_MASK;
-            output_entry.num_samples = min(samples_per_child, split_budget);
-
-            split_budget -= output_entry.num_samples;
-
-            if (continuation_entry.weight != 0.0f) {
-              _LIGHT_TREE_DEBUG_STORE_NODE_TOKEN(lane_id, queue_write_ptr, output_entry);
-
-              work_entry_mask |= (1 << queue_write_ptr);
-              work.data[queue_write_ptr++] = output_entry;
-            }
-            else {
-              continuation_entry = output_entry;
-            }
-          }
-
-          selected[lane_id] = LIGHT_TREE_INVALID_NODE;
-
-          ris_lane_reset(ris_lane[lane_id]);
-        }
-
-        ris_aggregator_reset(ris_aggregator);
-
-        if (continuation_entry.weight == 0.0f) {
-          // If this path has not produced any lights, then we must queue a dummy output so that we have no holes.
-          if (inplace_output_ptr != 0xFFFFFFFF) {
-            LightTreeWorkEntry output_entry;
-            output_entry.weight              = 0.0f;
-            output_entry.light_ptr           = LIGHT_TREE_LIGHT_ID_NULL;
-            output_entry.material_layer_mask = 0;
-
-            work.data[inplace_output_ptr] = output_entry;
-            work.num_outputs++;
-
-            _LIGHT_TREE_DEBUG_STORE_LEAF_TOKEN(0, inplace_output_ptr, output_entry);
-          }
-
-          has_reached_end = true;
-          break;
-        }
-        else {
-          sampling_weight = continuation_entry.weight;
-          node_ptr        = continuation_entry.node_ptr;
-          split_budget    = continuation_entry.num_samples;
-        }
-
-        if (node_ptr == LIGHT_TREE_INVALID_NODE) {
-          has_reached_end = true;
-          break;
-        }
-
-        const DeviceLightTreeNodeHeader header = load_light_tree_node_header(node_ptr);
-
-        base       = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
-        exp        = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
-        exp_v      = exp2f(header.exp_variance);
-        child_ptr  = ((uint32_t) header.child_and_light_ptr[0]) | (((uint32_t) header.child_and_light_ptr[1] & 0x00FF) << 16);
-        light_ptr  = ((uint32_t) header.child_and_light_ptr[2]) | (((uint32_t) header.child_and_light_ptr[1] & 0xFF00) << 8);
-        section_id = 0;
-
-        light_ptr |= LIGHT_TREE_SELECTED_IS_LIGHT;
-      }
-
-      const DeviceLightTreeNodeSection section = load_light_tree_node_section(node_ptr + 1 + section_id * 2);
-      section_id++;
-
-      has_next = (section.meta & LIGHT_TREE_META_HAS_NEXT) != 0;
-
-#pragma unroll
-      for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
-        float target               = 0.0f;
-        uint32_t offset_this_child = 0;
-
-        const bool is_light = ((section.meta >> LIGHT_TREE_META_LIGHT_COUNT_SHIFT) & LIGHT_TREE_META_LIGHT_COUNT_MASK) > rel_child_id;
-
-        if (section.rel_power[rel_child_id] > 0) {
-          target = light_tree_child_importance(data, position, normal, section, base, exp, exp_v, rel_child_id);
-          offset_this_child =
-            (((section.meta >> (rel_child_id * 2)) & 0x3) << LIGHT_TREE_CHILD_OFFSET_STRIDE_LOG) * LIGHT_TREE_NODE_SECTION_REL_SIZE + 1;
-        }
-
-        const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
-
-#pragma unroll
-        for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_SPLIT_LANES; lane_id++) {
-          if (split_budget > lane_id && ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
-            selected[lane_id] = is_light ? light_ptr : child_ptr;
-            _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(lane_id, selected[lane_id], target, section.meta);
-          }
-        }
-
-        child_ptr += is_light ? 0 : offset_this_child;
-        light_ptr += is_light ? 1 : 0;
       }
     }
   }
+
+  LightTreeWork work;
+
+#pragma unroll
+  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
+    work.data[lane_id] = _light_tree_continuation_pack(
+      selected[lane_id], ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), selected[lane_id] < header.num_root_lights);
+  }
+
+  return work;
 }
 
-__device__ void light_tree_work_init(LightTreeWork& work) {
-  work.num_outputs = 0;
-}
+__device__ LightTreeResult
+  light_tree_traverse_postpass(const GBufferData data, const ushort2 pixel, const uint32_t index, const LightTreeWork work) {
+  const LightTreeContinuation continuation = work.data[index];
 
-__device__ void light_tree_query(const GBufferData data, const ushort2 pixel, LightTreeWork& work) {
-  light_tree_traverse(data, data.position, data.normal, pixel, work);
+  LightTreeResult result;
+  result.light_id = 0xFFFFFFFF;
+  result.weight   = 1.0f / _light_tree_continuation_unpack_prob(continuation);
+
+  if (continuation.child_index == 0xFF) {
+    return result;
+  }
+
+  if (continuation.is_light) {
+    result.light_id = continuation.child_index;
+    return result;
+  }
+
+  DeviceLightTreeNode node = load_light_tree_node(continuation.child_index);
+
+  const float random     = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + index + LIGHT_TREE_NUM_OUTPUTS, pixel);
+  RISReservoir reservoir = ris_reservoir_init(random);
+
+  while (result.light_id == 0xFFFFFFFF) {
+    const vec3 base   = get_vector(bfloat_unpack(node.x), bfloat_unpack(node.y), bfloat_unpack(node.z));
+    const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
+    const float exp_v = exp2f(node.exp_variance);
+
+    uint8_t selected_child = 0xFF;
+
+    for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_CHILDREN_PER_NODE; rel_child_id++) {
+      const float target = light_tree_child_importance(data, node, base, exp, exp_v, rel_child_id);
+
+      if (ris_reservoir_add_sample(reservoir, target, 1.0f)) {
+        selected_child = rel_child_id;
+      }
+    }
+
+    if (selected_child == 0xFF) {
+      break;
+    }
+
+    result.weight *= ris_reservoir_get_sampling_weight(reservoir);
+
+    if (node.light_mask & (1 << selected_child)) {
+      result.light_id = node.light_ptr + selected_child;
+      break;
+    }
+
+    node = load_light_tree_node(node.child_ptr + selected_child);
+
+    ris_reservoir_reset(reservoir);
+  }
+
+  return result;
 }
 
 __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {
