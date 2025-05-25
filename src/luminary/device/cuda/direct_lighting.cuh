@@ -14,7 +14,7 @@
 #include "sky.cuh"
 #include "utils.cuh"
 
-#define DIRECT_LIGHTING_NO_SHADOW
+// #define DIRECT_LIGHTING_NO_SHADOW
 
 struct DirectLightingShadowTask {
   OptixTraceStatus trace_status;

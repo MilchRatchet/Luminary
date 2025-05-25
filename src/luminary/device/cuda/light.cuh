@@ -273,44 +273,38 @@ __device__ float light_tree_traverse_pdf(
 
 struct LightSampleWorkData {
   // Current Sample
-  uint32_t light_id;
+  TriangleHandle handle;
   vec3 ray;
   RGBF light_color;
   float dist;
   bool is_refraction;
-  // Reused data
-  float solid_angle;
-  float2 hit_coords;
-  float tree_sampling_weight;
-  TriangleHandle handle;
-  // Test
-  RGBF sum_colors;
 } typedef LightSampleWorkData;
 
-__device__ void light_sample_common(
-  const GBufferData data, const uint32_t light_id, const vec3 ray, const float dist, TriangleLight& light, RISReservoir& reservoir,
-  LightSampleWorkData& work) {
+__device__ void light_sample_solid_angle(
+  const GBufferData data, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+  const float tree_sampling_weight, RISReservoir& reservoir, LightSampleWorkData& work) {
+  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
+
+  vec3 ray;
+  float dist;
+  float solid_angle;
+  if (light_triangle_sample_finalize(light, light_uv_packed, data.position, ray_random, ray, dist, solid_angle) == false)
+    return;
+
   RGBF light_color = light_get_color(light);
 
   // TODO: When I improve the BSDF, I need to make sure that I handle correctly refraction BSDF sampled directions, they could be
   // incorrectly flagged as a reflection here or vice versa.
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
-  light_color            = mul_color(light_color, bsdf_weight);
-  light_color            = mul_color(
-    light_color, optix_geometry_shadowing(
-                   shift_origin_vector(data.position, data.V, ray, is_refraction), ray, dist, work.handle, OPTIX_TRACE_STATUS_EXECUTE));
+
+  light_color        = mul_color(light_color, bsdf_weight);
   const float target = color_importance(light_color);
 
-  const float one_over_solid_angle_pdf = work.solid_angle;
-  const float bsdf_pdf                 = bsdf_sample_for_light_pdf(data, ray);
-
-  const float sampling_weight = work.tree_sampling_weight * one_over_solid_angle_pdf / (1.0f + bsdf_pdf * one_over_solid_angle_pdf);
-
-  work.sum_colors = add_color(scale_color(light_color, sampling_weight), work.sum_colors);
+  const float sampling_weight = tree_sampling_weight * solid_angle;
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
-    work.light_id      = light_id;
+    work.handle        = handle;
     work.ray           = ray;
     work.light_color   = light_color;
     work.dist          = dist;
@@ -318,44 +312,15 @@ __device__ void light_sample_common(
   }
 }
 
-__device__ void light_sample_solid_angle(
-  const GBufferData data, const uint32_t light_id, const ushort2 pixel, TriangleLight& triangle_light, const uint3 light_uv_packed,
-  RISReservoir& reservoir, LightSampleWorkData& work) {
-  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
-
-  vec3 ray;
-  float dist;
-  if (light_triangle_sample_finalize(triangle_light, light_uv_packed, data.position, ray_random, ray, dist, work.solid_angle) == false)
-    return;
-
-  light_sample_common(data, light_id, ray, dist, triangle_light, reservoir, work);
-}
-
-__device__ void light_sample_bsdf(
-  const GBufferData data, const uint32_t light_id, const ushort2 pixel, TriangleLight& triangle_light, const uint3 light_uv_packed,
-  RISReservoir& reservoir, LightSampleWorkData& work) {
-  bool bsdf_sample_is_refraction = false;
-  bool bsdf_sample_is_valid      = false;
-  const vec3 ray = bsdf_sample_for_light(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
-
-  if (bsdf_sample_is_valid == false)
-    return;
-
-  float dist;
-  if (light_triangle_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, data.position, ray, dist) == false)
-    return;
-
-  light_sample_common(data, light_id, ray, dist, triangle_light, reservoir, work);
-}
-
-__device__ void light_linked_list_resample_brute_force(
-  const GBufferData data, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle, RISReservoir& reservoir,
+__device__ float light_list_resample(
+  const GBufferData data, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle,
   LightSampleWorkData& work) {
+  RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
+
   for (uint32_t output_id = 0; output_id < light_tree_work.num_outputs; output_id++) {
     const LightTreeWorkEntry output = light_tree_work.data[output_id];
 
-    const uint32_t light_id   = output.light_ptr;
-    work.tree_sampling_weight = output.weight;
+    const uint32_t light_id = output.light_ptr;
 
     if (light_id == LIGHT_TREE_LIGHT_ID_NULL)
       continue;
@@ -363,29 +328,21 @@ __device__ void light_linked_list_resample_brute_force(
     DeviceTransform trans;
     const TriangleHandle light_handle = light_tree_get_light(light_id, trans);
 
-    if (triangle_handle_equal(light_handle, blocked_handle) == false) {
-      uint3 light_uv_packed;
-      TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
+    if (triangle_handle_equal(light_handle, blocked_handle))
+      continue;
 
-      work.handle = light_handle;
+    uint3 light_uv_packed;
+    TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-      light_sample_solid_angle(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
-      light_sample_bsdf(data, light_id, pixel, triangle_light, light_uv_packed, reservoir, work);
-    }
+    light_sample_solid_angle(data, pixel, triangle_light, light_handle, light_uv_packed, output.weight, reservoir, work);
   }
+
+  return ris_reservoir_get_sampling_weight(reservoir);
 }
 
 __device__ TriangleHandle light_sample(
   const GBufferData data, const ushort2 pixel, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
   bool& selected_is_refraction) {
-  selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
-  selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
-  selected_dist          = 1.0f;
-  selected_is_refraction = false;
-
-  // Don't allow triangles to sample themselves.
-  const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
-
   ////////////////////////////////////////////////////////////////////
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
@@ -395,56 +352,30 @@ __device__ TriangleHandle light_sample(
   light_tree_query(data, pixel, light_tree_work);
 
   ////////////////////////////////////////////////////////////////////
-  // Sample from set of linked lists
+  // Sample from set of list of candidates
   ////////////////////////////////////////////////////////////////////
 
-  RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
+  // Don't allow triangles to sample themselves.
+  const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
 
   // We don't need to initialize it. It will end up uninitialized if and only if ris_reservoir.target is 0.
   LightSampleWorkData work;
-  work.sum_colors = splat_color(0.0f);
+  work.handle = triangle_handle_get(LIGHT_ID_NONE, 0);
 
-  light_linked_list_resample_brute_force(data, light_tree_work, pixel, blocked_handle, reservoir, work);
-
-  const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
-
-  // This happens if no light with non zero importance was found.
-  if (work.light_id == 0xFFFFFFFF)
-    return triangle_handle_get(LIGHT_ID_NONE, 0);
-
-  if (reservoir.selected_target == 0.0f)
-    return triangle_handle_get(LIGHT_ID_NONE, 0);
+  const float sampling_weight = light_list_resample(data, light_tree_work, pixel, blocked_handle, work);
 
   ////////////////////////////////////////////////////////////////////
   // Sample direction
   ////////////////////////////////////////////////////////////////////
 
-  DeviceTransform trans;
-  const TriangleHandle light_handle = light_tree_get_light(work.light_id, trans);
-
-  if (triangle_handle_equal(light_handle, blocked_handle))
-    return triangle_handle_get(LIGHT_ID_NONE, 0);
-
-  // if (is_center_pixel(pixel) && IS_PRIMARY_RAY) {
-  //   printf(
-  //     "ID:%u Num:%u Importance:%f Weight:%f\n=================\n", light_id, reservoir.num_samples, reservoir.selected_target,
-  //     direction_sampling_weight * linked_list_sampling_weight);
-  // }
-
   selected_ray           = work.ray;
-  selected_light_color   = work.sum_colors;
+  selected_light_color   = scale_color(work.light_color, sampling_weight);
   selected_dist          = work.dist;
   selected_is_refraction = work.is_refraction;
 
-  ////////////////////////////////////////////////////////////////////
-  // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
-  ////////////////////////////////////////////////////////////////////
-
-  // selected_light_color = scale_color(selected_light_color, sampling_weight);
-
   UTILS_CHECK_NANS(pixel, selected_light_color);
 
-  return light_handle;
+  return work.handle;
 }
 
 #endif /* !VOLUME_KERNEL */
