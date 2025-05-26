@@ -25,6 +25,12 @@
       "@%u ST.CONTINUATION.%s 0x%08X [Weight:%f]\n", __lane_id, __continuation.is_light ? "LIGHT" : "NODE", __continuation.child_index, \
       1.0f / _light_tree_continuation_unpack_prob(__continuation));                                                                     \
   }
+#define _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(__lane_id, __continuation)                                                            \
+  if (is_center_pixel(pixel)) {                                                                                                         \
+    printf(                                                                                                                             \
+      "@%u LD.CONTINUATION.%s 0x%08X [Weight:%f]\n", __lane_id, __continuation.is_light ? "LIGHT" : "NODE", __continuation.child_index, \
+      1.0f / _light_tree_continuation_unpack_prob(__continuation));                                                                     \
+  }
 #define _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(__lane_id, __selected, __weight)      \
   if (is_center_pixel(pixel)) {                                                   \
     printf("@%u ST.LIGHT 0x%08X [Weight:%f]\n", __lane_id, __selected, __weight); \
@@ -36,6 +42,7 @@
 #else
 #define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target)
 #define _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(__lane_id, __continuation)
+#define _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(__lane_id, __continuation)
 #define _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(__lane_id, __selected, __weight)
 #define _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(__lane_id, __selected, __weight)
 #endif /* LIGHT_TREE_DEBUG_TRAVERSAL */
@@ -201,7 +208,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
   const float exp_v = exp2f(header.exp_variance);
 
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
-    const DeviceLightTreeRootSection section = load_light_tree_root_section(1 + section_id * LIGHT_TREE_NODE_SECTION_REL_SIZE);
+    const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
 
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
       const float target               = light_tree_child_importance(data, section, base, exp, exp_v, rel_child_id);
@@ -234,6 +241,8 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
 __device__ LightTreeResult
   light_tree_traverse_postpass(const GBufferData data, const ushort2 pixel, const uint32_t index, const LightTreeWork work) {
   const LightTreeContinuation continuation = work.data[index];
+
+  _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(index, continuation);
 
   LightTreeResult result;
   result.light_id = 0xFFFFFFFF;
