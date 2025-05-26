@@ -816,23 +816,21 @@ static LuminaryResult _light_tree_collapse_binary_node(
     }
   }
 
-  // Sort children so that leaf nodes come first (only needed for the root)
-  if (is_root) {
-    for (uint32_t child_ptr = 0; child_ptr < num_leaf_nodes; child_ptr++) {
-      const LightTreeChildNode child = children[child_ptr];
+  // Sort children so that leaf nodes come first
+  for (uint32_t child_ptr = 0; child_ptr < num_leaf_nodes; child_ptr++) {
+    const LightTreeChildNode child = children[child_ptr];
 
-      // Child is not a leaf but is in the part of the list that contains leaves
-      if (child.is_leaf == false) {
-        // It is important that the order of the leaves is not modified, else we would have to apply this reordering to the fragments too
-        uint32_t child_swap_ptr = child_ptr + 1;
-        for (; child_swap_ptr < child_count; child_swap_ptr++) {
-          if (children[child_swap_ptr].is_leaf)
-            break;
-        }
-
-        _light_tree_swap(children[child_ptr], children[child_swap_ptr], LightTreeChildNode);
-        _light_tree_swap(child_binary_index[child_ptr], child_binary_index[child_swap_ptr], uint32_t);
+    // Child is not a leaf but is in the part of the list that contains leaves
+    if (child.is_leaf == false) {
+      // It is important that the order of the leaves is not modified, else we would have to apply this reordering to the fragments too
+      uint32_t child_swap_ptr = child_ptr + 1;
+      for (; child_swap_ptr < child_count; child_swap_ptr++) {
+        if (children[child_swap_ptr].is_leaf)
+          break;
       }
+
+      _light_tree_swap(children[child_ptr], children[child_swap_ptr], LightTreeChildNode);
+      _light_tree_swap(child_binary_index[child_ptr], child_binary_index[child_swap_ptr], uint32_t);
     }
   }
 
@@ -1067,8 +1065,9 @@ static LuminaryResult _light_tree_collapse_nodes(LightTreeCollapseWork* cwork, c
     DeviceLightTreeNode node;
     memset(&node, 0, sizeof(DeviceLightTreeNode));
 
-    node.child_ptr = cwork->num_node_jobs;
-    node.light_ptr = light_ptr;
+    node.child_ptr  = cwork->num_node_jobs;
+    node.light_ptr  = light_ptr;
+    node.num_lights = num_lights;
 
     node.x = device_pack_float(min_mean.x, DEVICE_PACK_FLOAT_ROUNDING_MODE_FLOOR);
     node.y = device_pack_float(min_mean.y, DEVICE_PACK_FLOAT_ROUNDING_MODE_FLOOR);
@@ -1090,8 +1089,6 @@ static LuminaryResult _light_tree_collapse_nodes(LightTreeCollapseWork* cwork, c
 
     for (uint32_t child_id = 0; child_id < child_count; child_id++) {
       const LightTreeChildNode child_node = children[child_id];
-
-      node.light_mask |= child_node.is_leaf ? (1 << child_id) : 0;
 
       uint64_t child_rel_mean_x   = (uint64_t) floorf((child_node.mean.x - min_mean.x) * compression_x + 0.5f);
       uint64_t child_rel_mean_y   = (uint64_t) floorf((child_node.mean.y - min_mean.y) * compression_y + 0.5f);

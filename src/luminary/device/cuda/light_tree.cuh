@@ -283,15 +283,15 @@ __device__ LightTreeResult
 
     result.weight *= ris_reservoir_get_sampling_weight(reservoir);
 
-    if (node.light_mask & (1 << selected_child)) {
+    if (selected_child < node.num_lights) {
       result.light_id = node.light_ptr + selected_child;
       _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(index, result.light_id, result.weight);
       break;
     }
 
-    _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(index, node.child_ptr + selected_child, result.weight);
+    _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(index, node.child_ptr + (selected_child - node.num_lights), result.weight);
 
-    node = load_light_tree_node(node.child_ptr + selected_child);
+    node = load_light_tree_node(node.child_ptr + (selected_child - node.num_lights));
 
     ris_reservoir_reset(reservoir);
   }

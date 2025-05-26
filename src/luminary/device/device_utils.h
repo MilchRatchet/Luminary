@@ -251,7 +251,7 @@ struct DeviceLightTreeNode {
   int8_t exp_y;
   int8_t exp_z;
   int8_t exp_variance;
-  uint8_t light_mask;
+  uint8_t num_lights;
   uint8_t padding1;
   uint16_t padding2;
   uint32_t child_ptr;
@@ -263,7 +263,6 @@ struct DeviceLightTreeNode {
   uint8_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
-static_assert(LIGHT_TREE_MAX_CHILDREN_PER_SECTION <= 8, "Light Mask only has 8 bits.");
 
 struct DeviceLightTreeRootHeader {
   uint16_t x;
