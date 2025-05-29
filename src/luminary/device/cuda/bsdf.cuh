@@ -55,13 +55,14 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
 }
 
 __device__ RGBF bsdf_evaluate_core(
-  const GBufferData data, const BSDFRayContext context, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f) {
-  return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf);
+  const GBufferData data, const BSDFRayContext context, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f,
+  const uint8_t layer_mask = 0xFF) {
+  return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf, layer_mask);
 }
 
 __device__ RGBF bsdf_evaluate(
-  const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
-  const float one_over_sampling_pdf = 1.0f) {
+  const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction, const float one_over_sampling_pdf = 1.0f,
+  const uint8_t layer_mask = 0xFF) {
 #ifdef PHASE_KERNEL
   return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.instance_id), L), one_over_sampling_pdf);
 #else
@@ -69,7 +70,7 @@ __device__ RGBF bsdf_evaluate(
 
   is_refraction = context.is_refraction;
 
-  return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
+  return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf, layer_mask);
 #endif
 }
 

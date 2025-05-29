@@ -39,10 +39,10 @@ extern "C" __global__ void __raygen__optix() {
 
   task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-  GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
+  MaterialContext ctx = geometry_generate_g_buffer(task, triangle_handle, pixel, true);
 
   // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
+  ctx.data.roughness = fmaxf(ctx.data.roughness, BSDF_ROUGHNESS_CLAMP);
 
   ////////////////////////////////////////////////////////////////////
   // Light Ray Sampling
@@ -51,12 +51,12 @@ extern "C" __global__ void __raygen__optix() {
   RGBF accumulated_light = splat_color(0.0f);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(ctx, task.index));
 #endif
 
 #ifdef OPTIX_ENABLE_SKY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_sun(data, task.index));
-  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx.data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx.data, task.index));
 #endif
 
   const RGBF record = load_RGBF(device.ptrs.records + pixel);

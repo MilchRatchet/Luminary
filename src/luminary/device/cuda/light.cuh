@@ -12,6 +12,7 @@
 #include "optix_common.cuh"
 #include "ris.cuh"
 #include "sky_utils.cuh"
+#include "splitting.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -281,8 +282,8 @@ struct LightSampleWorkData {
 } typedef LightSampleWorkData;
 
 __device__ void light_sample_solid_angle(
-  const GBufferData data, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
-  const float tree_sampling_weight, RISReservoir& reservoir, LightSampleWorkData& work) {
+  const GBufferData data, const uint8_t layer_mask, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle,
+  const uint3 light_uv_packed, const float tree_sampling_weight, RISReservoir& reservoir, LightSampleWorkData& work) {
   const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
 
   vec3 ray;
@@ -296,7 +297,7 @@ __device__ void light_sample_solid_angle(
   // TODO: When I improve the BSDF, I need to make sure that I handle correctly refraction BSDF sampled directions, they could be
   // incorrectly flagged as a reflection here or vice versa.
   bool is_refraction;
-  const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
+  const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f, layer_mask);
 
   light_color        = mul_color(light_color, bsdf_weight);
   const float target = color_importance(light_color);
@@ -312,13 +313,14 @@ __device__ void light_sample_solid_angle(
   }
 }
 
+template <MaterialLayerType TYPE>
 __device__ float light_list_resample(
-  const GBufferData data, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle,
-  LightSampleWorkData& work) {
+  const GBufferData data, const uint8_t layer_mask, const LightTreeWork& light_tree_work, ushort2 pixel,
+  const TriangleHandle blocked_handle, LightSampleWorkData& work) {
   RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
 
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
-    const LightTreeResult output = light_tree_traverse_postpass(data, pixel, output_id, light_tree_work);
+    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(data, pixel, output_id, light_tree_work);
 
     const uint32_t light_id = output.light_id;
 
@@ -334,20 +336,21 @@ __device__ float light_list_resample(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    light_sample_solid_angle(data, pixel, triangle_light, light_handle, light_uv_packed, output.weight, reservoir, work);
+    light_sample_solid_angle(data, layer_mask, pixel, triangle_light, light_handle, light_uv_packed, output.weight, reservoir, work);
   }
 
   return ris_reservoir_get_sampling_weight(reservoir);
 }
 
+template <MaterialLayerType TYPE>
 __device__ TriangleHandle light_sample(
-  const GBufferData data, const ushort2 pixel, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
-  bool& selected_is_refraction) {
+  const GBufferData data, const uint8_t layer_mask, const ushort2 pixel, vec3& selected_ray, RGBF& selected_light_color,
+  float& selected_dist, bool& selected_is_refraction) {
   ////////////////////////////////////////////////////////////////////
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  const LightTreeWork light_tree_work = light_tree_traverse_prepass(data, pixel);
+  const LightTreeWork light_tree_work = light_tree_traverse_prepass<TYPE>(data, pixel);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of list of candidates
@@ -360,7 +363,7 @@ __device__ TriangleHandle light_sample(
   LightSampleWorkData work;
   work.handle = triangle_handle_get(LIGHT_ID_NONE, 0);
 
-  const float sampling_weight = light_list_resample(data, light_tree_work, pixel, blocked_handle, work);
+  const float sampling_weight = light_list_resample<TYPE>(data, layer_mask, light_tree_work, pixel, blocked_handle, work);
 
   ////////////////////////////////////////////////////////////////////
   // Sample direction

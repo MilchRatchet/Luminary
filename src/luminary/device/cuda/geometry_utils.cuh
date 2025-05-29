@@ -4,6 +4,7 @@
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "splitting.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
@@ -36,7 +37,8 @@ __device__ vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-__device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel) {
+__device__ MaterialContext geometry_generate_g_buffer(
+  const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel, const bool generate_layers) {
   const uint32_t mesh_id      = mesh_id_load(triangle_handle.instance_id);
   const DeviceTransform trans = load_transform(triangle_handle.instance_id);
 
@@ -153,7 +155,27 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
   data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
 
-  return data;
+  MaterialContext ctx;
+
+  ctx.data = data;
+
+  if (generate_layers) {
+    // TODO: Compute this based on material properties
+    ctx.num_layers = 2;
+
+    MaterialLayerInstance diffuse_layer;
+    diffuse_layer.type      = MATERIAL_LAYER_TYPE_DIFFUSE;
+    diffuse_layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_DIFFUSE);
+
+    MaterialLayerInstance microfacet_reflection_layer;
+    microfacet_reflection_layer.type      = MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION;
+    microfacet_reflection_layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
+
+    ctx.layer_queue[0] = diffuse_layer;
+    ctx.layer_queue[1] = microfacet_reflection_layer;
+  }
+
+  return ctx;
 }
 
 #endif /* CU_GEOMETRY_UTILS_H */

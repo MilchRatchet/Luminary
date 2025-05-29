@@ -5,14 +5,30 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "ris.cuh"
+#include "splitting.cuh"
 #include "utils.cuh"
 
-#define LIGHT_TREE_NUM_OUTPUTS 8
+#define LIGHT_TREE_NUM_OUTPUTS 4
 #define LIGHT_TREE_INVALID_NODE 0xFFFFFF
 #define LIGHT_TREE_SELECTED_IS_LIGHT 0x80000000
 #define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
-
 // #define LIGHT_TREE_DEBUG_TRAVERSAL
+
+struct LightTreeContinuation {
+  // 3 bits spare
+  uint32_t is_light : 1, child_index : 8, probability : 20;
+} typedef LightTreeContinuation;
+LUM_STATIC_SIZE_ASSERT(LightTreeContinuation, 0x04);
+
+struct LightTreeResult {
+  uint32_t light_id;
+  float weight;
+} typedef LightTreeResult;
+LUM_STATIC_SIZE_ASSERT(LightTreeResult, 0x08);
+
+struct LightTreeWork {
+  LightTreeContinuation data[LIGHT_TREE_NUM_OUTPUTS];
+} typedef LightTreeWork;
 
 #ifdef LIGHT_TREE_DEBUG_TRAVERSAL
 #define _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(__lane_id, __selected, __target) \
@@ -47,60 +63,31 @@
 #define _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(__lane_id, __selected, __weight)
 #endif /* LIGHT_TREE_DEBUG_TRAVERSAL */
 
-struct LightTreeWorkEntry {
-  union {
-    struct {
-      uint32_t num_samples : 8, node_ptr : 24;
-    };
-    struct {
-      uint32_t material_layer_mask : 8, light_ptr : 24;
-    };
-  };
-  float weight;
-} typedef LightTreeWorkEntry;
-LUM_STATIC_SIZE_ASSERT(LightTreeWorkEntry, 0x08);
+template <MaterialLayerType TYPE>
+__device__ float light_tree_importance(const GBufferData data, const float power, const vec3 mean, const float radius);
 
-struct LightTreeContinuation {
-  // 3 bits spare
-  uint32_t is_light : 1, child_index : 8, probability : 20;
-} typedef LightTreeContinuation;
-LUM_STATIC_SIZE_ASSERT(LightTreeContinuation, 0x04);
-
-struct LightTreeResult {
-  uint32_t light_id;
-  float weight;
-} typedef LightTreeResult;
-LUM_STATIC_SIZE_ASSERT(LightTreeResult, 0x08);
-
-struct LightTreeWork {
-  LightTreeContinuation data[LIGHT_TREE_NUM_OUTPUTS];
-} typedef LightTreeWork;
-
-__device__ float light_tree_child_importance_diffuse(const GBufferData data, const float power, const vec3 mean, const float variance) {
-#if 1
+template <>
+__device__ float light_tree_importance<MATERIAL_LAYER_TYPE_DIFFUSE>(
+  const GBufferData data, const float power, const vec3 mean, const float radius) {
   const vec3 PO = sub_vector(mean, data.position);
 
 #if 0
   const vec3 D      = normalize_vector(cross_product(cross_product(PO, data.normal), PO));
   const vec3 v      = normalize_vector(PO);
-  const float theta = fminf(asinf(variance / get_length(PO)), acosf(dot_product(data.normal, v)));
+  const float theta = fminf(asinf(radius / get_length(PO)), acosf(dot_product(data.normal, v)));
   const vec3 L = normalize_vector(add_vector(scale_vector(v, cosf(theta)), scale_vector(D, sinf(theta))));
 #else
-  const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(data.normal, variance)), data.position));
+  const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(data.normal, radius)), data.position));
 #endif
 
-  const float dist_sq = fmaxf(dot_product(PO, PO), variance * variance);
+  const float dist_sq = fmaxf(dot_product(PO, PO), radius * radius);
 
   return power * __saturatef(dot_product(L, data.normal)) / dist_sq;
-#else
-  const vec3 PO       = sub_vector(mean, data.position);
-  const float dist_sq = fmaxf(dot_product(PO, PO), variance * variance);
-  return power / dist_sq;
-#endif
 }
 
-__device__ float light_tree_child_importance_microfacet_reflection(
-  const GBufferData data, const float power, const vec3 mean, const float variance) {
+template <>
+__device__ float light_tree_importance<MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION>(
+  const GBufferData data, const float power, const vec3 mean, const float radius) {
   const vec3 PO = sub_vector(mean, data.position);
 
   const vec3 R          = reflect_vector(data.V, data.normal);
@@ -110,12 +97,12 @@ __device__ float light_tree_child_importance_microfacet_reflection(
   const float R_dot_V   = dot_product(target_dir, v);
 
   float N_dot_H;
-  if (R_dot_V > 1.0f - eps || length_PO < variance) {
+  if (R_dot_V > 1.0f - eps || length_PO < radius) {
     N_dot_H = 1.0f;
   }
   else {
     const vec3 D      = normalize_vector(cross_product(cross_product(PO, target_dir), PO));
-    const float theta = fminf(asinf(variance / length_PO), acosf(R_dot_V));
+    const float theta = fminf(asinf(radius / length_PO), acosf(R_dot_V));
     const vec3 u      = normalize_vector(add_vector(scale_vector(v, cosf(theta)), scale_vector(D, sinf(theta))));
     const vec3 H      = normalize_vector(add_vector(data.V, u));
 
@@ -123,16 +110,22 @@ __device__ float light_tree_child_importance_microfacet_reflection(
   }
 
   const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
   // TODO: Why is roughness2 giving correct values? This seems like there is something wrong in the evaluation but I can't find anything.
   const float D = bsdf_microfacet_evaluate_D_GGX(N_dot_H, roughness2);
 
-  const float dist_sq    = fmaxf(dot_product(PO, PO), variance * variance);
+  const float dist_sq    = fmaxf(dot_product(PO, PO), radius * radius);
   const float power_term = lerp(1.0f, power / dist_sq, data.roughness);
 
   return power_term * fmaxf(D, 0.0f);
 }
 
+template <>
+__device__ float light_tree_importance<MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION>(
+  const GBufferData data, const float power, const vec3 mean, const float radius) {
+  return 0.0f;
+}
+
+template <MaterialLayerType TYPE>
 __device__ float light_tree_child_importance(
   const GBufferData data, const DeviceLightTreeRootSection section, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
   if (section.rel_power[i] == 0)
@@ -143,9 +136,10 @@ __device__ float light_tree_child_importance(
 
   const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
 
-  return fmaxf(light_tree_child_importance_diffuse(data, power, mean, variance), 0.0f);
+  return fmaxf(light_tree_importance<TYPE>(data, power, mean, variance), 0.0f);
 }
 
+template <MaterialLayerType TYPE>
 __device__ float light_tree_child_importance(
   const GBufferData data, const DeviceLightTreeNode node, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
   if (node.rel_power[i] == 0)
@@ -156,7 +150,7 @@ __device__ float light_tree_child_importance(
 
   const vec3 mean = add_vector(mul_vector(get_vector(node.rel_mean_x[i], node.rel_mean_y[i], node.rel_mean_z[i]), exp), base);
 
-  return fmaxf(light_tree_child_importance_diffuse(data, power, mean, variance), 0.0f);
+  return fmaxf(light_tree_importance<TYPE>(data, power, mean, variance), 0.0f);
 }
 
 __device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint32_t& queue_write_ptr) {
@@ -186,6 +180,7 @@ __device__ float _light_tree_continuation_unpack_prob(const LightTreeContinuatio
   return continuation.probability * (1.0f / 0xFFFFF) * LIGHT_TREE_NUM_OUTPUTS;
 }
 
+template <MaterialLayerType TYPE>
 __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, const ushort2 pixel) {
   const DeviceLightTreeRootHeader header = load_light_tree_root();
 
@@ -211,7 +206,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
     const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
 
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
-      const float target               = light_tree_child_importance(data, section, base, exp, exp_v, rel_child_id);
+      const float target               = light_tree_child_importance<TYPE>(data, section, base, exp, exp_v, rel_child_id);
       const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
 
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
@@ -238,6 +233,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const GBufferData data, con
   return work;
 }
 
+template <MaterialLayerType TYPE>
 __device__ LightTreeResult
   light_tree_traverse_postpass(const GBufferData data, const ushort2 pixel, const uint32_t index, const LightTreeWork work) {
   const LightTreeContinuation continuation = work.data[index];
@@ -270,7 +266,7 @@ __device__ LightTreeResult
     uint8_t selected_child = 0xFF;
 
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_CHILDREN_PER_NODE; rel_child_id++) {
-      const float target = light_tree_child_importance(data, node, base, exp, exp_v, rel_child_id);
+      const float target = light_tree_child_importance<TYPE>(data, node, base, exp, exp_v, rel_child_id);
 
       if (ris_reservoir_add_sample(reservoir, target, 1.0f)) {
         selected_child = rel_child_id;

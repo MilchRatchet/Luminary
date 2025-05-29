@@ -2,6 +2,7 @@
 #define CU_BSDF_UTILS_H
 
 #include "math.cuh"
+#include "splitting.cuh"
 #include "utils.cuh"
 
 struct BSDFRayContext {
@@ -365,15 +366,19 @@ __device__ float bsdf_conductor_directional_albedo(const float NdotV, const floa
 }
 
 __device__ RGBF bsdf_conductor(
-  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf,
+  const uint8_t layer_mask) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
   if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
   if ((data.flags & G_BUFFER_FLAG_METALLIC) == 0)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
+
+  if ((layer_mask & (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION)) == 0)
+    return splat_color(0.0f);
 
   float ss_term;
   switch (sampling_hint) {
@@ -405,8 +410,9 @@ __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float r
   return tex2D<float>(device.bsdf_lut_glossy.handle, NdotV, roughness);
 }
 
-__device__ RGBF
-  bsdf_glossy(const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+__device__ RGBF bsdf_glossy(
+  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf,
+  const uint8_t layer_mask) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
@@ -416,39 +422,43 @@ __device__ RGBF
   if ((data.flags & G_BUFFER_FLAG_METALLIC) != 0)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  float ss_term;
-  switch (sampling_hint) {
-    case BSDF_SAMPLING_GENERAL:
-      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
-      break;
-    case BSDF_SAMPLING_MICROFACET:
-      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
-      break;
-    case BSDF_SAMPLING_DIFFUSE:
-      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
-      break;
-    case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
-      break;
-  };
-
-  float diff_term;
-  switch (sampling_hint) {
-    case BSDF_SAMPLING_GENERAL:
-      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL) * one_over_sampling_pdf;
-      break;
-    case BSDF_SAMPLING_DIFFUSE:
-      diff_term = 1.0f;
-      break;
-    case BSDF_SAMPLING_MICROFACET:
-      diff_term = bsdf_diffuse_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotH, ctx.NdotV);
-      break;
-    case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL)
+  float ss_term = 0.0f;
+  if ((layer_mask & (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION)) != 0) {
+    switch (sampling_hint) {
+      case BSDF_SAMPLING_GENERAL:
+        ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
+        break;
+      case BSDF_SAMPLING_MICROFACET:
+        ss_term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
+        break;
+      case BSDF_SAMPLING_DIFFUSE:
+        ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+        break;
+      case BSDF_SAMPLING_MICROFACET_REFRACTION:
+        ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
                   / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
-      break;
-  };
+        break;
+    };
+  }
+
+  float diff_term = 0.0f;
+  if ((layer_mask & (1 << MATERIAL_LAYER_TYPE_DIFFUSE)) != 0) {
+    switch (sampling_hint) {
+      case BSDF_SAMPLING_GENERAL:
+        diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL) * one_over_sampling_pdf;
+        break;
+      case BSDF_SAMPLING_DIFFUSE:
+        diff_term = 1.0f;
+        break;
+      case BSDF_SAMPLING_MICROFACET:
+        diff_term = bsdf_diffuse_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotH, ctx.NdotV);
+        break;
+      case BSDF_SAMPLING_MICROFACET_REFRACTION:
+        diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL)
+                    / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+        break;
+    };
+  }
 
   const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
   const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, data.roughness);
@@ -470,15 +480,19 @@ __device__ float bsdf_dielectric_directional_albedo(const float NdotV, const flo
 }
 
 __device__ RGBF bsdf_dielectric(
-  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf,
+  const uint8_t layer_mask) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
   if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
   float term;
   if (ctx.is_refraction) {
+    if ((layer_mask & (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION)) == 0)
+      return splat_color(0.0f);
+
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
         term = bsdf_microfacet_refraction_evaluate(data, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index)
@@ -497,6 +511,9 @@ __device__ RGBF bsdf_dielectric(
     term *= (1.0f - ctx.fresnel_dielectric);
   }
   else {
+    if ((layer_mask & (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION)) == 0)
+      return splat_color(0.0f);
+
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
         term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
@@ -531,13 +548,14 @@ __device__ RGBF bsdf_dielectric(
 ///////////////////////////////////////////////////
 
 __device__ RGBF bsdf_multiscattering_evaluate(
-  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf,
+  const uint8_t layer_mask) {
   if (ctx.is_refraction)
-    return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a);
+    return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf, layer_mask), data.albedo.a);
 
-  RGBF conductor  = bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf);
-  RGBF glossy     = bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf);
-  RGBF dielectric = bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF conductor  = bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf, layer_mask);
+  RGBF glossy     = bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf, layer_mask);
+  RGBF dielectric = bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf, layer_mask);
 
   return scale_color(add_color(add_color(conductor, glossy), dielectric), data.albedo.a);
 }

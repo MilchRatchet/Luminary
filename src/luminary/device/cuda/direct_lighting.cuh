@@ -12,6 +12,7 @@
 #include "optix_include.cuh"
 #include "random.cuh"
 #include "sky.cuh"
+#include "splitting.cuh"
 #include "utils.cuh"
 
 // #define DIRECT_LIGHTING_NO_SHADOW
@@ -347,7 +348,9 @@ __device__ RGBF direct_lighting_sun_caustic(
 ////////////////////////////////////////////////////////////////////
 
 #ifndef VOLUME_KERNEL
-__device__ RGBF direct_lighting_geometry_sample(GBufferData data, const ushort2 pixel, DirectLightingShadowTask& task) {
+template <MaterialLayerType TYPE>
+__device__ RGBF
+  direct_lighting_geometry_sample(GBufferData data, const uint8_t layer_mask, const ushort2 pixel, DirectLightingShadowTask& task) {
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
   ////////////////////////////////////////////////////////////////////
@@ -356,7 +359,7 @@ __device__ RGBF direct_lighting_geometry_sample(GBufferData data, const ushort2 
   RGBF light_color;
   float dist;
   bool is_refraction;
-  const TriangleHandle light_handle = light_sample(data, pixel, dir, light_color, dist, is_refraction);
+  const TriangleHandle light_handle = light_sample<TYPE>(data, layer_mask, pixel, dir, light_color, dist, is_refraction);
 
   if (light_handle.instance_id == LIGHT_ID_NONE) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
@@ -554,13 +557,35 @@ __device__ RGBF direct_lighting_sun_phase(const GBufferData data, const ushort2 
 #endif
 
 #ifndef VOLUME_KERNEL
-__device__ RGBF direct_lighting_geometry(const GBufferData data, const ushort2 index) {
-  DirectLightingShadowTask task;
-  RGBF light = direct_lighting_geometry_sample(data, index, task);
+__device__ RGBF direct_lighting_geometry(const MaterialContext ctx, const ushort2 index) {
+  // if (is_center_pixel(index) == false)
+  //   return get_color(0.0f, 0.0f, 0.0f);
 
-  light = mul_color(light, direct_lighting_shadowing(task));
+  RGBF aggregate = get_color(0.0f, 0.0f, 0.0f);
 
-  return light;
+  for (uint32_t layer_id = 0; layer_id < ctx.num_layers; layer_id++) {
+    MaterialLayerInstance instance = ctx.layer_queue[layer_id];
+
+    DirectLightingShadowTask task;
+    RGBF light;
+
+    switch (instance.type) {
+      case MATERIAL_LAYER_TYPE_DIFFUSE:
+        light = direct_lighting_geometry_sample<MATERIAL_LAYER_TYPE_DIFFUSE>(ctx.data, instance.eval_mask, index, task);
+        break;
+      case MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION:
+        light = direct_lighting_geometry_sample<MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION>(ctx.data, instance.eval_mask, index, task);
+        break;
+      case MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION:
+        light = direct_lighting_geometry_sample<MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION>(ctx.data, instance.eval_mask, index, task);
+        break;
+    }
+
+    light     = mul_color(light, direct_lighting_shadowing(task));
+    aggregate = add_color(aggregate, light);
+  }
+
+  return aggregate;
 }
 
 #endif

@@ -25,7 +25,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
+    const MaterialContext ctx = geometry_generate_g_buffer(task, triangle_handle, pixel, false);
+
+    GBufferData data = ctx.data;
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
@@ -112,7 +114,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
+        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel, false).data;
 
         write_beauty_buffer_forced(add_color(opaque_color(data.albedo), data.emission), pixel);
       } break;
@@ -120,7 +122,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
+        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel, false).data;
 
         const vec3 normal = data.normal;
 
@@ -142,7 +144,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(color, pixel);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
+        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel, false).data;
         const RGBF color       = add_color(scale_color(opaque_color(data.albedo), 0.025f), data.emission);
 
         write_beauty_buffer_forced(color, pixel);
