@@ -161,18 +161,44 @@ __device__ MaterialContext geometry_generate_g_buffer(
 
   if (generate_layers) {
     // TODO: Compute this based on material properties
-    ctx.num_layers = 2;
+    ctx.num_layers = 0;
 
-    MaterialLayerInstance diffuse_layer;
-    diffuse_layer.type      = MATERIAL_LAYER_TYPE_DIFFUSE;
-    diffuse_layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_DIFFUSE);
+    const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_MATERIAL_PARTITION, task.index);
 
-    MaterialLayerInstance microfacet_reflection_layer;
-    microfacet_reflection_layer.type      = MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION;
-    microfacet_reflection_layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
+    bool add_diffuse_layer               = ((data.flags & G_BUFFER_FLAG_METALLIC) == 0) && GBUFFER_IS_SUBSTRATE_OPAQUE(data.flags);
+    bool add_microfacet_reflection_layer = true;
+    bool add_microfacet_refraction_layer = ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT) != 0);
 
-    ctx.layer_queue[0] = diffuse_layer;
-    ctx.layer_queue[1] = microfacet_reflection_layer;
+    if (add_diffuse_layer) {
+      MaterialLayerInstance layer;
+      layer.type      = MATERIAL_LAYER_TYPE_DIFFUSE;
+      layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_DIFFUSE);
+
+      const bool merge_microfacet_reflection = remap01(data.roughness, 0.2f, 0.5f) > random;
+
+      if (merge_microfacet_reflection) {
+        layer.eval_mask |= (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
+        add_microfacet_reflection_layer = false;
+      }
+
+      ctx.layer_queue[ctx.num_layers++] = layer;
+    }
+
+    if (add_microfacet_reflection_layer) {
+      MaterialLayerInstance layer;
+      layer.type      = MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION;
+      layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
+
+      ctx.layer_queue[ctx.num_layers++] = layer;
+    }
+
+    if (add_microfacet_refraction_layer) {
+      MaterialLayerInstance layer;
+      layer.type      = MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION;
+      layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION);
+
+      ctx.layer_queue[ctx.num_layers++] = layer;
+    }
   }
 
   return ctx;
