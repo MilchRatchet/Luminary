@@ -2,6 +2,7 @@
 #define CU_GEOMETRY_UTILS_H
 
 #include "ior_stack.cuh"
+#include "light_triangle.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "splitting.cuh"
@@ -89,8 +90,8 @@ __device__ MaterialContext geometry_generate_g_buffer(
     albedo.a              = albedo_f.w;
   }
 
-  const bool include_emission =
-    (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION));
+  const bool include_emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION);
+  //(mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION));
 
   RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
   if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
@@ -98,6 +99,18 @@ __device__ MaterialContext geometry_generate_g_buffer(
 
     emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
     emission = scale_color(emission, luminance_f.w * albedo.a * mat.emission_scale);
+  }
+
+  float solid_angle = 0.0f;
+  float power       = 0.0f;
+  if (color_any(emission)) {
+    const float area = get_length(cross_product(edge1, edge2)) * 0.5f;
+
+    power = color_importance(emission) * area;
+
+    const DeviceMISData mis_data = device.ptrs.emission_weight[pixel];
+
+    solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_data.origin);
   }
 
   float roughness = mat.roughness;
@@ -174,7 +187,7 @@ __device__ MaterialContext geometry_generate_g_buffer(
       layer.type      = MATERIAL_LAYER_TYPE_DIFFUSE;
       layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_DIFFUSE);
 
-      const bool merge_microfacet_reflection = remap01(data.roughness, 0.2f, 0.5f) > random;
+      const bool merge_microfacet_reflection = true;  // remap01(data.roughness, 0.2f, 0.5f) > random;
 
       if (merge_microfacet_reflection) {
         layer.eval_mask |= (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
@@ -200,6 +213,9 @@ __device__ MaterialContext geometry_generate_g_buffer(
       ctx.layer_queue[ctx.num_layers++] = layer;
     }
   }
+
+  ctx.power       = power;
+  ctx.solid_angle = solid_angle;
 
   return ctx;
 }

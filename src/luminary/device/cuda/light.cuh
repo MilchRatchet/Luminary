@@ -9,6 +9,7 @@
 #include "light_tree.cuh"
 #include "light_triangle.cuh"
 #include "memory.cuh"
+#include "mis.cuh"
 #include "optix_common.cuh"
 #include "ris.cuh"
 #include "sky_utils.cuh"
@@ -299,7 +300,10 @@ __device__ void light_sample_solid_angle(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f, layer_mask);
 
-  light_color        = mul_color(light_color, bsdf_weight);
+  const float light_area = get_length(cross_product(light.edge1, light.edge2)) * 0.5f;
+  const float power      = color_importance(light_color) * light_area;
+
+  light_color        = scale_color(mul_color(light_color, bsdf_weight), mis_compute_weight_dl(data, ray, solid_angle, power));
   const float target = color_importance(light_color);
 
   const float sampling_weight = tree_sampling_weight * solid_angle;

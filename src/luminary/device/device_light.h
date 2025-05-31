@@ -123,6 +123,7 @@ struct LightTree {
   size_t subsets_size;
   void* bvh_vertex_buffer_data;
   uint32_t light_count;
+  DeviceLightSceneData scene_data;
 } typedef LightTree;
 
 struct Device typedef Device;

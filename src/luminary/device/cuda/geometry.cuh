@@ -6,6 +6,7 @@
 #include "geometry_utils.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "mis.cuh"
 
 LUMINARY_KERNEL void geometry_process_tasks() {
   HANDLE_DEVICE_ABORT();
@@ -58,7 +59,10 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     if (color_any(data.emission)) {
-      write_beauty_buffer(mul_color(data.emission, record), pixel, task.state);
+      const DeviceMISData mis_data = device.ptrs.emission_weight[pixel];
+      const float emission_weight  = mis_compute_weight_gi(mis_data.sampling_probability, ctx.solid_angle, ctx.power);
+      const RGBF emission          = scale_color(mul_color(data.emission, record), emission_weight);
+      write_beauty_buffer(emission, pixel, task.state);
     }
 
     record = mul_color(record, bounce_info.weight);
@@ -90,6 +94,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     if (task_russian_roulette(bounce_task, task.state, record)) {
       task_store(bounce_task, get_task_address(trace_count++));
       store_RGBF(device.ptrs.records, pixel, record);
+      device.ptrs.emission_weight[pixel] = mis_get_payload(data, bounce_ray);
     }
   }
 

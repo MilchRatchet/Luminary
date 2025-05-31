@@ -21,6 +21,9 @@ struct MaterialContext {
   GBufferData data;
   uint32_t num_layers;
   MaterialLayerInstance layer_queue[MATERIAL_MAX_NUM_LAYERS];
+  // Light
+  float solid_angle;
+  float power;
 } typedef MaterialContext;
 
 #endif /* CU_LUMINARY_SPLITTING_H */

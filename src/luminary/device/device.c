@@ -600,6 +600,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(emission_weight, sizeof(DeviceMISData) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_current_result, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGBF) * internal_pixel_count);
@@ -634,6 +635,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
   __DEVICE_BUFFER_FREE(ior_stack);
+  __DEVICE_BUFFER_FREE(emission_weight);
   __DEVICE_BUFFER_FREE(frame_current_result);
   __DEVICE_BUFFER_FREE(frame_direct_buffer);
   __DEVICE_BUFFER_FREE(frame_direct_accumulate);
@@ -1246,6 +1248,7 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __DEVICE_BUFFER_ALLOCATE(light_tree_leaves, tree->leaves_size);
   __DEVICE_BUFFER_ALLOCATE(light_importance_normalization, tree->importance_normalization_size);
   __DEVICE_BUFFER_ALLOCATE(light_microtriangles, tree->microtriangle_size);
+  __DEVICE_BUFFER_ALLOCATE(light_scene_data, sizeof(DeviceLightSceneData));
 
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->root_data, (DEVICE void*) device->buffers.light_tree_root, 0, tree->root_size));
@@ -1263,6 +1266,8 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
     tree->importance_normalization_size));
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->microtriangle_data, (DEVICE void*) device->buffers.light_microtriangles, 0, tree->microtriangle_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, &tree->scene_data, (DEVICE void*) device->buffers.light_scene_data, 0, sizeof(DeviceLightSceneData)));
 
   __FAILURE_HANDLE(optix_bvh_light_build(device->optix_bvh_light, device, tree));
 
