@@ -102,7 +102,6 @@ struct Device {
   STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
-  DeviceTexture* ltc_tex[3];
   DeviceStagingManager* staging_manager;
   ARRAY DeviceTexture** textures;
   uint32_t num_materials;

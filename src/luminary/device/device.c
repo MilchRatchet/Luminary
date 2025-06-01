@@ -52,7 +52,6 @@ static const size_t device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEMB
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
-  offsetof(DeviceConstantMemory, ltc_tex),                       // DEVICE_CONSTANT_MEMORY_MEMBER_LTC_TEX
   offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   sizeof(DeviceConstantMemory)                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
@@ -73,7 +72,6 @@ static const size_t device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBER
   sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   sizeof(DeviceTextureObject) * 3,     // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
-  sizeof(DeviceTextureObject) * 3,     // DEVICE_CONSTANT_MEMORY_MEMBER_LTC_TEX
   sizeof(DeviceExecutionState)         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
 };
 
@@ -451,62 +449,11 @@ static LuminaryResult _device_load_light_bridge_lut(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-#include <stdio.h>
-
-static LuminaryResult _device_load_light_ltc_lut(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  void* ltc_tex_data0;
-  int64_t ltc_tex_data0_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_LTC0, &ltc_tex_data0, &ltc_tex_data0_length));
-
-  void* ltc_tex_data1;
-  int64_t ltc_tex_data1_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_LTC1, &ltc_tex_data1, &ltc_tex_data1_length));
-
-  void* ltc_tex_data2;
-  int64_t ltc_tex_data2_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_LTC2, &ltc_tex_data2, &ltc_tex_data2_length));
-
-  __DEBUG_ASSERT(ltc_tex_data0_length == (sizeof(float) * 8 * 8 * 8 * 8 * 4));
-  __DEBUG_ASSERT(ltc_tex_data1_length == (sizeof(float) * 8 * 8 * 8 * 8 * 4));
-  __DEBUG_ASSERT(ltc_tex_data2_length == (sizeof(float) * 8 * 8 * 8 * 8 * 2));
-
-  Texture* ltc_tex[3];
-
-  texture_create(&ltc_tex[0], 8, 8, 64, ltc_tex_data0, TexDataFP32, 4);
-  texture_create(&ltc_tex[1], 8, 8, 64, ltc_tex_data1, TexDataFP32, 4);
-  texture_create(&ltc_tex[2], 8, 8, 64, ltc_tex_data2, TexDataFP32, 2);
-
-  for (uint32_t tex_id = 0; tex_id < 3; tex_id++) {
-    ltc_tex[tex_id]->wrap_mode_R = TexModeClamp;
-    ltc_tex[tex_id]->wrap_mode_S = TexModeClamp;
-    ltc_tex[tex_id]->wrap_mode_T = TexModeClamp;
-
-    __FAILURE_HANDLE(device_texture_create(&device->ltc_tex[tex_id], ltc_tex[tex_id], device->stream_main));
-    __FAILURE_HANDLE(device_struct_texture_object_convert(device->ltc_tex[tex_id], &device->constant_memory->ltc_tex[tex_id]));
-  }
-
-  for (uint32_t tex_id = 0; tex_id < 3; tex_id++) {
-    // Host texture does not own the memory
-    ltc_tex[tex_id]->data = (void*) 0;
-    __FAILURE_HANDLE(texture_destroy(&ltc_tex[tex_id]));
-  }
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_LTC_TEX));
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _device_free_embedded_data(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   __FAILURE_HANDLE(device_texture_destroy(&device->moon_albedo_tex));
   __FAILURE_HANDLE(device_texture_destroy(&device->moon_normal_tex));
-
-  for (uint32_t tex_id = 0; tex_id < 3; tex_id++) {
-    __FAILURE_HANDLE(device_texture_destroy(&device->ltc_tex[tex_id]));
-  }
 
   return LUMINARY_SUCCESS;
 }
@@ -889,7 +836,6 @@ LuminaryResult device_load_embedded_data(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(_device_load_light_ltc_lut(device));
   __FAILURE_HANDLE(_device_load_light_bridge_lut(device));
   __FAILURE_HANDLE(_device_load_bluenoise_texture(device));
   __FAILURE_HANDLE(_device_load_moon_textures(device));
