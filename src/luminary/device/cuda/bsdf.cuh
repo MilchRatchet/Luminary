@@ -145,7 +145,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
       BSDFSampleInfo<MATERIAL_GEOMETRY> info;
       info.ray    = scale_vector(mat_ctx.V, -1.0f);
       info.weight = (mat_ctx.flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) ? opaque_color(mat_ctx.albedo) : get_color(1.0f, 1.0f, 1.0f);
-      info.is_microfacet_based = true;
+      info.is_microfacet_based = false;
       info.is_transparent_pass = true;
 
       return info;
@@ -171,136 +171,125 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
 
   const uint32_t base_substrate = mat_ctx_local.flags & MATERIAL_FLAG_BASE_SUBSTRATE_MASK;
 
-  if (
-    ior_compress(mat_ctx_local.ior_in) == ior_compress(mat_ctx_local.ior_out)
-    && (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT)) {
-    // Fast path for transparent surfaces without refraction/reflection
-    ray_local                = scale_vector(mat_ctx_local.V, -1.0f);
-    info.weight              = opaque_color(mat_ctx.albedo);
-    info.is_transparent_pass = true;
+  const bool include_diffuse =
+    (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE) && ((mat_ctx_local.flags & MATERIAL_FLAG_METALLIC) == 0);
+  const bool include_refraction = (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
+
+  float sum_weights  = 0.0f;
+  RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
+
+  float resampling_random = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
+
+  // Microfacet based sample
+  if (true) {
+    const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel);
+    const vec3 ray           = reflect_vector(mat_ctx_local.V, microfacet);
+    const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
+    const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET);
+    const float pdf          = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
+    const float diffuse_pdf  = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
+    const float refraction_pdf =
+      (include_refraction)
+        ? bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
+        : 0.0f;
+
+    const float sum_pdf    = pdf + diffuse_pdf + refraction_pdf;
+    const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
+
+    const float weight = color_importance(eval) * mis_weight;
+
+    UTILS_CHECK_NANS(pixel, weight);
+
+    ray_local                = ray;
+    sum_weights              = weight;
+    selected_eval            = eval;
+    info.is_transparent_pass = false;
     info.is_microfacet_based = true;
   }
-  else {
-    const bool include_diffuse =
-      (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE) && ((mat_ctx_local.flags & MATERIAL_FLAG_METALLIC) == 0);
-    const bool include_refraction = (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
 
-    float sum_weights  = 0.0f;
-    RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
+  // Diffuse based sample
+  if (include_diffuse) {
+    const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel));
+    const vec3 microfacet      = normalize_vector(add_vector(mat_ctx_local.V, ray));
+    const BSDFRayContext ctx   = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
+    const RGBF eval            = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_DIFFUSE);
+    const float pdf            = bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL);
+    const float microfacet_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
+    const float refraction_pdf =
+      (include_refraction)
+        ? bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
+        : 0.0f;
 
-    float resampling_random = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
+    const float sum_pdf    = pdf + microfacet_pdf + refraction_pdf;
+    const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
 
-    // Microfacet based sample
-    if (true) {
-      const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel);
-      const vec3 ray           = reflect_vector(mat_ctx_local.V, microfacet);
-      const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
-      const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET);
-      const float pdf          = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
-      const float diffuse_pdf  = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
-      const float refraction_pdf =
-        (include_refraction)
-          ? bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
-          : 0.0f;
+    const float weight = color_importance(eval) * mis_weight;
 
-      const float sum_pdf    = pdf + diffuse_pdf + refraction_pdf;
-      const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
+    UTILS_CHECK_NANS(pixel, weight);
 
-      const float weight = color_importance(eval) * mis_weight;
+    sum_weights += weight;
 
-      UTILS_CHECK_NANS(pixel, weight);
-
+    const float resampling_probability = weight / sum_weights;
+    if (resampling_random < resampling_probability) {
       ray_local                = ray;
-      sum_weights              = weight;
       selected_eval            = eval;
       info.is_transparent_pass = false;
-      info.is_microfacet_based = true;
+      info.is_microfacet_based = false;
+
+      resampling_random = random_saturate(resampling_random / resampling_probability);
     }
-
-    // Diffuse based sample
-    if (include_diffuse) {
-      const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel));
-      const vec3 microfacet      = normalize_vector(add_vector(mat_ctx_local.V, ray));
-      const BSDFRayContext ctx   = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
-      const RGBF eval            = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_DIFFUSE);
-      const float pdf            = bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL);
-      const float microfacet_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
-      const float refraction_pdf =
-        (include_refraction)
-          ? bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
-          : 0.0f;
-
-      const float sum_pdf    = pdf + microfacet_pdf + refraction_pdf;
-      const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
-
-      const float weight = color_importance(eval) * mis_weight;
-
-      UTILS_CHECK_NANS(pixel, weight);
-
-      sum_weights += weight;
-
-      const float resampling_probability = weight / sum_weights;
-      if (resampling_random < resampling_probability) {
-        ray_local                = ray;
-        selected_eval            = eval;
-        info.is_transparent_pass = false;
-        info.is_microfacet_based = false;
-
-        resampling_random = random_saturate(resampling_random / resampling_probability);
-      }
-      else {
-        resampling_random = random_saturate((resampling_random - resampling_probability) / (1.0f - resampling_probability));
-      }
+    else {
+      resampling_random = random_saturate((resampling_random - resampling_probability) / (1.0f - resampling_probability));
     }
-
-    // Microfacet refraction based sample
-    if (include_refraction) {
-      bool total_reflection;
-      const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel);
-      const vec3 ray           = refract_vector(mat_ctx_local.V, microfacet, mat_ctx.ior_in / mat_ctx.ior_out, total_reflection);
-      const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, !total_reflection);
-      const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION);
-
-      float mis_weight = 1.0f;
-
-      // If it is a reflection, then the direction could have been sampled from a microfacet reflection,
-      // hence we need to compute its MIS weight.
-      if (total_reflection) {
-        const float pdf =
-          bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
-        const float reflection_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
-        const float diffuse_pdf    = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
-
-        const float sum_pdf = pdf + reflection_pdf + diffuse_pdf;
-        mis_weight          = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
-      }
-
-      const float weight = color_importance(eval) * mis_weight;
-
-      UTILS_CHECK_NANS(pixel, weight);
-
-      sum_weights += weight;
-
-      const float resampling_probability = weight / sum_weights;
-      if (resampling_random < resampling_probability) {
-        ray_local                = ray;
-        selected_eval            = eval;
-        info.is_transparent_pass = !total_reflection;
-        info.is_microfacet_based = true;
-
-        resampling_random = random_saturate(resampling_random / resampling_probability);
-      }
-      else {
-        resampling_random = random_saturate((resampling_random - resampling_probability) / (1.0f - resampling_probability));
-      }
-    }
-
-    // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
-    // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
-    // and thus we evaluate f / |f| = (f / p) / |f / p|.
-    info.weight =
-      (sum_weights > 0.0f) ? scale_color(selected_eval, sum_weights / color_importance(selected_eval)) : get_color(0.0f, 0.0f, 0.0f);
   }
+
+  // Microfacet refraction based sample
+  if (include_refraction) {
+    bool total_reflection;
+    const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel);
+    const vec3 ray           = refract_vector(mat_ctx_local.V, microfacet, mat_ctx.ior_in / mat_ctx.ior_out, total_reflection);
+    const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, !total_reflection);
+    const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION);
+
+    float mis_weight = 1.0f;
+
+    // If it is a reflection, then the direction could have been sampled from a microfacet reflection,
+    // hence we need to compute its MIS weight.
+    if (total_reflection) {
+      const float pdf =
+        bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+      const float reflection_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
+      const float diffuse_pdf    = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
+
+      const float sum_pdf = pdf + reflection_pdf + diffuse_pdf;
+      mis_weight          = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
+    }
+
+    const float weight = color_importance(eval) * mis_weight;
+
+    UTILS_CHECK_NANS(pixel, weight);
+
+    sum_weights += weight;
+
+    const float resampling_probability = weight / sum_weights;
+    if (resampling_random < resampling_probability) {
+      ray_local                = ray;
+      selected_eval            = eval;
+      info.is_transparent_pass = !total_reflection;
+      info.is_microfacet_based = true;
+
+      resampling_random = random_saturate(resampling_random / resampling_probability);
+    }
+    else {
+      resampling_random = random_saturate((resampling_random - resampling_probability) / (1.0f - resampling_probability));
+    }
+  }
+
+  // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
+  // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
+  // and thus we evaluate f / |f| = (f / p) / |f / p|.
+  info.weight =
+    (sum_weights > 0.0f) ? scale_color(selected_eval, sum_weights / color_importance(selected_eval)) : get_color(0.0f, 0.0f, 0.0f);
 
   UTILS_CHECK_NANS(pixel, info.weight);
 

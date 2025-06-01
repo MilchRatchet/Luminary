@@ -71,10 +71,15 @@ template <>
 __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
   const MaterialContextGeometry ctx, const float power, const vec3 mean, const float radius) {
   const vec3 PO       = sub_vector(mean, ctx.position);
-  const vec3 L        = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.normal, radius)), ctx.position));
   const float dist_sq = fmaxf(dot_product(PO, PO), radius * radius);
 
-  return power * __saturatef(dot_product(L, ctx.normal)) / dist_sq;
+  float NdotL = 1.0f;
+  if (MATERIAL_IS_SUBSTRATE_OPAQUE(ctx.flags)) {
+    const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.normal, radius)), ctx.position));
+    NdotL        = __saturatef(dot_product(L, ctx.normal));
+  }
+
+  return power * NdotL * (1.0f / dist_sq);
 }
 
 template <>

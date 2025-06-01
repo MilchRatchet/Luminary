@@ -66,7 +66,7 @@ __device__ void light_evaluate_candidate(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float MIS_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle);
+  const float MIS_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction);
   light_color            = scale_color(mul_color(light_color, bsdf_weight), MIS_weight);
   const float target     = color_importance(light_color);
 

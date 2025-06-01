@@ -32,8 +32,6 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     record = mul_color(record, bounce_info.weight);
 
-    const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info.is_transparent_pass);
-
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method =
         (ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
@@ -44,10 +42,8 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     uint16_t new_state = task.state;
 
-    if (!is_pass_through) {
-      new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-      new_state &= ~STATE_FLAG_MIS_EMISSION;
-    }
+    new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~STATE_FLAG_MIS_EMISSION;
 
     DeviceTask bounce_task;
     bounce_task.state  = new_state;

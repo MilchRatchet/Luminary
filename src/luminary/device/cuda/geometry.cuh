@@ -46,7 +46,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       is_delta_distribution = bounce_info.is_microfacet_based && (ctx.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
-    const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info.is_transparent_pass);
+    const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info);
 
     ////////////////////////////////////////////////////////////////////
     // Emission and record
@@ -79,7 +79,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
       // We want to keep the old payload around if we are passthrough.
       new_state |= STATE_FLAG_MIS_EMISSION;
-      store_mis_payload(pixel, mis_get_payload(ctx, bounce_info.ray));
+      store_mis_payload(pixel, mis_get_payload(ctx, bounce_info.ray, bounce_info.is_transparent_pass));
     }
 
     DeviceTask bounce_task;

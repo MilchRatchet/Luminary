@@ -160,12 +160,6 @@ __device__ RGBF
     return splat_color(0.0f);
   }
 
-  // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(ctx, is_refraction)) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
-  }
-
   if (color_importance(light_color) == 0.0f) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
@@ -318,11 +312,6 @@ __device__ RGBF direct_lighting_sun_caustic(
     return splat_color(0.0f);
   }
 
-  // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(ctx, is_refraction)) {
-    return splat_color(0.0f);
-  }
-
   const vec3 position = shift_origin_vector(ctx.position, ctx.V, dir, is_refraction);
 
   ////////////////////////////////////////////////////////////////////
@@ -353,12 +342,6 @@ __device__ RGBF direct_lighting_geometry_sample(MaterialContext<TYPE> ctx, const
   const LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
 
   if (sample.handle.instance_id == LIGHT_ID_NONE) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
-  }
-
-  // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(ctx, sample.is_refraction)) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }

@@ -35,8 +35,8 @@ template <MaterialType TYPE>
 struct BSDFSampleInfo {
   vec3 ray;
   static constexpr RGBF weight              = {1.0f, 1.0f, 1.0f};
-  static constexpr bool is_transparent_pass = true;
-  static constexpr bool is_microfacet_based = true;
+  static constexpr bool is_transparent_pass = false;
+  static constexpr bool is_microfacet_based = false;
 };
 
 template <>
@@ -55,13 +55,14 @@ enum BSDFSamplingHint {
 };
 
 template <MaterialType TYPE>
-__device__ bool bsdf_is_pass_through_ray(const MaterialContext<TYPE> ctx, const bool is_transparent_pass) {
+__device__ bool bsdf_is_pass_through_ray(const MaterialContext<TYPE> ctx, const BSDFSampleInfo<TYPE> info) {
   return false;
 }
 
 template <>
-__device__ bool bsdf_is_pass_through_ray<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx, const bool is_transparent_pass) {
-  return is_transparent_pass && (ctx.ior_in == ctx.ior_out);
+__device__ bool bsdf_is_pass_through_ray<MATERIAL_GEOMETRY>(
+  const MaterialContextGeometry ctx, const BSDFSampleInfo<MATERIAL_GEOMETRY> info) {
+  return info.is_transparent_pass && ((ctx.ior_in == ctx.ior_out) || (info.is_microfacet_based == false));
 }
 
 ///////////////////////////////////////////////////
