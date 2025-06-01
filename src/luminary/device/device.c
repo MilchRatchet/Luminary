@@ -600,7 +600,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(emission_weight, sizeof(DeviceMISPayload) * internal_pixel_count);
+  __DEVICE_BUFFER_ALLOCATE(mis_payload, sizeof(DeviceMISPayload) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_current_result, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGBF) * internal_pixel_count);
@@ -635,7 +635,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
   __DEVICE_BUFFER_FREE(ior_stack);
-  __DEVICE_BUFFER_FREE(emission_weight);
+  __DEVICE_BUFFER_FREE(mis_payload);
   __DEVICE_BUFFER_FREE(frame_current_result);
   __DEVICE_BUFFER_FREE(frame_direct_buffer);
   __DEVICE_BUFFER_FREE(frame_direct_accumulate);

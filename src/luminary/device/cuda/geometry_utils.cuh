@@ -90,8 +90,8 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
     albedo.a              = albedo_f.w;
   }
 
-  const bool include_emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION);
-  //(mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION));
+  const bool has_emission     = mat.flags & DEVICE_MATERIAL_FLAG_EMISSION;
+  const bool include_emission = has_emission && (task.state & (STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_MIS_EMISSION));
 
   RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
   if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
@@ -101,15 +101,15 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
     emission = scale_color(emission, luminance_f.w * albedo.a * mat.emission_scale);
   }
 
-  if (color_any(emission)) {
-    const float area  = get_length(cross_product(edge1, edge2)) * 0.5f;
-    const float power = color_importance(emission) * area;
+  // STATE_FLAG_ALLOW_EMISSION not set implies that we only allow emission through MIS weights, apply them now.
+  if (color_any(emission) && ((task.state & STATE_FLAG_ALLOW_EMISSION) == 0)) {
+    const DeviceMISPayload mis_payload = load_mis_payload(pixel);
 
-    const DeviceMISPayload mis_data = device.ptrs.emission_weight[pixel];
+    const float area        = get_length(cross_product(edge1, edge2)) * 0.5f;
+    const float power       = color_importance(emission) * area;
+    const float solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_payload.origin);
 
-    const float solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_data.origin);
-
-    emission = scale_color(emission, mis_compute_weight_gi(mis_data.sampling_probability, solid_angle, power));
+    emission = scale_color(emission, mis_compute_weight_gi(mis_payload.sampling_probability, solid_angle, power));
   }
 
   float roughness = mat.roughness;

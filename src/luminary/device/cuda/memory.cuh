@@ -78,6 +78,54 @@ __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
     device.ptrs.light_tree_root, 1 + offset * LIGHT_TREE_NODE_SECTION_REL_SIZE)
 
 ////////////////////////////////////////////////////////////////////
+// Generic Path State IO
+////////////////////////////////////////////////////////////////////
+
+template <typename DATA_TYPE, typename LOAD_TYPE, typename STRIDE_TYPE = DATA_TYPE>
+__device__ DATA_TYPE load_state_generic(const void* src, uint32_t offset) {
+  static_assert(
+    (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)) * sizeof(LOAD_TYPE) == sizeof(DATA_TYPE), "DATA_TYPE must be a multiple of LOAD_TYPE in size.");
+  const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const STRIDE_TYPE*) src) + offset);
+
+  union {
+    DATA_TYPE dst;
+    struct {
+      LOAD_TYPE data[sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)];
+    };
+  } converter;
+
+  for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)); i++) {
+    converter.data[i] = __ldcs(ptr + i);
+  }
+
+  return converter.dst;
+}
+
+template <typename DATA_TYPE, typename STORE_TYPE, typename STRIDE_TYPE = DATA_TYPE>
+__device__ void store_state_generic(void* dst, uint32_t offset, const DATA_TYPE src) {
+  static_assert(
+    (sizeof(DATA_TYPE) / sizeof(STORE_TYPE)) * sizeof(STORE_TYPE) == sizeof(DATA_TYPE),
+    "DATA_TYPE must be a multiple of STORE_TYPE in size.");
+  STORE_TYPE* ptr = (STORE_TYPE*) (((const STRIDE_TYPE*) dst) + offset);
+
+  union {
+    DATA_TYPE src;
+    struct {
+      STORE_TYPE data[sizeof(DATA_TYPE) / sizeof(STORE_TYPE)];
+    };
+  } converter;
+
+  converter.src = src;
+
+  for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(STORE_TYPE)); i++) {
+    __stcs(ptr + i, converter.data[i]);
+  }
+}
+
+#define load_mis_payload(offset) load_state_generic<DeviceMISPayload, float4>(device.ptrs.mis_payload, offset)
+#define store_mis_payload(offset, data) store_state_generic<DeviceMISPayload, float4>(device.ptrs.mis_payload, offset, data)
+
+////////////////////////////////////////////////////////////////////
 // Task IO
 ////////////////////////////////////////////////////////////////////
 

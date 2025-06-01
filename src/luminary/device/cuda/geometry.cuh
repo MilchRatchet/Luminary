@@ -76,6 +76,10 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     if (!is_pass_through) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+
+      // We want to keep the old payload around if we are passthrough.
+      new_state |= STATE_FLAG_MIS_EMISSION;
+      store_mis_payload(pixel, mis_get_payload(ctx, bounce_info.ray));
     }
 
     DeviceTask bounce_task;
@@ -87,7 +91,6 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     if (task_russian_roulette(bounce_task, task.state, record)) {
       task_store(bounce_task, get_task_address(trace_count++));
       store_RGBF(device.ptrs.records, pixel, record);
-      device.ptrs.emission_weight[pixel] = mis_get_payload(ctx, bounce_info.ray);
     }
   }
 

@@ -198,7 +198,12 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     const vec3 bounce_ray = volume_sample_ray<MATERIAL_VOLUME>(ctx, task.index);
 
-    uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+    uint16_t new_state = task.state;
+
+    new_state &= ~STATE_FLAG_DELTA_PATH;
+    new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~STATE_FLAG_ALLOW_EMISSION;
+    new_state &= ~STATE_FLAG_MIS_EMISSION;
 
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
 

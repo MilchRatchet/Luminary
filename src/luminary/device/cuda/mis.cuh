@@ -5,6 +5,8 @@
 #include "material.cuh"
 #include "utils.cuh"
 
+#define MIS_FORCE_FULL_GI (-1.0f)
+
 __device__ float mis_compute_weight_base(const float gi_pdf, const float solid_angle, const float power) {
   const float dl_pdf = (1.0f / solid_angle) * power / device.ptrs.light_scene_data->total_power;
 
@@ -12,7 +14,7 @@ __device__ float mis_compute_weight_base(const float gi_pdf, const float solid_a
 }
 
 __device__ float mis_compute_weight_gi(const float gi_pdf, const float solid_angle, const float power) {
-  if (gi_pdf < 0.0f)
+  if (gi_pdf == MIS_FORCE_FULL_GI)
     return 1.0f;
 
   return mis_compute_weight_base(gi_pdf, solid_angle, power);

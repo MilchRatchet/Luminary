@@ -317,7 +317,7 @@ struct DevicePointers {
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;
   DEVICE uint32_t* LUM_RESTRICT ior_stack;
-  DEVICE DeviceMISPayload* LUM_RESTRICT emission_weight;
+  DEVICE DeviceMISPayload* LUM_RESTRICT mis_payload;
   DEVICE RGBF* LUM_RESTRICT frame_current_result;
   DEVICE RGBF* LUM_RESTRICT frame_direct_buffer;
   DEVICE RGBF* LUM_RESTRICT frame_direct_accumulate;

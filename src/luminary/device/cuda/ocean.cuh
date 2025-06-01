@@ -46,6 +46,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     if (!is_pass_through) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+      new_state &= ~STATE_FLAG_MIS_EMISSION;
     }
 
     DeviceTask bounce_task;
