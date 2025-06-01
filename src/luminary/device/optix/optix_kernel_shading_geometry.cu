@@ -39,10 +39,7 @@ extern "C" __global__ void __raygen__optix() {
 
   task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-  MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
-
-  // We have to clamp due to numerical precision issues in the microfacet models.
-  ctx.roughness = fmaxf(ctx.roughness, BSDF_ROUGHNESS_CLAMP);
+  const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
 
   ////////////////////////////////////////////////////////////////////
   // Light Ray Sampling

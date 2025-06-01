@@ -185,9 +185,6 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
       (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE) && ((mat_ctx_local.flags & MATERIAL_FLAG_METALLIC) == 0);
     const bool include_refraction = (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
 
-    // Microfacet evaluation is not numerically stable for very low roughness. We clamp the evaluation here.
-    mat_ctx_local.roughness = fmaxf(mat_ctx_local.roughness, BSDF_ROUGHNESS_CLAMP);
-
     float sum_weights  = 0.0f;
     RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 

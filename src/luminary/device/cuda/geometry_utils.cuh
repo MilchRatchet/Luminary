@@ -119,6 +119,13 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
     roughness = material_f.x;
   }
 
+  if (mat.flags & DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS) {
+    roughness = 1.0f - roughness;
+  }
+
+  // We have to clamp due to numerical precision issues in the microfacet models.
+  roughness = fmaxf(roughness, BSDF_ROUGHNESS_CLAMP);
+
   // We clamp the roughness to avoid caustics which would never clean up.
   if (!(task.state & STATE_FLAG_DELTA_PATH)) {
     roughness = fmaxf(roughness, mat.roughness_clamp);
@@ -137,10 +144,6 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
     flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
   }
 
-  if (mat.flags & DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS) {
-    roughness = 1.0f - roughness;
-  }
-
   if (task.state & STATE_FLAG_VOLUME_SCATTERED) {
     flags |= MATERIAL_FLAG_VOLUME_SCATTERED;
   }
@@ -153,6 +156,22 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
     (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
 
+  const float ior_in  = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
+  const float ior_out = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+
+  // If we have a translucent substrate and the IOR change is within some small threshold, treat the material as fully transparent.
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(flags) && (fabsf(1.0f - ior_in / ior_out) < 1e-4f)) {
+    // Fudge the albedo to be a blend between the transparent color and the refraction color.
+    if ((flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) == 0.0f) {
+      albedo.r = lerp(1.0f, albedo.r, albedo.a);
+      albedo.g = lerp(1.0f, albedo.g, albedo.a);
+      albedo.b = lerp(1.0f, albedo.b, albedo.a);
+    }
+
+    albedo.a = 0.0f;
+    flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
+  }
+
   MaterialContextGeometry ctx;
   ctx.instance_id = triangle_handle.instance_id;
   ctx.tri_id      = triangle_handle.tri_id;
@@ -164,8 +183,8 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
   ctx.roughness   = roughness;
   ctx.state       = task.state;
   ctx.flags       = flags;
-  ctx.ior_in      = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
-  ctx.ior_out     = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+  ctx.ior_in      = ior_in;
+  ctx.ior_out     = ior_out;
 
   return ctx;
 }

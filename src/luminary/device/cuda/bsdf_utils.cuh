@@ -157,10 +157,9 @@ __device__ float bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX
 }
 
 __device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float roughness4) {
-  if (roughness4 < 1e-8f)
-    return 0.0f;
+  const float NdotH2 = fminf(NdotH * NdotH, 1.0f);
+  const float a      = 1.0f - NdotH2 + roughness4 * NdotH2;
 
-  const float a = ((roughness4 - 1.0f) * NdotH * NdotH + 1.0f);
   return roughness4 / (PI * a * a);
 }
 

@@ -478,9 +478,6 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, cons
     (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(device.ocean.refractive_index, pixel, ior_stack_method);
 
-  // We clamp the roughness to avoid caustics that would never clean up.
-  const float roughness = 0.045f;
-
   MaterialContextGeometry ctx;
 
   ctx.instance_id = HIT_TYPE_OCEAN;
@@ -490,7 +487,7 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, cons
   ctx.normal      = normal;
   ctx.position    = task.origin;
   ctx.V           = scale_vector(task.ray, -1.0f);
-  ctx.roughness   = roughness;
+  ctx.roughness   = BSDF_ROUGHNESS_CLAMP;
   ctx.state       = task.state;
   ctx.flags       = flags;
   ctx.ior_in      = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
