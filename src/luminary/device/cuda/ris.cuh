@@ -70,13 +70,16 @@ __device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float ta
 
   const float resampling_probability = weight / reservoir.sum_weight;
 
+  if (resampling_probability == 0.0f)
+    return false;
+
   const bool sample_accepted = (reservoir.random < resampling_probability);
 
   reservoir.selected_target = (sample_accepted) ? target : reservoir.selected_target;
   const float random_shift  = (sample_accepted) ? 0.0f : resampling_probability;
   const float random_scale  = (sample_accepted) ? resampling_probability : 1.0f - resampling_probability;
 
-  reservoir.random = (reservoir.random - random_shift) / random_scale;
+  reservoir.random = random_saturate((reservoir.random - random_shift) / random_scale);
 
   return sample_accepted;
 }

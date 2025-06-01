@@ -95,7 +95,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
 
-    DeviceMISData mis_data;
+    DeviceMISPayload mis_data;
     mis_data.sampling_probability = -1.0f;
 
     device.ptrs.emission_weight[pixel] = mis_data;

@@ -411,27 +411,4 @@ __device__ Star star_load(const uint32_t offset) {
   return converter.star;
 }
 
-//===========================================================================================
-// Defaults
-//===========================================================================================
-
-__device__ GBufferData gbuffer_data_default() {
-  GBufferData data;
-
-  data.instance_id = HIT_TYPE_INVALID;
-  data.tri_id      = 0;
-  data.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
-  data.emission    = get_color(0.0f, 0.0f, 0.0f);
-  data.normal      = get_vector(0.0f, 0.0f, 1.0f);
-  data.position    = get_vector(0.0f, 0.0f, 0.0f);
-  data.V           = get_vector(0.0f, 0.0f, 1.0f);
-  data.roughness   = 0.5f;
-  data.state       = 0;
-  data.flags       = 0;
-  data.ior_in      = 1.0f;
-  data.ior_out     = 1.0f;
-
-  return data;
-}
-
 #endif /* CU_MEMORY_H */

@@ -1,6 +1,8 @@
 #ifndef CU_LUMINARY_OPTIX_ANYHIT_H
 #define CU_LUMINARY_OPTIX_ANYHIT_H
 
+#if defined(OPTIX_KERNEL)
+
 #include "optix_common.cuh"
 #include "optix_utils.cuh"
 
@@ -128,5 +130,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_sun_trace)() {
 
   optixIgnoreIntersection();
 }
+
+#endif /* OPTIX_KERNEL */
 
 #endif /* CU_LUMINARY_OPTIX_ANYHIT_H */

@@ -4,8 +4,6 @@
 #include "../optix_shared.h"
 #include "utils.cuh"
 
-enum OptixTraceStatus { OPTIX_TRACE_STATUS_EXECUTE, OPTIX_TRACE_STATUS_ABORT, OPTIX_TRACE_STATUS_OPTIONAL_UNUSED } typedef OptixTraceStatus;
-
 #ifdef OPTIX_KERNEL
 
 ////////////////////////////////////////////////////////////////////

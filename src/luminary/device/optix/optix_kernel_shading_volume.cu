@@ -44,19 +44,17 @@ extern "C" __global__ void __raygen__optix() {
 
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-#ifdef OPTIX_ENABLE_SKY_DL
-  GBufferData data = volume_generate_g_buffer(task, handle.instance_id, pixel, volume);
-#endif
+  MaterialContextVolume ctx = volume_get_context(task, handle.instance_id, pixel, volume);
 
   RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_geometry_bridges(task, volume_type, volume));
+  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(ctx, task.index));
 #endif
 
 #ifdef OPTIX_ENABLE_SKY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_sun_phase(data, task.index));
-  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
 #endif
 
   const RGBF record = load_RGBF(device.ptrs.records + pixel);

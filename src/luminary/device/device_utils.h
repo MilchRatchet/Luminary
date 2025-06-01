@@ -183,37 +183,30 @@ struct TriangleHandle {
   uint32_t tri_id;
 } typedef TriangleHandle;
 
-enum GBufferFlag {
-  G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE      = 0,
-  G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT = 1,
-  G_BUFFER_FLAG_BASE_SUBSTRATE_MASK        = 1,
-  G_BUFFER_FLAG_REFRACTION_IS_INSIDE       = 0b10,
-  G_BUFFER_FLAG_METALLIC                   = 0b100,
-  G_BUFFER_FLAG_COLORED_TRANSPARENCY       = 0b1000,
-  G_BUFFER_FLAG_VOLUME_SCATTERED           = 0b10000
-} typedef GBufferFlag;
+struct VolumeDescriptor {
+  VolumeType type;
+  RGBF absorption;
+  RGBF scattering;
+  float max_scattering;
+  float dist;
+  float max_height;
+  float min_height;
+} typedef VolumeDescriptor;
 
-#define GBUFFER_IS_SUBSTRATE_OPAQUE(__internal_macro_flags) \
-  (((__internal_macro_flags) & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) == G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
-#define GBUFFER_IS_SUBSTRATE_TRANSLUCENT(__internal_macro_flags) \
-  (((__internal_macro_flags) & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) == G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)
+enum MaterialFlag {
+  MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE      = 0,
+  MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT = 1,
+  MATERIAL_FLAG_BASE_SUBSTRATE_MASK        = 1,
+  MATERIAL_FLAG_REFRACTION_IS_INSIDE       = 0b10,
+  MATERIAL_FLAG_METALLIC                   = 0b100,
+  MATERIAL_FLAG_COLORED_TRANSPARENCY       = 0b1000,
+  MATERIAL_FLAG_VOLUME_SCATTERED           = 0b10000
+} typedef MaterialFlag;
 
-struct GBufferData {
-  uint32_t instance_id;
-  uint32_t tri_id;
-  RGBAF albedo;
-  RGBF emission;
-  vec3 position;
-  vec3 V;
-  vec3 normal;
-  float roughness;
-  uint16_t state;
-  uint8_t flags;
-  /* IOR of medium in direction of V. */
-  float ior_in;
-  /* IOR of medium on the other side. */
-  float ior_out;
-} typedef GBufferData;
+#define MATERIAL_IS_SUBSTRATE_OPAQUE(__internal_macro_flags) \
+  (((__internal_macro_flags) & MATERIAL_FLAG_BASE_SUBSTRATE_MASK) == MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE)
+#define MATERIAL_IS_SUBSTRATE_TRANSLUCENT(__internal_macro_flags) \
+  (((__internal_macro_flags) & MATERIAL_FLAG_BASE_SUBSTRATE_MASK) == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT)
 
 struct GBufferMetaData {
   uint32_t instance_id;
@@ -297,10 +290,10 @@ struct DeviceLightMicroTriangleImportance {
   uint8_t data[LIGHT_NUM_MICROTRIANGLES >> 1];
 } typedef DeviceLightMicroTriangleImportance;
 
-struct DeviceMISData {
+struct DeviceMISPayload {
   float sampling_probability;
   vec3 origin;
-} typedef DeviceMISData;
+} typedef DeviceMISPayload;
 
 struct DeviceLightSceneData {
   float total_power;
@@ -321,7 +314,7 @@ struct DevicePointers {
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;
   DEVICE uint32_t* LUM_RESTRICT ior_stack;
-  DEVICE DeviceMISData* LUM_RESTRICT emission_weight;
+  DEVICE DeviceMISPayload* LUM_RESTRICT emission_weight;
   DEVICE RGBF* LUM_RESTRICT frame_current_result;
   DEVICE RGBF* LUM_RESTRICT frame_direct_buffer;
   DEVICE RGBF* LUM_RESTRICT frame_direct_accumulate;

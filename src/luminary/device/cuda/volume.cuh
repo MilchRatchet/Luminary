@@ -62,7 +62,7 @@ LUMINARY_KERNEL void volume_process_events() {
 
     if (device.fog.active) {
       const VolumeDescriptor fog_volume = volume_get_descriptor_preset_fog();
-      const VolumePath fog_path         = volume_compute_path(fog_volume, task.origin, task.ray, depth);
+      const VolumePath fog_path         = volume_compute_path(fog_volume, task.origin, task.ray, depth, true);
 
       if (fog_path.length > 0.0f && fog_path.start < path.start) {
         volume = fog_volume;
@@ -72,7 +72,7 @@ LUMINARY_KERNEL void volume_process_events() {
 
     if (device.ocean.active) {
       const VolumeDescriptor ocean_volume = volume_get_descriptor_preset_ocean();
-      const VolumePath ocean_path         = volume_compute_path(ocean_volume, task.origin, task.ray, depth);
+      const VolumePath ocean_path         = volume_compute_path(ocean_volume, task.origin, task.ray, depth, true);
 
       if (ocean_path.length > 0.0f && ocean_path.start < path.start) {
         volume = ocean_volume;
@@ -194,9 +194,9 @@ LUMINARY_KERNEL void volume_process_tasks() {
     const VolumeType volume_type  = VOLUME_HIT_TYPE(handle.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    GBufferData data = volume_generate_g_buffer(task, handle.instance_id, pixel, volume);
+    MaterialContextVolume ctx = volume_get_context(task, handle.instance_id, pixel, volume);
 
-    const vec3 bounce_ray = bsdf_sample_volume(data, task.index);
+    const vec3 bounce_ray = volume_sample_ray<MATERIAL_VOLUME>(ctx, task.index);
 
     uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
 
@@ -204,7 +204,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     DeviceTask bounce_task;
     bounce_task.state  = new_state;
-    bounce_task.origin = data.position;
+    bounce_task.origin = ctx.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 

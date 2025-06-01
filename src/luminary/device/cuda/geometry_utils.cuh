@@ -3,9 +3,10 @@
 
 #include "ior_stack.cuh"
 #include "light_triangle.cuh"
+#include "material.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "splitting.cuh"
+#include "mis.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
@@ -38,8 +39,7 @@ __device__ vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-__device__ MaterialContext geometry_generate_g_buffer(
-  const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel, const bool generate_layers) {
+__device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel) {
   const uint32_t mesh_id      = mesh_id_load(triangle_handle.instance_id);
   const DeviceTransform trans = load_transform(triangle_handle.instance_id);
 
@@ -101,16 +101,15 @@ __device__ MaterialContext geometry_generate_g_buffer(
     emission = scale_color(emission, luminance_f.w * albedo.a * mat.emission_scale);
   }
 
-  float solid_angle = 0.0f;
-  float power       = 0.0f;
   if (color_any(emission)) {
-    const float area = get_length(cross_product(edge1, edge2)) * 0.5f;
+    const float area  = get_length(cross_product(edge1, edge2)) * 0.5f;
+    const float power = color_importance(emission) * area;
 
-    power = color_importance(emission) * area;
+    const DeviceMISPayload mis_data = device.ptrs.emission_weight[pixel];
 
-    const DeviceMISData mis_data = device.ptrs.emission_weight[pixel];
+    const float solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_data.origin);
 
-    solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_data.origin);
+    emission = scale_color(emission, mis_compute_weight_gi(mis_data.sampling_probability, solid_angle, power));
   }
 
   float roughness = mat.roughness;
@@ -131,11 +130,11 @@ __device__ MaterialContext geometry_generate_g_buffer(
     // TODO: Stochastic filtering of metallic texture.
   }
   else if (mat.flags & DEVICE_MATERIAL_FLAG_METALLIC) {
-    flags |= G_BUFFER_FLAG_METALLIC;
+    flags |= MATERIAL_FLAG_METALLIC;
   }
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
-    flags |= G_BUFFER_FLAG_COLORED_TRANSPARENCY;
+    flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
   }
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS) {
@@ -143,79 +142,30 @@ __device__ MaterialContext geometry_generate_g_buffer(
   }
 
   if (task.state & STATE_FLAG_VOLUME_SCATTERED) {
-    flags |= G_BUFFER_FLAG_VOLUME_SCATTERED;
+    flags |= MATERIAL_FLAG_VOLUME_SCATTERED;
   }
 
   if (is_inside) {
-    flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
+    flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
   const IORStackMethod ior_stack_method =
-    (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
 
-  GBufferData data;
-  data.instance_id = triangle_handle.instance_id;
-  data.tri_id      = triangle_handle.tri_id;
-  data.albedo      = albedo;
-  data.emission    = emission;
-  data.normal      = transform_apply_rotation(trans, normal);
-  data.position    = task.origin;
-  data.V           = scale_vector(task.ray, -1.0f);
-  data.roughness   = roughness;
-  data.state       = task.state;
-  data.flags       = flags;
-  data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
-  data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
-
-  MaterialContext ctx;
-
-  ctx.data = data;
-
-  if (generate_layers) {
-    // TODO: Compute this based on material properties
-    ctx.num_layers = 0;
-
-    const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_MATERIAL_PARTITION, task.index);
-
-    bool add_diffuse_layer               = ((data.flags & G_BUFFER_FLAG_METALLIC) == 0) && GBUFFER_IS_SUBSTRATE_OPAQUE(data.flags);
-    bool add_microfacet_reflection_layer = true;
-    bool add_microfacet_refraction_layer = ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT) != 0);
-
-    if (add_diffuse_layer) {
-      MaterialLayerInstance layer;
-      layer.type      = MATERIAL_LAYER_TYPE_DIFFUSE;
-      layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_DIFFUSE);
-
-      const bool merge_microfacet_reflection = true;  // remap01(data.roughness, 0.2f, 0.5f) > random;
-
-      if (merge_microfacet_reflection) {
-        layer.eval_mask |= (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
-        add_microfacet_reflection_layer = false;
-      }
-
-      ctx.layer_queue[ctx.num_layers++] = layer;
-    }
-
-    if (add_microfacet_reflection_layer) {
-      MaterialLayerInstance layer;
-      layer.type      = MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION;
-      layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFLECTION);
-
-      ctx.layer_queue[ctx.num_layers++] = layer;
-    }
-
-    if (add_microfacet_refraction_layer) {
-      MaterialLayerInstance layer;
-      layer.type      = MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION;
-      layer.eval_mask = (1 << MATERIAL_LAYER_TYPE_MICROFACET_REFRACTION);
-
-      ctx.layer_queue[ctx.num_layers++] = layer;
-    }
-  }
-
-  ctx.power       = power;
-  ctx.solid_angle = solid_angle;
+  MaterialContextGeometry ctx;
+  ctx.instance_id = triangle_handle.instance_id;
+  ctx.tri_id      = triangle_handle.tri_id;
+  ctx.albedo      = albedo;
+  ctx.emission    = emission;
+  ctx.normal      = transform_apply_rotation(trans, normal);
+  ctx.position    = task.origin;
+  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.roughness   = roughness;
+  ctx.state       = task.state;
+  ctx.flags       = flags;
+  ctx.ior_in      = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
+  ctx.ior_out     = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
 
   return ctx;
 }

@@ -2,6 +2,7 @@
 #define CU_OCEAN_UTILS_H
 
 #include "ior_stack.cuh"
+#include "material.cuh"
 #include "sky_utils.cuh"
 #include "utils.cuh"
 
@@ -459,7 +460,7 @@ __device__ float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-__device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint32_t pixel) {
+__device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, const uint32_t pixel) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
@@ -467,34 +468,35 @@ __device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint
   if (inside_water)
     normal = scale_vector(normal, -1.0f);
 
-  uint32_t flags = G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
+  uint32_t flags = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
 
   if (inside_water) {
-    flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
+    flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
   const IORStackMethod ior_stack_method =
-    (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(device.ocean.refractive_index, pixel, ior_stack_method);
 
   // We clamp the roughness to avoid caustics that would never clean up.
   const float roughness = 0.045f;
 
-  GBufferData data;
-  data.instance_id = HIT_TYPE_OCEAN;
-  data.tri_id      = 0;
-  data.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
-  data.emission    = get_color(0.0f, 0.0f, 0.0f);
-  data.normal      = normal;
-  data.position    = task.origin;
-  data.V           = scale_vector(task.ray, -1.0f);
-  data.roughness   = roughness;
-  data.state       = task.state;
-  data.flags       = flags;
-  data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
-  data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
+  MaterialContextGeometry ctx;
 
-  return data;
+  ctx.instance_id = HIT_TYPE_OCEAN;
+  ctx.tri_id      = 0;
+  ctx.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
+  ctx.emission    = get_color(0.0f, 0.0f, 0.0f);
+  ctx.normal      = normal;
+  ctx.position    = task.origin;
+  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.roughness   = roughness;
+  ctx.state       = task.state;
+  ctx.flags       = flags;
+  ctx.ior_in      = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
+  ctx.ior_out     = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
+
+  return ctx;
 }
 
 #endif /* CU_OCEAN_UTILS_H */

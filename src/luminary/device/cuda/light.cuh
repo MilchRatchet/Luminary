@@ -1,19 +1,22 @@
 #ifndef CU_LIGHT_H
 #define CU_LIGHT_H
 
+#if defined(OPTIX_KERNEL)
+
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
-#include "light_ltc.cuh"
+#include "light_bridges.cuh"
+#include "light_common.cuh"
 #include "light_microtriangle.cuh"
 #include "light_tree.cuh"
 #include "light_triangle.cuh"
+#include "material.cuh"
 #include "memory.cuh"
 #include "mis.cuh"
 #include "optix_common.cuh"
 #include "ris.cuh"
 #include "sky_utils.cuh"
-#include "splitting.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -30,267 +33,30 @@
 // Y. Tokuyoshi and S. Ikeda and P. Kulkarni and T. Harada, "Hierarchical Light Sampling with Accurate Spherical Gaussian Lighting",
 // SIGGRAPH Asia 2024 Conference Papers, 2024
 
-#if defined(SHADING_KERNEL)
-
-////////////////////////////////////////////////////////////////////
-// SG Lighting
-////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////
-// Light Tree
-////////////////////////////////////////////////////////////////////
-
-#ifdef VOLUME_KERNEL
-#if 0
-__device__ float light_tree_child_importance(
-  const float transmittance_importance, const vec3 origin, const vec3 ray, const DeviceLightTreeNode node, const vec3 exp,
-  const float exp_c, const uint32_t i) {
-  const bool lower_data = (i < 4);
-  const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
-
-  const uint32_t rel_energy = lower_data ? node.rel_energy[0] : node.rel_energy[1];
-
-  vec3 point;
-  const float energy = (float) ((rel_energy >> shift) & 0xFF);
-
-  if (energy == 0.0f)
-    return 0.0f;
-
-  const uint32_t rel_point_x = lower_data ? node.rel_point_x[0] : node.rel_point_x[1];
-  const uint32_t rel_point_y = lower_data ? node.rel_point_y[0] : node.rel_point_y[1];
-  const uint32_t rel_point_z = lower_data ? node.rel_point_z[0] : node.rel_point_z[1];
-
-  point = get_vector((rel_point_x >> shift) & 0xFF, (rel_point_y >> shift) & 0xFF, (rel_point_z >> shift) & 0xFF);
-  point = mul_vector(point, exp);
-  point = add_vector(point, node.base_point);
-
-  const vec3 diff = sub_vector(point, origin);
-
-  // Compute the point along our ray that is closest to the child point.
-  const float t            = fmaxf(dot_product(diff, ray), 0.0f);
-  const vec3 closest_point = add_vector(origin, scale_vector(ray, t));
-
-  const float dist = sqrtf(dot_product(diff, diff));
-
-  const vec3 shift_vector = normalize_vector(sub_vector(closest_point, point));
-
-  const uint32_t confidence_light = lower_data ? node.confidence_light[0] : node.confidence_light[1];
-
-  float confidence;
-  confidence = (confidence_light >> (shift + 2)) & 0x3F;
-  confidence = confidence * exp_c;
-
-  const float dist_clamped = fmaxf(dist, confidence);
-
-  // We shift the center of the child towards and along the ray based on the confidence.
-  const vec3 reference_point = add_vector(scale_vector(add_vector(shift_vector, ray), confidence), point);
-
-  const float angle_term = (1.0f + dot_product(ray, normalize_vector(sub_vector(reference_point, origin))));
-
-  return energy * angle_term / dist_clamped;
-}
-
-__device__ uint32_t light_tree_traverse(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, float& random, float& pdf) {
-  pdf = 1.0f;
-
-  DeviceLightTreeNode node = load_light_tree_node(0);
-
-  const float transmittance_importance = color_importance(add_color(volume.scattering, volume.absorption));
-
-  uint32_t subset_ptr = 0xFFFFFFFFu;
-
-  random = random_saturate(random);
-
-  while (subset_ptr == 0xFFFFFFFFu) {
-    const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_c = exp2f(node.exp_confidence);
-
-    float importance[8];
-
-    importance[0] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 7);
-
-    float sum_importance = 0.0f;
-    for (uint32_t i = 0; i < 8; i++) {
-      sum_importance += importance[i];
-    }
-
-    float accumulated_importance = 0.0f;
-
-    uint32_t selected_child             = 0xFFFFFFFF;
-    uint32_t selected_child_light_ptr   = 0;
-    uint32_t selected_child_light_count = 0;
-    uint32_t sum_lights                 = 0;
-    float selected_importance           = 0.0f;
-    float random_shift                  = 0.0f;
-
-    random *= sum_importance;
-
-    for (uint32_t i = 0; i < 8; i++) {
-      const float child_importance = importance[i];
-      accumulated_importance += child_importance;
-
-      const bool lower_data                 = (i < 4);
-      const uint32_t child_light_count_data = lower_data ? node.confidence_light[0] : node.confidence_light[1];
-      const uint32_t shift                  = (lower_data ? i : (i - 4)) << 3;
-
-      uint32_t child_light_count = (child_light_count_data >> shift) & 0x3;
-      sum_lights += child_light_count;
-
-      if (accumulated_importance > random) {
-        selected_child             = i;
-        selected_child_light_count = child_light_count;
-        selected_child_light_ptr   = sum_lights - child_light_count;
-        selected_importance        = child_importance;
-
-        random_shift = accumulated_importance - child_importance;
-
-        // No control flow, we always loop over all children.
-        accumulated_importance = -FLT_MAX;
-      }
-    }
-
-    if (selected_child == 0xFFFFFFFF) {
-      subset_ptr = 0;
-      break;
-    }
-
-    pdf *= selected_importance / sum_importance;
-
-    // Rescale random number
-    random = random_saturate((random - random_shift) / selected_importance);
-
-    if (selected_child_light_count > 0) {
-      subset_ptr = node.light_ptr + selected_child_light_ptr;
-      break;
-    }
-
-    node = load_light_tree_node(node.child_ptr + selected_child);
-  }
-
-  return subset_ptr;
-}
-#endif
-
-// TODO: Support light trees for volumes.
-__device__ TriangleHandle
-  light_tree_query(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, float random, float& pdf, DeviceTransform& trans) {
-  pdf = 1.0f;
-
-#if 0
-  const uint32_t light_tree_handle_key = light_tree_traverse(volume, origin, ray, random, pdf);
-#else
-  const uint32_t light_tree_handle_key = 0;
-#endif
-
-  const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[light_tree_handle_key];
-
-  trans = load_transform(handle.instance_id);
-
-  return handle;
-}
-
-#else /* VOLUME_KERNEL */
-
-#if 0
-__device__ float light_tree_traverse_pdf(
-  const LightTreeRuntimeData data, const vec3 position, const vec3 normal, const uint32_t primitive_id) {
-  float pdf = 1.0f;
-
-  const uint2 light_paths = __ldg(device.ptrs.light_tree_paths + primitive_id);
-
-  uint32_t current_light_path = light_paths.x;
-  uint32_t current_depth      = 0;
-
-  DeviceLightTreeNode node = load_light_tree_node(0);
-
-  while (true) {
-    const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_v = exp2f(node.exp_variance);
-
-    float importance[8];
-    importance[0] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 0);
-    importance[1] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 1);
-    importance[2] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 2);
-    importance[3] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 3);
-    importance[4] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 4);
-    importance[5] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 5);
-    importance[6] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 6);
-    importance[7] = light_tree_child_importance(data, position, normal, node, exp, exp_v, 7);
-
-    float sum_importance = 0.0f;
-    for (uint32_t i = 0; i < 8; i++) {
-      sum_importance += importance[i];
-    }
-
-    const float one_over_sum = 1.0f / sum_importance;
-
-    uint32_t selected_child     = 0xFFFFFFFF;
-    bool selected_child_is_leaf = false;
-    float child_pdf             = 0.0f;
-
-    for (uint32_t i = 0; i < 8; i++) {
-      const float child_importance = importance[i];
-
-      if ((current_light_path & 0x7) == i) {
-        selected_child         = i;
-        selected_child_is_leaf = ((i < 4) ? (node.rel_variance[0] >> (i * 8)) : (node.rel_variance[1] >> ((i - 4) * 8))) & 0x1;
-        child_pdf              = child_importance * one_over_sum;
-      }
-    }
-
-    if (selected_child == 0xFFFFFFFF) {
-      break;
-    }
-
-    pdf *= child_pdf;
-
-    if (selected_child_is_leaf) {
-      break;
-    }
-
-    current_light_path = current_light_path >> 3;
-    current_depth++;
-
-    if (current_depth == 10) {
-      current_light_path = light_paths.y;
-    }
-
-    node = load_light_tree_node(node.child_ptr + selected_child);
-  }
-
-  return pdf;
-}
-#endif
-
 ////////////////////////////////////////////////////////////////////
 // Light Sampling
 ////////////////////////////////////////////////////////////////////
 
-struct LightSampleWorkData {
-  // Current Sample
-  TriangleHandle handle;
-  vec3 ray;
-  RGBF light_color;
-  float dist;
-  bool is_refraction;
-} typedef LightSampleWorkData;
+template <MaterialType TYPE>
+__device__ TriangleHandle light_get_blocked_handle(const MaterialContext<TYPE> ctx) {
+  return triangle_handle_get(INSTANCE_ID_INVALID, 0);
+}
 
-__device__ void light_sample_solid_angle(
-  const GBufferData data, const uint8_t layer_mask, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle,
-  const uint3 light_uv_packed, const float tree_sampling_weight, RISReservoir& reservoir, LightSampleWorkData& work) {
-  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR, pixel);
+template <>
+__device__ TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx) {
+  return triangle_handle_get(ctx.instance_id, ctx.tri_id);
+}
+
+template <MaterialType TYPE>
+__device__ void light_evaluate_candidate(
+  const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+  const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<TYPE>& result) {
+  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + output_id, pixel);
 
   vec3 ray;
   float dist;
   float solid_angle;
-  if (light_triangle_sample_finalize(light, light_uv_packed, data.position, ray_random, ray, dist, solid_angle) == false)
+  if (light_triangle_sample_finalize(light, light_uv_packed, ctx.position, ray_random, ray, dist, solid_angle) == false)
     return;
 
   RGBF light_color = light_get_color(light);
@@ -298,33 +64,48 @@ __device__ void light_sample_solid_angle(
   // TODO: When I improve the BSDF, I need to make sure that I handle correctly refraction BSDF sampled directions, they could be
   // incorrectly flagged as a reflection here or vice versa.
   bool is_refraction;
-  const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f, layer_mask);
+  const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float light_area = get_length(cross_product(light.edge1, light.edge2)) * 0.5f;
-  const float power      = color_importance(light_color) * light_area;
-
-  light_color        = scale_color(mul_color(light_color, bsdf_weight), mis_compute_weight_dl(data, ray, solid_angle, power));
-  const float target = color_importance(light_color);
+  const float MIS_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle);
+  light_color            = scale_color(mul_color(light_color, bsdf_weight), MIS_weight);
+  const float target     = color_importance(light_color);
 
   const float sampling_weight = tree_sampling_weight * solid_angle;
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
-    work.handle        = handle;
-    work.ray           = ray;
-    work.light_color   = light_color;
-    work.dist          = dist;
-    work.is_refraction = is_refraction;
+    result.handle        = handle;
+    result.ray           = ray;
+    result.light_color   = light_color;
+    result.dist          = dist;
+    result.is_refraction = is_refraction;
   }
 }
 
-template <MaterialLayerType TYPE>
-__device__ float light_list_resample(
-  const GBufferData data, const uint8_t layer_mask, const LightTreeWork& light_tree_work, ushort2 pixel,
-  const TriangleHandle blocked_handle, LightSampleWorkData& work) {
+template <>
+__device__ void light_evaluate_candidate<MATERIAL_VOLUME>(
+  const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+  const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<MATERIAL_VOLUME>& result) {
+  float2 target_and_weight;
+  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, handle, light_uv_packed, pixel, output_id, target_and_weight);
+
+  const float target          = target_and_weight.x;
+  const float sampling_weight = target_and_weight.y * tree_sampling_weight;
+
+  if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
+    result = sample;
+  }
+}
+
+template <MaterialType TYPE>
+__device__ LightSampleResult<TYPE> light_list_resample(
+  const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle) {
+  LightSampleResult<TYPE> result;
+  result.handle = triangle_handle_get(LIGHT_ID_NONE, 0);
+
   RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
 
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
-    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(data, pixel, output_id, light_tree_work);
+    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(ctx, pixel, output_id, light_tree_work);
 
     const uint32_t light_id = output.light_id;
 
@@ -340,52 +121,44 @@ __device__ float light_list_resample(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    light_sample_solid_angle(data, layer_mask, pixel, triangle_light, light_handle, light_uv_packed, output.weight, reservoir, work);
+    light_evaluate_candidate(ctx, pixel, triangle_light, light_handle, light_uv_packed, output.weight, output_id, reservoir, result);
   }
 
-  return ris_reservoir_get_sampling_weight(reservoir);
+  const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
+
+  result.light_color = scale_color(result.light_color, sampling_weight);
+
+  return result;
 }
 
-template <MaterialLayerType TYPE>
-__device__ TriangleHandle light_sample(
-  const GBufferData data, const uint8_t layer_mask, const ushort2 pixel, vec3& selected_ray, RGBF& selected_light_color,
-  float& selected_dist, bool& selected_is_refraction) {
+template <MaterialType TYPE>
+__device__ LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  const LightTreeWork light_tree_work = light_tree_traverse_prepass<TYPE>(data, pixel);
+  const LightTreeWork light_tree_work = light_tree_traverse_prepass(ctx, pixel);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of list of candidates
   ////////////////////////////////////////////////////////////////////
 
   // Don't allow triangles to sample themselves.
-  const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
+  const TriangleHandle blocked_handle = light_get_blocked_handle(ctx);
 
-  // We don't need to initialize it. It will end up uninitialized if and only if ris_reservoir.target is 0.
-  LightSampleWorkData work;
-  work.handle = triangle_handle_get(LIGHT_ID_NONE, 0);
+  LightSampleResult<TYPE> result = light_list_resample(ctx, light_tree_work, pixel, blocked_handle);
 
-  const float sampling_weight = light_list_resample<TYPE>(data, layer_mask, light_tree_work, pixel, blocked_handle, work);
+  UTILS_CHECK_NANS(pixel, result.light_color);
 
-  ////////////////////////////////////////////////////////////////////
-  // Sample direction
-  ////////////////////////////////////////////////////////////////////
-
-  selected_ray           = work.ray;
-  selected_light_color   = scale_color(work.light_color, sampling_weight);
-  selected_dist          = work.dist;
-  selected_is_refraction = work.is_refraction;
-
-  UTILS_CHECK_NANS(pixel, selected_light_color);
-
-  return work.handle;
+  return result;
 }
 
-#endif /* !VOLUME_KERNEL */
+#else /* OPTIX_KERNEL */
 
-#else /* SHADING_KERNEL */
+#include "light_microtriangle.cuh"
+#include "math.cuh"
+#include "memory.cuh"
+#include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
 // Light Processing
@@ -414,8 +187,8 @@ __device__ float lights_integrate_emission(
 
   const float step_size = 1.0f / steps;
 
-  RGBF accumulator  = get_color(0.0f, 0.0f, 0.0f);
-  float texel_count = 0.0f;
+  RGBF accumulator     = get_color(0.0f, 0.0f, 0.0f);
+  uint32_t texel_count = 0;
 
   for (float a = 0.0f; a < 1.0f; a += step_size) {
     for (float b = 0.0f; a + b < 1.0f; b += step_size) {
@@ -427,9 +200,12 @@ __device__ float lights_integrate_emission(
       const RGBF color = scale_color(get_color(texel.x, texel.y, texel.z), texel.w);
 
       accumulator = add_color(accumulator, color);
-      texel_count += 1.0f;
+      texel_count++;
     }
   }
+
+  if (texel_count == 0)
+    return 1.0f;
 
   return color_importance(accumulator) / texel_count;
 }
@@ -492,6 +268,6 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   }
 }
 
-#endif /* !SHADING_KERNEL */
+#endif /* !OPTIX_KERNEL */
 
 #endif /* CU_LIGHT_H */

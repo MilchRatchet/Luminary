@@ -1,6 +1,7 @@
 #ifndef CU_CAUSTICS_H
 #define CU_CAUSTICS_H
 
+#include "material.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
 #include "random.cuh"
@@ -19,7 +20,8 @@ struct CausticsSamplingDomain {
 } typedef CausticsSamplingDomain;
 
 // Assuming a flat plane with a normal of (0,1,0), find the unique solution.
-__device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, const bool is_underwater, bool& valid) {
+template <MaterialType TYPE>
+__device__ vec3 caustics_solve_for_normal(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_underwater, bool& valid) {
   // Get view vector
   vec3 ray;
   if (is_underwater) {
@@ -31,11 +33,11 @@ __device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, 
     ray = get_vector(L.x, -L.y, L.z);
   }
 
-  const float dist = ocean_intersection_distance(data.position, ray, FLT_MAX);
+  const float dist = ocean_intersection_distance(ctx.position, ray, FLT_MAX);
 
   valid = dist != FLT_MAX;
 
-  return add_vector(data.position, scale_vector(ray, dist));
+  return add_vector(ctx.position, scale_vector(ray, dist));
 }
 
 __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
@@ -48,15 +50,13 @@ __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool i
   }
 }
 
-__device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, const vec3 L, const bool is_underwater) {
+template <MaterialType TYPE>
+__device__ CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_underwater) {
   bool is_valid;
-  const vec3 center = caustics_solve_for_normal(data, L, is_underwater, is_valid);
+  const vec3 center = caustics_solve_for_normal(ctx, L, is_underwater, is_valid);
 
-#ifdef PHASE_KERNEL
-  const bool fast_path = true;
-#else
-  const bool fast_path = device.ocean.amplitude == 0.0f || !device.ocean.caustics_active;
-#endif
+  // Phase based kernels never do proper caustics
+  const bool fast_path = (TYPE != MATERIAL_GEOMETRY) || (device.ocean.amplitude == 0.0f) || (device.ocean.caustics_active == false);
 
   // Fast path that assumes a flat ocean.
   if (fast_path) {
@@ -67,7 +67,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
     domain.edge1 = get_vector(0.0f, 0.0f, 0.0f);
     domain.edge2 = get_vector(0.0f, 0.0f, 0.0f);
 
-    domain.area = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(data.position));
+    domain.area = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(ctx.position));
 
     domain.ior_in  = (is_underwater) ? device.ocean.refractive_index : 1.0f;
     domain.ior_out = (is_underwater) ? 1.0f : device.ocean.refractive_index;
@@ -77,7 +77,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
     return domain;
   }
 
-  const vec3 center_dir = normalize_vector(sub_vector(center, data.position));
+  const vec3 center_dir = normalize_vector(sub_vector(center, ctx.position));
 
   float azimuth, altitude;
   direction_to_angles(center_dir, azimuth, altitude);
@@ -89,13 +89,13 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   const vec3 v1_dir = angles_to_direction(altitude - angle, azimuth + angle);
   const vec3 v2_dir = angles_to_direction(altitude + angle, azimuth - angle);
 
-  const float v0_dist = fabsf(data.position.y - plane_height) / fmaxf(0.01f, fabsf(v0_dir.y));
-  const float v1_dist = fabsf(data.position.y - plane_height) / fmaxf(0.01f, fabsf(v1_dir.y));
-  const float v2_dist = fabsf(data.position.y - plane_height) / fmaxf(0.01f, fabsf(v2_dir.y));
+  const float v0_dist = fabsf(ctx.position.y - plane_height) / fmaxf(0.01f, fabsf(v0_dir.y));
+  const float v1_dist = fabsf(ctx.position.y - plane_height) / fmaxf(0.01f, fabsf(v1_dir.y));
+  const float v2_dist = fabsf(ctx.position.y - plane_height) / fmaxf(0.01f, fabsf(v2_dir.y));
 
-  const vec3 v0 = add_vector(data.position, scale_vector(v0_dir, v0_dist));
-  const vec3 v1 = add_vector(data.position, scale_vector(v1_dir, v1_dist));
-  const vec3 v2 = add_vector(data.position, scale_vector(v2_dir, v2_dist));
+  const vec3 v0 = add_vector(ctx.position, scale_vector(v0_dir, v0_dist));
+  const vec3 v1 = add_vector(ctx.position, scale_vector(v1_dir, v1_dist));
+  const vec3 v2 = add_vector(ctx.position, scale_vector(v2_dir, v2_dist));
 
   CausticsSamplingDomain domain;
 
@@ -114,9 +114,10 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   return domain;
 }
 
+template <MaterialType TYPE>
 __device__ bool caustics_find_connection_point(
-  const GBufferData data, const ushort2 index, const CausticsSamplingDomain domain, const bool is_refraction, const uint32_t iteration,
-  const uint32_t num_iterations, vec3& point, float& sample_weight) {
+  const MaterialContext<TYPE> ctx, const ushort2 index, const CausticsSamplingDomain domain, const bool is_refraction,
+  const uint32_t iteration, const uint32_t num_iterations, vec3& point, float& sample_weight) {
   if (domain.fast_path) {
     point         = domain.base;
     sample_weight = domain.area;
@@ -129,7 +130,7 @@ __device__ bool caustics_find_connection_point(
 
   point = add_vector(domain.base, add_vector(scale_vector(domain.edge1, sample.x), scale_vector(domain.edge2, sample.y)));
 
-  vec3 V = sub_vector(data.position, point);
+  vec3 V = sub_vector(ctx.position, point);
 
   const float dist_sq = dot_product(V, V);
   V                   = scale_vector(V, 1.0f / sqrtf(dist_sq));

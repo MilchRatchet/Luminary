@@ -6,7 +6,6 @@
 #include "geometry_utils.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "mis.cuh"
 
 LUMINARY_KERNEL void geometry_process_tasks() {
   HANDLE_DEVICE_ABORT();
@@ -26,16 +25,13 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    const MaterialContext ctx = geometry_generate_g_buffer(task, triangle_handle, pixel, false);
-
-    GBufferData data = ctx.data;
+    MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    BSDFSampleInfo bounce_info;
-    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample(ctx, task.index);
 
     ////////////////////////////////////////////////////////////////////
     // Update delta path state
@@ -43,14 +39,14 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     bool is_delta_distribution;
     if (bounce_info.is_transparent_pass) {
-      const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
-      is_delta_distribution        = data.roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
+      const float refraction_scale = (ctx.ior_in > ctx.ior_out) ? ctx.ior_in / ctx.ior_out : ctx.ior_out / ctx.ior_in;
+      is_delta_distribution        = ctx.roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
     }
     else {
-      is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
+      is_delta_distribution = bounce_info.is_microfacet_based && (ctx.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
-    const bool is_pass_through = bsdf_is_pass_through_ray(bounce_info.is_transparent_pass, data.ior_in, data.ior_out);
+    const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info.is_transparent_pass);
 
     ////////////////////////////////////////////////////////////////////
     // Emission and record
@@ -58,22 +54,19 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    if (color_any(data.emission)) {
-      const DeviceMISData mis_data = device.ptrs.emission_weight[pixel];
-      const float emission_weight  = mis_compute_weight_gi(mis_data.sampling_probability, ctx.solid_angle, ctx.power);
-      const RGBF emission          = scale_color(mul_color(data.emission, record), emission_weight);
-      write_beauty_buffer(emission, pixel, task.state);
+    if (color_any(ctx.emission)) {
+      write_beauty_buffer(mul_color(ctx.emission, record), pixel, task.state);
     }
 
     record = mul_color(record, bounce_info.weight);
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method =
-        (data.flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(data.ior_out, pixel, ior_stack_method);
+        (ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ctx.ior_out, pixel, ior_stack_method);
     }
 
-    data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
+    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
     uint16_t new_state = task.state & ~STATE_FLAG_ALLOW_EMISSION;
 
@@ -87,14 +80,14 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     DeviceTask bounce_task;
     bounce_task.state  = new_state;
-    bounce_task.origin = data.position;
-    bounce_task.ray    = bounce_ray;
+    bounce_task.origin = ctx.position;
+    bounce_task.ray    = bounce_info.ray;
     bounce_task.index  = task.index;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
       task_store(bounce_task, get_task_address(trace_count++));
       store_RGBF(device.ptrs.records, pixel, record);
-      device.ptrs.emission_weight[pixel] = mis_get_payload(data, bounce_ray);
+      device.ptrs.emission_weight[pixel] = mis_get_payload(ctx, bounce_info.ray);
     }
   }
 
@@ -119,17 +112,17 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel, false).data;
+        const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
 
-        write_beauty_buffer_forced(add_color(opaque_color(data.albedo), data.emission), pixel);
+        write_beauty_buffer_forced(add_color(opaque_color(ctx.albedo), ctx.emission), pixel);
       } break;
       case LUMINARY_SHADING_MODE_DEPTH: {
         write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel, false).data;
+        const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
 
-        const vec3 normal = data.normal;
+        const vec3 normal = ctx.normal;
 
         write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
       } break;
@@ -149,8 +142,8 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(color, pixel);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        const GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel, false).data;
-        const RGBF color       = add_color(scale_color(opaque_color(data.albedo), 0.025f), data.emission);
+        const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
+        const RGBF color                  = add_color(scale_color(opaque_color(ctx.albedo), 0.025f), ctx.emission);
 
         write_beauty_buffer_forced(color, pixel);
       } break;

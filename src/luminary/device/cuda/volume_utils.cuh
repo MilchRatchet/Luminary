@@ -1,20 +1,11 @@
 #ifndef CU_VOLUME_UTILS_H
 #define CU_VOLUME_UTILS_H
 
+#include "material.cuh"
 #include "ocean_utils.cuh"
 #include "utils.cuh"
 
 #define FOG_DENSITY (0.001f * device.fog.density)
-
-struct VolumeDescriptor {
-  VolumeType type;
-  RGBF absorption;
-  RGBF scattering;
-  float max_scattering;
-  float dist;
-  float max_height;
-  float min_height;
-} typedef VolumeDescriptor;
 
 __device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
   return add_color(volume.absorption, volume.scattering);
@@ -119,7 +110,8 @@ __device__ VolumePath make_volume_path(const float start, const float length) {
  *                  - [x] = Start in world space.
  *                  - [y] = Distance through fog in world space.
  */
-__device__ VolumePath volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+__device__ VolumePath volume_compute_path(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, const bool ocean_fast_path = false) {
   if (limit <= 0.0f)
     return make_volume_path(-FLT_MAX, 0.0f);
 
@@ -134,11 +126,7 @@ __device__ VolumePath volume_compute_path(const VolumeDescriptor volume, const v
 
     // Without loss of generality, we can simply assume that the end of the volume is at our closest intersection
     // as long as we are below the surface.
-#ifdef SHADING_KERNEL
-    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
-#else
-    const float surface_intersect = (above_surface) ? ocean_intersection_distance(origin, ray, limit) : limit;
-#endif
+    const float surface_intersect = ((ocean_fast_path == false) || above_surface) ? ocean_intersection_distance(origin, ray, limit) : limit;
 
     if (above_surface) {
       start_y = surface_intersect;
@@ -239,20 +227,33 @@ __device__ float volume_sample_intersection_miss_probability(const VolumeDescrip
   return expf(-volume.max_scattering * depth);
 }
 
-__device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
-  const float cos_angle = -dot_product(data.V, ray);
+template <MaterialType TYPE>
+__device__ float volume_phase_evaluate(const MaterialContext<TYPE> ctx, const vec3 ray);
+
+template <>
+__device__ float volume_phase_evaluate<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const vec3 ray) {
+  const float cos_angle = -dot_product(ctx.V, ray);
 
   float phase;
-  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+  if (ctx.descriptor.type == VOLUME_TYPE_OCEAN) {
     phase = ocean_phase(cos_angle);
   }
   else {
-    const float diameter            = (volume_hit_type == VOLUME_TYPE_FOG) ? device.fog.droplet_diameter : device.particles.phase_diameter;
+    const float diameter            = device.fog.droplet_diameter;
     const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
     phase                           = jendersie_eon_phase_function(cos_angle, params);
   }
 
-  return scale_color(opaque_color(data.albedo), phase);
+  return phase;
+}
+
+template <>
+__device__ float volume_phase_evaluate<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const vec3 ray) {
+  const float cos_angle = -dot_product(ctx.V, ray);
+
+  const float diameter            = device.particles.phase_diameter;
+  const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
+  return jendersie_eon_phase_function(cos_angle, params);
 }
 
 __device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float length) {
@@ -307,29 +308,43 @@ __device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray
   return scale_color(ocean_transmittance, fog_transmittance);
 }
 
-__device__ GBufferData
-  volume_generate_g_buffer(const DeviceTask task, const uint32_t instance_id, const int pixel, const VolumeDescriptor volume) {
-  const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
+template <MaterialType TYPE>
+__device__ vec3 volume_sample_ray(const MaterialContext<TYPE> ctx, const ushort2 pixel);
 
-  const float ray_ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
+template <>
+__device__ vec3 volume_sample_ray<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 pixel) {
+  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE, pixel);
+  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_VOLUME, pixel);
 
-  GBufferData data;
-  data.instance_id = instance_id;
-  data.tri_id      = 0;
-  data.albedo      = RGBAF_set(
-    volume.scattering.r * scattering_normalization, volume.scattering.g * scattering_normalization,
-    volume.scattering.b * scattering_normalization, 0.0f);
-  data.emission  = get_color(0.0f, 0.0f, 0.0f);
-  data.normal    = get_vector(0.0f, 0.0f, 0.0f);
-  data.position  = task.origin;
-  data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = device.fog.droplet_diameter;
-  data.state     = task.state;
-  data.flags     = 0;
-  data.ior_in    = ray_ior;
-  data.ior_out   = ray_ior;
+  const vec3 ray = scale_vector(ctx.V, -1.0f);
 
-  return data;
+  const vec3 scatter_ray = (ctx.descriptor.type != VOLUME_TYPE_OCEAN)
+                             ? jendersie_eon_phase_sample(ray, device.fog.droplet_diameter, random_dir, random_choice)
+                             : ocean_phase_sampling(ray, random_dir, random_choice);
+
+  return scatter_ray;
+}
+
+template <>
+__device__ vec3 volume_sample_ray<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const ushort2 pixel) {
+  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE, pixel);
+  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_VOLUME, pixel);
+
+  const vec3 ray         = scale_vector(ctx.V, -1.0f);
+  const vec3 scatter_ray = jendersie_eon_phase_sample(ray, device.particles.phase_diameter, random_dir, random_choice);
+
+  return scatter_ray;
+}
+
+__device__ MaterialContextVolume
+  volume_get_context(const DeviceTask task, const uint32_t instance_id, const uint32_t pixel, const VolumeDescriptor volume) {
+  MaterialContextVolume ctx;
+  ctx.descriptor = volume;
+  ctx.position   = task.origin;
+  ctx.V          = scale_vector(task.ray, -1.0f);
+  ctx.state      = task.state;
+
+  return ctx;
 }
 
 #endif /* CU_VOLUME_UTILS_H */

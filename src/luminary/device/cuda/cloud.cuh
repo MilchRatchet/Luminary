@@ -290,12 +290,10 @@ __device__ float clouds_render(
     if (result.hit_dist == FLT_MAX)
       break;
 
-#ifndef SHADING_KERNEL
     if (device.cloud.atmosphere_scattering) {
       color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, pixel));
       origin = add_vector(origin, scale_vector(ray, result.hit_dist - prev_start));
     }
-#endif /* SHADING_KERNEL */
 
     color         = add_color(color, mul_color(result.scattered_light, transmittance));
     transmittance = scale_color(transmittance, result.transmittance);

@@ -26,15 +26,15 @@ LUMINARY_KERNEL void particle_process_tasks() {
     const VolumeType volume_type  = VOLUME_HIT_TYPE(handle.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    const GBufferData data = particle_generate_g_buffer(task, handle.instance_id, pixel);
+    const MaterialContextParticle ctx = particle_get_context(task, handle.instance_id, pixel);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    const vec3 bounce_ray = bsdf_sample_volume(data, task.index);
+    const vec3 bounce_ray = volume_sample_ray<MATERIAL_PARTICLE>(ctx, task.index);
 
     DeviceTask bounce_task;
     bounce_task.state  = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
-    bounce_task.origin = data.position;
+    bounce_task.origin = ctx.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
@@ -76,7 +76,7 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
       write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_NORMAL) {
-      const GBufferData data = particle_generate_g_buffer(task, handle.instance_id, pixel);
+      const MaterialContextParticle data = particle_get_context(task, handle.instance_id, pixel);
 
       const vec3 normal = data.normal;
 

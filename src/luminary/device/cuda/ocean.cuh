@@ -26,22 +26,21 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    GBufferData data = ocean_generate_g_buffer(task, pixel);
+    MaterialContextGeometry ctx = ocean_get_context(task, pixel);
 
-    BSDFSampleInfo bounce_info;
-    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample(ctx, task.index);
 
     record = mul_color(record, bounce_info.weight);
 
-    const bool is_pass_through = bsdf_is_pass_through_ray(bounce_info.is_transparent_pass, data.ior_in, data.ior_out);
+    const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info.is_transparent_pass);
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method =
-        (data.flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(data.ior_out, pixel, ior_stack_method);
+        (ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ctx.ior_out, pixel, ior_stack_method);
     }
 
-    data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
+    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
     uint16_t new_state = task.state;
 
@@ -51,8 +50,8 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     DeviceTask bounce_task;
     bounce_task.state  = new_state;
-    bounce_task.origin = data.position;
-    bounce_task.ray    = bounce_ray;
+    bounce_task.origin = ctx.position;
+    bounce_task.ray    = bounce_info.ray;
     bounce_task.index  = task.index;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {

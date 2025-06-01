@@ -1,23 +1,11 @@
 #ifndef CU_LUMINARY_LIGHT_TRIANGLE_H
 #define CU_LUMINARY_LIGHT_TRIANGLE_H
 
+#include "light_common.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
-
-/*
- * This struct is computed on the device when needed, it is not stored in memory.
- * The expectation is that the vertex positions are already transformed and the UV
- * is already transformed using the triangle transforms.
- */
-struct TriangleLight {
-  vec3 vertex;
-  vec3 edge1;
-  vec3 edge2;
-  UV tex_coords;
-  uint16_t material_id;
-} typedef TriangleLight;
 
 __device__ float light_triangle_intersection_uv_generic(
   const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 origin, const vec3 ray, float2& coords) {

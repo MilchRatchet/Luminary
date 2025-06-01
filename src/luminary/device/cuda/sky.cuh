@@ -100,7 +100,7 @@ __device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const floa
   return make_float2(start, distance);
 }
 
-#ifndef SHADING_KERNEL
+#ifndef OPTIX_KERNEL
 
 ////////////////////////////////////////////////////////////////////
 // Sky LUT function
@@ -325,7 +325,7 @@ LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(KernelArgsSkyComp
   args.dst_high[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
 }
 
-#endif /* SHADING_KERNEL */
+#endif /* !OPTIX_KERNEL */
 
 ////////////////////////////////////////////////////////////////////
 // Atmosphere Integration
@@ -593,7 +593,7 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t 
   return sky;
 }
 
-#ifndef SHADING_KERNEL
+#ifndef OPTIX_KERNEL
 
 ////////////////////////////////////////////////////////////////////
 // Kernel
@@ -652,6 +652,6 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
   }
 }
 
-#endif /* !SHADING_KERNEL */
+#endif /* !OPTIX_KERNEL */
 
 #endif /* CU_SKY_H */
