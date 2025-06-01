@@ -13,6 +13,8 @@
 #define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
 // #define LIGHT_TREE_DEBUG_TRAVERSAL
 
+static_assert(LIGHT_TREE_NUM_OUTPUTS <= LIGHT_GEO_MAX_SAMPLES, "Update random allocations if you increase number of output samples.");
+
 struct LightTreeContinuation {
   // 3 bits spare
   uint32_t is_light : 1, child_index : 8, probability : 20;
@@ -172,7 +174,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
   RISLane ris_lane[LIGHT_TREE_NUM_OUTPUTS];
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    ris_lane[lane_id] = ris_lane_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + lane_id, pixel));
+    ris_lane[lane_id] = ris_lane_init(random_1D(RANDOM_TARGET_LIGHT_GEO_TREE_PREPASS + lane_id, pixel));
   }
 
   uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
@@ -218,10 +220,10 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 
 template <MaterialType TYPE>
 __device__ LightTreeResult
-  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t index, const LightTreeWork work) {
-  const LightTreeContinuation continuation = work.data[index];
+  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork work) {
+  const LightTreeContinuation continuation = work.data[lane_id];
 
-  _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(index, continuation);
+  _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(lane_id, continuation);
 
   LightTreeResult result;
   result.light_id = 0xFFFFFFFF;
@@ -238,7 +240,7 @@ __device__ LightTreeResult
 
   DeviceLightTreeNode node = load_light_tree_node(continuation.child_index);
 
-  const float random     = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + index + LIGHT_TREE_NUM_OUTPUTS, pixel);
+  const float random     = random_1D(RANDOM_TARGET_LIGHT_GEO_TREE_POSTPASS + lane_id, pixel);
   RISReservoir reservoir = ris_reservoir_init(random);
 
   while (result.light_id == 0xFFFFFFFF) {
@@ -264,11 +266,11 @@ __device__ LightTreeResult
 
     if (selected_child < node.num_lights) {
       result.light_id = node.light_ptr + selected_child;
-      _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(index, result.light_id, result.weight);
+      _LIGHT_TREE_DEBUG_STORE_LIGHT_TOKEN(lane_id, result.light_id, result.weight);
       break;
     }
 
-    _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(index, node.child_ptr + (selected_child - node.num_lights), result.weight);
+    _LIGHT_TREE_DEBUG_JUMP_NODE_TOKEN(lane_id, node.child_ptr + (selected_child - node.num_lights), result.weight);
 
     node = load_light_tree_node(node.child_ptr + (selected_child - node.num_lights));
 

@@ -102,7 +102,7 @@ __device__ void optix_raytrace_particles(const DeviceTask task, OptixRaytraceRes
     trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
-  const float time         = quasirandom_sequence_1D_base_float(QUASI_RANDOM_TARGET_CAMERA_TIME, task.index, device.state.sample_id, 0);
+  const float time         = random_1D_base_float(RANDOM_TARGET_CAMERA_TIME, task.index, device.state.sample_id, 0);
   const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
   const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 

@@ -20,7 +20,7 @@ __device__ bool task_russian_roulette(const DeviceTask task, const uint8_t state
   if (value < device.camera.russian_roulette_threshold) {
     // Clamp probability to avoid fireflies. Always remove paths that carry no light at all.
     const float p = (value > 0.0f) ? fmaxf(value / device.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP) : 0.0f;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {
+    if (random_1D(RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {
       accepted = false;
     }
     else {

@@ -16,8 +16,6 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
-#define BRIDGES_MAX_DEPTH (8)
-
 // This must correspond to the G term used when computing the LUT.
 #define BRIDGES_HG_G_TERM (0.85f)
 
@@ -128,14 +126,14 @@ __device__ uint32_t
   bridges_sample_vertex_count(const VolumeDescriptor volume, const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
   const float effective_dist = light_dist * volume.max_scattering;
 
-  float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT + seed, pixel);
+  float random = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_VERTEX_COUNT + seed, pixel);
 
   ////////////////////////////////////////////////////////////////////
   // Compute importance for each vertex count
   ////////////////////////////////////////////////////////////////////
 
   float sum_importance = 0.0f;
-  float count_importance[BRIDGES_MAX_DEPTH];
+  float count_importance[LIGHT_GEO_MAX_BRIDGE_LENGTH];
 
   for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
     // TODO: The paper uses some additional terms here for the importance
@@ -196,7 +194,7 @@ __device__ RGBF bridges_sample_bridge(
   float sum_dist = 0.0f;
 
   {
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
+    const float random_dist = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel);
     const float dist        = -logf(random_dist);
     current_vertex          = add_vector(current_vertex, scale_vector(current_direction, dist));
 
@@ -204,11 +202,11 @@ __device__ RGBF bridges_sample_bridge(
   }
 
   for (uint32_t i = 1; i < vertex_count; i++) {
-    const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
+    const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
 
     current_direction = bridges_phase_sample(current_direction, random_phase);
 
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
+    const float random_dist = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
     const float dist        = -logf(random_dist);
     current_vertex          = add_vector(current_vertex, scale_vector(current_direction, dist));
 
@@ -251,7 +249,7 @@ __device__ RGBF bridges_sample_bridge(
 __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   MaterialContextVolume ctx, TriangleLight light, const TriangleHandle light_handle, const uint3 light_uv_packed, const ushort2 pixel,
   const uint32_t output_id, float2& target_and_weight) {
-  const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + output_id, pixel);
+  const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + output_id, pixel);
 
   vec3 light_dir;
   float area, light_dist;
@@ -343,7 +341,7 @@ __device__ RGBF
     uint3 light_packed_uv;
     TriangleLight light = light_triangle_sample_init(sample.handle, light_transform, light_packed_uv);
 
-    const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + sample.seed, pixel);
+    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + sample.seed, pixel);
 
     vec3 light_dir;
     float light_dist, area;
@@ -377,7 +375,8 @@ __device__ RGBF
 
   float sum_dist = 0.0f;
 
-  float dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + sample.seed * 32 + 0, pixel)) * sample.scale;
+  float dist;
+  dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * sample.scale;
 
   shadow_term = mul_color(shadow_term, optix_geometry_shadowing(current_vertex, current_direction, dist, sample.handle, trace_status));
 
@@ -386,13 +385,13 @@ __device__ RGBF
   for (int i = 1; i < vertex_count; i++) {
     current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
 
-    const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + sample.seed * 32 + i, pixel);
+    const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
 
     current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
 
     current_direction = quaternion_apply(sample.rotation, current_direction_sampled);
 
-    dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + sample.seed * 32 + i, pixel)) * sample.scale;
+    dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel)) * sample.scale;
 
     shadow_term = mul_color(shadow_term, optix_geometry_shadowing(current_vertex, current_direction, dist, sample.handle, trace_status));
 

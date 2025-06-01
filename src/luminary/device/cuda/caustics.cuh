@@ -125,8 +125,7 @@ __device__ bool caustics_find_connection_point(
     return true;
   }
 
-  const float2 sample =
-    ris_transform_stratum_2D(iteration, num_iterations, quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index));
+  const float2 sample = ris_transform_stratum_2D(iteration, num_iterations, random_2D(RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index));
 
   point = add_vector(domain.base, add_vector(scale_vector(domain.edge1, sample.x), scale_vector(domain.edge2, sample.y)));
 

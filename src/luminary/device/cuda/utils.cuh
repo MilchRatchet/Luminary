@@ -130,6 +130,10 @@ __device__ bool is_selected_pixel_lenient(const ushort2 index) {
   return is_selected_pixel(index);
 }
 
+__device__ bool is_center_pixel(const ushort2 index) {
+  return ((index.x == device.settings.width >> 1) && (index.y == device.settings.height >> 1));
+}
+
 __device__ uint32_t get_pixel_id(const ushort2 pixel) {
   return pixel.x + device.settings.width * pixel.y;
 }

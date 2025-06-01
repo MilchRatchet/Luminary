@@ -120,12 +120,12 @@ __device__ CloudRenderResult
     }
   }
 
-  step_count += 8.0f * quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
+  step_count += 8.0f * random_1D(RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
 
   start = fmaxf(0.0f, start);
 
   const float step_size     = dist / step_count;
-  const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
+  const float random_offset = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
   float reach               = start + (0.1f + random_offset * 0.9f) * step_size;
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
@@ -137,7 +137,7 @@ __device__ CloudRenderResult
   float hit_dist       = start;
   bool hit             = false;
 
-  const float2 ambient_r        = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CLOUD_DIR, pixel);
+  const float2 ambient_r        = random_2D(RANDOM_TARGET_CLOUD_DIR, pixel);
   const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 

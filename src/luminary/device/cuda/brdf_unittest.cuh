@@ -45,8 +45,8 @@ LUMINARY_KERNEL void brdf_unittest_kernel(float* bounce, float* light) {
     data.normal    = get_vector(0.0f, 1.0f, 0.0f);
 
     for (int i = 0; i < BRDF_UNITTEST_ITERATIONS; i++) {
-      float2 ran0 = quasirandom_sequence_2D_base_float(0, make_ushort2(0, 0), i, 0);
-      float2 ran1 = quasirandom_sequence_2D_base_float(1, make_ushort2(0, 0), i, 0);
+      float2 ran0 = random_2D_base_float(0, make_ushort2(0, 0), i, 0);
+      float2 ran1 = random_2D_base_float(1, make_ushort2(0, 0), i, 0);
 
       ran0.x = 0.5f * PI * (1.0f - ran0.x);
       ran0.y = 0.5f * PI * ran0.y;

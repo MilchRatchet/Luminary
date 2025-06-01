@@ -105,7 +105,7 @@ LUMINARY_KERNEL void volume_process_events() {
         handle.instance_id              = HIT_TYPE_INVALID;
       }
 
-      const float2 randoms = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_VOLUME_INTERSECTION, task.index);
+      const float2 randoms = random_2D(RANDOM_TARGET_VOLUME_INTERSECTION, task.index);
 
       bool sampled_volume_intersection = false;
 

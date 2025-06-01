@@ -21,7 +21,7 @@ LUMINARY_KERNEL void random_unittest_kernel(float* results) {
     for (int d = 0; d < RANDOM_UNITTEST_DEPTH; d++) {
       float sum = 0.0f;
       for (int i = 0; i < RANDOM_UNITTEST_ITERATIONS; i++) {
-        sum += quasirandom_sequence_1D_base_float(id, make_ushort2(0, 0), i, d);
+        sum += random_1D_base_float(id, make_ushort2(0, 0), i, d);
       }
       depth_sums[d] = sum / RANDOM_UNITTEST_ITERATIONS;
     }

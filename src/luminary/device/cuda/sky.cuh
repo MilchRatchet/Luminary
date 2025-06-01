@@ -348,7 +348,7 @@ __device__ Spectrum sky_compute_atmosphere(
     float step_size;
 
     const float light_angle   = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, origin);
-    const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
+    const float random_offset = random_1D(RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
 
     const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.sky.mie_diameter);
 
@@ -512,8 +512,8 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   const float base_range = (IS_PRIMARY_RAY) ? 40.0f : 80.0f;
 
-  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6)
-                    + quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
+  const int steps =
+    fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6) + random_1D(RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, pixel);
 

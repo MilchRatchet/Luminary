@@ -313,8 +313,8 @@ __device__ vec3 volume_sample_ray(const MaterialContext<TYPE> ctx, const ushort2
 
 template <>
 __device__ vec3 volume_sample_ray<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 pixel) {
-  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE, pixel);
-  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_VOLUME, pixel);
+  const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
+  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
 
   const vec3 ray = scale_vector(ctx.V, -1.0f);
 
@@ -327,8 +327,8 @@ __device__ vec3 volume_sample_ray<MATERIAL_VOLUME>(const MaterialContextVolume c
 
 template <>
 __device__ vec3 volume_sample_ray<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const ushort2 pixel) {
-  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE, pixel);
-  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_VOLUME, pixel);
+  const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
+  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
 
   const vec3 ray         = scale_vector(ctx.V, -1.0f);
   const vec3 scatter_ray = jendersie_eon_phase_sample(ray, device.particles.phase_diameter, random_dir, random_choice);

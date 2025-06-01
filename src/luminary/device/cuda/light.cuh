@@ -51,7 +51,7 @@ template <MaterialType TYPE>
 __device__ void light_evaluate_candidate(
   const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<TYPE>& result) {
-  const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + output_id, pixel);
+  const float2 ray_random = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + output_id, pixel);
 
   vec3 ray;
   float dist;
@@ -102,7 +102,7 @@ __device__ LightSampleResult<TYPE> light_list_resample(
   LightSampleResult<TYPE> result;
   result.handle = triangle_handle_get(LIGHT_ID_NONE, 0);
 
-  RISReservoir reservoir = ris_reservoir_init(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel));
+  RISReservoir reservoir = ris_reservoir_init(random_1D(RANDOM_TARGET_LIGHT_GEO_RESAMPLING, pixel));
 
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
     const LightTreeResult output = light_tree_traverse_postpass<TYPE>(ctx, pixel, output_id, light_tree_work);
