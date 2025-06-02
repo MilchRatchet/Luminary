@@ -90,7 +90,8 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
   CUDA_FAILURE_HANDLE(
     cuKernelGetAttribute((int*) &shared_memory_size, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, (*kernel)->cuda_kernel, device->cuda_device));
 
-  (*kernel)->shared_memory_size = shared_memory_size;
+  (*kernel)->shared_memory_size  = shared_memory_size;
+  (*kernel)->default_block_count = device->properties.optimal_block_count;
 
   return LUMINARY_SUCCESS;
 }
@@ -103,7 +104,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream) {
   launch_config.blockDimX      = THREADS_PER_BLOCK;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
-  launch_config.gridDimX       = BLOCKS_PER_GRID;
+  launch_config.gridDimX       = kernel->default_block_count;
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
   launch_config.sharedMemBytes = kernel->shared_memory_size;
@@ -124,7 +125,7 @@ LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CU
   launch_config.blockDimX      = THREADS_PER_BLOCK;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
-  launch_config.gridDimX       = BLOCKS_PER_GRID;
+  launch_config.gridDimX       = kernel->default_block_count;
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
   launch_config.sharedMemBytes = kernel->shared_memory_size;

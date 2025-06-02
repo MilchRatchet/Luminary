@@ -111,7 +111,7 @@ LUMINARY_KERNEL void balance_trace_tasks() {
 
   const uint32_t warp = THREAD_ID;
 
-  if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5)
+  if (warp >= NUM_WARPS)
     return;
 
   __shared__ uint16_t counts[32 * THREADS_PER_BLOCK];

@@ -253,7 +253,7 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
     kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
-    THREADS_PER_BLOCK, BLOCKS_PER_GRID, thread_internal_task_id));
+    THREADS_PER_BLOCK, device->properties.optimal_block_count, thread_internal_task_id));
 
   return LUMINARY_SUCCESS;
 }

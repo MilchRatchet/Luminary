@@ -6,7 +6,8 @@
 #include "../device_utils.h"
 #include "../kernel_args.h"
 
-#define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
+#define NUM_THREADS (THREADS_PER_BLOCK * device.config.num_blocks)
+#define NUM_WARPS (NUM_THREADS >> 5)
 
 #ifndef OPTIX_KERNEL
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)

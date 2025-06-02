@@ -45,6 +45,9 @@ struct DeviceProperties {
   uint32_t sm_count;
   size_t l2_cache_size;
   uint32_t max_block_count;
+  uint32_t max_blocks_per_sm;
+  uint32_t max_threads_per_sm;
+  uint32_t optimal_block_count;
 } typedef DeviceProperties;
 
 struct DeviceConstantMemoryDirtyProperties {

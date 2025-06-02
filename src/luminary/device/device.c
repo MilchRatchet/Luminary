@@ -53,26 +53,28 @@ static const size_t device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEMB
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
   offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
+  offsetof(DeviceConstantMemory, config),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   sizeof(DeviceConstantMemory)                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
 
 static const size_t device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBER_COUNT] = {
-  sizeof(DevicePointers),              // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
-  sizeof(DeviceRendererSettings),      // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
-  sizeof(DeviceCamera),                // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
-  sizeof(DeviceOcean),                 // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
-  sizeof(DeviceSky),                   // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
-  sizeof(DeviceCloud),                 // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
-  sizeof(DeviceFog),                   // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
-  sizeof(DeviceParticles),             // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  sizeof(uint32_t) * 2,                // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
-  sizeof(OptixTraversableHandle) * 4,  // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
-  sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
-  sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
-  sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
-  sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
-  sizeof(DeviceTextureObject) * 3,     // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
-  sizeof(DeviceExecutionState)         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
+  sizeof(DevicePointers),               // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
+  sizeof(DeviceRendererSettings),       // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
+  sizeof(DeviceCamera),                 // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
+  sizeof(DeviceOcean),                  // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
+  sizeof(DeviceSky),                    // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
+  sizeof(DeviceCloud),                  // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
+  sizeof(DeviceFog),                    // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
+  sizeof(DeviceParticles),              // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  sizeof(uint32_t) * 2,                 // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
+  sizeof(OptixTraversableHandle) * 4,   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  sizeof(DeviceTextureObject) * 2,      // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  sizeof(DeviceTextureObject) * 4,      // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
+  sizeof(DeviceTextureObject) * 2,      // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  sizeof(DeviceTextureObject) * 4,      // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
+  sizeof(DeviceTextureObject) * 3,      // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  sizeof(DeviceExecutionState),         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
+  sizeof(DeviceExecutionConfiguration)  // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
 };
 
 #define DEVICE_UPDATE_CONSTANT_MEMORY(member, value)                                              \
@@ -171,15 +173,36 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   int max_block_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&max_block_count, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X, device->cuda_device));
 
-  props->major           = (uint32_t) major;
-  props->minor           = (uint32_t) minor;
-  props->sm_count        = (uint32_t) sm_count;
-  props->l2_cache_size   = (size_t) l2_cache_size;
-  props->max_block_count = (uint32_t) max_block_count;
+  int max_blocks_per_sm;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&max_blocks_per_sm, CU_DEVICE_ATTRIBUTE_MAX_BLOCKS_PER_MULTIPROCESSOR, device->cuda_device));
+
+  int max_threads_per_sm;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&max_threads_per_sm, CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR, device->cuda_device));
+
+  props->major              = (uint32_t) major;
+  props->minor              = (uint32_t) minor;
+  props->sm_count           = (uint32_t) sm_count;
+  props->l2_cache_size      = (size_t) l2_cache_size;
+  props->max_block_count    = (uint32_t) max_block_count;
+  props->max_blocks_per_sm  = (uint32_t) max_blocks_per_sm;
+  props->max_threads_per_sm = (uint32_t) max_threads_per_sm;
+
+  const uint32_t max_actual_blocks_per_sm = min(props->max_blocks_per_sm, props->max_threads_per_sm / THREADS_PER_BLOCK);
+  props->optimal_block_count              = max_actual_blocks_per_sm * props->sm_count;
 
   CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
 
   CUDA_FAILURE_HANDLE(cuDeviceTotalMem(&props->memory_size, device->cuda_device));
+
+  int warp_size;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&warp_size, CU_DEVICE_ATTRIBUTE_WARP_SIZE, device->cuda_device));
+
+  if (warp_size != 32) {
+    warn_message(
+      "CUDA reported that %s has a warp size of %d. This is not supported and unexpected. Deactivating this GPU.", props->name, warp_size);
+    device->state = DEVICE_STATE_UNAVAILABLE;
+    return LUMINARY_SUCCESS;
+  }
 
   switch (major) {
     case 6: {
@@ -372,6 +395,18 @@ static LuminaryResult _device_update_constant_memory(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_setup_execution_config(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  DeviceExecutionConfiguration config;
+
+  config.num_blocks = device->properties.optimal_block_count;
+
+  DEVICE_UPDATE_CONSTANT_MEMORY(config, config);
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Embedded data
 ////////////////////////////////////////////////////////////////////
@@ -535,7 +570,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   const uint32_t external_pixel_count     = (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2));
   const uint32_t gbuffer_meta_pixel_count = external_pixel_count >> 2;
 
-  const uint32_t thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
+  const uint32_t thread_count      = THREADS_PER_BLOCK * device->properties.optimal_block_count;
   const uint32_t pixels_per_thread = 1 + ((internal_pixel_count + thread_count - 1) / thread_count);
   const uint32_t max_task_count    = pixels_per_thread * thread_count;
 
@@ -695,6 +730,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   memset(device->constant_memory, 0, sizeof(DeviceConstantMemory));
 
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
+  __FAILURE_HANDLE(_device_setup_execution_config(device));
 
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
 

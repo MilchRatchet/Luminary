@@ -6,7 +6,6 @@
 
 #define LUMINARY_MAX_NUM_DEVICES 4
 #define THREADS_PER_BLOCK 128
-#define BLOCKS_PER_GRID 2048
 
 // #define OPTIX_VALIDATION
 #define NO_LUMINARY_BVH
@@ -348,6 +347,10 @@ struct DeviceExecutionState {
   uint32_t aggregate_sample_count;
 } typedef DeviceExecutionState;
 
+struct DeviceExecutionConfiguration {
+  uint32_t num_blocks;
+} typedef DeviceExecutionConfiguration;
+
 enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_PTRS,
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,
@@ -365,6 +368,7 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_STATE,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 } typedef DeviceConstantMemoryMember;
@@ -415,6 +419,8 @@ struct DeviceConstantMemory {
   DeviceTextureObject cloud_noise_weather_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   DeviceExecutionState state;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
+  DeviceExecutionConfiguration config;
 } typedef DeviceConstantMemory;
 
 #endif /* LUMINARY_DEVICE_UTILS_H */
