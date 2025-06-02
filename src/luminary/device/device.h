@@ -111,7 +111,6 @@ struct Device {
   bool meshes_need_building;
   OptixBVHInstanceCache* optix_instance_cache;
   OptixBVH* optix_bvh_ias;
-  OptixBVH* optix_bvh_light;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
   DeviceSkyStars* sky_stars;

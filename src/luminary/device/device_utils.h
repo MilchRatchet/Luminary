@@ -284,15 +284,6 @@ struct DeviceLightTreeRootSection {
 } typedef DeviceLightTreeRootSection;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
-struct DeviceLightTreeLeaf {
-  float power;
-  uint32_t packed_normal;
-} typedef DeviceLightTreeLeaf;
-
-struct DeviceLightMicroTriangleImportance {
-  uint8_t data[LIGHT_NUM_MICROTRIANGLES >> 1];
-} typedef DeviceLightMicroTriangleImportance;
-
 struct DeviceMISPayload {
   float sampling_probability;
   vec3 origin;
@@ -339,10 +330,6 @@ struct DevicePointers {
   DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
   DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
-  DEVICE const DeviceLightTreeLeaf* LUM_RESTRICT light_tree_leaves;
-  DEVICE const float* LUM_RESTRICT light_importance_normalization;
-  DEVICE const DeviceLightMicroTriangleImportance* LUM_RESTRICT light_microtriangles;
-  DEVICE const uint2* LUM_RESTRICT light_tree_paths;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const DeviceLightSceneData* LUM_RESTRICT light_scene_data;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
@@ -405,7 +392,6 @@ struct DeviceConstantMemory {
   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;
-  OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   DeviceTextureObject moon_albedo_tex;

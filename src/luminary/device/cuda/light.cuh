@@ -171,12 +171,12 @@ __device__ float lights_integrate_emission(
   float2 bary0, bary1, bary2;
   light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
 
-  const UV microv0 = get_uv(vertex.u + bary0.x * edge1.u + bary0.y * edge2.u, vertex.v + bary0.x * edge1.v + bary0.y * edge2.v);
-  const UV microv1 = get_uv(vertex.u + bary1.x * edge1.u + bary1.y * edge2.u, vertex.v + bary1.x * edge1.v + bary1.y * edge2.v);
-  const UV microv2 = get_uv(vertex.u + bary2.x * edge1.u + bary2.y * edge2.u, vertex.v + bary2.x * edge1.v + bary2.y * edge2.v);
+  const UV microUV0 = get_uv(vertex.u + bary0.x * edge1.u + bary0.y * edge2.u, vertex.v + bary0.x * edge1.v + bary0.y * edge2.v);
+  const UV microUV1 = get_uv(vertex.u + bary1.x * edge1.u + bary1.y * edge2.u, vertex.v + bary1.x * edge1.v + bary1.y * edge2.v);
+  const UV microUV2 = get_uv(vertex.u + bary2.x * edge1.u + bary2.y * edge2.u, vertex.v + bary2.x * edge1.v + bary2.y * edge2.v);
 
-  const UV microedge1 = uv_sub(microv1, microv0);
-  const UV microedge2 = uv_sub(microv2, microv0);
+  const UV microedge1 = uv_sub(microUV1, microUV0);
+  const UV microedge2 = uv_sub(microUV2, microUV0);
 
   // Super crude way of determining the number of texel fetches I will need. If performance of this becomes an issue
   // then I will have to rethink this here.
@@ -192,8 +192,8 @@ __device__ float lights_integrate_emission(
 
   for (float a = 0.0f; a < 1.0f; a += step_size) {
     for (float b = 0.0f; a + b < 1.0f; b += step_size) {
-      const float u = microv0.u + a * microedge1.u + b * microedge2.u;
-      const float v = microv0.v + a * microedge1.v + b * microedge2.v;
+      const float u = microUV0.u + a * microedge1.u + b * microedge2.u;
+      const float v = microUV0.v + a * microedge1.v + b * microedge2.v;
 
       const float4 texel = texture_load(tex, get_uv(u, v));
 
@@ -242,29 +242,12 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   const float microtriangle_intensity2 =
     lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 1);
 
-  const float max_microtriangle_intensity = fmaxf(microtriangle_intensity1, microtriangle_intensity2);
   const float sum_microtriangle_intensity = microtriangle_intensity1 + microtriangle_intensity2;
 
-  const float max_intensity = warp_reduce_max(max_microtriangle_intensity);
   const float sum_intensity = warp_reduce_sum(sum_microtriangle_intensity);
 
-  const float normalized_intensity1   = (max_intensity > 0.0f) ? microtriangle_intensity1 / max_intensity : 0.0f;
-  const uint8_t compressed_intensity1 = max((uint8_t) (normalized_intensity1 * 15.0f + 0.5f), 1);
-
-  const float normalized_intensity2   = (max_intensity > 0.0f) ? microtriangle_intensity2 / max_intensity : 0.0f;
-  const uint8_t compressed_intensity2 = max((uint8_t) (normalized_intensity2 * 15.0f + 0.5f), 1);
-
-  const uint8_t compressed_intensity = compressed_intensity1 | (compressed_intensity2 << 4);
-
-  args.dst_microtriangle_importance[light_id * (LIGHT_NUM_MICROTRIANGLES >> 1) + (microtriangle_id >> 1)] = compressed_intensity;
-
-  const float importance = compressed_intensity1 + compressed_intensity2;
-
-  const float sum_importance = warp_reduce_sum(importance);
-
   if (microtriangle_id == 0) {
-    args.dst_importance_normalization[light_id] = sum_importance;
-    args.dst_intensities[light_id]              = sum_intensity;
+    args.dst_intensities[light_id] = sum_intensity / LIGHT_NUM_MICROTRIANGLES;
   }
 }
 

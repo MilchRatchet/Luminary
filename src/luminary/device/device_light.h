@@ -33,7 +33,6 @@ struct LightTreeCacheTriangle {
   Vec128 vertex2;
   Vec128 cross;
   float average_intensity;
-  DeviceLightMicroTriangleImportance microtriangle_importance;
   float importance_normalization;
 } typedef LightTreeCacheTriangle;
 
@@ -45,13 +44,6 @@ struct LightTreeCacheMesh {
   ARRAY LightTreeCacheTriangle* ARRAY* material_triangles;
 } typedef LightTreeCacheMesh;
 
-struct LightTreeBVHTriangle {
-  Vec128 vertex;
-  Vec128 vertex1;
-  Vec128 vertex2;
-} typedef LightTreeBVHTriangle;
-LUM_STATIC_SIZE_ASSERT(LightTreeBVHTriangle, 3 * sizeof(Vec128));
-
 struct LightTreeCacheInstance {
   bool active;
   uint32_t mesh_id;
@@ -59,8 +51,7 @@ struct LightTreeCacheInstance {
   vec3 scale;
   vec3 translation;
   bool is_dirty;
-  ARRAY LightTreeFragment* fragments;        /* Computed during build step */
-  ARRAY LightTreeBVHTriangle* bvh_triangles; /* Computed during build step */
+  ARRAY LightTreeFragment* fragments; /* Computed during build step */
 } typedef LightTreeCacheInstance;
 
 struct LightTreeCacheMaterial {
@@ -90,13 +81,9 @@ struct LightTreeIntegrator {
   ARRAY LightTreeIntegratorTask* tasks;
   uint32_t* mesh_ids;
   uint32_t* triangle_ids;
-  uint8_t* microtriangle_importance;
-  float* importance_normalization;
   float* intensities;
   DEVICE uint32_t* device_mesh_ids;
   DEVICE uint32_t* device_triangle_ids;
-  DEVICE float* device_microtriangle_importance;
-  DEVICE float* device_importance_normalization;
   DEVICE float* device_intensities;
   uint32_t allocated_tasks;
 } typedef LightTreeIntegrator;
@@ -109,19 +96,8 @@ struct LightTree {
   size_t root_size;
   void* nodes_data;
   size_t nodes_size;
-  void* paths_data;
-  size_t paths_size;
   void* tri_handle_map_data;
   size_t tri_handle_map_size;
-  void* leaves_data;
-  size_t leaves_size;
-  void* importance_normalization_data;
-  size_t importance_normalization_size;
-  void* microtriangle_data;
-  size_t microtriangle_size;
-  void* subsets_data;
-  size_t subsets_size;
-  void* bvh_vertex_buffer_data;
   uint32_t light_count;
   DeviceLightSceneData scene_data;
 } typedef LightTree;
