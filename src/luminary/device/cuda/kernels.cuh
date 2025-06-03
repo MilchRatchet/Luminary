@@ -57,7 +57,12 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
+  const uint32_t tile_id     = 0;  // TODO
+  const uint32_t num_threads = NUM_THREADS;
+  const uint32_t start_pixel = THREAD_ID + tile_id * num_threads;
+  const uint32_t end_pixel   = min(amount, start_pixel + device.config.num_tasks_per_thread * num_threads);
+
+  for (uint32_t undersampling_pixel = start_pixel; undersampling_pixel < end_pixel; undersampling_pixel += num_threads) {
     uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
     uint16_t undersampling_x = (uint16_t) (undersampling_pixel - undersampling_y * undersampling_width);
 

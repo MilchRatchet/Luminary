@@ -20,6 +20,9 @@
  */
 #define DEVICE_CTX_FUNC
 
+#define RECOMMENDED_TASKS_PER_THREAD 8
+#define MINIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD >> 1)
+
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
@@ -349,6 +352,7 @@ struct DeviceExecutionState {
 
 struct DeviceExecutionConfiguration {
   uint32_t num_blocks;
+  uint32_t num_tasks_per_thread;
 } typedef DeviceExecutionConfiguration;
 
 enum DeviceConstantMemoryMember {
@@ -360,7 +364,6 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD,
   DEVICE_CONSTANT_MEMORY_MEMBER_FOG,
   DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META,
   DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH,
   DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX,
@@ -390,9 +393,6 @@ struct DeviceConstantMemory {
   DeviceFog fog;
   // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
   DeviceParticles particles;
-  // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
-  uint32_t pixels_per_thread;
-  uint32_t max_task_count;
   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;

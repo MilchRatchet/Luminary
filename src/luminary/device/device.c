@@ -45,7 +45,6 @@ static const size_t device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEMB
   offsetof(DeviceConstantMemory, cloud),                         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   offsetof(DeviceConstantMemory, fog),                           // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   offsetof(DeviceConstantMemory, particles),                     // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  offsetof(DeviceConstantMemory, pixels_per_thread),             // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   offsetof(DeviceConstantMemory, optix_bvh),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   offsetof(DeviceConstantMemory, sky_lut_transmission_low_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
@@ -66,7 +65,6 @@ static const size_t device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBER
   sizeof(DeviceCloud),                  // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   sizeof(DeviceFog),                    // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   sizeof(DeviceParticles),              // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  sizeof(uint32_t) * 2,                 // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   sizeof(OptixTraversableHandle) * 4,   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(DeviceTextureObject) * 2,      // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   sizeof(DeviceTextureObject) * 4,      // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
@@ -400,7 +398,8 @@ static LuminaryResult _device_setup_execution_config(Device* device) {
 
   DeviceExecutionConfiguration config;
 
-  config.num_blocks = device->properties.optimal_block_count;
+  config.num_blocks           = device->properties.optimal_block_count;
+  config.num_tasks_per_thread = RECOMMENDED_TASKS_PER_THREAD;
 
   DEVICE_UPDATE_CONSTANT_MEMORY(config, config);
 
@@ -570,14 +569,30 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   const uint32_t external_pixel_count     = (internal_pixel_count >> (device->constant_memory->settings.supersampling * 2));
   const uint32_t gbuffer_meta_pixel_count = external_pixel_count >> 2;
 
-  const uint32_t thread_count      = THREADS_PER_BLOCK * device->properties.optimal_block_count;
-  const uint32_t pixels_per_thread = 1 + ((internal_pixel_count + thread_count - 1) / thread_count);
-  const uint32_t max_task_count    = pixels_per_thread * thread_count;
+  const uint32_t thread_count = THREADS_PER_BLOCK * device->properties.optimal_block_count;
 
-  __DEVICE_BUFFER_ALLOCATE(tasks0, sizeof(float4) * max_task_count);
-  __DEVICE_BUFFER_ALLOCATE(tasks1, sizeof(float4) * max_task_count);
-  __DEVICE_BUFFER_ALLOCATE(triangle_handles, sizeof(TriangleHandle) * max_task_count);
-  __DEVICE_BUFFER_ALLOCATE(trace_depths, sizeof(float) * max_task_count);
+  // Start by computing how well this pixel count fits to the recommended tasks per thread.
+  uint32_t tasks_per_thread = RECOMMENDED_TASKS_PER_THREAD;
+  uint32_t allocated_tasks;
+
+  while (tasks_per_thread < 2 * RECOMMENDED_TASKS_PER_THREAD) {
+    allocated_tasks = thread_count * tasks_per_thread;
+
+    const uint32_t tile_count       = (internal_pixel_count + allocated_tasks - 1) / allocated_tasks;
+    const uint32_t stale_tail_tasks = tile_count * allocated_tasks - internal_pixel_count;
+
+    // If the number of resident tasks in the last tile is above a threshold, then accept this tasks per thread.
+    if (allocated_tasks - stale_tail_tasks > thread_count * MINIMUM_TASKS_PER_THREAD) {
+      break;
+    }
+
+    tasks_per_thread++;
+  }
+
+  __DEVICE_BUFFER_ALLOCATE(tasks0, sizeof(float4) * allocated_tasks);
+  __DEVICE_BUFFER_ALLOCATE(tasks1, sizeof(float4) * allocated_tasks);
+  __DEVICE_BUFFER_ALLOCATE(triangle_handles, sizeof(TriangleHandle) * allocated_tasks);
+  __DEVICE_BUFFER_ALLOCATE(trace_depths, sizeof(float) * allocated_tasks);
   __DEVICE_BUFFER_ALLOCATE(trace_counts, sizeof(uint16_t) * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
@@ -600,8 +615,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
   memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
 
-  DEVICE_UPDATE_CONSTANT_MEMORY(max_task_count, max_task_count);
-  DEVICE_UPDATE_CONSTANT_MEMORY(pixels_per_thread, pixels_per_thread);
+  DEVICE_UPDATE_CONSTANT_MEMORY(config.num_tasks_per_thread, tasks_per_thread);
 
   return LUMINARY_SUCCESS;
 }
