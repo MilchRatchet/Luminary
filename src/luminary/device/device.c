@@ -901,6 +901,15 @@ LuminaryResult device_get_internal_resolution(Device* device, uint32_t* width, u
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_count) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(task_count);
+
+  *task_count = device->constant_memory->config.num_blocks * THREADS_PER_BLOCK * device->constant_memory->config.num_tasks_per_thread;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(object);
@@ -947,6 +956,21 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
   CUDA_FAILURE_HANDLE(cuMemsetD32Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.aggregate_sample_count), device->aggregate_sample_count, 1,
     device->stream_main));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD32Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.tile_id), tile_id, 1, device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

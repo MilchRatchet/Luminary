@@ -3,13 +3,24 @@
 #include "device.h"
 #include "internal_error.h"
 
+struct DeviceRendererWork {
+  uint32_t event_id;
+  uint32_t launch_id;
+  uint32_t tile_id;
+  SampleCountSlice* sample_count;
+  bool is_gbuffer_meta_query;
+  DeviceRenderCallbackData* shared_callback_data;
+} typedef DeviceRendererWork;
+
 LuminaryResult device_renderer_create(DeviceRenderer** renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
 
   __FAILURE_HANDLE(host_malloc(renderer, sizeof(DeviceRenderer)));
   memset(*renderer, 0, sizeof(DeviceRenderer));
 
+  __FAILURE_HANDLE(array_create(&(*renderer)->prepass_queue, sizeof(DeviceRendererQueueAction), 16));
   __FAILURE_HANDLE(array_create(&(*renderer)->queue, sizeof(DeviceRendererQueueAction), 16));
+  __FAILURE_HANDLE(array_create(&(*renderer)->postpass_queue, sizeof(DeviceRendererQueueAction), 16));
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_start[event_id], 0));
@@ -49,12 +60,6 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
     action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = depth};
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    // TODO: Figure out better ways of doing this.
-    if (depth == 0) {
-      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
 
     if (depth == 0) {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
@@ -165,9 +170,6 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   action.cuda_type = CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
   action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
   action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
@@ -213,11 +215,27 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
+  __FAILURE_HANDLE(array_set_num_elements(&renderer->prepass_queue, 0));
   __FAILURE_HANDLE(array_set_num_elements(&renderer->queue, 0));
+  __FAILURE_HANDLE(array_set_num_elements(&renderer->postpass_queue, 0));
 
   DeviceRendererQueueAction action;
 
+  ////////////////////////////////////////////////////////////////////
+  // Prepass Queue
+  ////////////////////////////////////////////////////////////////////
+
   action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
+  __FAILURE_HANDLE(array_push(&renderer->prepass_queue, &action));
+
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
+  __FAILURE_HANDLE(array_push(&renderer->prepass_queue, &action));
+
+  ////////////////////////////////////////////////////////////////////
+  // Main Queue
+  ////////////////////////////////////////////////////////////////////
+
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   switch (args->shading_mode) {
@@ -234,8 +252,12 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
       break;
   }
 
+  ////////////////////////////////////////////////////////////////////
+  // Postpass Queue
+  ////////////////////////////////////////////////////////////////////
+
   action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+  __FAILURE_HANDLE(array_push(&renderer->postpass_queue, &action));
 
   return LUMINARY_SUCCESS;
 }
@@ -332,6 +354,100 @@ static LuminaryResult _device_renderer_queue_optix_kernel(
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_renderer_handle_queue_action(
+  DeviceRenderer* renderer, Device* device, DeviceRendererWork* work, const DeviceRendererQueueAction* action) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(device);
+
+  switch (action->type) {
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL:
+      __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, action->cuda_type, &work->launch_id));
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL:
+      __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, action->optix_type, &work->launch_id));
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
+      __FAILURE_HANDLE(device_update_dynamic_const_mem(device, work->sample_count->current_sample_count, 0xFFFF, 0xFFFF));
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID:
+      __FAILURE_HANDLE(device_update_tile_id_const_mem(device, work->tile_id));
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
+      __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
+
+      if (work->is_gbuffer_meta_query && (action->mem_update.depth > 0)) {
+        __FAILURE_HANDLE(device_query_gbuffer_meta(device));
+        work->is_gbuffer_meta_query = false;
+      }
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
+      CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, device->stream_main));
+      CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
+      CUDA_FAILURE_HANDLE(
+        cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, work->shared_callback_data));
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
+      if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
+        if (device->aggregate_sample_count == 0) {
+          __FAILURE_HANDLE(
+            _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE, &work->launch_id));
+        }
+        else {
+          __FAILURE_HANDLE(
+            _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE, &work->launch_id));
+
+          // TODO: This is only needed when outputting
+          if (device->constant_memory->camera.do_firefly_rejection) {
+            __FAILURE_HANDLE(
+              _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT, &work->launch_id));
+          }
+          else {
+            __FAILURE_HANDLE(
+              _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_RAW, &work->launch_id));
+          }
+        }
+      }
+      else {
+        __FAILURE_HANDLE(
+          _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV, &work->launch_id));
+      }
+
+      CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[work->event_id], device->stream_main));
+      CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[work->event_id], CU_EVENT_WAIT_DEFAULT));
+      CUDA_FAILURE_HANDLE(
+        cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_finished_func, work->shared_callback_data));
+
+      renderer->event_id++;
+
+      if (work->is_gbuffer_meta_query) {
+        __FAILURE_HANDLE(device_query_gbuffer_meta(device));
+      }
+
+      break;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_renderer_execute_queue(
+  DeviceRenderer* renderer, Device* device, DeviceRendererWork* work, const ARRAY DeviceRendererQueueAction* queue) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(work);
+  __CHECK_NULL_ARGUMENT(queue);
+
+  uint32_t num_actions;
+  __FAILURE_HANDLE(array_get_num_elements(queue, &num_actions));
+
+  for (uint32_t action_id = 0; action_id < num_actions; action_id++) {
+    const DeviceRendererQueueAction* action = queue + action_id;
+
+    __FAILURE_HANDLE(_device_renderer_handle_queue_action(renderer, device, work, action));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
@@ -339,8 +455,9 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   if (sample_count->current_sample_count == sample_count->end_sample_count)
     return LUMINARY_SUCCESS;
 
-  uint32_t num_actions;
-  __FAILURE_HANDLE(array_get_num_elements(renderer->queue, &num_actions));
+  ////////////////////////////////////////////////////////////////////
+  // Gather data
+  ////////////////////////////////////////////////////////////////////
 
   uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
 
@@ -353,87 +470,55 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
 
-  // Query only during the first sample
-  bool is_gbuffer_meta_query = (sample_count->current_sample_count == 0);
+  const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
-  if (is_gbuffer_meta_query) {
-    const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  uint32_t width;
+  uint32_t height;
+  __FAILURE_HANDLE(device_get_internal_resolution(device, &width, &height));
 
-    // Query only if enough samples have been computed after this iteration.
-    if (undersampling_stage > (1 + device->constant_memory->settings.supersampling)) {
-      is_gbuffer_meta_query = false;
-    }
+  const uint32_t internal_width_this_sample  = (width + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t internal_height_this_sample = (height + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t internal_pixels_this_sample = internal_width_this_sample * internal_height_this_sample;
+
+  uint32_t allocated_tasks;
+  __FAILURE_HANDLE(device_get_allocated_task_count(device, &allocated_tasks));
+
+  const uint32_t tile_count = (internal_pixels_this_sample + allocated_tasks - 1) / allocated_tasks;
+
+  // Query only during the first sample and if enough samples have been computed after this iteration.
+  const bool is_gbuffer_meta_query =
+    (sample_count->current_sample_count == 0) && (undersampling_stage <= (1 + device->constant_memory->settings.supersampling));
+
+  ////////////////////////////////////////////////////////////////////
+  // Setup work
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceRendererWork work;
+  work.event_id              = event_id;
+  work.launch_id             = 0;
+  work.tile_id               = 0;
+  work.sample_count          = sample_count;
+  work.is_gbuffer_meta_query = is_gbuffer_meta_query;
+  work.shared_callback_data  = shared_callback_data;
+
+  ////////////////////////////////////////////////////////////////////
+  // Execute
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->prepass_queue));
+
+  for (; work.tile_id < tile_count; work.tile_id++) {
+    __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->queue));
   }
 
-  uint32_t launch_id = 0;
+  __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->postpass_queue));
 
-  for (uint32_t action_id = renderer->action_ptr; action_id < num_actions; action_id++) {
-    const DeviceRendererQueueAction* action = renderer->queue + action_id;
-
-    switch (action->type) {
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL:
-        __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, action->cuda_type, &launch_id));
-        break;
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL:
-        __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, action->optix_type, &launch_id));
-        break;
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
-        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_count->current_sample_count, 0xFFFF, 0xFFFF));
-        break;
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
-        __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
-
-        if (is_gbuffer_meta_query && (action->mem_update.depth > 0)) {
-          __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-          is_gbuffer_meta_query = false;
-        }
-        break;
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
-        CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, device->stream_main));
-        CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
-        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, shared_callback_data));
-        break;
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-        if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-          if (device->aggregate_sample_count == 0) {
-            __FAILURE_HANDLE(
-              _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE, &launch_id));
-          }
-          else {
-            __FAILURE_HANDLE(
-              _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE, &launch_id));
-
-            // TODO: This is only needed when outputting
-            if (device->constant_memory->camera.do_firefly_rejection) {
-              __FAILURE_HANDLE(
-                _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT, &launch_id));
-            }
-            else {
-              __FAILURE_HANDLE(
-                _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_RAW, &launch_id));
-            }
-          }
-        }
-        else {
-          __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV, &launch_id));
-        }
-
-        CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], device->stream_main));
-        CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[event_id], CU_EVENT_WAIT_DEFAULT));
-        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_finished_func, shared_callback_data));
-
-        renderer->event_id++;
-
-        if (is_gbuffer_meta_query) {
-          __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-        }
-
-        break;
-    }
-  }
+  ////////////////////////////////////////////////////////////////////
+  // Exit
+  ////////////////////////////////////////////////////////////////////
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  renderer->kernel_times[event_id].num_kernel_launches = min(launch_id, DEVICE_RENDERER_MAX_TIMED_KERNELS);
+  renderer->kernel_times[event_id].num_kernel_launches = min(work.launch_id, DEVICE_RENDERER_MAX_TIMED_KERNELS);
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
   return LUMINARY_SUCCESS;
@@ -528,7 +613,9 @@ LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(*renderer);
 
+  __FAILURE_HANDLE(array_destroy(&(*renderer)->prepass_queue));
   __FAILURE_HANDLE(array_destroy(&(*renderer)->queue));
+  __FAILURE_HANDLE(array_destroy(&(*renderer)->postpass_queue));
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventDestroy((*renderer)->time_start[event_id]));

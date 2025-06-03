@@ -15,13 +15,20 @@ enum DeviceRendererQueueActionType {
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE
 } typedef DeviceRendererQueueActionType;
 
 struct DeviceRendererQueueActionMemUpdate {
-  uint32_t depth;
+  union {
+    // DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH
+    struct {
+      uint32_t depth;
+    };
+  };
+
 } typedef DeviceRendererQueueActionMemUpdate;
 
 struct DeviceRendererQueueAction {
@@ -55,7 +62,9 @@ struct DeviceRendererPerKernelTimings {
 
 struct DeviceRenderer {
   uint32_t action_ptr;
+  ARRAY DeviceRendererQueueAction* prepass_queue;
   ARRAY DeviceRendererQueueAction* queue;
+  ARRAY DeviceRendererQueueAction* postpass_queue;
   CUhostFn registered_callback_continue_func;
   CUhostFn registered_callback_finished_func;
   DeviceCommonCallbackData common_callback_data;

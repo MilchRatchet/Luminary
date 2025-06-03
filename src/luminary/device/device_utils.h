@@ -343,6 +343,7 @@ struct DevicePointers {
 struct DeviceExecutionState {
   // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
   uint32_t sample_id;
+  uint32_t tile_id;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   uint8_t depth;
