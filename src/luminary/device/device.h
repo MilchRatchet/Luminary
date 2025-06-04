@@ -143,6 +143,7 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_get_internal_resolution(Device* device, uint32_t* width, uint32_t* height);
 LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_count);
+LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pixels_per_thread);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
 LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y);
 LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id);

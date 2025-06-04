@@ -905,7 +905,23 @@ LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_co
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(task_count);
 
-  *task_count = device->constant_memory->config.num_blocks * THREADS_PER_BLOCK * device->constant_memory->config.num_tasks_per_thread;
+  const uint32_t num_threads = device->constant_memory->config.num_blocks * THREADS_PER_BLOCK;
+
+  *task_count = num_threads * device->constant_memory->config.num_tasks_per_thread;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pixels_per_thread) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(pixels_per_thread);
+
+  const uint32_t num_threads = device->constant_memory->config.num_blocks * THREADS_PER_BLOCK;
+  const uint32_t num_pixels  = device->constant_memory->settings.width * device->constant_memory->settings.height;
+
+  const uint32_t num_current_pixels = num_pixels >> ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT);
+
+  *pixels_per_thread = (num_current_pixels + num_threads - 1) / num_threads;
 
   return LUMINARY_SUCCESS;
 }

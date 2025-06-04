@@ -247,15 +247,16 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
 
-  // const uint32_t pixels_per_thread =
-  //   device->constant_memory->pixels_per_thread >> ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >>
-  //   UNDERSAMPLING_STAGE_SHIFT);
-  const uint32_t pixels_per_thread       = device->constant_memory->config.num_tasks_per_thread;  // TODO
-  const uint32_t thread_internal_task_id = max(1, pixels_per_thread);
+  uint32_t pixels_per_thread;
+  __FAILURE_HANDLE(device_get_current_pixels_per_thread(device, &pixels_per_thread));
+
+  const uint32_t tasks_per_thread = device->constant_memory->config.num_tasks_per_thread;
+
+  const uint32_t max_current_resident_tasks_per_thread = min(tasks_per_thread, pixels_per_thread);
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
     kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
-    THREADS_PER_BLOCK, device->properties.optimal_block_count, thread_internal_task_id));
+    THREADS_PER_BLOCK, device->properties.optimal_block_count, max_current_resident_tasks_per_thread));
 
   return LUMINARY_SUCCESS;
 }
