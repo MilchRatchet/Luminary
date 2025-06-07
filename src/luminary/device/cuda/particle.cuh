@@ -15,20 +15,17 @@ LUMINARY_KERNEL void particle_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t offset       = get_task_address(task_offset + i);
-    DeviceTask task             = task_load(offset);
-    const TriangleHandle handle = triangle_handle_load(offset);
-    const float depth           = trace_depth_load(offset);
-    const uint32_t pixel        = get_pixel_id(task.index);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const VolumeType volume_type  = VOLUME_HIT_TYPE(handle.instance_id);
+    const VolumeType volume_type  = VOLUME_HIT_TYPE(trace.handle.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    const MaterialContextParticle ctx = particle_get_context(task, handle.instance_id, pixel);
-
-    const RGBF record = load_RGBF(device.ptrs.records + pixel);
+    const MaterialContextParticle ctx = particle_get_context(task, trace.handle.instance_id);
 
     const vec3 bounce_ray = volume_sample_ray<MATERIAL_PARTICLE>(ctx, task.index);
 
@@ -45,11 +42,14 @@ LUMINARY_KERNEL void particle_process_tasks() {
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
-    RGBF bounce_record = mul_color(device.particles.albedo, record);
+    RGBF record = record_unpack(throughput.record);
+    record      = mul_color(record, device.particles.albedo);
 
-    if (task_russian_roulette(bounce_task, task.state, bounce_record)) {
-      store_RGBF(device.ptrs.records, pixel, bounce_record);
-      task_store(bounce_task, get_task_address(trace_count++));
+    if (task_russian_roulette(bounce_task, task.state, record)) {
+      const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+      task_store(dst_task_base_address, bounce_task);
+      task_throughput_record_store(dst_task_base_address, record_pack(record));
     }
   }
 
@@ -65,32 +65,32 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t offset       = get_task_address(task_offset + i);
-    DeviceTask task             = task_load(offset);
-    const TriangleHandle handle = triangle_handle_load(offset);
-    const float depth           = trace_depth_load(offset);
-    const uint32_t pixel        = get_pixel_id(task.index);
+    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                  = task_load(task_base_address);
+    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
 
-    if (VOLUME_HIT_CHECK(handle.instance_id))
+    const uint32_t pixel = get_pixel_id(task.index);
+
+    if (VOLUME_HIT_CHECK(trace.handle.instance_id))
       continue;
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
       write_beauty_buffer_forced(device.particles.albedo, pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
+      write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_NORMAL) {
-      const MaterialContextParticle data = particle_get_context(task, handle.instance_id, pixel);
+      const MaterialContextParticle data = particle_get_context(task, trace.handle.instance_id);
 
       const vec3 normal = data.normal;
 
       write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      const uint32_t v = random_uint32_t_base(0x55555555, handle.instance_id);
+      const uint32_t v = random_uint32_t_base(0x55555555, trace.handle.instance_id);
 
       const uint16_t r = v & 0x7ff;
       const uint16_t g = (v >> 10) & 0x7ff;

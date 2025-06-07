@@ -164,7 +164,6 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
     LuminaryDeviceInfo device_info;
     LUM_FAILURE_HANDLE(luminary_host_get_device_info(host, device_id, &device_info));
 
-    // TODO: Allow for toggling of devices
     bool device_active = device_info.is_enabled;
 
     window_push_section(window, 32, 4);

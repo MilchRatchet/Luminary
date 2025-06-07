@@ -15,10 +15,6 @@
 // GBufferMetaData
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint16_t optix_float_to_bfloat16(const float val) {
-  return __float_as_uint(val) >> 16;
-}
-
 __device__ void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
   if (device.state.sample_id != 0 || device.state.depth != 0)
     return;
@@ -64,9 +60,9 @@ __device__ void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytrac
   meta_data.depth              = result.depth;
   meta_data.instance_id        = instance_id;
   meta_data.material_id        = material_id;
-  meta_data.rel_hit_x_bfloat16 = optix_float_to_bfloat16(rel_hit_pos.x);
-  meta_data.rel_hit_y_bfloat16 = optix_float_to_bfloat16(rel_hit_pos.y);
-  meta_data.rel_hit_z_bfloat16 = optix_float_to_bfloat16(rel_hit_pos.z);
+  meta_data.rel_hit_x_bfloat16 = bfloat_pack(rel_hit_pos.x);
+  meta_data.rel_hit_y_bfloat16 = bfloat_pack(rel_hit_pos.y);
+  meta_data.rel_hit_z_bfloat16 = bfloat_pack(rel_hit_pos.z);
 
   uint4 data;
   data.x = meta_data.instance_id;
@@ -140,8 +136,8 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= trace_task_count)
     return;
 
-  const uint32_t offset = get_task_address(task_id);
-  const DeviceTask task = task_load(offset);
+  const uint32_t task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+  const DeviceTask task            = task_load(task_base_address);
 
   OptixRaytraceResult result;
   result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
@@ -150,8 +146,8 @@ extern "C" __global__ void __raygen__optix() {
   optix_raytrace_geometry(task, result);
   optix_raytrace_particles(task, result);
 
-  triangle_handle_store(result.handle, offset);
-  trace_depth_store(result.depth, offset);
+  task_trace_handle_store(task_base_address, result.handle);
+  task_trace_depth_store(task_base_address, result.depth);
 
   optix_write_out_gbuffer_meta(task, result);
 }

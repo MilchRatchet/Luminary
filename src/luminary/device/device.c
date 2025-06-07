@@ -589,22 +589,16 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     tasks_per_thread++;
   }
 
-  __DEVICE_BUFFER_ALLOCATE(tasks0, sizeof(float4) * allocated_tasks);
-  __DEVICE_BUFFER_ALLOCATE(tasks1, sizeof(float4) * allocated_tasks);
-  __DEVICE_BUFFER_ALLOCATE(triangle_handles, sizeof(TriangleHandle) * allocated_tasks);
-  __DEVICE_BUFFER_ALLOCATE(trace_depths, sizeof(float) * allocated_tasks);
+  __DEVICE_BUFFER_ALLOCATE(task_states, sizeof(DeviceTaskState) * allocated_tasks * TASK_STATE_BUFFER_INDEX_COUNT);
   __DEVICE_BUFFER_ALLOCATE(trace_counts, sizeof(uint16_t) * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
-  __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(mis_payload, sizeof(DeviceMISPayload) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_current_result, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGBF) * internal_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * external_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(records, sizeof(RGBF) * internal_pixel_count);
 
   for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
     __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_red[bucket_id], sizeof(float) * internal_pixel_count);
@@ -623,22 +617,16 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  __DEVICE_BUFFER_FREE(tasks0);
-  __DEVICE_BUFFER_FREE(tasks1);
-  __DEVICE_BUFFER_FREE(triangle_handles);
-  __DEVICE_BUFFER_FREE(trace_depths);
+  __DEVICE_BUFFER_FREE(task_states);
   __DEVICE_BUFFER_FREE(trace_counts);
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
-  __DEVICE_BUFFER_FREE(ior_stack);
-  __DEVICE_BUFFER_FREE(mis_payload);
   __DEVICE_BUFFER_FREE(frame_current_result);
   __DEVICE_BUFFER_FREE(frame_direct_buffer);
   __DEVICE_BUFFER_FREE(frame_direct_accumulate);
   __DEVICE_BUFFER_FREE(frame_indirect_buffer);
   __DEVICE_BUFFER_FREE(frame_final);
   __DEVICE_BUFFER_FREE(gbuffer_meta);
-  __DEVICE_BUFFER_FREE(records);
   __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);

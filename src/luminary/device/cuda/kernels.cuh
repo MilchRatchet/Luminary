@@ -83,6 +83,10 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     if (undersampling_y < device.settings.window_y || undersampling_y >= device.settings.window_y + device.settings.window_height)
       continue;
 
+    ////////////////////////////////////////////////////////////////////
+    // Task
+    ////////////////////////////////////////////////////////////////////
+
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION;
     task.index.x = undersampling_x;
@@ -90,28 +94,39 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
     task = camera_get_ray(task);
 
-    const uint32_t pixel = get_pixel_id(task.index);
-
-    store_RGBF(device.ptrs.records, pixel, splat_color(1.0f));
-
+    const uint32_t pixel                     = get_pixel_id(task.index);
     device.ptrs.frame_direct_buffer[pixel]   = {};
     device.ptrs.frame_indirect_buffer[pixel] = {};
 
+    const uint32_t task_base_address = task_get_base_address(task_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+    task_store(task_base_address, task);
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Trace Result
+    ////////////////////////////////////////////////////////////////////
+
+    DeviceIORStack ior_stack = {};
+
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
-    ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
+    ior_stack_interact(ior_stack, ambient_ior, IOR_STACK_METHOD_RESET);
 
-    DeviceMISPayload mis_payload;
-    mis_payload.sampling_probability = MIS_FORCE_FULL_GI;
+    // Handle and depth are initialized during the tracing so we don't need to initialize it here.
+    task_trace_ior_stack_store(task_base_address, ior_stack);
 
-    store_mis_payload(pixel, mis_payload);
+    ////////////////////////////////////////////////////////////////////
+    // Task Throughput
+    ////////////////////////////////////////////////////////////////////
 
-    task_store(task, get_task_address(task_count++));
+    // MISPayload does not need to be initialized because we allow emission directly.
+    task_throughput_record_store(task_base_address, record_pack(splat_color(1.0f)));
   }
 
   device.ptrs.trace_counts[THREAD_ID] = task_count;
 }
 
 LUMINARY_KERNEL void balance_trace_tasks() {
+#if 0
   HANDLE_DEVICE_ABORT();
 
   const uint32_t warp = THREAD_ID;
@@ -179,6 +194,7 @@ LUMINARY_KERNEL void balance_trace_tasks() {
       counts[threadIdx.x + (i + 2) * THREADS_PER_BLOCK], counts[threadIdx.x + (i + 3) * THREADS_PER_BLOCK]);
     __stcs((ushort4*) (device.ptrs.trace_counts + 32 * warp + i), vals);
   }
+#endif
 }
 
 LUMINARY_KERNEL void sky_process_inscattering_events() {
@@ -189,30 +205,32 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const int offset            = get_task_address(i);
-    DeviceTask task             = task_load(offset);
-    const TriangleHandle handle = triangle_handle_load(offset);
+    const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    DeviceTask task                  = task_load(task_base_address);
+    DeviceTaskTrace trace            = task_trace_load(task_base_address);
 
-    if (handle.instance_id == HIT_TYPE_SKY)
+    if (trace.handle.instance_id == HIT_TYPE_SKY)
       continue;
-
-    const float depth = trace_depth_load(offset);
 
     const uint32_t pixel = get_pixel_id(task.index);
 
-    const vec3 sky_origin = world_to_sky_transform(task.origin);
+    const vec3 sky_origin          = world_to_sky_transform(task.origin);
+    const float inscattering_limit = world_to_sky_scale(trace.depth);
 
-    const float inscattering_limit = world_to_sky_scale(depth);
+    DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
+    RGBF record = record_unpack(throughput.record);
 
     const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
 
-    store_RGBF(device.ptrs.records, pixel, record);
+    throughput.record = record_pack(record);
+
+    task_throughput_store(task_base_address, throughput);
     write_beauty_buffer(inscattering, pixel, task.state);
   }
 }
 
+#if 0
 __device__ void tasks_swap(const ShadingTaskIndex target, uint16_t offsets[], const uint32_t iteration_end) {
   const uint32_t initial_offset = offsets[threadIdx.x + target * THREADS_PER_BLOCK];
 
@@ -291,6 +309,92 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   tasks_swap(SHADING_TASK_INDEX_VOLUME, offsets, initial_particle_offset);
   tasks_swap(SHADING_TASK_INDEX_PARTICLE, offsets, initial_sky_offset);
   tasks_swap(SHADING_TASK_INDEX_SKY, offsets, initial_rejects_offset);
+
+  device.ptrs.trace_counts[THREAD_ID] = 0;
+}
+#endif
+
+LUMINARY_KERNEL void postprocess_trace_tasks() {
+  HANDLE_DEVICE_ABORT();
+
+  uint32_t original_thread_task_counts[SHADING_TASK_INDEX_TOTAL];
+
+  original_thread_task_counts[SHADING_TASK_INDEX_GEOMETRY] = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
+  original_thread_task_counts[SHADING_TASK_INDEX_OCEAN]    = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN];
+  original_thread_task_counts[SHADING_TASK_INDEX_VOLUME]   = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
+  original_thread_task_counts[SHADING_TASK_INDEX_PARTICLE] = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE];
+  original_thread_task_counts[SHADING_TASK_INDEX_SKY]      = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY];
+
+  uint32_t warp_counts[SHADING_TASK_INDEX_TOTAL];
+
+  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+    warp_counts[task_index] = warp_reduce_sum(original_thread_task_counts[task_index]);
+  }
+
+  uint32_t warp_offsets[SHADING_TASK_INDEX_TOTAL];
+
+  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+    warp_offsets[task_index] = (task_index > 0) ? (warp_offsets[task_index - 1] + warp_counts[task_index - 1]) : 0;
+  }
+
+  uint32_t write_thread_offsets[SHADING_TASK_INDEX_TOTAL];
+
+  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+    const uint32_t orig_task_count   = original_thread_task_counts[task_index];
+    const uint32_t rel_offset        = warp_reduce_prefixsum(orig_task_count) - orig_task_count + warp_counts[task_index];
+    write_thread_offsets[task_index] = warp_offsets[task_index] + rel_offset;
+  }
+
+  const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+  uint32_t thread_shift            = WARP_SIZE - 1 - thread_id_in_warp;
+
+  uint32_t read_thread_counts[SHADING_TASK_INDEX_TOTAL];
+
+  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+    read_thread_counts[task_index]                                = (warp_counts[task_index] + thread_shift) >> WARP_SIZE_LOG;
+    device.ptrs.task_counts[TASK_ADDRESS_OFFSET_IMPL(task_index)] = read_thread_counts[task_index];
+
+    thread_shift = (thread_shift + (warp_counts[task_index] & WARP_SIZE_MASK)) & WARP_SIZE_MASK;
+  }
+
+  uint32_t read_thread_offsets[SHADING_TASK_INDEX_TOTAL];
+
+  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+    read_thread_offsets[task_index] = (task_index > 0) ? (read_thread_offsets[task_index - 1] + read_thread_counts[task_index - 1]) : 0;
+    device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_IMPL(task_index)] = read_thread_offsets[task_index];
+  }
+
+  __shared__ uint16_t offsets[SHADING_TASK_INDEX_TOTAL * THREADS_PER_BLOCK];
+
+  const uint32_t tid = threadIdx.x;
+
+  offsets[tid + SHADING_TASK_INDEX_GEOMETRY * THREADS_PER_BLOCK] = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_GEOMETRY];
+  offsets[tid + SHADING_TASK_INDEX_OCEAN * THREADS_PER_BLOCK]    = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_OCEAN];
+  offsets[tid + SHADING_TASK_INDEX_VOLUME * THREADS_PER_BLOCK]   = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_VOLUME];
+  offsets[tid + SHADING_TASK_INDEX_PARTICLE * THREADS_PER_BLOCK] = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_PARTICLE];
+  offsets[tid + SHADING_TASK_INDEX_SKY * THREADS_PER_BLOCK]      = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_SKY];
+
+  const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
+
+  for (uint32_t task_id = 0; task_id < task_count; task_id++) {
+    const uint32_t src_task_base_address  = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+    const DeviceTask task                 = task_load(src_task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(src_task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(src_task_base_address);
+
+    const ShadingTaskIndex index = shading_task_index_from_instance_id(trace.handle.instance_id);
+
+    if (index == SHADING_TASK_INDEX_INVALID)
+      continue;
+
+    const uint32_t dst_offset = offsets[threadIdx.x + index * THREADS_PER_BLOCK]++;
+
+    const uint32_t dst_task_base_address = task_arbitrary_warp_address(dst_offset, TASK_STATE_BUFFER_INDEX_POSTSORT);
+
+    task_store(dst_task_base_address, task);
+    task_trace_store(dst_task_base_address, trace);
+    task_throughput_store(dst_task_base_address, throughput);
+  }
 
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }

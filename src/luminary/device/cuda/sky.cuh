@@ -557,7 +557,7 @@ __device__ RGBF sky_color_no_compute(const vec3 ray, const uint8_t state) {
   return sky;
 }
 
-__device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const uint32_t pixel, const ushort2 index) {
+__device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const ushort2 index) {
   RGBF sky;
   switch (device.sky.mode) {
     default:
@@ -608,14 +608,14 @@ LUMINARY_KERNEL void sky_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t offset = get_task_address(task_offset + i);
-    const DeviceTask task = task_load(offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task                 = task_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    const RGBF record = load_RGBF(device.ptrs.records + pixel);
+    RGBF sky = sky_color_main(task.origin, task.ray, task.state, task.index);
+    sky      = mul_color(sky, record_unpack(throughput.record));
 
-    RGBF sky = sky_color_main(task.origin, task.ray, task.state, pixel, task.index);
-    sky      = mul_color(sky, record);
+    const uint32_t pixel = get_pixel_id(task.index);
 
     if (device.state.depth <= 1) {
       write_beauty_buffer_direct(sky, pixel);
@@ -635,19 +635,18 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t offset = get_task_address(task_offset + i);
-    const DeviceTask task = task_load(offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task            = task_load(task_base_address);
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, pixel, task.index);
-      write_beauty_buffer_forced(sky, pixel);
+      RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, task.index);
+      write_beauty_buffer_forced(sky, get_pixel_id(task.index));
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), pixel);
+      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), get_pixel_id(task.index));
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), pixel);
+      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), get_pixel_id(task.index));
     }
   }
 }

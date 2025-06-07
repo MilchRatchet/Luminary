@@ -39,17 +39,18 @@ __device__ vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-__device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, const TriangleHandle triangle_handle, const uint32_t pixel) {
-  const uint32_t mesh_id      = mesh_id_load(triangle_handle.instance_id);
-  const DeviceTransform trans = load_transform(triangle_handle.instance_id);
+__device__ MaterialContextGeometry geometry_get_context(
+  const DeviceTask task, const TriangleHandle handle, DeviceIORStack& ior_stack, const PackedMISPayload packed_mis_payload) {
+  const uint32_t mesh_id      = mesh_id_load(handle.instance_id);
+  const DeviceTransform trans = load_transform(handle.instance_id);
 
   const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
   const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
 
-  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, triangle_handle.tri_id, triangle_count));
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, triangle_handle.tri_id, triangle_count));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, triangle_handle.tri_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_handle.tri_id, triangle_count));
+  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
+  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, handle.tri_id, triangle_count));
 
   const vec3 position = transform_apply_inv(trans, task.origin);
   const vec3 ray      = transform_apply_rotation_inv(trans, task.ray);
@@ -103,7 +104,7 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
 
   // STATE_FLAG_ALLOW_EMISSION not set implies that we only allow emission through MIS weights, apply them now.
   if (color_any(emission) && ((task.state & STATE_FLAG_ALLOW_EMISSION) == 0)) {
-    const DeviceMISPayload mis_payload = load_mis_payload(pixel);
+    const MISPayload mis_payload = mis_payload_unpack(packed_mis_payload);
 
     const float area        = get_length(cross_product(edge1, edge2)) * 0.5f;
     const float power       = color_importance(emission) * area;
@@ -154,7 +155,7 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
 
   const IORStackMethod ior_stack_method =
     (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
+  const float ray_ior = ior_stack_interact(ior_stack, mat.refraction_index, ior_stack_method);
 
   const float ior_in  = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
   const float ior_out = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
@@ -173,8 +174,8 @@ __device__ MaterialContextGeometry geometry_get_context(const DeviceTask task, c
   }
 
   MaterialContextGeometry ctx;
-  ctx.instance_id = triangle_handle.instance_id;
-  ctx.tri_id      = triangle_handle.tri_id;
+  ctx.instance_id = handle.instance_id;
+  ctx.tri_id      = handle.tri_id;
   ctx.albedo      = albedo;
   ctx.emission    = emission;
   ctx.normal      = transform_apply_rotation(trans, normal);

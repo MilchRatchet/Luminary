@@ -317,14 +317,17 @@ LUMINARY_KERNEL void cloud_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const int offset         = get_task_address(i);
-    DeviceTask task          = task_load(offset);
-    float depth              = trace_depth_load(offset);
+    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
+    float depth              = trace.depth;
     const float sky_max_dist = world_to_sky_scale(depth);
     vec3 sky_origin          = world_to_sky_transform(task.origin);
     const uint32_t pixel     = get_pixel_id(task.index);
 
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
+    RGBF record = record_unpack(throughput.record);
     RGBF color  = get_color(0.0f, 0.0f, 0.0f);
 
     float cloud_transmittance;
@@ -335,17 +338,17 @@ LUMINARY_KERNEL void cloud_process_tasks() {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
         task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
-        task_store(task, offset);
+        task_store(task_base_address, task);
 
         if (depth != FLT_MAX) {
           // Move past the clouds
           depth -= cloud_world_offset;
-          trace_depth_store(depth, offset);
+          task_trace_depth_store(task_base_address, depth);
         }
       }
     }
 
-    store_RGBF(device.ptrs.records, pixel, record);
+    task_throughput_record_store(task_base_address, record_pack(record));
     write_beauty_buffer(color, pixel, task.state);
   }
 }

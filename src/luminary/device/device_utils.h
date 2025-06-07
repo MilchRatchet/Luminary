@@ -20,7 +20,7 @@
  */
 #define DEVICE_CTX_FUNC
 
-#define RECOMMENDED_TASKS_PER_THREAD 8
+#define RECOMMENDED_TASKS_PER_THREAD 32
 #define MINIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD >> 1)
 
 #define STARS_GRID_LD 64
@@ -143,6 +143,11 @@ struct float4 {
 // Misc data types
 ////////////////////////////////////////////////////////////////////
 
+typedef uint16_t BFloat16;
+typedef uint16_t UnsignedBFloat16;
+typedef uint2 PackedRecord;
+typedef uint2 PackedMISPayload;
+
 struct Mat3x3 {
   float f11;
   float f12;
@@ -224,19 +229,6 @@ struct GBufferMetaData {
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
 
 ////////////////////////////////////////////////////////////////////
-// Kernel Passing Structs
-////////////////////////////////////////////////////////////////////
-
-struct DeviceTask {
-  uint16_t state;
-  uint16_t padding;
-  ushort2 index;
-  vec3 origin;  // (Position if shading and not sky)
-  vec3 ray;
-} typedef DeviceTask;
-LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
-
-////////////////////////////////////////////////////////////////////
 // Light Importance Sampling Structs
 ////////////////////////////////////////////////////////////////////
 
@@ -286,10 +278,10 @@ struct DeviceLightTreeRootSection {
 } typedef DeviceLightTreeRootSection;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
-struct DeviceMISPayload {
+struct MISPayload {
   float sampling_probability;
   vec3 origin;
-} typedef DeviceMISPayload;
+} typedef MISPayload;
 
 struct DeviceLightSceneData {
   float total_power;
@@ -298,19 +290,57 @@ struct DeviceLightSceneData {
 #define MAX_NUM_INDIRECT_BUCKETS 3
 
 ////////////////////////////////////////////////////////////////////
+// Task State
+////////////////////////////////////////////////////////////////////
+
+enum TaskStateBufferIndex {
+  TASK_STATE_BUFFER_INDEX_PRESORT,
+  TASK_STATE_BUFFER_INDEX_POSTSORT,
+
+  TASK_STATE_BUFFER_INDEX_COUNT
+} typedef TaskStateBufferIndex;
+
+// TODO: This needs to change when adding SSS.
+typedef uint32_t DeviceIORStack;
+
+struct DeviceTask {
+  uint16_t state;
+  uint16_t padding;
+  ushort2 index;
+  vec3 origin;
+  vec3 ray;
+} typedef DeviceTask;
+LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
+
+struct DeviceTaskTrace {
+  TriangleHandle handle;
+  float depth;
+  DeviceIORStack ior_stack;
+} typedef DeviceTaskTrace;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
+
+struct DeviceTaskThroughput {
+  PackedRecord record;
+  PackedMISPayload payload;
+} typedef DeviceTaskThroughput;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
+
+struct DeviceTaskState {
+  DeviceTask task;
+  DeviceTaskTrace trace_result;
+  DeviceTaskThroughput throughput;
+} typedef DeviceTaskState;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
+
+////////////////////////////////////////////////////////////////////
 // Globals
 ////////////////////////////////////////////////////////////////////
 
 struct DevicePointers {
-  DEVICE float4* LUM_RESTRICT tasks0;
-  DEVICE float4* LUM_RESTRICT tasks1;
-  DEVICE TriangleHandle* LUM_RESTRICT triangle_handles;
-  DEVICE float* LUM_RESTRICT trace_depths;
+  DEVICE DeviceTaskState* task_states;
   DEVICE uint16_t* LUM_RESTRICT trace_counts;  // TODO: Remove and reuse inside task_counts
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;
-  DEVICE uint32_t* LUM_RESTRICT ior_stack;
-  DEVICE DeviceMISPayload* LUM_RESTRICT mis_payload;
   DEVICE RGBF* LUM_RESTRICT frame_current_result;
   DEVICE RGBF* LUM_RESTRICT frame_direct_buffer;
   DEVICE RGBF* LUM_RESTRICT frame_direct_accumulate;
@@ -320,7 +350,6 @@ struct DevicePointers {
   DEVICE float* LUM_RESTRICT frame_indirect_accumulate_blue[MAX_NUM_INDIRECT_BUCKETS];
   DEVICE RGBF* LUM_RESTRICT frame_final;
   DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
-  DEVICE RGBF* LUM_RESTRICT records;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
   DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
   DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;

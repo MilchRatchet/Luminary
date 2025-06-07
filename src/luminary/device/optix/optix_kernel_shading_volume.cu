@@ -26,25 +26,23 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= task_count)
     return;
 
-  const uint32_t offset       = get_task_address(task_offset + task_id);
-  DeviceTask task             = task_load(offset);
-  const TriangleHandle handle = triangle_handle_load(offset);
+  const uint32_t task_base_address      = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
+  DeviceTask task                       = task_load(task_base_address);
+  const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+  const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-  const VolumeType volume_type = VOLUME_HIT_TYPE(handle.instance_id);
+  const VolumeType volume_type = VOLUME_HIT_TYPE(trace.handle.instance_id);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   if (volume_should_do_direct_lighting(volume_type, task.state) == false)
     return;
 #endif
 
-  const float depth    = trace_depth_load(offset);
-  const uint32_t pixel = get_pixel_id(task.index);
-
-  task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+  task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-  MaterialContextVolume ctx = volume_get_context(task, handle.instance_id, pixel, volume);
+  MaterialContextVolume ctx = volume_get_context(task, volume);
 
   RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
@@ -57,9 +55,8 @@ extern "C" __global__ void __raygen__optix() {
   accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
 #endif
 
-  const RGBF record = load_RGBF(device.ptrs.records + pixel);
+  accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
-  accumulated_light = mul_color(accumulated_light, record);
-
+  const uint32_t pixel = get_pixel_id(task.index);
   write_beauty_buffer_indirect(accumulated_light, pixel);
 }

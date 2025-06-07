@@ -7,7 +7,12 @@
 #include "../kernel_args.h"
 
 #define NUM_THREADS (THREADS_PER_BLOCK * device.config.num_blocks)
-#define NUM_WARPS (NUM_THREADS >> 5)
+
+#define WARP_SIZE_LOG 5
+#define WARP_SIZE (1 << WARP_SIZE_LOG)
+#define WARP_SIZE_MASK (WARP_SIZE - 1)
+
+#define NUM_WARPS (NUM_THREADS >> WARP_SIZE_LOG)
 
 #ifndef OPTIX_KERNEL
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
@@ -53,8 +58,8 @@ enum ShadingTaskIndex {
   SHADING_TASK_INDEX_VOLUME,
   SHADING_TASK_INDEX_PARTICLE,
   SHADING_TASK_INDEX_SKY,
-  SHADING_TASK_INDEX_INVALID,
-  SHADING_TASK_INDEX_TOTAL_WITH_INVALID
+  SHADING_TASK_INDEX_TOTAL,
+  SHADING_TASK_INDEX_INVALID = 0xFF
 } typedef ShadingTaskIndex;
 
 #define TASK_ADDRESS_OFFSET_IMPL(__internal_macro_shading_task_index) (NUM_THREADS * __internal_macro_shading_task_index + THREAD_ID)
@@ -143,6 +148,7 @@ __device__ uint32_t get_pixel_id(const ushort2 pixel) {
   return pixel.x + device.settings.width * pixel.y;
 }
 
+#if 0
 __device__ uint32_t get_task_address_of_thread(const uint32_t thread_id, const uint32_t block_id, const uint32_t number) {
   static_assert(THREADS_PER_BLOCK == 128, "I wrote this using that we have 4 warps per block, this is also used in the 0x3!");
 
@@ -160,6 +166,7 @@ __device__ uint32_t get_task_address(const uint32_t number) {
   return get_task_address_of_thread(idx.x, idx.y, number);
 #endif
 }
+#endif
 
 __device__ bool is_non_finite(const float a) {
 #ifndef __INTELLISENSE__

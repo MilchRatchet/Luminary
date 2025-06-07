@@ -47,6 +47,16 @@ __device__ T warp_reduce_max(T max_value) {
   return max_value;
 }
 
+template <typename T>
+__device__ T warp_reduce_prefixsum(T value) {
+  value += __shfl_down_sync(0xFFFFFFFF, value, 16);
+  value += __shfl_down_sync(0xFFFFFFFF, value, 8);
+  value += __shfl_down_sync(0xFFFFFFFF, value, 4);
+  value += __shfl_down_sync(0xFFFFFFFF, value, 2);
+  value += __shfl_down_sync(0xFFFFFFFF, value, 1);
+  return value;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Generic Scene Data IO
 ////////////////////////////////////////////////////////////////////
@@ -78,14 +88,46 @@ __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
     device.ptrs.light_tree_root, 1 + offset * LIGHT_TREE_NODE_SECTION_REL_SIZE)
 
 ////////////////////////////////////////////////////////////////////
-// Generic Path State IO
+// Task State IO
 ////////////////////////////////////////////////////////////////////
 
-template <typename DATA_TYPE, typename LOAD_TYPE, typename STRIDE_TYPE = DATA_TYPE>
-__device__ DATA_TYPE load_state_generic(const void* src, uint32_t offset) {
-  static_assert(
-    (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)) * sizeof(LOAD_TYPE) == sizeof(DATA_TYPE), "DATA_TYPE must be a multiple of LOAD_TYPE in size.");
-  const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const STRIDE_TYPE*) src) + offset);
+__device__ uint32_t
+  task_address_impl(const uint32_t thread_id_in_warp, const uint32_t warp_id, const uint32_t task_id, const TaskStateBufferIndex index) {
+  constexpr uint32_t num_chunks = sizeof(DeviceTaskState) / sizeof(float4);
+
+  uint32_t base_address = 0;
+  base_address += thread_id_in_warp;
+  base_address += warp_id * num_chunks * WARP_SIZE;
+  base_address += task_id * NUM_WARPS * num_chunks * WARP_SIZE;
+
+  base_address += index * device.config.num_tasks_per_thread * NUM_WARPS * num_chunks * WARP_SIZE;
+
+  return base_address;
+}
+
+__device__ uint32_t task_arbitrary_warp_address(const uint32_t warp_offset, const TaskStateBufferIndex index) {
+  const uint32_t thread_id_in_warp = warp_offset & WARP_SIZE_MASK;
+  const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
+  const uint32_t task_id           = warp_offset >> WARP_SIZE_LOG;
+
+  return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
+}
+
+__device__ uint32_t task_get_base_address(const uint32_t task_id, const TaskStateBufferIndex index) {
+  const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+  const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
+
+  return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
+}
+
+template <typename DATA_TYPE, typename LOAD_TYPE>
+__device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t member_offset) {
+  const uint32_t chunk_id = member_offset >> 4;
+
+  const float4* ptr = ((const float4*) device.ptrs.task_states);
+
+  ptr += base_address;
+  ptr += chunk_id * WARP_SIZE;
 
   union {
     DATA_TYPE dst;
@@ -95,18 +137,20 @@ __device__ DATA_TYPE load_state_generic(const void* src, uint32_t offset) {
   } converter;
 
   for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)); i++) {
-    converter.data[i] = __ldcs(ptr + i);
+    converter.data[i] = __ldcs((const LOAD_TYPE*) (ptr + i * WARP_SIZE));
   }
 
   return converter.dst;
 }
 
-template <typename DATA_TYPE, typename STORE_TYPE, typename STRIDE_TYPE = DATA_TYPE>
-__device__ void store_state_generic(void* dst, uint32_t offset, const DATA_TYPE src) {
-  static_assert(
-    (sizeof(DATA_TYPE) / sizeof(STORE_TYPE)) * sizeof(STORE_TYPE) == sizeof(DATA_TYPE),
-    "DATA_TYPE must be a multiple of STORE_TYPE in size.");
-  STORE_TYPE* ptr = (STORE_TYPE*) (((const STRIDE_TYPE*) dst) + offset);
+template <typename DATA_TYPE, typename STORE_TYPE>
+__device__ void store_task_state(const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
+  const uint32_t chunk_id = member_offset >> 4;
+
+  float4* ptr = ((float4*) device.ptrs.task_states);
+
+  ptr += base_address;
+  ptr += chunk_id * WARP_SIZE;
 
   union {
     DATA_TYPE src;
@@ -118,116 +162,58 @@ __device__ void store_state_generic(void* dst, uint32_t offset, const DATA_TYPE 
   converter.src = src;
 
   for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(STORE_TYPE)); i++) {
-    __stcs(ptr + i, converter.data[i]);
+    __stcs((STORE_TYPE*) (ptr + i * WARP_SIZE), converter.data[i]);
   }
 }
 
-#define load_mis_payload(offset) load_state_generic<DeviceMISPayload, float4>(device.ptrs.mis_payload, offset)
-#define store_mis_payload(offset, data) store_state_generic<DeviceMISPayload, float4>(device.ptrs.mis_payload, offset, data)
-
-////////////////////////////////////////////////////////////////////
-// Task IO
-////////////////////////////////////////////////////////////////////
-
-__device__ void stream_uint2(const uint2* source, uint2* target) {
-  __stcs(target, __ldcs(source));
+__device__ DeviceTask task_load(const uint32_t base_address) {
+  return load_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task));
 }
 
-__device__ void stream_float(const float* source, float* target) {
-  __stcs(target, __ldcs(source));
+__device__ DeviceTaskTrace task_trace_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result));
 }
 
-__device__ void stream_float4(const float4* source, float4* target) {
-  __stcs(target, __ldcs(source));
+__device__ DeviceTaskThroughput task_throughput_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput));
 }
 
-__device__ void swap_trace_data(const uint32_t index0, const uint32_t index1) {
-  const uint32_t offset0 = get_task_address(index0);
+// DeviceTask
 
-  const float4 data0 = __ldcs(device.ptrs.tasks0 + offset0);
-  const float4 data1 = __ldcs(device.ptrs.tasks1 + offset0);
-  const float depth  = __ldcs((float*) (device.ptrs.trace_depths + offset0));
-  const uint2 handle = __ldcs((uint2*) (device.ptrs.triangle_handles + offset0));
-
-  const uint32_t offset1 = get_task_address(index1);
-  stream_float4(device.ptrs.tasks0 + offset1, device.ptrs.tasks0 + offset0);
-  stream_float4(device.ptrs.tasks1 + offset1, device.ptrs.tasks1 + offset0);
-  stream_float((float*) (device.ptrs.trace_depths + offset1), (float*) (device.ptrs.trace_depths + offset0));
-  stream_uint2((uint2*) (device.ptrs.triangle_handles + offset1), (uint2*) (device.ptrs.triangle_handles + offset0));
-
-  __stcs(device.ptrs.tasks0 + offset1, data0);
-  __stcs(device.ptrs.tasks1 + offset1, data1);
-  __stcs((float*) (device.ptrs.trace_depths + offset1), depth);
-  __stcs((uint2*) (device.ptrs.triangle_handles + offset1), handle);
+__device__ void task_store(const uint32_t base_address, const DeviceTask data) {
+  store_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task), data);
 }
 
-__device__ DeviceTask task_load(const uint32_t offset) {
-  const float4 data0 = __ldcs(device.ptrs.tasks0 + offset);
-  const float4 data1 = __ldcs(device.ptrs.tasks1 + offset);
+// DeviceTaskTrace
 
-  DeviceTask task;
-  task.state    = __float_as_uint(data0.x) & 0xFFFF;
-  task.padding  = __float_as_uint(data0.x) >> 16;
-  task.index.x  = __float_as_uint(data0.y) & 0xFFFF;
-  task.index.y  = __float_as_uint(data0.y) >> 16;
-  task.origin.x = data0.z;
-  task.origin.y = data0.w;
-
-  task.origin.z = data1.x;
-  task.ray.x    = data1.y;
-  task.ray.y    = data1.z;
-  task.ray.z    = data1.w;
-
-  return task;
+__device__ void task_trace_store(const uint32_t base_address, const DeviceTaskTrace data) {
+  store_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result), data);
 }
 
-__device__ void task_store(const DeviceTask task, const uint32_t offset) {
-  float4 data0;
-  float4 data1;
-
-  data0.x = __uint_as_float(((uint32_t) task.state & 0xffff) | ((uint32_t) 0 << 16));
-  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
-  data0.z = task.origin.x;
-  data0.w = task.origin.y;
-
-  __stcs(device.ptrs.tasks0 + offset, data0);
-
-  data1.x = task.origin.z;
-  data1.y = task.ray.x;
-  data1.z = task.ray.y;
-  data1.w = task.ray.z;
-
-  __stcs(device.ptrs.tasks1 + offset, data1);
+__device__ void task_trace_handle_store(const uint32_t base_address, const TriangleHandle data) {
+  store_task_state<TriangleHandle, float2>(base_address, offsetof(DeviceTaskState, trace_result.handle), data);
 }
 
-__device__ TriangleHandle triangle_handle_load(const uint32_t offset) {
-  const uint2* data_ptr = (const uint2*) (device.ptrs.triangle_handles + offset);
-
-  const uint2 data = __ldcs(data_ptr + 0);
-
-  TriangleHandle handle;
-  handle.instance_id = data.x;
-  handle.tri_id      = data.y;
-
-  return handle;
+__device__ void task_trace_depth_store(const uint32_t base_address, const float data) {
+  store_task_state<float, float>(base_address, offsetof(DeviceTaskState, trace_result.depth), data);
 }
 
-__device__ void triangle_handle_store(const TriangleHandle handle, const uint32_t offset) {
-  uint2* data_ptr = (uint2*) (device.ptrs.triangle_handles + offset);
-
-  uint2 data;
-  data.x = handle.instance_id;
-  data.y = handle.tri_id;
-
-  __stcs(data_ptr, data);
+__device__ void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
+  store_task_state<DeviceIORStack, float>(base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
 }
 
-__device__ float trace_depth_load(const uint32_t offset) {
-  return __ldcs((float*) (device.ptrs.trace_depths + offset));
+// DeviceTaskThroughput
+
+__device__ void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
+  store_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput), data);
 }
 
-__device__ void trace_depth_store(const float depth, const uint32_t offset) {
-  __stcs((float*) (device.ptrs.trace_depths + offset), depth);
+__device__ void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
+  store_task_state<PackedRecord, float2>(base_address, offsetof(DeviceTaskState, throughput.record), data);
+}
+
+__device__ void task_throughput_mis_payload_store(const uint32_t base_address, const PackedMISPayload data) {
+  store_task_state<PackedMISPayload, float2>(base_address, offsetof(DeviceTaskState, throughput.payload), data);
 }
 
 ////////////////////////////////////////////////////////////////////

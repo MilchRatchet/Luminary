@@ -336,8 +336,7 @@ __device__ vec3 volume_sample_ray<MATERIAL_PARTICLE>(const MaterialContextPartic
   return scatter_ray;
 }
 
-__device__ MaterialContextVolume
-  volume_get_context(const DeviceTask task, const uint32_t instance_id, const uint32_t pixel, const VolumeDescriptor volume) {
+__device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume) {
   MaterialContextVolume ctx;
   ctx.descriptor = volume;
   ctx.position   = task.origin;

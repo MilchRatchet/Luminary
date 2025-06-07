@@ -5,7 +5,7 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-__device__ MaterialContextParticle particle_get_context(const DeviceTask task, const uint32_t instance_id, const int pixel) {
+__device__ MaterialContextParticle particle_get_context(const DeviceTask task, const uint32_t instance_id) {
   const Quad q = load_quad(device.ptrs.particle_quads, instance_id & HIT_TYPE_PARTICLE_MASK);
 
   const vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);

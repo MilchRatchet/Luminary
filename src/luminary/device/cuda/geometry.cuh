@@ -17,15 +17,16 @@ LUMINARY_KERNEL void geometry_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t offset          = get_task_address(task_offset + i);
-    DeviceTask task                = task_load(offset);
-    TriangleHandle triangle_handle = triangle_handle_load(offset);
-    const float depth              = trace_depth_load(offset);
-    const uint32_t pixel           = get_pixel_id(task.index);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
+    DeviceIORStack ior_stack     = trace.ior_stack;
+    PackedMISPayload mis_payload = throughput.payload;
+    MaterialContextGeometry ctx  = geometry_get_context(task, trace.handle, ior_stack, mis_payload);
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
@@ -52,18 +53,19 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Emission and record
     ////////////////////////////////////////////////////////////////////
 
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
+    RGBF record = record_unpack(throughput.record);
 
     if (color_any(ctx.emission)) {
+      const uint32_t pixel = get_pixel_id(task.index);
       write_beauty_buffer(mul_color(ctx.emission, record), pixel, task.state);
     }
 
     record = mul_color(record, bounce_info.weight);
 
     if (bounce_info.is_transparent_pass) {
-      const IORStackMethod ior_stack_method =
-        (ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ctx.ior_out, pixel, ior_stack_method);
+      const bool refraction_is_inside       = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+      const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ior_stack, ctx.ior_out, ior_stack_method);
     }
 
     ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
@@ -79,7 +81,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
       // We want to keep the old payload around if we are passthrough.
       new_state |= STATE_FLAG_MIS_EMISSION;
-      store_mis_payload(pixel, mis_get_payload(ctx, bounce_info.ray, bounce_info.is_transparent_pass));
+      mis_payload = mis_payload_pack(mis_get_payload(ctx, bounce_info.ray, bounce_info.is_transparent_pass));
     }
 
     DeviceTask bounce_task;
@@ -89,8 +91,19 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     bounce_task.index  = task.index;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
-      task_store(bounce_task, get_task_address(trace_count++));
-      store_RGBF(device.ptrs.records, pixel, record);
+      DeviceTaskThroughput bounce_throughput;
+      bounce_throughput.record  = record_pack(record);
+      bounce_throughput.payload = mis_payload;
+
+      const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+      task_store(dst_task_base_address, bounce_task);
+      task_throughput_store(dst_task_base_address, bounce_throughput);
+
+      // Only if the IOR stack has changed do we need to write this out.
+      if (bounce_info.is_transparent_pass) {
+        task_trace_ior_stack_store(dst_task_base_address, ior_stack);
+      }
     }
   }
 
@@ -105,32 +118,34 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t offset          = get_task_address(i);
-    DeviceTask task                = task_load(offset);
-    TriangleHandle triangle_handle = triangle_handle_load(offset);
-    const float depth              = trace_depth_load(offset);
-    const uint32_t pixel           = get_pixel_id(task.index);
+    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const uint32_t pixel                  = get_pixel_id(task.index);
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    DeviceIORStack ior_stack = trace.ior_stack;
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
 
         write_beauty_buffer_forced(add_color(opaque_color(ctx.albedo), ctx.emission), pixel);
       } break;
       case LUMINARY_SHADING_MODE_DEPTH: {
-        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
+        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
 
         const vec3 normal = ctx.normal;
 
         write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_IDENTIFICATION: {
-        const uint32_t v = random_uint32_t_base(0x55555555, (triangle_handle.instance_id << 16) | triangle_handle.tri_id);
+        const uint32_t v = random_uint32_t_base(0x55555555, (trace.handle.instance_id << 16) | trace.handle.tri_id);
 
         const uint16_t r = v & 0x7ff;
         const uint16_t g = (v >> 10) & 0x7ff;
@@ -145,7 +160,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(color, pixel);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, triangle_handle, pixel);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
         const RGBF color                  = add_color(scale_color(opaque_color(ctx.albedo), 0.025f), ctx.emission);
 
         write_beauty_buffer_forced(color, pixel);

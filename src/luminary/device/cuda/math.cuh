@@ -7,12 +7,70 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-typedef uint16_t BFloat16;
-
-__device__ float bfloat_unpack(BFloat16 val) {
+__device__ float bfloat_unpack(const BFloat16 val) {
   const uint32_t data = val;
 
   return __uint_as_float(data << 16);
+}
+
+__device__ BFloat16 bfloat_pack(const float val) {
+  return __float_as_uint(val) >> 16;
+}
+
+__device__ float unsigned_bfloat_unpack(const UnsignedBFloat16 val) {
+  const uint32_t data = val;
+
+  return __uint_as_float(data << 15);
+}
+
+__device__ UnsignedBFloat16 unsigned_bfloat_pack(const float val) {
+  return (__float_as_uint(val) >> 15) & 0xFFFF;
+}
+
+__device__ RGBF record_unpack(const PackedRecord packed) {
+  // 21 bits each
+  const uint32_t red   = packed.x & 0x1FFFFF;
+  const uint32_t green = (packed.x >> 21) | ((packed.y & 0x3FF) << 11);
+  const uint32_t blue  = packed.y >> 10;
+
+  RGBF record;
+  record.r = __uint_as_float(red << 10);
+  record.g = __uint_as_float(green << 10);
+  record.b = __uint_as_float(blue << 10);
+
+  return record;
+}
+
+__device__ PackedRecord record_pack(const RGBF record) {
+  const uint32_t red   = (__float_as_uint(record.r) >> 10) & 0x1FFFFF;
+  const uint32_t green = (__float_as_uint(record.g) >> 10) & 0x1FFFFF;
+  const uint32_t blue  = (__float_as_uint(record.b) >> 10) & 0x1FFFFF;
+
+  PackedRecord packed;
+  packed.x = red | (green << 21);
+  packed.y = (green >> 11) | (blue << 10);
+
+  return packed;
+}
+
+__device__ MISPayload mis_payload_unpack(const PackedMISPayload packed) {
+  MISPayload payload;
+  payload.origin.x             = bfloat_unpack(packed.x & 0xFFFF);
+  payload.origin.y             = bfloat_unpack(packed.x >> 16);
+  payload.origin.z             = bfloat_unpack(packed.y & 0xFFFF);
+  payload.sampling_probability = unsigned_bfloat_unpack(packed.y >> 16);
+
+  return payload;
+}
+
+__device__ PackedMISPayload mis_payload_pack(const MISPayload payload) {
+  PackedMISPayload packed;
+  packed.x = (uint32_t) bfloat_pack(payload.origin.x);
+  packed.x |= ((uint32_t) bfloat_pack(payload.origin.y)) << 16;
+  packed.y = (uint32_t) bfloat_pack(payload.origin.z);
+  packed.y |= ((uint32_t) unsigned_bfloat_pack(payload.sampling_probability)) << 16;
+
+  return packed;
 }
 
 __device__ float difference_of_products(const float a, const float b, const float c, const float d) {

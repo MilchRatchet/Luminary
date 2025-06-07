@@ -74,8 +74,8 @@ __device__ float mis_compute_weight_dl(
   return 1.0f - mis_compute_weight_base(gi_pdf, solid_angle, power);
 }
 
-__device__ DeviceMISPayload mis_get_payload(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
-  DeviceMISPayload mis_data;
+__device__ MISPayload mis_get_payload(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
+  MISPayload mis_data;
   mis_data.origin               = ctx.position;
   mis_data.sampling_probability = mis_compute_gi_pdf(ctx, L, is_refraction);
 

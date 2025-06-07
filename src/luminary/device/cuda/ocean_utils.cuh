@@ -460,7 +460,7 @@ __device__ float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-__device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, const uint32_t pixel) {
+__device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceIORStack& ior_stack) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
@@ -474,9 +474,9 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, cons
     flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const IORStackMethod ior_stack_method =
-    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(device.ocean.refractive_index, pixel, ior_stack_method);
+  const bool refraction_is_inside       = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
+  const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+  const float ray_ior                   = ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
 
   MaterialContextGeometry ctx;
 
