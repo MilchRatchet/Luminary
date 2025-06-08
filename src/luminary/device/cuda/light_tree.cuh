@@ -161,7 +161,7 @@ __device__ LightTreeContinuation _light_tree_continuation_pack(const uint8_t chi
 
   continuation.is_light    = is_light ? 1 : 0;
   continuation.child_index = child_index;
-  continuation.probability = (uint32_t) ((0xFFFFF * probability) + 0.5f);
+  continuation.probability = max((uint32_t) ((0xFFFFF * probability) + 0.5f), 1);
 
   return continuation;
 }
@@ -214,7 +214,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
     const bool is_light  = selected[lane_id] < header.num_root_lights;
-    const uint32_t index = is_light ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
+    const uint32_t index = (is_light || selected[lane_id] == 0xFF) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
     work.data[lane_id]   = _light_tree_continuation_pack(index, ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), is_light);
 
     _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(lane_id, work.data[lane_id]);
