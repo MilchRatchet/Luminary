@@ -106,12 +106,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       task_store(dst_task_base_address, bounce_task);
+      task_trace_ior_stack_store(dst_task_base_address, ior_stack);
       task_throughput_store(dst_task_base_address, bounce_throughput);
-
-      // Only if the IOR stack has changed do we need to write this out.
-      if (bounce_info.is_transparent_pass) {
-        task_trace_ior_stack_store(dst_task_base_address, ior_stack);
-      }
     }
   }
 

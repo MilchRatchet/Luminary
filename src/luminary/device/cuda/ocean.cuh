@@ -56,6 +56,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       task_store(dst_task_base_address, bounce_task);
+      task_trace_ior_stack_store(dst_task_base_address, ior_stack);
       task_throughput_record_store(dst_task_base_address, record_pack(record));
     }
   }

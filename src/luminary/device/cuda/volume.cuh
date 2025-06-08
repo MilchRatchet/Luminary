@@ -41,10 +41,9 @@ LUMINARY_KERNEL void volume_process_events() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
-    DeviceTask task                       = task_load(task_base_address);
-    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
-    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    DeviceTask task                  = task_load(task_base_address);
+    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
 
     TriangleHandle handle = trace.handle;
     float depth           = trace.depth;
@@ -83,8 +82,9 @@ LUMINARY_KERNEL void volume_process_events() {
       }
     }
 
-    const uint32_t pixel = get_pixel_id(task.index);
-    RGBF record          = record_unpack(throughput.record);
+    const uint32_t pixel                  = get_pixel_id(task.index);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    RGBF record                           = record_unpack(throughput.record);
 
     if (volume.type != VOLUME_TYPE_NONE) {
       float volume_intersection_probability = (task.state & STATE_FLAG_CAMERA_DIRECTION) ? 0.75f : 1.0f;
@@ -186,9 +186,10 @@ LUMINARY_KERNEL void volume_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    DeviceTask task                  = task_load(task_base_address);
-    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
     const uint32_t pixel = get_pixel_id(task.index);
 
@@ -211,6 +212,9 @@ LUMINARY_KERNEL void volume_process_tasks() {
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
 
     const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+    task_trace_ior_stack_store(dst_task_base_address, trace.ior_stack);
+    task_throughput_record_store(dst_task_base_address, throughput.record);
 
     DeviceTask bounce_task;
     bounce_task.state  = new_state;
