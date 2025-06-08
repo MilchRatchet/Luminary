@@ -88,6 +88,10 @@ __device__ float ris_reservoir_get_sampling_weight(const RISReservoir reservoir)
   return (reservoir.selected_target > 0.0f) ? reservoir.sum_weight / reservoir.selected_target : 0.0f;
 }
 
+__device__ float ris_reservoir_get_sampling_prob(const RISReservoir reservoir) {
+  return (reservoir.sum_weight > 0.0f) ? reservoir.selected_target / reservoir.sum_weight : 1.0f;
+}
+
 struct RISAggregator {
   float sum_weight;
 } typedef RISAggregator;

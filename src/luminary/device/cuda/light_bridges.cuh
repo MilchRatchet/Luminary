@@ -126,46 +126,27 @@ __device__ uint32_t
   bridges_sample_vertex_count(const VolumeDescriptor volume, const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
   const float effective_dist = light_dist * volume.max_scattering;
 
-  float random = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_VERTEX_COUNT + seed, pixel);
+  const float random         = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_VERTEX_COUNT + seed, pixel);
+  RISReservoir ris_reservoir = ris_reservoir_init(random);
 
   ////////////////////////////////////////////////////////////////////
-  // Compute importance for each vertex count
+  // Sample a vertex count based on importance LUT
   ////////////////////////////////////////////////////////////////////
 
-  float sum_importance = 0.0f;
-  float count_importance[LIGHT_GEO_MAX_BRIDGE_LENGTH];
+  // Fallback values. These come into play if sum_importance is 0.0f.
+  // This happens when effective dist is too large.
+  uint32_t selected_vertex_count = device.settings.bridge_max_num_vertices - 1;
 
   for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
     // TODO: The paper uses some additional terms here for the importance
     const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
 
-    count_importance[i] = importance;
-    sum_importance += importance;
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Choose a vertex count proportional to the evaluated importance
-  ////////////////////////////////////////////////////////////////////
-
-  random *= sum_importance;
-
-  // Fallback values. These come into play if sum_importance is 0.0f.
-  // This happens when effective dist is too large.
-  uint32_t selected_vertex_count = device.settings.bridge_max_num_vertices - 1;
-  pdf                            = 1.0f;
-
-  for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
-    const float importance = count_importance[i];
-
-    random -= importance;
-
-    if (random < 0.0f) {
+    if (ris_reservoir_add_sample(ris_reservoir, importance, 1.0f)) {
       selected_vertex_count = i;
-
-      pdf = importance / sum_importance;
-      break;
     }
   }
+
+  pdf = ris_reservoir_get_sampling_prob(ris_reservoir);
 
   return 1 + selected_vertex_count;
 }
