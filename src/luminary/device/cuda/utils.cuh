@@ -148,26 +148,6 @@ __device__ uint32_t get_pixel_id(const ushort2 pixel) {
   return pixel.x + device.settings.width * pixel.y;
 }
 
-#if 0
-__device__ uint32_t get_task_address_of_thread(const uint32_t thread_id, const uint32_t block_id, const uint32_t number) {
-  static_assert(THREADS_PER_BLOCK == 128, "I wrote this using that we have 4 warps per block, this is also used in the 0x3!");
-
-  const uint32_t threads_per_warp  = 32;
-  const uint32_t warp_id           = ((thread_id >> 5) & 0x3) + block_id * 4;
-  const uint32_t thread_id_in_warp = (thread_id & 0x1f);
-  return threads_per_warp * device.config.num_tasks_per_thread * warp_id + threads_per_warp * number + thread_id_in_warp;
-}
-
-__device__ uint32_t get_task_address(const uint32_t number) {
-#ifndef OPTIX_KERNEL
-  return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
-#else
-  const uint3 idx = optixGetLaunchIndex();
-  return get_task_address_of_thread(idx.x, idx.y, number);
-#endif
-}
-#endif
-
 __device__ bool is_non_finite(const float a) {
 #ifndef __INTELLISENSE__
   return isnan(a) || isinf(a);

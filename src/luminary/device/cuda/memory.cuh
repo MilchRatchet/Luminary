@@ -49,11 +49,15 @@ __device__ T warp_reduce_max(T max_value) {
 
 template <typename T>
 __device__ T warp_reduce_prefixsum(T value) {
-  value += __shfl_down_sync(0xFFFFFFFF, value, 16);
-  value += __shfl_down_sync(0xFFFFFFFF, value, 8);
-  value += __shfl_down_sync(0xFFFFFFFF, value, 4);
-  value += __shfl_down_sync(0xFFFFFFFF, value, 2);
-  value += __shfl_down_sync(0xFFFFFFFF, value, 1);
+  const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+
+  for (uint32_t stride = 1; stride <= WARP_SIZE; stride = stride << 1) {
+    const T shuffledValue = __shfl_up_sync(0xFFFFFFFF, value, stride);
+
+    if (thread_id_in_warp >= stride)
+      value += shuffledValue;
+  }
+
   return value;
 }
 
@@ -122,12 +126,15 @@ __device__ uint32_t task_get_base_address(const uint32_t task_id, const TaskStat
 
 template <typename DATA_TYPE, typename LOAD_TYPE>
 __device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t member_offset) {
-  const uint32_t chunk_id = member_offset >> 4;
+  const uint32_t chunk_id          = member_offset >> 4;
+  const uint32_t sub_member_offset = member_offset & 0xF;
 
   const float4* ptr = ((const float4*) device.ptrs.task_states);
 
   ptr += base_address;
   ptr += chunk_id * WARP_SIZE;
+
+  ptr = (const float4*) (((const uint8_t*) ptr) + sub_member_offset);
 
   union {
     DATA_TYPE dst;
@@ -145,12 +152,15 @@ __device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t
 
 template <typename DATA_TYPE, typename STORE_TYPE>
 __device__ void store_task_state(const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
-  const uint32_t chunk_id = member_offset >> 4;
+  const uint32_t chunk_id          = member_offset >> 4;
+  const uint32_t sub_member_offset = member_offset & 0xF;
 
   float4* ptr = ((float4*) device.ptrs.task_states);
 
   ptr += base_address;
   ptr += chunk_id * WARP_SIZE;
+
+  ptr = (float4*) (((uint8_t*) ptr) + sub_member_offset);
 
   union {
     DATA_TYPE src;
