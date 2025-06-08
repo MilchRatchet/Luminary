@@ -26,7 +26,15 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     DeviceIORStack ior_stack     = trace.ior_stack;
     PackedMISPayload mis_payload = throughput.payload;
-    MaterialContextGeometry ctx  = geometry_get_context(task, trace.handle, ior_stack, mis_payload);
+
+    GeometryContextCreationInfo ctx_creation_info;
+    ctx_creation_info.task               = task;
+    ctx_creation_info.handle             = trace.handle;
+    ctx_creation_info.ior_stack          = trace.ior_stack;
+    ctx_creation_info.packed_mis_payload = throughput.payload;
+    ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
+
+    MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
@@ -124,13 +132,18 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
     const uint32_t pixel                  = get_pixel_id(task.index);
 
-    DeviceIORStack ior_stack = trace.ior_stack;
-
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
+        GeometryContextCreationInfo ctx_creation_info;
+        ctx_creation_info.task               = task;
+        ctx_creation_info.handle             = trace.handle;
+        ctx_creation_info.ior_stack          = trace.ior_stack;
+        ctx_creation_info.packed_mis_payload = throughput.payload;
+        ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
+
+        const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
 
         write_beauty_buffer_forced(add_color(opaque_color(ctx.albedo), ctx.emission), pixel);
       } break;
@@ -138,7 +151,14 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
+        GeometryContextCreationInfo ctx_creation_info;
+        ctx_creation_info.task               = task;
+        ctx_creation_info.handle             = trace.handle;
+        ctx_creation_info.ior_stack          = trace.ior_stack;
+        ctx_creation_info.packed_mis_payload = throughput.payload;
+        ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
+
+        const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
 
         const vec3 normal = ctx.normal;
 
@@ -160,7 +180,14 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(color, pixel);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
+        GeometryContextCreationInfo ctx_creation_info;
+        ctx_creation_info.task               = task;
+        ctx_creation_info.handle             = trace.handle;
+        ctx_creation_info.ior_stack          = trace.ior_stack;
+        ctx_creation_info.packed_mis_payload = throughput.payload;
+        ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
+
+        const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
         const RGBF color                  = add_color(scale_color(opaque_color(ctx.albedo), 0.025f), ctx.emission);
 
         write_beauty_buffer_forced(color, pixel);

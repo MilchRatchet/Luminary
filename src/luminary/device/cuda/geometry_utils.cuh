@@ -39,21 +39,33 @@ __device__ vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-__device__ MaterialContextGeometry geometry_get_context(
-  const DeviceTask task, const TriangleHandle handle, DeviceIORStack& ior_stack, const PackedMISPayload packed_mis_payload) {
-  const uint32_t mesh_id      = mesh_id_load(handle.instance_id);
-  const DeviceTransform trans = load_transform(handle.instance_id);
+enum GeometryContextCreationHint {
+  GEOMETRY_CONTEXT_CREATION_HINT_NONE = 0,
+  GEOMETRY_CONTEXT_CREATION_HINT_DL   = (1 << 0)
+} typedef GeometryContextCreationHint;
+
+struct GeometryContextCreationInfo {
+  DeviceTask task;
+  TriangleHandle handle;
+  DeviceIORStack ior_stack;
+  PackedMISPayload packed_mis_payload;
+  uint32_t hints;
+} typedef GeometryContextCreationInfo;
+
+__device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationInfo info) {
+  const uint32_t mesh_id      = mesh_id_load(info.handle.instance_id);
+  const DeviceTransform trans = load_transform(info.handle.instance_id);
 
   const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
   const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
 
-  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, handle.tri_id, triangle_count));
+  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, info.handle.tri_id, triangle_count));
+  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, info.handle.tri_id, triangle_count));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, info.handle.tri_id, triangle_count));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, info.handle.tri_id, triangle_count));
 
-  const vec3 position = transform_apply_inv(trans, task.origin);
-  const vec3 ray      = transform_apply_rotation_inv(trans, task.ray);
+  const vec3 position = transform_apply_inv(trans, info.task.origin);
+  const vec3 ray      = transform_apply_rotation_inv(trans, info.task.ray);
 
   const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
   const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
@@ -92,25 +104,29 @@ __device__ MaterialContextGeometry geometry_get_context(
   }
 
   const bool has_emission     = mat.flags & DEVICE_MATERIAL_FLAG_EMISSION;
-  const bool include_emission = has_emission && (task.state & (STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_MIS_EMISSION));
+  const bool include_emission = has_emission && (info.task.state & (STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_MIS_EMISSION));
 
-  RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
-  if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
-    const float4 luminance_f = texture_load(load_texture_object(mat.luminance_tex), tex_coords);
+  RGBF emission = get_color(0.0f, 0.0f, 0.0f);
+  if ((info.hints & GEOMETRY_CONTEXT_CREATION_HINT_DL) == 0 && include_emission) {
+    emission = mat.emission;
 
-    emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
-    emission = scale_color(emission, luminance_f.w * albedo.a * mat.emission_scale);
-  }
+    if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
+      const float4 luminance_f = texture_load(load_texture_object(mat.luminance_tex), tex_coords);
 
-  // STATE_FLAG_ALLOW_EMISSION not set implies that we only allow emission through MIS weights, apply them now.
-  if (color_any(emission) && ((task.state & STATE_FLAG_ALLOW_EMISSION) == 0)) {
-    const MISPayload mis_payload = mis_payload_unpack(packed_mis_payload);
+      emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
+      emission = scale_color(emission, luminance_f.w * albedo.a * mat.emission_scale);
+    }
 
-    const float area        = get_length(cross_product(edge1, edge2)) * 0.5f;
-    const float power       = color_importance(emission) * area;
-    const float solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_payload.origin);
+    // STATE_FLAG_ALLOW_EMISSION not set implies that we only allow emission through MIS weights, apply them now.
+    if (color_any(emission) && ((info.task.state & STATE_FLAG_ALLOW_EMISSION) == 0)) {
+      const MISPayload mis_payload = mis_payload_unpack(info.packed_mis_payload);
 
-    emission = scale_color(emission, mis_compute_weight_gi(mis_payload.sampling_probability, solid_angle, power));
+      const float area        = get_length(cross_product(edge1, edge2)) * 0.5f;
+      const float power       = color_importance(emission) * area;
+      const float solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_payload.origin);
+
+      emission = scale_color(emission, mis_compute_weight_gi(mis_payload.sampling_probability, solid_angle, power));
+    }
   }
 
   float roughness = mat.roughness;
@@ -128,7 +144,7 @@ __device__ MaterialContextGeometry geometry_get_context(
   roughness = fmaxf(roughness, BSDF_ROUGHNESS_CLAMP);
 
   // We clamp the roughness to avoid caustics which would never clean up.
-  if (!(task.state & STATE_FLAG_DELTA_PATH)) {
+  if ((info.task.state & STATE_FLAG_DELTA_PATH) == 0) {
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
@@ -145,7 +161,7 @@ __device__ MaterialContextGeometry geometry_get_context(
     flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
   }
 
-  if (task.state & STATE_FLAG_VOLUME_SCATTERED) {
+  if (info.task.state & STATE_FLAG_VOLUME_SCATTERED) {
     flags |= MATERIAL_FLAG_VOLUME_SCATTERED;
   }
 
@@ -155,7 +171,7 @@ __device__ MaterialContextGeometry geometry_get_context(
 
   const IORStackMethod ior_stack_method =
     (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(ior_stack, mat.refraction_index, ior_stack_method);
+  const float ray_ior = ior_stack_interact(info.ior_stack, mat.refraction_index, ior_stack_method);
 
   const float ior_in  = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
   const float ior_out = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
@@ -174,15 +190,15 @@ __device__ MaterialContextGeometry geometry_get_context(
   }
 
   MaterialContextGeometry ctx;
-  ctx.instance_id = handle.instance_id;
-  ctx.tri_id      = handle.tri_id;
+  ctx.instance_id = info.handle.instance_id;
+  ctx.tri_id      = info.handle.tri_id;
   ctx.albedo      = albedo;
   ctx.emission    = emission;
   ctx.normal      = transform_apply_rotation(trans, normal);
-  ctx.position    = task.origin;
-  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.position    = info.task.origin;
+  ctx.V           = scale_vector(info.task.ray, -1.0f);
   ctx.roughness   = roughness;
-  ctx.state       = task.state;
+  ctx.state       = info.task.state;
   ctx.flags       = flags;
   ctx.ior_in      = ior_in;
   ctx.ior_out     = ior_out;

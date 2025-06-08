@@ -25,10 +25,9 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= task_count)
     return;
 
-  const uint32_t task_base_address      = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
-  DeviceTask task                       = task_load(task_base_address);
-  const DeviceTaskTrace trace           = task_trace_load(task_base_address);
-  const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+  const uint32_t task_base_address = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
+  DeviceTask task                  = task_load(task_base_address);
+  const DeviceTaskTrace trace      = task_trace_load(task_base_address);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   if (direct_lighting_geometry_is_valid(task) == false)
@@ -37,8 +36,13 @@ extern "C" __global__ void __raygen__optix() {
 
   task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-  DeviceIORStack ior_stack          = trace.ior_stack;
-  const MaterialContextGeometry ctx = geometry_get_context(task, trace.handle, ior_stack, throughput.payload);
+  GeometryContextCreationInfo ctx_creation_info;
+  ctx_creation_info.task      = task;
+  ctx_creation_info.handle    = trace.handle;
+  ctx_creation_info.ior_stack = trace.ior_stack;
+  ctx_creation_info.hints     = GEOMETRY_CONTEXT_CREATION_HINT_DL;
+
+  const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
 
   ////////////////////////////////////////////////////////////////////
   // Light Ray Sampling
@@ -54,6 +58,8 @@ extern "C" __global__ void __raygen__optix() {
   accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx, task.index));
   accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
 #endif
+
+  const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
   accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
