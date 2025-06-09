@@ -488,6 +488,8 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   const bool is_gbuffer_meta_query =
     (sample_count->current_sample_count == 0) && (undersampling_stage <= (1 + device->constant_memory->settings.supersampling));
 
+  renderer->is_rendering_first_sample = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
+
   ////////////////////////////////////////////////////////////////////
   // Setup work
   ////////////////////////////////////////////////////////////////////
@@ -612,11 +614,22 @@ LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uin
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, DeviceRendererStatus* status) {
+LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* status) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(status);
 
-  *status = (renderer->tile_id == 0) ? DEVICE_RENDERER_STATUS_STARTING_NEW_SAMPLE : DEVICE_RENDERER_STATUS_IN_PROGRESS;
+  *status = DEVICE_RENDERER_STATUS_FLAGS_NONE;
+
+  if (renderer->tile_id == 0) {
+    *status |= DEVICE_RENDERER_STATUS_FLAGS_READY;
+  }
+  else {
+    *status |= DEVICE_RENDERER_STATUS_FLAGS_IN_PROGRESS;
+  }
+
+  if (renderer->is_rendering_first_sample) {
+    *status |= DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE;
+  }
 
   return LUMINARY_SUCCESS;
 }

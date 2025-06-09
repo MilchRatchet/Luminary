@@ -63,6 +63,7 @@ struct DeviceRendererPerKernelTimings {
 
 struct DeviceRenderer {
   uint32_t tile_id;
+  bool is_rendering_first_sample;
   ARRAY DeviceRendererQueueAction* prepass_queue;
   ARRAY DeviceRendererQueueAction* queue;
   ARRAY DeviceRendererQueueAction* postpass_queue;
@@ -83,7 +84,12 @@ struct DeviceRenderer {
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 } typedef DeviceRenderer;
 
-enum DeviceRendererStatus { DEVICE_RENDERER_STATUS_STARTING_NEW_SAMPLE, DEVICE_RENDERER_STATUS_IN_PROGRESS } typedef DeviceRendererStatus;
+enum DeviceRendererStatusFlags {
+  DEVICE_RENDERER_STATUS_FLAGS_NONE         = 0,
+  DEVICE_RENDERER_STATUS_FLAGS_READY        = (1 << 0),
+  DEVICE_RENDERER_STATUS_FLAGS_IN_PROGRESS  = (1 << 1),
+  DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE = (1 << 2)
+} typedef DeviceRendererStatusFlags;
 
 struct DeviceRendererQueueArgs {
   uint32_t max_depth;
@@ -107,7 +113,7 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_continue(DeviceRenderer* renderer
 DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time);
 LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id);
-LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, DeviceRendererStatus* status);
+LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* status_flags);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 
 #endif /* LUMINARY_DEVICE_RENDERER_H */

@@ -23,6 +23,15 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
     if (!success)
       return LUMINARY_SUCCESS;
 
+    if (entry.deferring_func) {
+      bool defer_execution;
+      __FAILURE_HANDLE(entry.deferring_func(device_manager, entry.args, &defer_execution));
+      if (defer_execution) {
+        __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+        continue;
+      }
+    }
+
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(device_manager->queue_wall_time));
 
@@ -289,6 +298,21 @@ static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
 
+static LuminaryResult _device_manager_handle_scene_updates_deferred_work(DeviceManager* device_manager, void* args, bool* defer_execution) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  LUM_UNUSED(args);
+
+  Device* device = device_manager->devices[device_manager->main_device_index];
+
+  uint32_t renderer_status;
+  __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
+
+  *defer_execution = (renderer_status & DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE) != 0;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceManager* device_manager, void* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
@@ -533,6 +557,7 @@ static LuminaryResult _device_manager_enable_device_queue_work(DeviceManager* de
   entry.name              = "Update device scene";
   entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
   entry.clear_func        = (QueueEntryFunction) 0;
+  entry.deferring_func    = (QueueEntryDeferringFunction) _device_manager_handle_scene_updates_deferred_work;
   entry.args              = (void*) 0;
   entry.remove_duplicates = true;
 
@@ -934,6 +959,7 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   entry.name              = "Update device scene";
   entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
   entry.clear_func        = (QueueEntryFunction) 0;
+  entry.deferring_func    = (QueueEntryDeferringFunction) _device_manager_handle_scene_updates_deferred_work;
   entry.args              = (void*) 0;
   entry.remove_duplicates = true;
 
