@@ -51,28 +51,28 @@ static const size_t device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEMB
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
-  offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   offsetof(DeviceConstantMemory, config),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
+  offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   sizeof(DeviceConstantMemory)                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
 
 static const size_t device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBER_COUNT] = {
-  sizeof(DevicePointers),               // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
-  sizeof(DeviceRendererSettings),       // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
-  sizeof(DeviceCamera),                 // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
-  sizeof(DeviceOcean),                  // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
-  sizeof(DeviceSky),                    // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
-  sizeof(DeviceCloud),                  // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
-  sizeof(DeviceFog),                    // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
-  sizeof(DeviceParticles),              // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  sizeof(OptixTraversableHandle) * 4,   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
-  sizeof(DeviceTextureObject) * 2,      // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
-  sizeof(DeviceTextureObject) * 4,      // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
-  sizeof(DeviceTextureObject) * 2,      // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
-  sizeof(DeviceTextureObject) * 4,      // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
-  sizeof(DeviceTextureObject) * 3,      // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
-  sizeof(DeviceExecutionState),         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
-  sizeof(DeviceExecutionConfiguration)  // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
+  sizeof(DevicePointers),                // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
+  sizeof(DeviceRendererSettings),        // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
+  sizeof(DeviceCamera),                  // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
+  sizeof(DeviceOcean),                   // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
+  sizeof(DeviceSky),                     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
+  sizeof(DeviceCloud),                   // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
+  sizeof(DeviceFog),                     // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
+  sizeof(DeviceParticles),               // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  sizeof(OptixTraversableHandle) * 4,    // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  sizeof(DeviceTextureObject) * 4,       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
+  sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  sizeof(DeviceTextureObject) * 4,       // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
+  sizeof(DeviceTextureObject) * 3,       // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  sizeof(DeviceExecutionConfiguration),  // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
+  sizeof(DeviceExecutionState)           // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
 };
 
 #define DEVICE_UPDATE_CONSTANT_MEMORY(member, value)                                              \
@@ -380,7 +380,7 @@ static LuminaryResult _device_update_constant_memory(Device* device) {
   size_t size;
   if (device->constant_memory_dirty.update_everything) {
     offset = 0;
-    size   = sizeof(DeviceConstantMemory);
+    size   = sizeof(DeviceConstantMemory) - sizeof(DeviceExecutionState);  // Exec state is updated separately by the renderer.
   }
   else {
     offset = device_cuda_const_memory_offsets[device->constant_memory_dirty.member];

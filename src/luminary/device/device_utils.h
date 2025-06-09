@@ -400,8 +400,8 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX,
-  DEVICE_CONSTANT_MEMORY_MEMBER_STATE,
   DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG,
+  DEVICE_CONSTANT_MEMORY_MEMBER_STATE,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 } typedef DeviceConstantMemoryMember;
@@ -447,10 +447,10 @@ struct DeviceConstantMemory {
   DeviceTextureObject cloud_noise_shape_tex;
   DeviceTextureObject cloud_noise_detail_tex;
   DeviceTextureObject cloud_noise_weather_tex;
-  // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
-  DeviceExecutionState state;
   // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   DeviceExecutionConfiguration config;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
+  DeviceExecutionState state;
 } typedef DeviceConstantMemory;
 
 #endif /* LUMINARY_DEVICE_UTILS_H */
