@@ -639,6 +639,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(light_tree_root);
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
+  __DEVICE_BUFFER_FREE(light_scene_data);
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
