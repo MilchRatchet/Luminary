@@ -6,7 +6,6 @@
 struct DeviceRendererWork {
   uint32_t event_id;
   uint32_t launch_id;
-  uint32_t tile_id;
   SampleCountSlice* sample_count;
   bool is_gbuffer_meta_query;
   DeviceRenderCallbackData* shared_callback_data;
@@ -220,10 +219,10 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
   // Prepass Queue
   ////////////////////////////////////////////////////////////////////
 
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE;
   __FAILURE_HANDLE(array_push(&renderer->prepass_queue, &action));
 
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
   __FAILURE_HANDLE(array_push(&renderer->prepass_queue, &action));
 
   ////////////////////////////////////////////////////////////////////
@@ -231,6 +230,9 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
   ////////////////////////////////////////////////////////////////////
 
   action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   switch (args->shading_mode) {
@@ -274,6 +276,7 @@ LuminaryResult device_renderer_register_callback(
 LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
   __CHECK_NULL_ARGUMENT(renderer);
 
+  renderer->tile_id = 0;
   renderer->render_id++;
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
@@ -365,7 +368,7 @@ static LuminaryResult _device_renderer_handle_queue_action(
       __FAILURE_HANDLE(device_update_dynamic_const_mem(device, work->sample_count->current_sample_count, 0xFFFF, 0xFFFF));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID:
-      __FAILURE_HANDLE(device_update_tile_id_const_mem(device, work->tile_id));
+      __FAILURE_HANDLE(device_update_tile_id_const_mem(device, renderer->tile_id));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
       __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
@@ -375,11 +378,14 @@ static LuminaryResult _device_renderer_handle_queue_action(
         work->is_gbuffer_meta_query = false;
       }
       break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION:
       CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, device->stream_main));
       CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
       CUDA_FAILURE_HANDLE(
         cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, work->shared_callback_data));
+      break;
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE:
+      CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
       if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
@@ -443,7 +449,7 @@ static LuminaryResult _device_renderer_execute_queue(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
+LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
 
@@ -462,8 +468,6 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   shared_callback_data->common          = renderer->common_callback_data;
   shared_callback_data->render_id       = renderer->render_id;
   shared_callback_data->render_event_id = renderer->event_id;
-
-  CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
 
   const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
@@ -491,7 +495,6 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   DeviceRendererWork work;
   work.event_id              = event_id;
   work.launch_id             = 0;
-  work.tile_id               = 0;
   work.sample_count          = sample_count;
   work.is_gbuffer_meta_query = is_gbuffer_meta_query;
   work.shared_callback_data  = shared_callback_data;
@@ -500,13 +503,18 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   // Execute
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->prepass_queue));
-
-  for (; work.tile_id < tile_count; work.tile_id++) {
-    __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->queue));
+  if (renderer->tile_id == 0) {
+    __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->prepass_queue));
   }
 
-  __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->postpass_queue));
+  __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->queue));
+  renderer->tile_id++;
+
+  if (renderer->tile_id == tile_count) {
+    __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->postpass_queue));
+
+    renderer->tile_id = 0;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Exit
@@ -600,6 +608,15 @@ LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uin
 
   // Event ID is the ID of the next event so we need to decrement.
   *event_id = renderer->event_id - 1;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, DeviceRendererStatus* status) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(status);
+
+  *status = (renderer->tile_id == 0) ? DEVICE_RENDERER_STATUS_STARTING_NEW_SAMPLE : DEVICE_RENDERER_STATUS_IN_PROGRESS;
 
   return LUMINARY_SUCCESS;
 }

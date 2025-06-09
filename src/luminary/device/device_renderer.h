@@ -17,7 +17,8 @@ enum DeviceRendererQueueActionType {
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE
 } typedef DeviceRendererQueueActionType;
 
@@ -61,7 +62,7 @@ struct DeviceRendererPerKernelTimings {
 #define DEVICE_RENDERER_TIMING_EVENTS_MASK (DEVICE_RENDERER_TIMING_EVENTS_COUNT - 1)
 
 struct DeviceRenderer {
-  uint32_t action_ptr;
+  uint32_t tile_id;
   ARRAY DeviceRendererQueueAction* prepass_queue;
   ARRAY DeviceRendererQueueAction* queue;
   ARRAY DeviceRendererQueueAction* postpass_queue;
@@ -82,6 +83,8 @@ struct DeviceRenderer {
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 } typedef DeviceRenderer;
 
+enum DeviceRendererStatus { DEVICE_RENDERER_STATUS_STARTING_NEW_SAMPLE, DEVICE_RENDERER_STATUS_IN_PROGRESS } typedef DeviceRendererStatus;
+
 struct DeviceRendererQueueArgs {
   uint32_t max_depth;
   bool render_particles;
@@ -100,10 +103,11 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer
 DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(
   DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time);
 LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id);
+LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, DeviceRendererStatus* status);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 
 #endif /* LUMINARY_DEVICE_RENDERER_H */

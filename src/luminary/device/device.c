@@ -1611,7 +1611,7 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
   __FAILURE_HANDLE(device_sync_constant_memory(device));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
-  __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
+  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device, &device->sample_count));
   __FAILURE_HANDLE(device_post_apply(device->post, device));
   __FAILURE_HANDLE(device_renderer_get_latest_event_id(device->renderer, &renderer_event_id));
   __FAILURE_HANDLE(device_output_generate_output(device->output, device, renderer_event_id));
@@ -1650,6 +1650,13 @@ LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* 
 
   DEVICE_ASSERT_AVAILABLE
 
+  DeviceRendererStatus renderer_status;
+  __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
+
+  // We can only finish the render iteration if we are next up starting a new sample.
+  if (renderer_status != DEVICE_RENDERER_STATUS_STARTING_NEW_SAMPLE)
+    return LUMINARY_SUCCESS;
+
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   uint32_t new_undersampling_state;
@@ -1687,7 +1694,7 @@ LuminaryResult device_continue_render(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
+  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device, &device->sample_count));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1714,6 +1721,13 @@ LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterfac
   __CHECK_NULL_ARGUMENT(interface);
 
   DEVICE_ASSERT_AVAILABLE
+
+  DeviceRendererStatus renderer_status;
+  __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
+
+  // Only gather results between samples.
+  if (renderer_status != DEVICE_RENDERER_STATUS_STARTING_NEW_SAMPLE)
+    return LUMINARY_SUCCESS;
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
