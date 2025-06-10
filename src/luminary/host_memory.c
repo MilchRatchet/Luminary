@@ -253,12 +253,12 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
   const uint64_t prev_total = atomic_fetch_sub(&_host_memory_total_allocation, header->size);
   LUM_UNUSED(prev_total);
 
-  free(header);
-
 #ifdef LUMINARY_MEMORY_DEBUG
   _debug_memory_allocation_remove(*ptr, buf_name, func, line, size);
   luminary_print_log("Free    %012llu [Total: %012llu] [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
 #endif /* LUMINARY_MEMORY_DEBUG */
+
+  free(header);
 
   *ptr = (void*) 0;
 
