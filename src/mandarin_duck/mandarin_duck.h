@@ -6,13 +6,13 @@
 
 enum MandarinDuckMode { MANDARIN_DUCK_MODE_DEFAULT, MANDARIN_DUCK_MODE_BENCHMARK, MANDARIN_DUCK_MODE_COUNT } typedef MandarinDuckMode;
 
-struct MandarinDuckCreateArgs {
+struct MandarinDuckCreateInfo {
   LuminaryHost* host;
   const char* output_directory;
   MandarinDuckMode mode;
   uint32_t num_benchmark_outputs;
   const char* benchmark_name;
-} typedef MandarinDuckCreateArgs;
+} typedef MandarinDuckCreateInfo;
 
 struct MandarinDuck {
   MandarinDuckMode mode;
@@ -23,7 +23,7 @@ struct MandarinDuck {
   const char* benchmark_name;
 } typedef MandarinDuck;
 
-void mandarin_duck_create(MandarinDuck** duck, MandarinDuckCreateArgs args);
+void mandarin_duck_create(MandarinDuck** duck, MandarinDuckCreateInfo args);
 void mandarin_duck_run(MandarinDuck* duck);
 void mandarin_duck_destroy(MandarinDuck** duck);
 

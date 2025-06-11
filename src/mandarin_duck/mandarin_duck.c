@@ -48,17 +48,17 @@ static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* ho
   LUM_FAILURE_HANDLE(array_clear(file_drop_array));
 }
 
-void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
+void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateInfo info) {
   MD_CHECK_NULL_ARGUMENT(_duck);
-  MD_CHECK_NULL_ARGUMENT(args.host);
+  MD_CHECK_NULL_ARGUMENT(info.host);
 
   MandarinDuck* duck;
   LUM_FAILURE_HANDLE(host_malloc(&duck, sizeof(MandarinDuck)));
   memset(duck, 0, sizeof(MandarinDuck));
 
-  duck->mode             = args.mode;
-  duck->host             = args.host;
-  duck->output_directory = args.output_directory;
+  duck->mode             = info.mode;
+  duck->host             = info.host;
+  duck->output_directory = info.output_directory;
 
   switch (duck->mode) {
     case MANDARIN_DUCK_MODE_DEFAULT: {
@@ -73,11 +73,11 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
       LuminaryRendererSettings renderer_settings;
       LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
 
-      duck->benchmark_name = args.benchmark_name;
+      duck->benchmark_name = info.benchmark_name;
 
-      LUM_FAILURE_HANDLE(array_create(&duck->benchmark_output_promises, sizeof(LuminaryOutputPromiseHandle), args.num_benchmark_outputs));
+      LUM_FAILURE_HANDLE(array_create(&duck->benchmark_output_promises, sizeof(LuminaryOutputPromiseHandle), info.num_benchmark_outputs));
 
-      const uint32_t num_exponential_outputs = (args.num_benchmark_outputs < 5) ? args.num_benchmark_outputs : 5;
+      const uint32_t num_exponential_outputs = (info.num_benchmark_outputs < 5) ? info.num_benchmark_outputs : 5;
 
       for (uint32_t output_id = 0; output_id <= num_exponential_outputs; output_id++) {
         LuminaryOutputRequestProperties properties;
@@ -100,8 +100,8 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateArgs args) {
         }
       }
 
-      if (args.num_benchmark_outputs > 5) {
-        const uint32_t max_sample_count   = 1 << args.num_benchmark_outputs;
+      if (info.num_benchmark_outputs > 5) {
+        const uint32_t max_sample_count   = 1 << info.num_benchmark_outputs;
         const uint32_t start_sample_count = 1 << 6;
 
         for (uint32_t sample_count = start_sample_count; sample_count <= max_sample_count; sample_count += 32) {

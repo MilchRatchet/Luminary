@@ -310,33 +310,33 @@ static LuminaryResult _host_set_scene_entity_entry(Host* host, void* object, Sce
 // External API implementation
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult luminary_host_create(Host** _host) {
-  __CHECK_NULL_ARGUMENT(_host);
+LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
+  __CHECK_NULL_ARGUMENT(host);
 
-  Host* host;
-  __FAILURE_HANDLE(host_malloc(&host, sizeof(Host)));
-  memset(host, 0, sizeof(Host));
+  __FAILURE_HANDLE(host_malloc(host, sizeof(Host)));
+  memset(*host, 0, sizeof(Host));
 
-  __FAILURE_HANDLE(output_handler_create(&host->output_handler));
+  __FAILURE_HANDLE(output_handler_create(&(*host)->output_handler));
 
-  __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
-  __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
+  __FAILURE_HANDLE(array_create(&(*host)->meshes, sizeof(Mesh*), 16));
+  __FAILURE_HANDLE(array_create(&(*host)->textures, sizeof(Texture*), 16));
 
-  __FAILURE_HANDLE(scene_create(&host->scene_caller));
-  __FAILURE_HANDLE(scene_create(&host->scene_host));
+  __FAILURE_HANDLE(scene_create(&(*host)->scene_caller));
+  __FAILURE_HANDLE(scene_create(&(*host)->scene_host));
 
-  __FAILURE_HANDLE(thread_create(&host->work_thread));
-  __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
-  __FAILURE_HANDLE(ringbuffer_create(&host->ringbuffer, HOST_RINGBUFFER_SIZE));
-  __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
+  __FAILURE_HANDLE(thread_create(&(*host)->work_thread));
+  __FAILURE_HANDLE(queue_create(&(*host)->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
+  __FAILURE_HANDLE(ringbuffer_create(&(*host)->ringbuffer, HOST_RINGBUFFER_SIZE));
+  __FAILURE_HANDLE(wall_time_create(&(*host)->queue_wall_time));
 
-  __FAILURE_HANDLE(device_manager_create(&host->device_manager, host));
+  DeviceManagerCreateInfo device_manager_create_info;
+  device_manager_create_info.device_mask = info.device_mask;
 
-  host->enable_output = false;
+  __FAILURE_HANDLE(device_manager_create(&(*host)->device_manager, *host, device_manager_create_info));
 
-  __FAILURE_HANDLE(thread_start(host->work_thread, (ThreadMainFunc) _host_queue_worker, host));
+  (*host)->enable_output = false;
 
-  *_host = host;
+  __FAILURE_HANDLE(thread_start((*host)->work_thread, (ThreadMainFunc) _host_queue_worker, *host));
 
   return LUMINARY_SUCCESS;
 }

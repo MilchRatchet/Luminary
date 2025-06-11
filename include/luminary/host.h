@@ -26,7 +26,7 @@
 struct LuminaryHost;
 typedef struct LuminaryHost LuminaryHost;
 
-LUMINARY_API LuminaryResult luminary_host_create(LuminaryHost** host);
+LUMINARY_API LuminaryResult luminary_host_create(LuminaryHost** host, LuminaryHostCreateInfo info);
 LUMINARY_API LuminaryResult luminary_host_destroy(LuminaryHost** host);
 
 LUMINARY_API LuminaryResult luminary_host_get_device_count(LuminaryHost* host, uint32_t* device_count);

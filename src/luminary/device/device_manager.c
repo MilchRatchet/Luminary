@@ -769,7 +769,7 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
 // API functions
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host) {
+LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host, DeviceManagerCreateInfo info) {
   __CHECK_NULL_ARGUMENT(_device_manager);
   __CHECK_NULL_ARGUMENT(host);
 
@@ -791,6 +791,9 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   for (int32_t device_id = 0; device_id < device_count; device_id++) {
     Device* device;
     __FAILURE_HANDLE(device_create(&device, device_id));
+
+    if (device->state != DEVICE_STATE_UNAVAILABLE)
+      device->state = ((info.device_mask & (1 << device->index)) != 0) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
 
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
