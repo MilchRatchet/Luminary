@@ -30,7 +30,7 @@
 #define LIGHT_TREE_MAX_CHILDREN_PER_SECTION 8
 #define LIGHT_TREE_CHILDREN_PER_NODE 8
 #define LIGHT_TREE_NODE_SECTION_REL_SIZE (sizeof(DeviceLightTreeRootSection) / sizeof(DeviceLightTreeRootHeader))
-#define LIGHT_GEO_MAX_SAMPLES 4
+#define LIGHT_GEO_MAX_SAMPLES 8
 #define LIGHT_GEO_MAX_BRIDGE_LENGTH 8
 #define LIGHT_SUN_CAUSTICS_MAX_SAMPLES 128
 #define LIGHT_NUM_MICROTRIANGLES 64
@@ -240,7 +240,7 @@ struct DeviceLightTreeNode {
   int8_t exp_x;
   int8_t exp_y;
   int8_t exp_z;
-  int8_t exp_variance;
+  int8_t exp_std_dev;
   uint8_t num_lights;
   uint8_t padding1;
   uint16_t padding2;
@@ -249,7 +249,7 @@ struct DeviceLightTreeNode {
   uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_variance[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_std_dev[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
@@ -265,7 +265,7 @@ struct DeviceLightTreeRootHeader {
   int8_t exp_x;
   int8_t exp_y;
   int8_t exp_z;
-  int8_t exp_variance;
+  int8_t exp_std_dev;
 } typedef DeviceLightTreeRootHeader;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootHeader, 0x10);
 
@@ -273,7 +273,7 @@ struct DeviceLightTreeRootSection {
   uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_variance[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_std_dev[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint16_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
 } typedef DeviceLightTreeRootSection;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
@@ -285,6 +285,7 @@ struct MISPayload {
 
 struct DeviceLightSceneData {
   float total_power;
+  uint32_t num_lights;
 } typedef DeviceLightSceneData;
 
 #define MAX_NUM_INDIRECT_BUCKETS 3

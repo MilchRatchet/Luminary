@@ -121,11 +121,14 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
     if (color_any(emission) && ((info.task.state & STATE_FLAG_ALLOW_EMISSION) == 0)) {
       const MISPayload mis_payload = mis_payload_unpack(info.packed_mis_payload);
 
-      const float area        = get_length(cross_product(edge1, edge2)) * 0.5f;
-      const float power       = color_importance(emission) * area;
-      const float solid_angle = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_payload.origin);
+      const float area          = get_length(cross_product(edge1, edge2)) * 0.5f;
+      const float power         = color_importance(emission) * area;
+      const float solid_angle   = light_triangle_get_solid_angle_generic(vertex, edge1, edge2, mis_payload.origin);
+      const vec3 light_center   = add_vector(vertex, add_vector(scale_vector(edge1, 1.0f / 3.0f), scale_vector(edge2, 1.0f / 3.0f)));
+      const vec3 diff_to_center = sub_vector(mis_payload.origin, light_center);
+      const float dist_sq       = dot_product(diff_to_center, diff_to_center);
 
-      emission = scale_color(emission, mis_compute_weight_gi(mis_payload.sampling_probability, solid_angle, power));
+      emission = scale_color(emission, mis_compute_weight_gi(mis_payload.sampling_probability, solid_angle, power, dist_sq));
     }
   }
 

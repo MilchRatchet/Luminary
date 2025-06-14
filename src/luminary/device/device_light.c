@@ -18,7 +18,7 @@
 // #define LIGHT_COMPUTE_VMF_DISTRIBUTIONS
 
 // #define LIGHT_TREE_UNIFORM_WEIGHTING
-#define LIGHT_TREE_USE_BOUND_AS_VARIANCE
+// #define LIGHT_TREE_USE_BOUND_AS_VARIANCE
 
 #define LIGHT_TREE_MAX_LEAF_TRIANGLE_COUNT (1)
 #define LIGHT_TREE_BINARY_INDEX_NULL (0xFFFFFFFF)
@@ -72,7 +72,6 @@ struct LightTreeNode {
   uint32_t child_ptr;
   uint32_t light_ptr;
   uint32_t light_count;
-  float cost;
 } typedef LightTreeNode;
 
 struct LightTreeChildNode {
@@ -101,7 +100,7 @@ struct Bin {
   uint32_t padding;
 } typedef Bin;
 
-#define OBJECT_SPLIT_BIN_COUNT_LOG (6)
+#define OBJECT_SPLIT_BIN_COUNT_LOG (5)
 #define OBJECT_SPLIT_BIN_COUNT (1 << OBJECT_SPLIT_BIN_COUNT_LOG)
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
@@ -317,9 +316,8 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       Vec128 high_parent, low_parent;
       _light_tree_fit_bounds(fragments + fragments_ptr, fragments_count, &high_parent, &low_parent);
 
-      const Vec128 diff               = vec128_set_w_to_0(vec128_sub(high_parent, low_parent));
-      const float max_axis_interval   = vec128_hmax(diff);
-      const float parent_surface_area = vec128_box_area(diff);
+      const Vec128 diff             = vec128_set_w_to_0(vec128_sub(high_parent, low_parent));
+      const float max_axis_interval = vec128_hmax(diff);
 
       Vec128 high, low;
       double optimal_cost = DBL_MAX;
@@ -367,7 +365,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
           const float left_area  = vec128_box_area(vec128_set_w_to_0(diff_left));
           const float right_area = vec128_box_area(vec128_set_w_to_0(diff_right));
 
-          const double total_cost = interval_cost * (left_power * left_area + right_power * right_area) / parent_surface_area;
+          const double total_cost = interval_cost * (left_power * left_area + right_power * right_area);
 
           left += bins[k - 1].entry;
 
@@ -560,7 +558,7 @@ static LuminaryResult _lights_get_vmf_and_mean_and_variance(
   *vmf_sharpness = (3.0f * avg_dir_norm - avg_dir_norm * avg_dir_norm * avg_dir_norm) / (1.0f - avg_dir_norm * avg_dir_norm);
 #endif /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
   *mean     = (vec3) {.x = p.x, .y = p.y, .z = p.z};
-  *variance = sqrtf(spatial_variance);
+  *variance = spatial_variance;
 
   return LUMINARY_SUCCESS;
 }
@@ -606,19 +604,6 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
       default:
         __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Encountered illegal node type!");
     }
-
-    const float mean_dist = (node.left_mean.x - node.right_mean.x) * (node.left_mean.x - node.right_mean.x)
-                            + (node.left_mean.y - node.right_mean.y) * (node.left_mean.y - node.right_mean.y)
-                            + (node.left_mean.z - node.right_mean.z) * (node.left_mean.z - node.right_mean.z);
-    const float left_weight  = node.left_power / (node.left_power + node.right_power);
-    const float right_weight = node.right_power / (node.left_power + node.right_power);
-
-    const float self_variance =
-      left_weight * node.left_variance + right_weight * node.right_variance + left_weight * right_weight * mean_dist;
-
-    const float variance_reduction = (node.left_variance + node.right_variance) / self_variance;
-
-    node.cost = self_variance / variance_reduction;
 
     nodes[i] = node;
   }
@@ -729,7 +714,8 @@ static LuminaryResult _light_tree_collapse_binary_node(
       if (binary_node.light_count == 1)
         continue;
 
-      const float cost_this_node = (binary_node.left_power + binary_node.right_power) * binary_node.cost;
+      const float cost_this_node =
+        (binary_node.left_power + binary_node.right_power) * (binary_node.left_variance + binary_node.right_variance);
 
       if (cost_this_node > optimal_cost) {
         optimal_cost          = cost_this_node;
@@ -880,6 +866,8 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
     max_power    = fmaxf(max_power, children[child_ptr].power);
   }
 
+  const float max_std_dev = sqrtf(max_variance);
+
   __DEBUG_ASSERT(child_count > 0);
 
   DeviceLightTreeRootHeader header;
@@ -893,15 +881,15 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
   min_mean.y = device_unpack_float(header.y);
   min_mean.z = device_unpack_float(header.z);
 
-  header.exp_x        = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 255.0f)) : 0;
-  header.exp_y        = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
-  header.exp_z        = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
-  header.exp_variance = (int8_t) ceilf(log2f(max_variance * 1.0f / 255.0f));
+  header.exp_x       = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 255.0f)) : 0;
+  header.exp_y       = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
+  header.exp_z       = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
+  header.exp_std_dev = (int8_t) ceilf(log2f(max_std_dev * 1.0f / 255.0f));
 
   const float compression_x = 1.0f / exp2f(header.exp_x);
   const float compression_y = 1.0f / exp2f(header.exp_y);
   const float compression_z = 1.0f / exp2f(header.exp_z);
-  const float compression_v = 1.0f / exp2f(header.exp_variance);
+  const float compression_v = 1.0f / exp2f(header.exp_std_dev);
 
   header.num_sections    = (child_count + LIGHT_TREE_MAX_CHILDREN_PER_SECTION - 1) / LIGHT_TREE_MAX_CHILDREN_PER_SECTION;
   header.num_root_lights = num_lights;
@@ -914,7 +902,7 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
   info_message("Max: (%f, %f, %f)", max_mean.x, max_mean.y, max_mean.z);
   info_message(
     "Exponents: %d %d %d => %f %f %f | %d => %f", header.exp_x, header.exp_y, header.exp_z, 1.0f / compression_x, 1.0f / compression_y,
-    1.0f / compression_z, header.exp_variance, 1.0f / compression_v);
+    1.0f / compression_z, header.exp_std_dev, 1.0f / compression_v);
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
   __FAILURE_HANDLE(array_push(&cwork->root, &header));
@@ -929,26 +917,26 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
     for (uint32_t child_id = child_id_start; child_id < child_id_end; child_id++) {
       const LightTreeChildNode child_node = children[child_id];
 
-      uint64_t child_rel_mean_x   = (uint64_t) floorf((child_node.mean.x - min_mean.x) * compression_x + 0.5f);
-      uint64_t child_rel_mean_y   = (uint64_t) floorf((child_node.mean.y - min_mean.y) * compression_y + 0.5f);
-      uint64_t child_rel_mean_z   = (uint64_t) floorf((child_node.mean.z - min_mean.z) * compression_z + 0.5f);
-      uint64_t child_rel_variance = (uint64_t) (child_node.variance * compression_v + 0.5f);
-      uint64_t child_rel_power    = (uint64_t) floorf(0xFFFF * child_node.power / max_power + 0.5f);
+      uint64_t child_rel_mean_x  = (uint64_t) floorf((child_node.mean.x - min_mean.x) * compression_x + 0.5f);
+      uint64_t child_rel_mean_y  = (uint64_t) floorf((child_node.mean.y - min_mean.y) * compression_y + 0.5f);
+      uint64_t child_rel_mean_z  = (uint64_t) floorf((child_node.mean.z - min_mean.z) * compression_z + 0.5f);
+      uint64_t child_rel_std_dev = (uint64_t) (sqrtf(child_node.variance) * compression_v + 0.5f);
+      uint64_t child_rel_power   = (uint64_t) floorf(0xFFFF * child_node.power / max_power + 0.5f);
 
       __DEBUG_ASSERT((child_rel_mean_x & 0xFF) == child_rel_mean_x);
       __DEBUG_ASSERT((child_rel_mean_y & 0xFF) == child_rel_mean_y);
       __DEBUG_ASSERT((child_rel_mean_z & 0xFF) == child_rel_mean_z);
-      __DEBUG_ASSERT((child_rel_variance & 0xFF) == child_rel_variance);
+      __DEBUG_ASSERT((child_rel_std_dev & 0xFF) == child_rel_std_dev);
       __DEBUG_ASSERT((child_rel_power & 0xFFFF) == child_rel_power);
 
       // Power may not be zero as zero implies NULL node and a node with 0 power cannot be sampled.
-      child_rel_variance = max(child_rel_variance, 1);
-      child_rel_power    = max(child_rel_power, 1);
+      child_rel_std_dev = max(child_rel_std_dev, 1);
+      child_rel_power   = max(child_rel_power, 1);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
       info_message(
         "[%u] %llX %llX %llX %llX %llX %s", child_id, child_rel_mean_x, child_rel_mean_y, child_rel_mean_z, child_rel_power,
-        child_rel_variance, child_node.is_leaf ? "LEAF" : "");
+        child_rel_std_dev, child_node.is_leaf ? "LEAF" : "");
 
       {
         // Check error of compressed mean
@@ -973,11 +961,12 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
       }
 
       {
-        // Check error of variance
-        const float decompression_v       = exp2f(header.exp_variance);
-        const float decompressed_variance = child_rel_variance * decompression_v;
+        // Check error of standard deviation
+        const float decompression_v      = exp2f(header.exp_std_dev);
+        const float decompressed_std_dev = child_rel_std_dev * decompression_v;
 
-        info_message("    %f => %f [Err: %f]", child_node.variance, decompressed_variance, child_node.variance - decompressed_variance);
+        info_message(
+          "    %f => %f [Err: %f]", sqrtf(child_node.variance), decompressed_std_dev, sqrtf(child_node.variance) - decompressed_std_dev);
       }
 
       {
@@ -990,11 +979,11 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
 
       const uint32_t section_child_id = child_id - section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION;
 
-      section.rel_mean_x[section_child_id]   = child_rel_mean_x;
-      section.rel_mean_y[section_child_id]   = child_rel_mean_y;
-      section.rel_mean_z[section_child_id]   = child_rel_mean_z;
-      section.rel_variance[section_child_id] = child_rel_variance;
-      section.rel_power[section_child_id]    = child_rel_power;
+      section.rel_mean_x[section_child_id]  = child_rel_mean_x;
+      section.rel_mean_y[section_child_id]  = child_rel_mean_y;
+      section.rel_mean_z[section_child_id]  = child_rel_mean_z;
+      section.rel_std_dev[section_child_id] = child_rel_std_dev;
+      section.rel_power[section_child_id]   = child_rel_power;
     }
 
     for (uint32_t section_part = 0; section_part < LIGHT_TREE_NODE_SECTION_REL_SIZE; section_part++) {
@@ -1059,6 +1048,8 @@ static LuminaryResult _light_tree_collapse_nodes(LightTreeCollapseWork* cwork, c
       max_power    = fmaxf(max_power, children[child_ptr].power);
     }
 
+    const float max_std_dev = sqrtf(max_variance);
+
     __DEBUG_ASSERT(child_count > 0);
 
     DeviceLightTreeNode node;
@@ -1076,40 +1067,40 @@ static LuminaryResult _light_tree_collapse_nodes(LightTreeCollapseWork* cwork, c
     min_mean.y = device_unpack_float(node.y);
     min_mean.z = device_unpack_float(node.z);
 
-    node.exp_x        = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 255.0f)) : 0;
-    node.exp_y        = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
-    node.exp_z        = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
-    node.exp_variance = (int8_t) ceilf(log2f(max_variance * 1.0f / 255.0f));
+    node.exp_x       = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 255.0f)) : 0;
+    node.exp_y       = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
+    node.exp_z       = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
+    node.exp_std_dev = (int8_t) ceilf(log2f(max_std_dev * 1.0f / 255.0f));
 
     const float compression_x = 1.0f / exp2f(node.exp_x);
     const float compression_y = 1.0f / exp2f(node.exp_y);
     const float compression_z = 1.0f / exp2f(node.exp_z);
-    const float compression_v = 1.0f / exp2f(node.exp_variance);
+    const float compression_v = 1.0f / exp2f(node.exp_std_dev);
 
     for (uint32_t child_id = 0; child_id < child_count; child_id++) {
       const LightTreeChildNode child_node = children[child_id];
 
-      uint64_t child_rel_mean_x   = (uint64_t) floorf((child_node.mean.x - min_mean.x) * compression_x + 0.5f);
-      uint64_t child_rel_mean_y   = (uint64_t) floorf((child_node.mean.y - min_mean.y) * compression_y + 0.5f);
-      uint64_t child_rel_mean_z   = (uint64_t) floorf((child_node.mean.z - min_mean.z) * compression_z + 0.5f);
-      uint64_t child_rel_variance = (uint64_t) (child_node.variance * compression_v + 0.5f);
-      uint64_t child_rel_power    = (uint64_t) floorf(0xFF * child_node.power / max_power + 0.5f);
+      uint64_t child_rel_mean_x  = (uint64_t) floorf((child_node.mean.x - min_mean.x) * compression_x + 0.5f);
+      uint64_t child_rel_mean_y  = (uint64_t) floorf((child_node.mean.y - min_mean.y) * compression_y + 0.5f);
+      uint64_t child_rel_mean_z  = (uint64_t) floorf((child_node.mean.z - min_mean.z) * compression_z + 0.5f);
+      uint64_t child_rel_std_dev = (uint64_t) (sqrtf(child_node.variance) * compression_v + 0.5f);
+      uint64_t child_rel_power   = (uint64_t) floorf(0xFF * child_node.power / max_power + 0.5f);
 
       // Power may not be zero as zero implies NULL node and a node with 0 power cannot be sampled.
-      child_rel_variance = max(child_rel_variance, 1);
-      child_rel_power    = max(child_rel_power, 1);
+      child_rel_std_dev = max(child_rel_std_dev, 1);
+      child_rel_power   = max(child_rel_power, 1);
 
       __DEBUG_ASSERT((child_rel_mean_x & 0xFF) == child_rel_mean_x);
       __DEBUG_ASSERT((child_rel_mean_y & 0xFF) == child_rel_mean_y);
       __DEBUG_ASSERT((child_rel_mean_z & 0xFF) == child_rel_mean_z);
-      __DEBUG_ASSERT((child_rel_variance & 0xFF) == child_rel_variance);
+      __DEBUG_ASSERT((child_rel_std_dev & 0xFF) == child_rel_std_dev);
       __DEBUG_ASSERT((child_rel_power & 0xFF) == child_rel_power);
 
-      node.rel_mean_x[child_id]   = child_rel_mean_x;
-      node.rel_mean_y[child_id]   = child_rel_mean_y;
-      node.rel_mean_z[child_id]   = child_rel_mean_z;
-      node.rel_variance[child_id] = child_rel_variance;
-      node.rel_power[child_id]    = child_rel_power;
+      node.rel_mean_x[child_id]  = child_rel_mean_x;
+      node.rel_mean_y[child_id]  = child_rel_mean_y;
+      node.rel_mean_z[child_id]  = child_rel_mean_z;
+      node.rel_std_dev[child_id] = child_rel_std_dev;
+      node.rel_power[child_id]   = child_rel_power;
     }
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
@@ -1119,7 +1110,7 @@ static LuminaryResult _light_tree_collapse_nodes(LightTreeCollapseWork* cwork, c
     info_message("Max: (%f, %f, %f)", max_mean.x, max_mean.y, max_mean.z);
     info_message(
       "Exponents: %d %d %d => %f %f %f | %d => %f", node.exp_x, node.exp_y, node.exp_z, 1.0f / compression_x, 1.0f / compression_y,
-      1.0f / compression_z, node.exp_variance, 1.0f / compression_v);
+      1.0f / compression_z, node.exp_std_dev, 1.0f / compression_v);
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
     __FAILURE_HANDLE(array_push(&cwork->nodes, &node));
@@ -2191,7 +2182,27 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
     fragment_offset += num_fragments;
   }
 
-  tree->scene_data.total_power = total_power / total_fragments;
+  Vec128 mean = vec128_set_1(0.0f);
+
+  for (uint32_t fragment_id = 0; fragment_id < total_fragments; fragment_id++) {
+    const LightTreeFragment fragment = work->fragments[fragment_id];
+
+    mean = vec128_add(mean, vec128_scale(fragment.middle, fragment.power / total_power));
+  }
+
+  float sum_one_over_distance_sq = 0.0f;
+
+  for (uint32_t fragment_id = 0; fragment_id < total_fragments; fragment_id++) {
+    const LightTreeFragment fragment = work->fragments[fragment_id];
+
+    const Vec128 diff   = vec128_sub(fragment.middle, mean);
+    const float dist_sq = vec128_dot(diff, diff);
+
+    sum_one_over_distance_sq += (1.0f / dist_sq) * (fragment.power / total_power);
+  }
+
+  tree->scene_data.total_power = total_power * sum_one_over_distance_sq;
+  tree->scene_data.num_lights  = total_fragments;
 
   return LUMINARY_SUCCESS;
 }

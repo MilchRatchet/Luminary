@@ -7,7 +7,7 @@
 #include "ris.cuh"
 #include "utils.cuh"
 
-#define LIGHT_TREE_NUM_OUTPUTS 4
+#define LIGHT_TREE_NUM_OUTPUTS 8
 #define LIGHT_TREE_INVALID_NODE 0xFFFFFF
 #define LIGHT_TREE_SELECTED_IS_LIGHT 0x80000000
 #define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
@@ -65,18 +65,19 @@ struct LightTreeWork {
 #endif /* LIGHT_TREE_DEBUG_TRAVERSAL */
 
 template <MaterialType TYPE>
-__device__ float light_tree_importance(const MaterialContext<TYPE> ctx, const float power, const vec3 mean, const float radius);
+__device__ float light_tree_importance(const MaterialContext<TYPE> ctx, const float power, const vec3 mean, const float std_dev);
 
 template <>
 __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
-  const MaterialContextGeometry ctx, const float power, const vec3 mean, const float radius) {
+  const MaterialContextGeometry ctx, const float power, const vec3 mean, const float std_dev) {
   const vec3 PO       = sub_vector(mean, ctx.position);
-  const float dist_sq = fmaxf(dot_product(PO, PO), radius * radius);
+  const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
 
   float NdotL = 1.0f;
   if (MATERIAL_IS_SUBSTRATE_OPAQUE(ctx.flags)) {
-    const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.normal, radius)), ctx.position));
+    const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.normal, 2.0f * std_dev)), ctx.position));
     NdotL        = __saturatef(dot_product(L, ctx.normal));
+    NdotL        = NdotL * 0.95f + 0.05f;
   }
 
   return power * NdotL * (1.0f / dist_sq);
@@ -84,32 +85,30 @@ __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
 
 template <>
 __device__ float light_tree_importance<MATERIAL_VOLUME>(
-  const MaterialContextVolume ctx, const float power, const vec3 mean, const float radius) {
-  const vec3 PO = sub_vector(mean, ctx.position);
-
-  // Compute the point along our ray that is closest to the child point.
-  const float t            = -fminf(dot_product(PO, ctx.V), 0.0f);
-  const vec3 closest_point = add_vector(ctx.position, scale_vector(ctx.V, t));
-
+  const MaterialContextVolume ctx, const float power, const vec3 mean, const float std_dev) {
+  const vec3 PO    = sub_vector(mean, ctx.position);
   const float dist = sqrtf(dot_product(PO, PO));
 
-  const vec3 shift_vector = normalize_vector(sub_vector(closest_point, mean));
+  float transmittance = 1.0f;
+  if (dist > std_dev) {
+    const float t = dist - std_dev;
 
-  const float dist_clamped = fmaxf(dist, radius);
+    const float extinction = color_importance(ctx.descriptor.absorption) + color_importance(ctx.descriptor.scattering);
+    transmittance          = expf(-extinction * t);
+  }
 
-  // We shift the center of the child towards and along the ray based on the radius.
-  const vec3 reference_point = add_vector(scale_vector(sub_vector(shift_vector, ctx.V), radius), mean);
+  const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.V, -2.0f * std_dev)), ctx.position));
+  float NdotL  = __saturatef(-dot_product(L, ctx.V));
+  NdotL        = NdotL * 0.95f + 0.05f;
 
-  const float angle_term = (1.0f - dot_product(ctx.V, normalize_vector(sub_vector(reference_point, ctx.position))));
-
-  return power * angle_term / dist_clamped;
+  return power * NdotL * transmittance;
 }
 
 template <>
 __device__ float light_tree_importance<MATERIAL_PARTICLE>(
-  const MaterialContextParticle ctx, const float power, const vec3 mean, const float radius) {
+  const MaterialContextParticle ctx, const float power, const vec3 mean, const float std_dev) {
   const vec3 PO       = sub_vector(mean, ctx.position);
-  const float dist_sq = fmaxf(dot_product(PO, PO), radius * radius);
+  const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
 
   return power / dist_sq;
 }
@@ -121,12 +120,12 @@ __device__ float light_tree_child_importance(
   if (section.rel_power[i] == 0)
     return 0.0f;
 
-  const float power    = (float) section.rel_power[i];
-  const float variance = section.rel_variance[i] * exp_v;
+  const float power   = (float) section.rel_power[i];
+  const float std_dev = section.rel_std_dev[i] * exp_v;
 
   const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
 
-  return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, variance), 0.0f);
+  return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
 
 template <MaterialType TYPE>
@@ -135,12 +134,12 @@ __device__ float light_tree_child_importance(
   if (node.rel_power[i] == 0)
     return 0.0f;
 
-  const float power    = (float) node.rel_power[i];
-  const float variance = node.rel_variance[i] * exp_v;
+  const float power   = (float) node.rel_power[i];
+  const float std_dev = node.rel_std_dev[i] * exp_v;
 
   const vec3 mean = add_vector(mul_vector(get_vector(node.rel_mean_x[i], node.rel_mean_y[i], node.rel_mean_z[i]), exp), base);
 
-  return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, variance), 0.0f);
+  return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
 
 __device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint32_t& queue_write_ptr) {
@@ -190,7 +189,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 
   const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
   const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
-  const float exp_v = exp2f(header.exp_variance);
+  const float exp_v = exp2f(header.exp_std_dev);
 
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
     const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
@@ -251,7 +250,7 @@ __device__ LightTreeResult
   while (result.light_id == 0xFFFFFFFF) {
     const vec3 base   = get_vector(bfloat_unpack(node.x), bfloat_unpack(node.y), bfloat_unpack(node.z));
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
-    const float exp_v = exp2f(node.exp_variance);
+    const float exp_v = exp2f(node.exp_std_dev);
 
     uint8_t selected_child = 0xFF;
 
