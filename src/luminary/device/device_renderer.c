@@ -62,7 +62,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
 
     if (depth == 0) {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS;
+      action.cuda_type = CUDA_KERNEL_TYPE_TASKS_CREATE;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
@@ -87,7 +87,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     }
 
     action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS;
+    action.cuda_type = CUDA_KERNEL_TYPE_TASKS_SORT;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
     action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
@@ -161,7 +161,7 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS;
+  action.cuda_type = CUDA_KERNEL_TYPE_TASKS_CREATE;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
@@ -179,7 +179,7 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   }
 
   action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS;
+  action.cuda_type = CUDA_KERNEL_TYPE_TASKS_SORT;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;

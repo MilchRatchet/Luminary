@@ -29,29 +29,37 @@ __device__ void* triangle_get_entry_address(
 
 template <typename T>
 __device__ T warp_reduce_sum(T sum) {
-  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 16);
-  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 8);
-  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 4);
-  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 2);
-  sum += __shfl_xor_sync(0xFFFFFFFF, sum, 1);
+  const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
+  sum += __shfl_xor_sync(mask, sum, 16);
+  sum += __shfl_xor_sync(mask, sum, 8);
+  sum += __shfl_xor_sync(mask, sum, 4);
+  sum += __shfl_xor_sync(mask, sum, 2);
+  sum += __shfl_xor_sync(mask, sum, 1);
   return sum;
 }
 
 template <typename T>
 __device__ T warp_reduce_max(T max_value) {
-  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 16));
-  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 8));
-  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 4));
-  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 2));
-  max_value = fmaxf(max_value, __shfl_xor_sync(0xFFFFFFFF, max_value, 1));
+  const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 4));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 2));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 1));
   return max_value;
 }
 
 template <typename T>
 __device__ T warp_reduce_prefixsum(T value) {
+  // It is important that all threads are participating. In theory, this should also work as long as all threads enter this function but
+  // then some are predicated off. However, I had issues with that. The intention now is to pass in a 0 if a thread does not want to
+  // participate.
   const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+  // Example code to enable predicating
+  // const uint32_t mask              = __ballot_sync(0xFFFFFFFF, thread_predicate);
+  // const uint32_t rank              = __popc(mask & ((1u << thread_id_in_warp) - 1));
 
-  for (uint32_t stride = 1; stride <= WARP_SIZE; stride = stride << 1) {
+  for (uint32_t stride = 1; stride < WARP_SIZE; stride = stride << 1) {
     const T shuffledValue = __shfl_up_sync(0xFFFFFFFF, value, stride);
 
     if (thread_id_in_warp >= stride)

@@ -41,8 +41,7 @@
 //  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
 //
 
-// TODO: Turn this into a function and call this in the trace kernel if primary ray.
-LUMINARY_KERNEL void generate_trace_tasks() {
+LUMINARY_KERNEL void tasks_create() {
   HANDLE_DEVICE_ABORT();
 
   uint32_t task_count = 0;
@@ -158,16 +157,17 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
   }
 }
 
-LUMINARY_KERNEL void postprocess_trace_tasks() {
+#define SORT_TYPE_NUM_BITS 12
+#define SORT_TYPE_MASK ((1 << SORT_TYPE_NUM_BITS) - 1)
+
+LUMINARY_KERNEL void tasks_sort() {
   HANDLE_DEVICE_ABORT();
 
   uint32_t original_thread_task_counts[SHADING_TASK_INDEX_TOTAL];
 
-  original_thread_task_counts[SHADING_TASK_INDEX_GEOMETRY] = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
-  original_thread_task_counts[SHADING_TASK_INDEX_OCEAN]    = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN];
-  original_thread_task_counts[SHADING_TASK_INDEX_VOLUME]   = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
-  original_thread_task_counts[SHADING_TASK_INDEX_PARTICLE] = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE];
-  original_thread_task_counts[SHADING_TASK_INDEX_SKY]      = (uint32_t) device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY];
+  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+    original_thread_task_counts[task_index] = __ldcs(device.ptrs.task_counts + TASK_ADDRESS_OFFSET_IMPL(task_index));
+  }
 
   uint32_t warp_counts[SHADING_TASK_INDEX_TOTAL];
 
@@ -179,14 +179,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
     warp_offsets[task_index] = (task_index > 0) ? (warp_offsets[task_index - 1] + warp_counts[task_index - 1]) : 0;
-  }
-
-  uint32_t write_thread_offsets[SHADING_TASK_INDEX_TOTAL];
-
-  for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
-    const uint32_t orig_task_count   = original_thread_task_counts[task_index];
-    const uint32_t rel_offset        = warp_reduce_prefixsum(orig_task_count) - orig_task_count;
-    write_thread_offsets[task_index] = warp_offsets[task_index] + rel_offset;
   }
 
   const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
@@ -208,30 +200,40 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_IMPL(task_index)] = read_thread_offsets[task_index];
   }
 
-  __shared__ uint16_t offsets[SHADING_TASK_INDEX_TOTAL * THREADS_PER_BLOCK];
+  const uint32_t task_count          = __ldcs(device.ptrs.trace_counts + THREAD_ID);
+  const uint32_t max_warp_task_count = warp_reduce_max(task_count);
 
-  const uint32_t tid = threadIdx.x;
+  uint64_t offset_mask = 0;
 
-  offsets[tid + SHADING_TASK_INDEX_GEOMETRY * THREADS_PER_BLOCK] = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_GEOMETRY];
-  offsets[tid + SHADING_TASK_INDEX_OCEAN * THREADS_PER_BLOCK]    = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_OCEAN];
-  offsets[tid + SHADING_TASK_INDEX_VOLUME * THREADS_PER_BLOCK]   = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_VOLUME];
-  offsets[tid + SHADING_TASK_INDEX_PARTICLE * THREADS_PER_BLOCK] = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_PARTICLE];
-  offsets[tid + SHADING_TASK_INDEX_SKY * THREADS_PER_BLOCK]      = (uint16_t) write_thread_offsets[SHADING_TASK_INDEX_SKY];
+  for (uint32_t task_id = 0; task_id < max_warp_task_count; task_id++) {
+    // Due to the prefix sum, all threads must always keep participating, the actual load/stores must hence be predicated off.
+    const bool thread_predicate = task_id < task_count;
 
-  const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
+    DeviceTask task;
+    DeviceTaskTrace trace;
+    DeviceTaskThroughput throughput;
+    ShadingTaskIndex index = SHADING_TASK_INDEX_INVALID;
 
-  for (uint32_t task_id = 0; task_id < task_count; task_id++) {
-    const uint32_t src_task_base_address  = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
-    const DeviceTask task                 = task_load(src_task_base_address);
-    const DeviceTaskTrace trace           = task_trace_load(src_task_base_address);
-    const DeviceTaskThroughput throughput = task_throughput_load(src_task_base_address);
+    if (thread_predicate) {
+      const uint32_t src_task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
 
-    const ShadingTaskIndex index = shading_task_index_from_instance_id(trace.handle.instance_id);
+      task       = task_load(src_task_base_address);
+      trace      = task_trace_load(src_task_base_address);
+      throughput = task_throughput_load(src_task_base_address);
 
-    if (index == SHADING_TASK_INDEX_INVALID)
+      index = shading_task_index_from_instance_id(trace.handle.instance_id);
+    }
+
+    const uint64_t index_entry     = (index != SHADING_TASK_INDEX_INVALID) ? ((uint64_t) 1) << (index * SORT_TYPE_NUM_BITS) : 0;
+    const uint64_t offset_result   = offset_mask + warp_reduce_prefixsum(index_entry) - index_entry;
+    const uint64_t warp_sum_offset = warp_reduce_sum(index_entry);
+    offset_mask += warp_sum_offset;
+
+    // It is important that threads participate in the reduction even when their task is invalid so their mask stays synced.
+    if ((thread_predicate == false) || (index == SHADING_TASK_INDEX_INVALID))
       continue;
 
-    const uint32_t dst_offset = offsets[tid + index * THREADS_PER_BLOCK]++;
+    const uint32_t dst_offset = warp_offsets[index] + (((uint32_t) (offset_result >> (index * SORT_TYPE_NUM_BITS))) & SORT_TYPE_MASK);
 
     const uint32_t dst_task_base_address = task_arbitrary_warp_address(dst_offset, TASK_STATE_BUFFER_INDEX_POSTSORT);
 
