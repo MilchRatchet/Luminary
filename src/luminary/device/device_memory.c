@@ -8,6 +8,7 @@ struct DeviceMemoryHeader {
   CUdeviceptr ptr;  // Important that this comes second.
   size_t size;
   size_t pitch;
+  CUdevice device;
 };
 
 // LUMDEVIM
@@ -43,12 +44,13 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
     header->ptr = (CUdeviceptr) 0;
   }
 
-  header->magic = DEVICE_MEMORY_HEADER_MAGIC;
-  header->size  = size;
-  header->pitch = 0;
-
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
+
+  header->magic  = DEVICE_MEMORY_HEADER_MAGIC;
+  header->size   = size;
+  header->pitch  = 0;
+  header->device = device;
 
   total_memory_allocation[device] += size;
 
@@ -68,12 +70,13 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
 
   const size_t size = pitch * height;
 
-  header->magic = DEVICE_MEMORY_HEADER_MAGIC;
-  header->size  = size;
-  header->pitch = pitch;
-
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
+
+  header->magic  = DEVICE_MEMORY_HEADER_MAGIC;
+  header->size   = size;
+  header->pitch  = pitch;
+  header->device = device;
 
   total_memory_allocation[device] += size;
 
@@ -300,6 +303,12 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
+
+  if (device != header->device) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Device memory allocation belongs to device %u but was attempted to be freed for device %u.",
+      header->device, device);
+  }
 
   if (header->size > total_memory_allocation[device]) {
     __RETURN_ERROR(
