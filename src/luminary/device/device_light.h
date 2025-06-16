@@ -114,6 +114,7 @@ LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInsta
 LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material* material);
 
 DEVICE_CTX_FUNC LuminaryResult light_tree_build(LightTree* tree, Device* device);
+DEVICE_CTX_FUNC LuminaryResult light_tree_unload_integrator(LightTree* tree);
 
 LuminaryResult light_tree_destroy(LightTree** tree);
 

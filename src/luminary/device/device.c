@@ -1277,6 +1277,21 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_unload_light_tree(Device* device, LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(tree);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(light_tree_unload_integrator(tree));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_lut);

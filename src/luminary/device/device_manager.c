@@ -1091,6 +1091,9 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
+  const uint32_t main_device_index = (*device_manager)->main_device_index;
+  __FAILURE_HANDLE(device_unload_light_tree((*device_manager)->devices[main_device_index], (*device_manager)->light_tree));
+
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
 
   __FAILURE_HANDLE(device_result_interface_destroy(&(*device_manager)->result_interface));

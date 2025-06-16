@@ -1935,15 +1935,7 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
   // TODO: Optimize, this will only rarely run so it does not really matter for now
 
   if (num_tasks > tree->integrator.allocated_tasks) {
-    if (tree->integrator.allocated_tasks > 0) {
-      __FAILURE_HANDLE(host_free(&tree->integrator.mesh_ids));
-      __FAILURE_HANDLE(host_free(&tree->integrator.triangle_ids));
-      __FAILURE_HANDLE(host_free(&tree->integrator.intensities));
-
-      __FAILURE_HANDLE(device_free(&tree->integrator.device_mesh_ids));
-      __FAILURE_HANDLE(device_free(&tree->integrator.device_triangle_ids));
-      __FAILURE_HANDLE(device_free(&tree->integrator.device_intensities));
-    }
+    __FAILURE_HANDLE(light_tree_unload_integrator(tree));
 
     __FAILURE_HANDLE(host_malloc(&tree->integrator.mesh_ids, sizeof(uint32_t) * num_tasks));
     __FAILURE_HANDLE(host_malloc(&tree->integrator.triangle_ids, sizeof(uint32_t) * num_tasks));
@@ -2259,6 +2251,23 @@ LuminaryResult light_tree_build(LightTree* tree, Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult light_tree_unload_integrator(LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  if (tree->integrator.allocated_tasks > 0) {
+    __FAILURE_HANDLE(host_free(&tree->integrator.mesh_ids));
+    __FAILURE_HANDLE(host_free(&tree->integrator.triangle_ids));
+    __FAILURE_HANDLE(host_free(&tree->integrator.intensities));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_mesh_ids));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_triangle_ids));
+    __FAILURE_HANDLE(device_free(&tree->integrator.device_intensities));
+
+    tree->integrator.allocated_tasks = 0;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Destructor
 ////////////////////////////////////////////////////////////////////
@@ -2266,6 +2275,9 @@ LuminaryResult light_tree_build(LightTree* tree, Device* device) {
 LuminaryResult light_tree_destroy(LightTree** tree) {
   __CHECK_NULL_ARGUMENT(tree);
   __CHECK_NULL_ARGUMENT(*tree);
+
+  // Tasks are allocated by the GPU so they must be freed in a DEVICE_CTX_FUNC.
+  __DEBUG_ASSERT((*tree)->integrator.allocated_tasks == 0);
 
   uint32_t num_meshes;
   __FAILURE_HANDLE(array_get_num_elements((*tree)->cache.meshes, &num_meshes));
@@ -2301,15 +2313,6 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
-
-  if ((*tree)->integrator.allocated_tasks > 0) {
-    __FAILURE_HANDLE(host_free(&(*tree)->integrator.mesh_ids));
-    __FAILURE_HANDLE(host_free(&(*tree)->integrator.triangle_ids));
-    __FAILURE_HANDLE(host_free(&(*tree)->integrator.intensities));
-    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_mesh_ids));
-    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_triangle_ids));
-    __FAILURE_HANDLE(device_free(&(*tree)->integrator.device_intensities));
-  }
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.meshes));
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.instances));
