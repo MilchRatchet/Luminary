@@ -789,11 +789,12 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
 
   for (int32_t device_id = 0; device_id < device_count; device_id++) {
+    // Skip devices that are not supposed to be used.
+    if ((info.device_mask & (1 << device_id)) == 0)
+      continue;
+
     Device* device;
     __FAILURE_HANDLE(device_create(&device, device_id));
-
-    if (device->state != DEVICE_STATE_UNAVAILABLE)
-      device->state = ((info.device_mask & (1 << device->index)) != 0) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
 
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
