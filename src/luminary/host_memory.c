@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <threads.h>
 
 // Include stdatomic later, otherwise I run into issues.
@@ -177,6 +178,8 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
   __CHECK_NULL_ARGUMENT(func);
 
   struct HostMemoryHeader* header = (struct HostMemoryHeader*) malloc((uint64_t) size + sizeof(struct HostMemoryHeader));
+
+  memset(header, 0, sizeof(struct HostMemoryHeader));
 
   header->magic = HOST_MEMORY_HEADER_MAGIC;
   header->size  = size;
