@@ -177,7 +177,18 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
                                .color        = MD_COLOR_ACCENT_LIGHT_2,
                                .hover_color  = MD_COLOR_ACCENT_LIGHT_2,
                                .press_color  = MD_COLOR_ACCENT_LIGHT_2,
-                               .tooltip_text = "GPU is unavailable, see logs."});
+                               .tooltip_text = "Device is unavailable, see logs."});
+      }
+      else if (device_info.is_main_device) {
+        element_button(
+          window, display, mouse_state,
+          (ElementButtonArgs) {.shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+                               .image        = ELEMENT_BUTTON_IMAGE_STAR,
+                               .size         = (ElementSize) {.width = 24, .height = 24},
+                               .color        = MD_COLOR_ACCENT_LIGHT_1,
+                               .hover_color  = MD_COLOR_ACCENT_LIGHT_1,
+                               .press_color  = MD_COLOR_ACCENT_LIGHT_1,
+                               .tooltip_text = "Main device"});
       }
       else {
         element_checkbox(

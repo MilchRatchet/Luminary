@@ -421,6 +421,7 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
 
   Device* device = host->device_manager->devices[device_id];
 
+  info->is_main_device = device->is_main_device;
   info->is_unavailable = device->state == DEVICE_STATE_UNAVAILABLE;
   info->is_enabled     = device->state == DEVICE_STATE_ENABLED;
 
@@ -445,6 +446,10 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   }
 
   Device* device = host->device_manager->devices[device_id];
+
+  if (device->is_main_device && enable == false) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Main device cannot be disabled.");
+  }
 
   // Device is already in the requested state
   if ((device->state == DEVICE_STATE_ENABLED) == enable)

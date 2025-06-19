@@ -43,7 +43,7 @@ static const char* _button_image_string[ELEMENT_BUTTON_IMAGE_COUNT] = {
   [ELEMENT_BUTTON_IMAGE_MIST] = "\ue188",     [ELEMENT_BUTTON_IMAGE_PRECIPITATION] = "\ue810", [ELEMENT_BUTTON_IMAGE_MATERIAL] = "\uef8f",
   [ELEMENT_BUTTON_IMAGE_INSTANCE] = "\uead3", [ELEMENT_BUTTON_IMAGE_MOVE] = "\ue89f",          [ELEMENT_BUTTON_IMAGE_SELECT] = "\uf706",
   [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4",    [ELEMENT_BUTTON_IMAGE_SYNC] = "\ue627",          [ELEMENT_BUTTON_IMAGE_REGION] = "\ue5d0",
-  [ELEMENT_BUTTON_IMAGE_ERROR] = "\ue000"};
+  [ELEMENT_BUTTON_IMAGE_ERROR] = "\ue000",    [ELEMENT_BUTTON_IMAGE_STAR] = "\ue838"};
 
 static void _element_button_render_image(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
