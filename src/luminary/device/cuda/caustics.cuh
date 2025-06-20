@@ -55,8 +55,10 @@ __device__ CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE
   bool is_valid;
   const vec3 center = caustics_solve_for_normal(ctx, L, is_underwater, is_valid);
 
-  // Phase based kernels never do proper caustics
-  const bool fast_path = (TYPE != MATERIAL_GEOMETRY) || (device.ocean.amplitude == 0.0f) || (device.ocean.caustics_active == false);
+  bool fast_path = (TYPE != MATERIAL_GEOMETRY);   // Phase based kernels never do proper caustics
+  fast_path |= (device.ocean.amplitude == 0.0f);  // Fast path is assuming amplitude == 0, so if that is actually true we can just do it.
+  fast_path |= (device.ocean.caustics_active == false);           // Caustics not active still means we want the shift in direction.
+  fast_path |= (ctx.state & STATE_FLAG_ALLOW_EMISSION == false);  // If we are indirect lighting, proper caustics are too noisy.
 
   // Fast path that assumes a flat ocean.
   if (fast_path) {
