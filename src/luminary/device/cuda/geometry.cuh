@@ -78,7 +78,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
-    uint16_t new_state = task.state & ~STATE_FLAG_ALLOW_EMISSION;
+    uint16_t new_state = task.state;
 
     if (!is_delta_distribution) {
       new_state &= ~STATE_FLAG_DELTA_PATH;
@@ -86,6 +86,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     if (!is_pass_through) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+      new_state &= ~STATE_FLAG_ALLOW_EMISSION;
 
       // We want to keep the old payload around if we are passthrough.
       new_state |= STATE_FLAG_MIS_EMISSION;
