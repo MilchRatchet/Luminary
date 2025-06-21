@@ -39,6 +39,8 @@ struct SkyHDRI {
   bool output_is_dirty;
   Sky sky;
   uint32_t id;
+  uint32_t width;
+  uint32_t height;
   SampleCountSlice sample_count;
   Texture* color_tex;
   Texture* shadow_tex;

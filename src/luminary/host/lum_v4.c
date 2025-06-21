@@ -364,6 +364,7 @@ static LuminaryResult parse_sky_settings(Sky* sky, char* line) {
     /* HDRIDIM_ */
     case 6867225564446606408u:
       sscanf(value, "%u\n", &sky->hdri_dim);
+      sky->hdri_dim = (sky->hdri_dim > 0) ? sky->hdri_dim : 1;
       break;
     /* HDRISAMP */
     case 5786352922209174600u:
