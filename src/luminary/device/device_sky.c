@@ -288,7 +288,8 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   args.dst_color    = DEVICE_PTR(device_hdri->color_tex->memory);
   args.dst_shadow   = DEVICE_PTR(device_hdri->shadow_tex->memory);
   args.dim          = hdri->width;
-  args.ld           = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
+  args.ld_color     = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
+  args.ld_shadow    = device_hdri->shadow_tex->pitch / device_hdri->shadow_tex->pixel_size;
   args.origin       = hdri->sky.hdri_origin;
   args.sample_count = hdri->sample_count.end_sample_count;
 
@@ -336,7 +337,7 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
         __FAILURE_HANDLE(texture_create(&hdri->shadow_tex, hdri->width, hdri->height, 1, (void*) 0, TexDataFP32, 1));
 
         __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
-        __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->pitch * sizeof(float) * hdri->shadow_tex->height));
+        __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->width * sizeof(float) * hdri->shadow_tex->height));
       }
 
       __FAILURE_HANDLE(device_sync_constant_memory(device));

@@ -14,9 +14,9 @@
 // TODO: Use splatting
 
 LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
-  unsigned int id = THREAD_ID;
+  uint32_t id = THREAD_ID;
 
-  const int amount = args.dim * args.dim;
+  const uint32_t amount = args.dim * args.dim;
 
   const float step_size = 1.0f / (args.dim - 1);
 
@@ -24,8 +24,9 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     const int y = id / args.dim;
     const int x = id - y * args.dim;
 
-    const ushort2 pixel_coords = make_ushort2(x, y);
-    const uint32_t pixel       = x + y * args.ld;
+    const ushort2 pixel_coords  = make_ushort2(x, y);
+    const uint32_t index_color  = x + y * args.ld_color;
+    const uint32_t index_shadow = x + y * args.ld_shadow;
 
     const float2 jitter = random_2D(RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
 
@@ -55,9 +56,9 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     RGBF result;
     float variance;
     float alpha;
-    if (device.state.sample_id != 0.0f) {
-      float4 data = __ldcs(args.dst_color + pixel);
-      alpha       = __ldcs(args.dst_shadow + pixel);
+    if (device.state.sample_id != 0) {
+      float4 data = __ldcs(args.dst_color + index_color);
+      alpha       = __ldcs(args.dst_shadow + index_shadow);
 
       result   = get_color(data.x, data.y, data.z);
       variance = data.w;
@@ -101,8 +102,8 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     result = scale_color(result, 1.0f / (device.state.sample_id + 1));
     alpha *= 1.0f / (device.state.sample_id + 1);
 
-    __stcs(args.dst_color + pixel, make_float4(result.r, result.g, result.b, variance));
-    __stcs(args.dst_shadow + pixel, alpha);
+    __stcs(args.dst_color + index_color, make_float4(result.r, result.g, result.b, variance));
+    __stcs(args.dst_shadow + index_shadow, alpha);
 
     id += blockDim.x * gridDim.x;
   }
