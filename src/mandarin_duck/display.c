@@ -545,6 +545,52 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
   }
 }
 
+void display_handle_maximize(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  uint32_t width;
+  uint32_t height;
+  uint32_t x;
+  uint32_t y;
+
+  if (display->is_maximized) {
+    width  = display->unmaximize_width;
+    height = display->unmaximize_height;
+
+    x = display->unmaximize_x;
+    y = display->unmaximize_y;
+  }
+  else {
+    // Store the current size so we can restore it later again.
+    display->unmaximize_width  = display->width;
+    display->unmaximize_height = display->height;
+
+    width  = display->screen_width;
+    height = display->screen_height;
+
+    SDL_GetWindowPosition(display->sdl_window, (int*) &display->unmaximize_x, (int*) &display->unmaximize_y);
+
+    x = SDL_WINDOWPOS_CENTERED;
+    y = SDL_WINDOWPOS_CENTERED;
+  }
+
+  display->is_maximized = !display->is_maximized;
+
+  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
+  SDL_SetWindowPosition(display->sdl_window, (int) x, (int) y);
+
+  if (display->sync_render_resolution) {
+    LuminaryRendererSettings settings;
+    LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+    if (settings.width != width || settings.height != height) {
+      settings.width  = width;
+      settings.height = height;
+      LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
+    }
+  }
+}
+
 static void _display_render_output(Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
