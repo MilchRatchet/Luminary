@@ -65,7 +65,7 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateInfo info) {
       LuminaryRendererSettings renderer_settings;
       LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
 
-      display_create(&duck->display, renderer_settings.width, renderer_settings.height);
+      display_create(&duck->display, renderer_settings.width, renderer_settings.height, info.sync_render_resolution);
 
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     } break;

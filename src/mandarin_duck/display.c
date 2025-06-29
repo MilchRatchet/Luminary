@@ -6,6 +6,7 @@
 #include <time.h>
 
 #define DISPLAY_MIN_FRAME_TIME_NS 16666666  // Nanoseconds frametime at 60 FPS
+#define DISPLAY_SCREEN_MARGIN 5
 
 static uint32_t __num_displays = 0;
 
@@ -57,7 +58,7 @@ static void _display_set_hittest(Display* display, bool enable) {
   SDL_SetWindowHitTest(display->sdl_window, (SDL_HitTest) enable ? _display_sdl_hittestcallback : 0, (void*) display);
 }
 
-void display_create(Display** _display, uint32_t width, uint32_t height) {
+void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution) {
   MD_CHECK_NULL_ARGUMENT(_display);
 
   if (__num_displays == 0) {
@@ -71,7 +72,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   LUM_FAILURE_HANDLE(host_malloc(&display, sizeof(Display)));
   memset(display, 0, sizeof(Display));
 
-  display->show_ui = true;
+  display->show_ui                = true;
+  display->sync_render_resolution = sync_render_resolution;
 
   SDL_Rect rect;
   SDL_Rect screen_size;
@@ -86,11 +88,16 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_GetDisplayUsableBounds(displays[0], &rect);
   SDL_GetDisplayBounds(displays[0], &screen_size);
 
-  // Add some margin to the usable bounds.
-  const uint32_t margin = 5;
+  rect.w = rect.w - 2 * DISPLAY_SCREEN_MARGIN;
+  rect.h = rect.h - 2 * DISPLAY_SCREEN_MARGIN;
 
-  rect.w = rect.w - 2 * margin;
-  rect.h = rect.h - 2 * margin;
+  display->screen_width  = (uint32_t) rect.w;
+  display->screen_height = (uint32_t) rect.h;
+
+  if (display->sync_render_resolution && (width > display->screen_width || height > display->screen_height)) {
+    log_message("Luminary resolution exceeds screen size, turning off synchronization of render resolution.");
+    display->sync_render_resolution = false;
+  }
 
   rect.w = min(rect.w, (int) width);
   rect.h = min(rect.h, (int) height);
@@ -108,6 +115,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, rect.h);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, false);
+  SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
 
   display->sdl_window = SDL_CreateWindowWithProperties(sdl_properties);
 

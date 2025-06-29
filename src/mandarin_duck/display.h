@@ -34,14 +34,22 @@ struct Display {
   uint64_t ticks_last_frame;
   SDL_Window* sdl_window;
   SDL_Surface* sdl_surface;
+  uint32_t screen_width;
+  uint32_t screen_height;
   uint32_t width;
   uint32_t height;
+  uint32_t unmaximize_width;
+  uint32_t unmaximize_height;
+  uint32_t unmaximize_x;
+  uint32_t unmaximize_y;
   uint8_t* buffer;
   uint32_t pitch;
   bool exit_requested;
   bool show_ui;
   bool mouse_visible;
   bool active_camera_movement;
+  bool is_maximized;
+  bool sync_render_resolution;
   double frametime;
   KeyboardState* keyboard_state;
   MouseState* mouse_state;
@@ -63,7 +71,7 @@ struct Display {
   RenderRegion* region;
 } typedef Display;
 
-void display_create(Display** _display, uint32_t width, uint32_t height);
+void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);
 void display_set_mouse_visible(Display* display, bool enable);
 void display_set_cursor(Display* display, SDL_SystemCursor cursor);
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode);
@@ -72,6 +80,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
 void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory);
 void display_render(Display* display, LuminaryHost* host);
 void display_update(Display* display);
+void display_resize(Display* display, uint32_t width, uint32_t height);
 void display_destroy(Display** display);
 
 #endif /* MANDARIN_DUCK_DISPLAY_H */
