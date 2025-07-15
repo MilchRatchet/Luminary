@@ -117,7 +117,15 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
   __FAILURE_HANDLE(vault_object_create(&output_request.buffer_object));
   output_request.props = props;
 
-  __FAILURE_HANDLE(vault_object_set(output_request.buffer_object, 0, output_request.buffer));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_object_lock(output_request.buffer_object));
+
+  __FAILURE_HANDLE_CRITICAL(vault_object_set(output_request.buffer_object, 0, output_request.buffer));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_object_unlock(output_request.buffer_object));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   __FAILURE_HANDLE(array_push(&output->output_requests, &output_request));
 
