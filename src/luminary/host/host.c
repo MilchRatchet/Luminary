@@ -156,23 +156,45 @@ static LuminaryResult _host_propagate_scene_changes_queue_work(Host* host, void*
 
 static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor* args) {
   __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
 
-  uint32_t handle;
-  if (args->is_recurring_output) {
-    __FAILURE_HANDLE(output_handler_acquire_new(host->output_handler, *args, &handle));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_handle_lock(args->data_handle));
+
+  STAGING void* data;
+  __FAILURE_HANDLE(vault_handle_get(args->data_handle, &data));
+
+  // If the data pointer is NULL, then it was freed and we need to drop this output.
+  if (data != (STAGING void*) 0) {
+    uint32_t handle;
+    if (args->is_recurring_output) {
+      __FAILURE_HANDLE_CRITICAL(output_handler_acquire_new(host->output_handler, *args, &handle));
+    }
+    else {
+      __FAILURE_HANDLE_CRITICAL(output_handler_acquire_from_request_new(host->output_handler, *args, &handle));
+    }
+
+    Image dst;
+    __FAILURE_HANDLE_CRITICAL(output_handler_get_image(host->output_handler, handle, &dst));
+
+    memcpy(dst.buffer, data, args->meta_data.width * args->meta_data.height * sizeof(ARGB8));
+
+    __FAILURE_HANDLE_CRITICAL(output_handler_release_new(host->output_handler, handle));
   }
-  else {
-    __FAILURE_HANDLE(output_handler_acquire_from_request_new(host->output_handler, *args, &handle));
-  }
 
-  Image dst;
-  __FAILURE_HANDLE(output_handler_get_image(host->output_handler, handle, &dst));
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_handle_unlock(args->data_handle));
 
-  memcpy(dst.buffer, args->data, args->meta_data.width * args->meta_data.height * sizeof(ARGB8));
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
-  __FAILURE_HANDLE(output_handler_release_new(host->output_handler, handle));
+  return LUMINARY_SUCCESS;
+}
 
-  // Clean up
+static LuminaryResult _host_copy_output_clear_work(Host* host, OutputDescriptor* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(vault_handle_destroy(&args->data_handle));
   __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(OutputDescriptor)));
 
   return LUMINARY_SUCCESS;
@@ -960,7 +982,7 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
 
   entry.name       = "Copy Output";
   entry.function   = (QueueEntryFunction) _host_copy_output_queue_work;
-  entry.clear_func = (QueueEntryFunction) 0;
+  entry.clear_func = (QueueEntryFunction) _host_copy_output_clear_work;
   entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));

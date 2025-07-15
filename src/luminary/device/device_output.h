@@ -4,6 +4,7 @@
 #include "device_callback.h"
 #include "device_memory.h"
 #include "device_utils.h"
+#include "vault_object.h"
 
 struct Device typedef Device;
 
@@ -13,6 +14,7 @@ struct Device typedef Device;
 struct DeviceOutputRequest {
   bool queued;
   STAGING void* buffer;
+  VaultObject* buffer_object;
   OutputRequestProperties props;
 } typedef DeviceOutputRequest;
 
@@ -21,7 +23,9 @@ struct DeviceOutput {
   uint32_t height;
   CUevent event_output_ready;
   CUevent event_output_finished;
+  uint32_t buffer_allocation_count;
   STAGING void* buffers[DEVICE_OUTPUT_BUFFER_COUNT];
+  VaultObject* buffer_objects[DEVICE_OUTPUT_BUFFER_COUNT];
   uint32_t buffer_index;
   DEVICE ARGB8* device_buffer;
   CUhostFn registered_callback_func;

@@ -15,6 +15,10 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_ready, CU_EVENT_DISABLE_TIMING));
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_finished, CU_EVENT_DISABLE_TIMING));
 
+  for (uint32_t buffer_id = 0; buffer_id < DEVICE_OUTPUT_BUFFER_COUNT; buffer_id++) {
+    __FAILURE_HANDLE(vault_object_create(&(*output)->buffer_objects[buffer_id]));
+  }
+
   // Default size
   device_output_set_size(*output, 1920, 1080);
 
@@ -65,12 +69,25 @@ LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint
     output->height = height;
 
     for (uint32_t buffer_id = 0; buffer_id < DEVICE_OUTPUT_BUFFER_COUNT; buffer_id++) {
+      __FAILURE_HANDLE_LOCK_CRITICAL();
+      __FAILURE_HANDLE(vault_object_lock(output->buffer_objects[buffer_id]));
+
       if (output->buffers[buffer_id]) {
-        __FAILURE_HANDLE(device_free_staging(&output->buffers[buffer_id]));
+        __FAILURE_HANDLE_CRITICAL(device_free_staging(&output->buffers[buffer_id]));
       }
 
-      __FAILURE_HANDLE(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
+      __FAILURE_HANDLE_CRITICAL(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
+
+      __FAILURE_HANDLE_CRITICAL(
+        vault_object_set(output->buffer_objects[buffer_id], output->buffer_allocation_count, output->buffers[buffer_id]));
+
+      __FAILURE_HANDLE_UNLOCK_CRITICAL();
+      __FAILURE_HANDLE(vault_object_unlock(output->buffer_objects[buffer_id]));
+
+      __FAILURE_HANDLE_CHECK_CRITICAL();
     }
+
+    output->buffer_allocation_count++;
 
     __FAILURE_HANDLE(_device_output_allocate_device_buffer(output, width, height));
   }
@@ -97,7 +114,10 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
 
   output_request.queued = false;
   __FAILURE_HANDLE(device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, false));
+  __FAILURE_HANDLE(vault_object_create(&output_request.buffer_object));
   output_request.props = props;
+
+  __FAILURE_HANDLE(vault_object_set(output_request.buffer_object, 0, output_request.buffer));
 
   __FAILURE_HANDLE(array_push(&output->output_requests, &output_request));
 
@@ -127,7 +147,10 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   const uint32_t width  = callback_data->descriptor.meta_data.width;
   const uint32_t height = callback_data->descriptor.meta_data.height;
 
-  STAGING void* dst_buffer = callback_data->descriptor.data;
+  // We access the buffer without locking because the handle will only be available to other threads
+  // once the callback has happened which is when the download has finished.
+  STAGING void* dst_buffer;
+  __FAILURE_HANDLE(vault_handle_get(callback_data->descriptor.data_handle, &dst_buffer));
 
   KernelArgsConvertRGBFToARGB8 args;
   args.dst    = DEVICE_PTR(output->device_buffer);
@@ -247,7 +270,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   data->descriptor.meta_data.height          = output->height;
   data->descriptor.meta_data.sample_count    = current_sample_count;
   data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
-  data->descriptor.data                      = output->buffers[output->buffer_index];
+
+  __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output->buffer_objects[output->buffer_index]));
 
   __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
 
@@ -260,6 +284,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
     DeviceOutputRequest* output_request = output->output_requests + output_request_id;
 
+    // TODO: If the output request has already been processed, mark it for deletion, else we leak precious staging memory.
+
     if (_device_output_request_needs_queueing(output_request, current_sample_count) == false)
       continue;
 
@@ -271,7 +297,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     data->descriptor.meta_data.height          = output_request->props.height;
     data->descriptor.meta_data.sample_count    = current_sample_count;
     data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
-    data->descriptor.data                      = output_request->buffer;
+
+    __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output_request->buffer_object));
 
     __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
 
@@ -289,9 +316,13 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
   __CHECK_NULL_ARGUMENT(output);
 
   for (uint32_t buffer_id = 0; buffer_id < DEVICE_OUTPUT_BUFFER_COUNT; buffer_id++) {
+    __FAILURE_HANDLE(vault_object_reset((*output)->buffer_objects[buffer_id]));
+
     if ((*output)->buffers[buffer_id]) {
       __FAILURE_HANDLE(device_free_staging(&(*output)->buffers[buffer_id]));
     }
+
+    __FAILURE_HANDLE(vault_object_destroy(&(*output)->buffer_objects[buffer_id]));
   }
 
   if ((*output)->device_buffer) {
@@ -302,7 +333,13 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
   __FAILURE_HANDLE(array_get_num_elements((*output)->output_requests, &num_output_requests));
 
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
-    __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id].buffer));
+    __FAILURE_HANDLE(vault_object_reset((*output)->output_requests[output_request_id].buffer_object));
+
+    if ((*output)->output_requests[output_request_id].buffer) {
+      __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id].buffer));
+    }
+
+    __FAILURE_HANDLE(vault_object_destroy(&(*output)->output_requests[output_request_id].buffer_object));
   }
 
   CUDA_FAILURE_HANDLE(cuEventDestroy((*output)->event_output_ready));

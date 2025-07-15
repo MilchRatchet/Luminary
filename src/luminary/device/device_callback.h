@@ -2,6 +2,7 @@
 #define LUMINARY_DEVICE_CALLBACK_H
 
 #include "device_utils.h"
+#include "output_descriptor.h"
 
 struct DeviceManager typedef DeviceManager;
 

@@ -256,7 +256,7 @@ static void _device_manager_render_finished_callback(DeviceRenderCallbackData* d
   }
 }
 
-static LuminaryResult _device_manager_handle_device_output(DeviceManager* device_manager, DeviceOutputCallbackData* data) {
+static LuminaryResult _device_manager_handle_device_output_queue_work(DeviceManager* device_manager, DeviceOutputCallbackData* data) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
@@ -268,23 +268,35 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
   return LUMINARY_SUCCESS;
 }
 
-static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
-  // Ignore callbacks if we are shutting down.
-  if (data->common.device_manager->is_shutdown)
-    return;
+static LuminaryResult _device_manager_handle_device_output_clear_work(DeviceManager* device_manager, DeviceOutputCallbackData* data) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(data);
 
+  const bool skip_execution =
+    data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output;
+
+  // If we skipped execution, it is our job to destroy the handle, else the handle would be destroyed by the host.
+  if (skip_execution) {
+    __FAILURE_HANDLE(vault_handle_destroy(&data->descriptor.data_handle));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
   // Don't output aborted outputs unless it is the first output.
-  if (data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output)
-    return;
+  const bool skip_execution =
+    data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output;
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
 
   entry.name                  = "Handle Device Output";
-  entry.function              = (QueueEntryFunction) _device_manager_handle_device_output;
-  entry.clear_func            = (QueueEntryFunction) 0;
+  entry.function              = (QueueEntryFunction) _device_manager_handle_device_output_queue_work;
+  entry.clear_func            = (QueueEntryFunction) _device_manager_handle_device_output_clear_work;
   entry.args                  = (void*) data;
   entry.queuer_cannot_execute = true;
+  entry.skip_execution        = skip_execution;
 
   LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
 
@@ -876,9 +888,10 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   bool device_thread_is_running;
   __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
 
-  const bool skip_work = device_manager->is_shutdown || ((device_thread_is_running == false) && (entry->queuer_cannot_execute == true));
+  const bool cannot_execute =
+    device_manager->is_shutdown || ((device_thread_is_running == false) && (entry->queuer_cannot_execute == true));
 
-  if (skip_work) {
+  if (cannot_execute || entry->skip_execution) {
     if (entry->clear_func) {
       __FAILURE_HANDLE(entry->clear_func(device_manager, entry->args));
     }

@@ -58,6 +58,7 @@ struct QueueEntry {
   void* args;
   bool remove_duplicates;
   bool queuer_cannot_execute;  // Used to avoid self execution on CUDA callback threads.
+  bool skip_execution;         // Used to skip the actual work function but still execute the clear func.
 } typedef QueueEntry;
 
 struct Quaternion {
@@ -171,17 +172,5 @@ struct BVHNode8 {
   uint8_t high_y[8];
   uint8_t high_z[8];
 } typedef BVHNode8;
-
-struct OutputDescriptor {
-  bool is_recurring_output;
-  struct {
-    uint32_t width;
-    uint32_t height;
-    uint32_t sample_count;
-    bool is_first_output;
-    float time;
-  } meta_data;
-  void* data;
-} typedef OutputDescriptor;
 
 #endif /* LUMINARY_UTILS_H */
