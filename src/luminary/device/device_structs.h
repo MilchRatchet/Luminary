@@ -9,9 +9,8 @@ struct DeviceRendererSettings {
   uint32_t max_ray_depth : 6;
   uint32_t shading_mode : 3;
   uint32_t bridge_max_num_vertices : 4;
-  uint32_t bridge_num_ris_samples : 6;
-  uint32_t light_num_ris_samples : 6;
   uint32_t supersampling : 2;
+  // 12 bits spare
 
   uint16_t width;
   uint16_t height;

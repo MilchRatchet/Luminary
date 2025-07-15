@@ -52,8 +52,6 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t height;
   uint32_t max_ray_depth;
   uint32_t bridge_max_num_vertices;
-  uint32_t bridge_num_ris_samples;
-  uint32_t light_num_ris_samples;
   uint32_t undersampling;
   uint32_t supersampling;
   LuminaryShadingMode shading_mode;
