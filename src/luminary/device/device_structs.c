@@ -5,6 +5,7 @@
 #include "device_mesh.h"
 #include "device_packing.h"
 #include "device_texture.h"
+#include "host_math.h"
 #include "internal_error.h"
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings) {
@@ -35,31 +36,6 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   return LUMINARY_SUCCESS;
 }
 
-/*
- * Computes a rotation quaternion from euler angles.
- * @param rotation Euler angles defining the rotation.
- * @result Rotation quaternion
- */
-static LuminaryResult _device_struct_get_quaternion(Quaternion* q, const vec3 rotation) {
-  const float alpha = rotation.x;
-  const float beta  = rotation.y;
-  const float gamma = rotation.z;
-
-  const float cy = cosf(gamma * 0.5f);
-  const float sy = sinf(gamma * 0.5f);
-  const float cp = cosf(beta * 0.5f);
-  const float sp = sinf(beta * 0.5f);
-  const float cr = cosf(alpha * 0.5f);
-  const float sr = sinf(alpha * 0.5f);
-
-  q->w = cr * cp * cy + sr * sp * sy;
-  q->x = sr * cp * cy - cr * sp * sy;
-  q->y = cr * sp * cy + sr * cp * sy;
-  q->z = cr * cp * sy - sr * sp * cy;
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera) {
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(device_camera);
@@ -73,8 +49,8 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->do_firefly_rejection = camera->do_firefly_rejection;
   device_camera->indirect_only        = camera->indirect_only;
 
-  device_camera->pos = camera->pos;
-  __FAILURE_HANDLE(_device_struct_get_quaternion(&device_camera->rotation, camera->rotation));
+  device_camera->pos                        = camera->pos;
+  device_camera->rotation                   = rotation_euler_angles_to_quaternion(camera->rotation);
   device_camera->fov                        = camera->fov;
   device_camera->focal_length               = camera->focal_length;
   device_camera->aperture_size              = camera->aperture_size;
@@ -416,9 +392,11 @@ LuminaryResult device_struct_instance_transform_convert(const MeshInstance* inst
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(device_transform);
 
+  const Quaternion rotation = rotation_euler_angles_to_quaternion(instance->rotation);
+
   device_transform->translation = instance->translation;
   device_transform->scale       = instance->scale;
-  __FAILURE_HANDLE(_device_struct_quaternion_to_quaternion16(&device_transform->rotation, &instance->rotation));
+  __FAILURE_HANDLE(_device_struct_quaternion_to_quaternion16(&device_transform->rotation, &rotation));
 
   return LUMINARY_SUCCESS;
 }

@@ -8,6 +8,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "device_memory.h"
+#include "host_math.h"
 #include "internal_error.h"
 #include "utils.h"
 
@@ -55,7 +56,9 @@ static LuminaryResult _optix_bvh_get_optix_instance(
   optix_instance->flags             = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
   optix_instance->traversableHandle = device->meshes[instance->mesh_id]->bvh->traversable[type];
 
-  __FAILURE_HANDLE(_optix_bvh_compute_transform(instance->rotation, instance->scale, instance->translation, optix_instance->transform));
+  const Quaternion rotation = rotation_euler_angles_to_quaternion(instance->rotation);
+
+  __FAILURE_HANDLE(_optix_bvh_compute_transform(rotation, instance->scale, instance->translation, optix_instance->transform));
 
   return LUMINARY_SUCCESS;
 }

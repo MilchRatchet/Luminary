@@ -9,6 +9,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "device_packing.h"
+#include "host_math.h"
 #include "internal_error.h"
 #include "kernel_args.h"
 #include "texture.h"
@@ -1734,8 +1735,10 @@ static LuminaryResult _light_tree_update_cache_instance(
 
   const bool current_mesh_has_emission = cache_meshes[cache->mesh_id].has_emission;
 
-  if (memcmp(&cache->rotation, &instance->rotation, sizeof(Quaternion))) {
-    cache->rotation   = instance->rotation;
+  const Quaternion rotation = rotation_euler_angles_to_quaternion(instance->rotation);
+
+  if (memcmp(&cache->rotation, &rotation, sizeof(Quaternion))) {
+    cache->rotation   = rotation;
     instance_is_dirty = true;
   }
 
