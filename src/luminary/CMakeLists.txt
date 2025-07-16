@@ -207,6 +207,7 @@ ceb_embed_files(
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
   ${CMAKE_SOURCE_DIR}/data/bridge/bridge_lut.bin
+  ${CMAKE_SOURCE_DIR}/data/icons/SplashScreen.bmp
 )
 
 #=============================================================

@@ -69,6 +69,7 @@ struct Display {
   RenderMetaData current_render_meta_data;
   LuminaryOutputPromiseHandle output_promise_handle;
   RenderRegion* region;
+  const uint32_t* splash_screen;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);

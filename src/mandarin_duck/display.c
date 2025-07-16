@@ -5,8 +5,15 @@
 #include <string.h>
 #include <time.h>
 
+// TODO: Let Mandarin Duck have its own embedded files.
+void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
+
 #define DISPLAY_MIN_FRAME_TIME_NS 16666666  // Nanoseconds frametime at 60 FPS
 #define DISPLAY_SCREEN_MARGIN 5
+
+#define DISPLAY_SPLASHSCREEN_WIDTH 640
+#define DISPLAY_SPLASHSCREEN_HEIGHT 180
+#define DISPLAY_SPLASHSCREEN_DATA_OFFSET 0x8A
 
 static uint32_t __num_displays = 0;
 
@@ -147,6 +154,17 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   display_set_mouse_visible(display, display->show_ui);
 
   display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
+
+  uint8_t* splash_screen_data;
+  int64_t splash_screen_size;
+  uint64_t info;
+  ceb_access("SplashScreen.bmp", (void**) &splash_screen_data, &splash_screen_size, &info);
+
+  if (info || splash_screen_size < (DISPLAY_SPLASHSCREEN_WIDTH * DISPLAY_SPLASHSCREEN_HEIGHT * 3 + DISPLAY_SPLASHSCREEN_DATA_OFFSET)) {
+    crash_message("Splash screen is corrupted. Luminary needs to be rebuild. Ceb Error Code: %zu", info);
+  }
+
+  display->splash_screen = (const uint32_t*) (splash_screen_data + DISPLAY_SPLASHSCREEN_DATA_OFFSET);
 
   *_display = display;
 }
@@ -600,7 +618,20 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
 
   if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID) {
     for (uint32_t y = 0; y < display->height; y++) {
-      memset(display->buffer + y * display->pitch, 0xFF, sizeof(uint8_t) * 4 * display->width);
+      uint32_t* dst = (uint32_t*) (display->buffer + y * display->pitch);
+      for (uint32_t x = 0; x < display->width; x++) {
+        dst[x] = MD_COLOR_DISPLAY_BACKGROUND;
+      }
+    }
+
+    uint32_t splash_screen_x = (display->width - DISPLAY_SPLASHSCREEN_WIDTH) >> 1;
+    uint32_t splash_screen_y = (display->height - DISPLAY_SPLASHSCREEN_HEIGHT) >> 1;
+
+    for (uint32_t y = 0; y < DISPLAY_SPLASHSCREEN_HEIGHT; y++) {
+      uint32_t* dst = (uint32_t*) (display->buffer + (splash_screen_y + y) * display->pitch);
+      for (uint32_t x = 0; x < DISPLAY_SPLASHSCREEN_WIDTH; x++) {
+        dst[splash_screen_x + x] = display->splash_screen[(DISPLAY_SPLASHSCREEN_HEIGHT - y - 1) * DISPLAY_SPLASHSCREEN_WIDTH + x];
+      }
     }
 
     return;
