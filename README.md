@@ -71,15 +71,14 @@ where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Arg
 # Building
 
 Requirements:
-- CUDA Toolkit 12.6
-- Optix 8.0 SDK
+- CUDA Toolkit 12.9
 - SDL3 and SDL3_ttf
 - Modern CMake
 - Make or Ninja
 - AVX2 compatible CPU
 - Supported Nvidia GPU (Pascal or later)
 
->📝 `zlib`, `qoi` and `Ceb` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
+>📝 `zlib`, `qoi`, `Ceb` and `OptiX` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
 ## CMake Options
 | Option                     | Description

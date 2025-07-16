@@ -5,10 +5,12 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 #=============================================================
 
 set(LUMINARY_CUDA_VERSION 12.9 CACHE INTERNAL "CUDA Version")
-set(LUMINARY_OPTIX_VERSION 8.0 CACHE INTERNAL "OptiX Version")
+set(LUMINARY_OPTIX_VERSION 9.0 CACHE INTERNAL "OptiX Version")
 
 find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED QUIET)
-find_package(Optix ${LUMINARY_OPTIX_VERSION} REQUIRED QUIET)
+
+# OptiX is a header only library, the headers are provided through a git submodule.
+set(OptiX_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/optix-dev/include")
 
 #=============================================================
 # Get source files
