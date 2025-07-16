@@ -306,7 +306,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
 __device__ RGBF
   bridges_sample_apply_shadowing(const MaterialContextVolume ctx, const LightSampleResult<MATERIAL_VOLUME> sample, const ushort2 pixel) {
   bool bridge_is_valid = true;
-  bridge_is_valid &= sample.handle.instance_id != LIGHT_ID_NONE;
+  bridge_is_valid &= sample.handle.instance_id != INSTANCE_ID_INVALID;
   bridge_is_valid &= sample.seed != 0xFFFFFFFF;
 
   ////////////////////////////////////////////////////////////////////

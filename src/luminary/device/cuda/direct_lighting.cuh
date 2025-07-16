@@ -341,22 +341,24 @@ template <MaterialType TYPE>
 __device__ RGBF direct_lighting_geometry_sample(MaterialContext<TYPE> ctx, const ushort2 pixel, DirectLightingShadowTask& task) {
   const LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
 
-  if (sample.handle.instance_id == LIGHT_ID_NONE) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
-  }
+  const bool valid_sample = sample.handle.instance_id != INSTANCE_ID_INVALID;
 
   ////////////////////////////////////////////////////////////////////
   // Create shadow task
   ////////////////////////////////////////////////////////////////////
 
-  task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task.origin       = shift_origin_vector(ctx.position, ctx.V, sample.ray, sample.is_refraction);
+  task.trace_status = (valid_sample) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+  task.origin       = ctx.position;
   task.ray          = sample.ray;
   task.target_light = sample.handle;
   task.limit        = sample.dist;
 
-  return sample.light_color;
+  // No need to shift origin for particles.
+  if (TYPE == MATERIAL_GEOMETRY) {
+    task.origin = shift_origin_vector(task.origin, ctx.V, sample.ray, sample.is_refraction);
+  }
+
+  return (valid_sample) ? sample.light_color : splat_color(0.0f);
 }
 
 template <>
@@ -490,9 +492,6 @@ __device__ RGBF direct_lighting_sun(const MaterialContext<TYPE> ctx, const ushor
 
 template <MaterialType TYPE>
 __device__ RGBF direct_lighting_geometry(const MaterialContext<TYPE> ctx, const ushort2 index) {
-  // if (is_center_pixel(index) == false)
-  //   return get_color(0.0f, 0.0f, 0.0f);
-
   DirectLightingShadowTask task;
   RGBF light = direct_lighting_geometry_sample<TYPE>(ctx, index, task);
 

@@ -33,13 +33,8 @@
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
 #define MATERIAL_ID_INVALID 0xFFFF
-#define INSTANCE_ID_INVALID 0xFFFF
+#define INSTANCE_ID_INVALID 0xFFFFFFFF
 #define DEPTH_INVALID -1.0f
-
-#define LIGHT_ID_SUN (0xffffffffu)
-#define LIGHT_ID_NONE (0xfffffff1u)
-#define LIGHT_ID_ANY (0xfffffff0u)
-#define LIGHT_ID_TRIANGLE_ID_LIMIT (0x7fffffffu)
 
 // Print stats for the work queues
 #define LUMINARY_WORK_QUEUE_STATS_PRINT

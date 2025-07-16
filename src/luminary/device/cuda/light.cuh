@@ -66,8 +66,8 @@ __device__ void light_evaluate_candidate(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float MIS_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction);
-  light_color            = scale_color(mul_color(light_color, bsdf_weight), MIS_weight);
+  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction);
+  light_color            = scale_color(mul_color(light_color, bsdf_weight), mis_weight);
   const float target     = color_importance(light_color);
 
   const float sampling_weight = tree_sampling_weight * solid_angle;
@@ -100,7 +100,7 @@ template <MaterialType TYPE>
 __device__ LightSampleResult<TYPE> light_list_resample(
   const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle) {
   LightSampleResult<TYPE> result;
-  result.handle = triangle_handle_get(LIGHT_ID_NONE, 0);
+  result.handle = triangle_handle_get(INSTANCE_ID_INVALID, 0);
 
   RISReservoir reservoir = ris_reservoir_init(random_1D(RANDOM_TARGET_LIGHT_GEO_RESAMPLING, pixel));
 
