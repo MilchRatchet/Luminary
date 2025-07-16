@@ -885,11 +885,16 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(entry);
 
-  bool device_thread_is_running;
-  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+  // TODO: This must be guarded with a mutex for when the device manager is shutting down.
 
-  const bool cannot_execute =
-    device_manager->is_shutdown || ((device_thread_is_running == false) && (entry->queuer_cannot_execute == true));
+  bool cannot_execute           = device_manager->is_shutdown;
+  bool device_thread_is_running = device_manager->is_shutdown == false;
+
+  if (device_manager->is_shutdown == false) {
+    __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+
+    cannot_execute |= (device_thread_is_running == false) && (entry->queuer_cannot_execute == true);
+  }
 
   if (cannot_execute || entry->skip_execution) {
     if (entry->clear_func) {
