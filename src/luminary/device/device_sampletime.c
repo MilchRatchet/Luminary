@@ -35,7 +35,8 @@ LuminaryResult sample_time_get_time(SampleTime* sample_time, double* time) {
   double samples_per_ms = 0.0;
 
   for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
-    samples_per_ms += (sample_time->time[device_id] > 0.0) ? 1.0 / sample_time->time[device_id] : 0.0;
+    const double device_time = sample_time->time[device_id];
+    samples_per_ms += (device_time > 0.0) ? 1.0 / device_time : 0.0;
   }
 
   *time = (samples_per_ms > 0.0) ? 1.0 / samples_per_ms : 0.0;

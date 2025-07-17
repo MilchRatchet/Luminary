@@ -228,6 +228,9 @@ static LuminaryResult _device_manager_handle_device_render_finished(DeviceManage
   if (device->state != DEVICE_STATE_ENABLED)
     return LUMINARY_SUCCESS;
 
+  if (device->state_abort && device->is_main_device == false)
+    return LUMINARY_SUCCESS;
+
   __FAILURE_HANDLE(device_update_render_time(device, data));
   __FAILURE_HANDLE(sample_time_set_time(device_manager->sample_time, data->common.device_index, device->renderer->last_time));
 
@@ -476,7 +479,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       }
     }
 
-    __FAILURE_HANDLE_CRITICAL(sample_time_reset(device_manager->sample_time));
     __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
 
     // Main device always computes the first samples
