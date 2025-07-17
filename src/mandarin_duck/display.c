@@ -225,16 +225,32 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
       case SDL_EVENT_QUIT:
         *exit_requested = true;
         break;
+      case SDL_EVENT_WINDOW_SHOWN:
+      case SDL_EVENT_WINDOW_HIDDEN:
+      case SDL_EVENT_WINDOW_EXPOSED:
+      case SDL_EVENT_WINDOW_MOVED:
+        break;
       case SDL_EVENT_WINDOW_RESIZED:
         _display_handle_resize(display);
         *dirty = true;
+        break;
+      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        break;
+      case SDL_EVENT_WINDOW_MINIMIZED:
+      case SDL_EVENT_WINDOW_MAXIMIZED:
+      case SDL_EVENT_WINDOW_RESTORED:
         break;
       case SDL_EVENT_WINDOW_MOUSE_ENTER:
         break;
       case SDL_EVENT_WINDOW_MOUSE_LEAVE:
         mouse_state_invalidate(display->mouse_state);
         break;
+      case SDL_EVENT_WINDOW_FOCUS_GAINED:
+      case SDL_EVENT_WINDOW_FOCUS_LOST:
+        break;
       case SDL_EVENT_WINDOW_HIT_TEST:
+        break;
+      case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
         break;
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP:
@@ -250,8 +266,15 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
       case SDL_EVENT_MOUSE_WHEEL:
         mouse_state_update_wheel(display->mouse_state, event.wheel);
         break;
+      case SDL_EVENT_CLIPBOARD_UPDATE:
+        break;
       case SDL_EVENT_DROP_FILE:
         _display_handle_drop_event(file_drop_array, event.drop);
+        break;
+      case SDL_EVENT_DROP_TEXT:
+      case SDL_EVENT_DROP_BEGIN:
+      case SDL_EVENT_DROP_COMPLETE:
+      case SDL_EVENT_DROP_POSITION:
         break;
       default:
         warn_message("Unhandled SDL event type: %u.", event.type);
