@@ -172,6 +172,11 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
 
   FILE* render_times_file = fopen(render_times_file_path, "wb");
 
+  if (render_times_file == (FILE*) 0) {
+    error_message("Failed to open file %s", render_times_file_path);
+    return;
+  }
+
   uint32_t num_benchmark_outputs;
   LUM_FAILURE_HANDLE(array_get_num_elements(duck->benchmark_output_promises, &num_benchmark_outputs));
 
