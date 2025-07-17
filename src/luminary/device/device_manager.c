@@ -265,6 +265,9 @@ static LuminaryResult _device_manager_handle_device_output_queue_work(DeviceMana
   __FAILURE_HANDLE(device_renderer_get_render_time(device->renderer, data->render_event_id, &data->descriptor.meta_data.time));
   __FAILURE_HANDLE(host_queue_output_copy_from_device(device_manager->host, data->descriptor));
 
+  // The host is now the owner of the handle.
+  data->descriptor.data_handle = (VaultHandle*) 0;
+
   return LUMINARY_SUCCESS;
 }
 
@@ -272,11 +275,8 @@ static LuminaryResult _device_manager_handle_device_output_clear_work(DeviceMana
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
-  const bool skip_execution =
-    data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output;
-
   // If we skipped execution, it is our job to destroy the handle, else the handle would be destroyed by the host.
-  if (skip_execution) {
+  if (data->descriptor.data_handle != (VaultHandle*) 0) {
     __FAILURE_HANDLE(vault_handle_destroy(&data->descriptor.data_handle));
   }
 
