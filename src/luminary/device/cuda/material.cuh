@@ -25,6 +25,7 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   float ior_in;
   /* IOR of medium on the other side. */
   float ior_out;
+  VolumeType volume_type;
 };
 
 template <>
@@ -33,6 +34,7 @@ struct MaterialContext<MATERIAL_VOLUME> {
   vec3 position;
   vec3 V;
   uint16_t state;
+  VolumeType volume_type;
 };
 
 template <>
@@ -43,6 +45,7 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   vec3 normal;
   uint16_t state;
   uint8_t flags;
+  VolumeType volume_type;
 };
 
 typedef MaterialContext<MATERIAL_GEOMETRY> MaterialContextGeometry;

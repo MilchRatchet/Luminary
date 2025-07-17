@@ -37,10 +37,11 @@ LUMINARY_KERNEL void particle_process_tasks() {
     new_state &= ~STATE_FLAG_MIS_EMISSION;
 
     DeviceTask bounce_task;
-    bounce_task.state  = new_state;
-    bounce_task.origin = ctx.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
+    bounce_task.state     = new_state;
+    bounce_task.origin    = ctx.position;
+    bounce_task.ray       = bounce_ray;
+    bounce_task.index     = task.index;
+    bounce_task.volume_id = task.volume_id;
 
     RGBF record = record_unpack(throughput.record);
     record      = mul_color(record, device.particles.albedo);

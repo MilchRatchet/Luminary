@@ -23,6 +23,7 @@ __device__ MaterialContextParticle particle_get_context(const DeviceTask task, c
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
   ctx.flags       = flags;
+  ctx.volume_type = VolumeType(task.volume_id);
 
   return ctx;
 }

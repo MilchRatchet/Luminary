@@ -94,10 +94,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     }
 
     DeviceTask bounce_task;
-    bounce_task.state  = new_state;
-    bounce_task.origin = ctx.position;
-    bounce_task.ray    = bounce_info.ray;
-    bounce_task.index  = task.index;
+    bounce_task.state     = new_state;
+    bounce_task.origin    = ctx.position;
+    bounce_task.ray       = bounce_info.ray;
+    bounce_task.index     = task.index;
+    bounce_task.volume_id = task.volume_id;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
       DeviceTaskThroughput bounce_throughput;

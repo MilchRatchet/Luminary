@@ -33,10 +33,16 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     RGBF record = record_unpack(throughput.record);
     record      = mul_color(record, bounce_info.weight);
 
+    uint16_t volume_id = task.volume_id;
+
     if (bounce_info.is_transparent_pass) {
       const bool refraction_is_inside       = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
       const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(ior_stack, ctx.ior_out, ior_stack_method);
+
+      const VolumeType above_water_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+
+      volume_id = (refraction_is_inside) ? above_water_volume : VOLUME_TYPE_OCEAN;
     }
 
     ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
@@ -47,10 +53,11 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     new_state &= ~STATE_FLAG_MIS_EMISSION;
 
     DeviceTask bounce_task;
-    bounce_task.state  = new_state;
-    bounce_task.origin = ctx.position;
-    bounce_task.ray    = bounce_info.ray;
-    bounce_task.index  = task.index;
+    bounce_task.state     = new_state;
+    bounce_task.origin    = ctx.position;
+    bounce_task.ray       = bounce_info.ray;
+    bounce_task.index     = task.index;
+    bounce_task.volume_id = volume_id;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);

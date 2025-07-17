@@ -32,7 +32,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.absorption = ocean_jerlov_absorption_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.scattering = ocean_jerlov_scattering_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.dist       = 10000.0f;
-  volume.max_height = OCEAN_MAX_HEIGHT;
+  volume.max_height = 65535.0f;
   volume.min_height = -65535.0f;
 
   volume.max_scattering = color_importance(volume.scattering);
@@ -49,28 +49,6 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
     default:
       return {};
   }
-}
-
-__device__ VolumeType volume_get_type_at_position(const vec3 pos) {
-  VolumeType type = VOLUME_TYPE_NONE;
-
-  if (device.fog.active) {
-    const VolumeDescriptor volume_fog = volume_get_descriptor_preset_fog();
-
-    if (pos.y <= volume_fog.max_height && pos.y >= volume_fog.min_height) {
-      type = VOLUME_TYPE_FOG;
-    }
-  }
-
-  if (device.ocean.active) {
-    const VolumeDescriptor volume_ocean = volume_get_descriptor_preset_ocean();
-
-    if (pos.y <= volume_ocean.max_height && pos.y >= volume_ocean.min_height) {
-      type = VOLUME_TYPE_OCEAN;
-    }
-  }
-
-  return type;
 }
 
 __device__ bool volume_should_do_direct_lighting(const VolumeType type, const uint8_t state) {
@@ -118,24 +96,15 @@ __device__ VolumePath volume_compute_path(
   if (volume.max_height <= volume.min_height)
     return make_volume_path(-FLT_MAX, 0.0f);
 
+  if (volume.type == VOLUME_TYPE_NONE)
+    return make_volume_path(-FLT_MAX, 0.0f);
+
   // Vertical intersection
   float start_y;
   float end_y;
   if (volume.type == VOLUME_TYPE_OCEAN) {
-    const bool above_surface = ocean_get_relative_height(origin, OCEAN_ITERATIONS_INTERSECTION) > 0.0f;
-
-    // Without loss of generality, we can simply assume that the end of the volume is at our closest intersection
-    // as long as we are below the surface.
-    const float surface_intersect = ((ocean_fast_path == false) || above_surface) ? ocean_intersection_distance(origin, ray, limit) : limit;
-
-    if (above_surface) {
-      start_y = surface_intersect;
-      end_y   = FLT_MAX;
-    }
-    else {
-      start_y = 0.0f;
-      end_y   = surface_intersect;
-    }
+    start_y = 0.0f;
+    end_y   = (ocean_fast_path == false) ? ocean_intersection_distance(origin, ray, limit) : limit;
   }
   else {
     if (fabsf(ray.y) < 0.005f) {
@@ -301,11 +270,22 @@ __device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec
   return fog_transmittance;
 }
 
-__device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray, const float depth) {
-  const float fog_transmittance  = volume_integrate_transmittance_fog(origin, ray, depth);
-  const RGBF ocean_transmittance = volume_integrate_transmittance_ocean(origin, ray, depth);
+__device__ RGBF volume_integrate_transmittance(const VolumeType volume_type, const vec3 origin, const vec3 ray, const float depth) {
+  const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-  return scale_color(ocean_transmittance, fog_transmittance);
+  const VolumePath path = volume_compute_path(volume, origin, ray, depth);
+
+  RGBF transmittance = splat_color(1.0f);
+
+  if (path.start >= 0.0f) {
+    RGBF volume_transmittance = volume_get_transmittance(volume);
+
+    transmittance.r = expf(-path.length * volume_transmittance.r);
+    transmittance.g = expf(-path.length * volume_transmittance.g);
+    transmittance.b = expf(-path.length * volume_transmittance.b);
+  }
+
+  return transmittance;
 }
 
 template <MaterialType TYPE>
@@ -338,10 +318,11 @@ __device__ vec3 volume_sample_ray<MATERIAL_PARTICLE>(const MaterialContextPartic
 
 __device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume) {
   MaterialContextVolume ctx;
-  ctx.descriptor = volume;
-  ctx.position   = task.origin;
-  ctx.V          = scale_vector(task.ray, -1.0f);
-  ctx.state      = task.state;
+  ctx.descriptor  = volume;
+  ctx.position    = task.origin;
+  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.state       = task.state;
+  ctx.volume_type = volume.type;
 
   return ctx;
 }

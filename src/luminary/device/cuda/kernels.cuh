@@ -7,6 +7,7 @@
 #include "camera_post_common.cuh"
 #include "cloud.cuh"
 #include "ior_stack.cuh"
+#include "ocean_utils.cuh"
 #include "purkinje.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
@@ -92,6 +93,18 @@ LUMINARY_KERNEL void tasks_create() {
     task.index.y = undersampling_y;
 
     task = camera_get_ray(task);
+
+    task.volume_id = uint16_t(VOLUME_TYPE_NONE);
+
+    if (device.fog.active) {
+      task.volume_id = VOLUME_TYPE_FOG;
+    }
+
+    if (device.ocean.active) {
+      const bool camera_is_underwater = ocean_is_underwater(task.origin);
+
+      task.volume_id = (camera_is_underwater) ? VOLUME_TYPE_OCEAN : task.volume_id;
+    }
 
     const uint32_t pixel                     = get_pixel_id(task.index);
     device.ptrs.frame_direct_buffer[pixel]   = {};

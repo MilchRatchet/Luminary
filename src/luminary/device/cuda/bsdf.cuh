@@ -81,6 +81,7 @@ template <>
 __device__ RGBF bsdf_evaluate(
   const MaterialContextVolume ctx, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
   const float one_over_sampling_pdf) {
+  is_refraction = false;
   return splat_color(volume_phase_evaluate(ctx, L) * one_over_sampling_pdf);
 }
 
@@ -88,6 +89,7 @@ template <>
 __device__ RGBF bsdf_evaluate(
   const MaterialContextParticle ctx, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
   const float one_over_sampling_pdf) {
+  is_refraction = false;
   return scale_color(device.particles.albedo, volume_phase_evaluate(ctx, L) * one_over_sampling_pdf);
 }
 

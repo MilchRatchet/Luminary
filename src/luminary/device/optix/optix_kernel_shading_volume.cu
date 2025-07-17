@@ -31,7 +31,7 @@ extern "C" __global__ void __raygen__optix() {
   const DeviceTaskTrace trace           = task_trace_load(task_base_address);
   const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-  const VolumeType volume_type = VOLUME_HIT_TYPE(trace.handle.instance_id);
+  const VolumeType volume_type = VolumeType(task.volume_id);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   if (volume_should_do_direct_lighting(volume_type, task.state) == false)

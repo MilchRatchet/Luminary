@@ -205,6 +205,7 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   ctx.flags       = flags;
   ctx.ior_in      = ior_in;
   ctx.ior_out     = ior_out;
+  ctx.volume_type = VolumeType(info.task.volume_id);
 
   return ctx;
 }

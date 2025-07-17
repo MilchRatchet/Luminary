@@ -58,35 +58,17 @@ LUMINARY_KERNEL void volume_process_events() {
       }
     }
 
-    VolumePath path = make_volume_path(FLT_MAX, 0.0f);
-    VolumeDescriptor volume;
-    volume.type = VOLUME_TYPE_NONE;
-
-    if (device.fog.active) {
-      const VolumeDescriptor fog_volume = volume_get_descriptor_preset_fog();
-      const VolumePath fog_path         = volume_compute_path(fog_volume, task.origin, task.ray, depth, true);
-
-      if (fog_path.length > 0.0f && fog_path.start < path.start) {
-        volume = fog_volume;
-        path   = fog_path;
-      }
-    }
-
-    if (device.ocean.active) {
-      const VolumeDescriptor ocean_volume = volume_get_descriptor_preset_ocean();
-      const VolumePath ocean_path         = volume_compute_path(ocean_volume, task.origin, task.ray, depth, true);
-
-      if (ocean_path.length > 0.0f && ocean_path.start < path.start) {
-        volume = ocean_volume;
-        path   = ocean_path;
-      }
-    }
-
     const uint32_t pixel                  = get_pixel_id(task.index);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
     RGBF record                           = record_unpack(throughput.record);
 
+    VolumeDescriptor volume;
+    volume.type = VolumeType(task.volume_id);
+
     if (volume.type != VOLUME_TYPE_NONE) {
+      volume          = volume_get_descriptor_preset(volume.type);
+      VolumePath path = volume_compute_path(volume, task.origin, task.ray, depth, true);
+
       float volume_intersection_probability = (task.state & STATE_FLAG_CAMERA_DIRECTION) ? 0.75f : 1.0f;
 
       const bool sky_fast_path = handle.instance_id == HIT_TYPE_SKY && device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
@@ -217,10 +199,11 @@ LUMINARY_KERNEL void volume_process_tasks() {
     task_throughput_record_store(dst_task_base_address, throughput.record);
 
     DeviceTask bounce_task;
-    bounce_task.state  = new_state;
-    bounce_task.origin = ctx.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
+    bounce_task.state     = new_state;
+    bounce_task.origin    = ctx.position;
+    bounce_task.ray       = bounce_ray;
+    bounce_task.index     = task.index;
+    bounce_task.volume_id = task.volume_id;
 
     task_store(dst_task_base_address, bounce_task);
   }

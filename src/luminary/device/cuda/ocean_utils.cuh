@@ -110,6 +110,10 @@ __device__ float ocean_get_relative_height(const vec3 p, const int steps) {
   return p.y - (device.ocean.height + ocean_get_height(p, steps));
 }
 
+__device__ bool ocean_is_underwater(const vec3 p) {
+  return ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION) < 0.0f;
+}
+
 __device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
   const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
 

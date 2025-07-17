@@ -306,7 +306,7 @@ typedef uint32_t DeviceIORStack;
 
 struct DeviceTask {
   uint16_t state;
-  uint16_t padding;
+  uint16_t volume_id;
   ushort2 index;
   vec3 origin;
   vec3 ray;
