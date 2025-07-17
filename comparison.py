@@ -28,7 +28,7 @@ def GatherData(ref, testPath):
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser("simple_example")
+  parser = argparse.ArgumentParser("Luminary Comparison")
   parser.add_argument("--reference", type=str, nargs=1, required=True, help="Path to reference image")
   parser.add_argument("--test", type=str, nargs='+', required=True, help="Paths to directories containing test images")
   parser.add_argument("--output", type=str, nargs=1, required=True, help="Path to output directory")
