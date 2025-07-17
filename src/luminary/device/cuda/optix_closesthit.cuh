@@ -37,16 +37,6 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(particle_trace)() {
 }
 
 ////////////////////////////////////////////////////////////////////
-// OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE
-////////////////////////////////////////////////////////////////////
-
-extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(light_bsdf_trace)() {
-  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE);
-
-  optixSetPayloadTriangleID(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_ID, optixGetPrimitiveIndex());
-}
-
-////////////////////////////////////////////////////////////////////
 // OPTIX_SBT_OFFSET_SHADOW_TRACE
 ////////////////////////////////////////////////////////////////////
 

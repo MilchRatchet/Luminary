@@ -4,7 +4,6 @@
 enum OptixKernelFunction {
   OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE,
   OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE,
-  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE,
   OPTIX_KERNEL_FUNCTION_COUNT
@@ -47,18 +46,6 @@ enum OptixKernelFunctionParticleTracePayloadValue {
   OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_INSTANCE_ID,
   OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_COUNT
 } typedef OptixKernelFunctionParticleTracePayloadValue;
-
-struct OptixKernelFunctionLightBSDFTracePayload {
-  union {
-    uint32_t triangle_id;
-    unsigned int v0;
-  };
-} typedef OptixKernelFunctionLightBSDFTracePayload;
-
-enum OptixKernelFunctionLightBSDFTracePayloadValue {
-  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_ID,
-  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT
-} typedef OptixKernelFunctionLightBSDFTracePayloadValue;
 
 struct OptixKernelFunctionShadowTracePayload {
   union {

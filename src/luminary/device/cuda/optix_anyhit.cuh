@@ -37,15 +37,6 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
 }
 
 ////////////////////////////////////////////////////////////////////
-// OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE
-////////////////////////////////////////////////////////////////////
-
-extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
-  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE);
-  // TODO: Add support to check for fully transparent hits, we want to ignore those.
-}
-
-////////////////////////////////////////////////////////////////////
 // OPTIX_SBT_OFFSET_SHADOW_TRACE
 ////////////////////////////////////////////////////////////////////
 

@@ -30,12 +30,10 @@ static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
   [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_SKY] = {.name = "optix_kernel_shading_particles_sky", .register_count = 40, .allow_gas = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
-  "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__light_bsdf_trace", "__anyhit__shadow_trace",
-  "__anyhit__shadow_sun_trace"};
+  "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__shadow_trace", "__anyhit__shadow_sun_trace"};
 
 static const char* optix_closesthit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
-  "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__light_bsdf_trace", "__closesthit__shadow_trace",
-  "__closesthit__shadow_sun_trace"};
+  "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__shadow_trace", "__closesthit__shadow_sun_trace"};
 
 static const uint32_t optix_kernel_function_payload_semantics_geometry_trace[OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_COUNT] = {
   [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_DEPTH] =
@@ -50,10 +48,6 @@ static const uint32_t optix_kernel_function_payload_semantics_particle_trace[OPT
     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE,
   [OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_INSTANCE_ID] =
     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE};
-
-static const uint32_t optix_kernel_function_payload_semantics_light_bsdf_trace[OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT] =
-  {[OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_ID] =
-     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_NONE};
 
 static const uint32_t optix_kernel_function_payload_semantics_shadow_trace[OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT] = {
   [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE] =
@@ -82,9 +76,6 @@ static const OptixPayloadType optix_kernel_function_payload_types[OPTIX_KERNEL_F
   [OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE] =
     {.numPayloadValues = OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE_PAYLOAD_VALUE_COUNT,
      .payloadSemantics = optix_kernel_function_payload_semantics_particle_trace},
-  [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE] =
-    {.numPayloadValues = OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT,
-     .payloadSemantics = optix_kernel_function_payload_semantics_light_bsdf_trace},
   [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE] =
     {.numPayloadValues = OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT,
      .payloadSemantics = optix_kernel_function_payload_semantics_shadow_trace},
