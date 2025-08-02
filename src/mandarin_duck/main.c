@@ -26,11 +26,19 @@ int main(int argc, char* argv[]) {
 
     mandarin_duck_create_info.mode =
       (argument_parser->results.num_benchmark_outputs == 0) ? MANDARIN_DUCK_MODE_DEFAULT : MANDARIN_DUCK_MODE_BENCHMARK;
-    mandarin_duck_create_info.host                   = host;
-    mandarin_duck_create_info.output_directory       = argument_parser->results.output_directory;
-    mandarin_duck_create_info.num_benchmark_outputs  = argument_parser->results.num_benchmark_outputs;
-    mandarin_duck_create_info.benchmark_name         = argument_parser->results.benchmark_name;
-    mandarin_duck_create_info.sync_render_resolution = true;
+    mandarin_duck_create_info.host             = host;
+    mandarin_duck_create_info.output_directory = argument_parser->results.output_directory;
+
+    switch (mandarin_duck_create_info.mode) {
+      default:
+      case MANDARIN_DUCK_MODE_DEFAULT:
+        mandarin_duck_create_info.sync_render_resolution = true;
+        break;
+      case MANDARIN_DUCK_MODE_BENCHMARK:
+        mandarin_duck_create_info.num_benchmark_outputs = argument_parser->results.num_benchmark_outputs;
+        mandarin_duck_create_info.benchmark_name        = argument_parser->results.benchmark_name;
+        break;
+    }
   }
 
   argument_parser_destroy(&argument_parser);
