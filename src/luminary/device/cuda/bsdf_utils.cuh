@@ -397,11 +397,12 @@ __device__ RGBF bsdf_conductor(
       break;
   };
 
+  const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
 
-  const RGBF f0_conductor      = opaque_color(mat_ctx.albedo);
+  const RGBF f0_conductor      = albedo;
   const RGBF fresnel_conductor = bsdf_fresnel_schlick(f0_conductor, bsdf_shadowed_F90(f0_conductor), ctx.HdotV);
 
   const RGBF ss_term_with_fresnel = scale_color(fresnel_conductor, ss_term);
@@ -462,6 +463,7 @@ __device__ RGBF bsdf_glossy(
       break;
   };
 
+  const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
@@ -471,7 +473,7 @@ __device__ RGBF bsdf_glossy(
   const RGBF fresnel_glossy = bsdf_fresnel_schlick(f0_glossy, bsdf_shadowed_F90(f0_glossy), ctx.HdotV);
 
   const RGBF ss_term_with_fresnel = scale_color(fresnel_glossy, ss_term / conductor_directional_albedo);
-  const RGBF diff_term_with_color = scale_color(opaque_color(mat_ctx.albedo), diff_term * (1.0f - glossy_directional_albedo));
+  const RGBF diff_term_with_color = scale_color(albedo, diff_term * (1.0f - glossy_directional_albedo));
 
   return add_color(ss_term_with_fresnel, diff_term_with_color);
 }
@@ -535,6 +537,7 @@ __device__ RGBF bsdf_dielectric(
     term *= ctx.fresnel_dielectric;
   }
 
+  const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, roughness, ctx.refraction_index);
@@ -545,7 +548,7 @@ __device__ RGBF bsdf_dielectric(
     term = (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION) ? 1.0f : 0.0f;
   }
 
-  return scale_color(opaque_color(mat_ctx.albedo), term);
+  return scale_color(albedo, term);
 }
 
 ///////////////////////////////////////////////////
@@ -555,14 +558,16 @@ __device__ RGBF bsdf_dielectric(
 __device__ RGBF bsdf_multiscattering_evaluate(
   const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
   const float one_over_sampling_pdf) {
+  const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx);
+
   if (ctx.is_refraction)
-    return scale_color(bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf), mat_ctx.albedo.a);
+    return scale_color(bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf), opacity);
 
   RGBF conductor  = bsdf_conductor(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
   RGBF glossy     = bsdf_glossy(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
   RGBF dielectric = bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
 
-  return scale_color(add_color(add_color(conductor, glossy), dielectric), mat_ctx.albedo.a);
+  return scale_color(add_color(add_color(conductor, glossy), dielectric), opacity);
 }
 
 #endif /* CU_BSDF_UTILS_H */

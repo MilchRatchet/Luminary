@@ -51,7 +51,6 @@ template <>
 struct MaterialContext<MATERIAL_GEOMETRY> {
   uint32_t instance_id;
   uint32_t tri_id;
-  RGBAF albedo;
   vec3 position;
   vec3 V;
   vec3 normal;
@@ -301,7 +300,6 @@ __device__ MaterialContextGeometry material_get_default_context() {
 
   ctx.instance_id = HIT_TYPE_INVALID;
   ctx.tri_id      = 0;
-  ctx.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
   ctx.normal      = get_vector(0.0f, 0.0f, 1.0f);
   ctx.position    = get_vector(0.0f, 0.0f, 0.0f);
   ctx.V           = get_vector(0.0f, 0.0f, 1.0f);
@@ -310,6 +308,8 @@ __device__ MaterialContextGeometry material_get_default_context() {
   ctx.ior_in      = 1.0f;
   ctx.ior_out     = 1.0f;
 
+  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, 0.5f);
   material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
 

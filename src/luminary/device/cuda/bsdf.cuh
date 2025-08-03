@@ -136,13 +136,17 @@ __device__ BSDFSampleInfo<TYPE> bsdf_sample(const MaterialContext<TYPE> mat_ctx,
 
 template <>
 __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(const MaterialContextGeometry mat_ctx, const ushort2 pixel) {
-  if (mat_ctx.albedo.a < 1.0f) {
+  const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx);
+
+  if (opacity < 1.0f) {
     const float transparency_random = random_1D(RANDOM_TARGET_BSDF_OPACITY, pixel);
 
-    if (transparency_random > mat_ctx.albedo.a) {
+    if (transparency_random > opacity) {
+      const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+
       BSDFSampleInfo<MATERIAL_GEOMETRY> info;
-      info.ray    = scale_vector(mat_ctx.V, -1.0f);
-      info.weight = (mat_ctx.flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) ? opaque_color(mat_ctx.albedo) : get_color(1.0f, 1.0f, 1.0f);
+      info.ray                 = scale_vector(mat_ctx.V, -1.0f);
+      info.weight              = (mat_ctx.flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) ? albedo : get_color(1.0f, 1.0f, 1.0f);
       info.is_microfacet_based = false;
       info.is_transparent_pass = true;
 

@@ -146,9 +146,10 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 
         const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+        const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
 
-        write_beauty_buffer_forced(add_color(opaque_color(ctx.albedo), emission), pixel);
+        write_beauty_buffer_forced(add_color(albedo, emission), pixel);
       } break;
       case LUMINARY_SHADING_MODE_DEPTH: {
         write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
@@ -191,8 +192,9 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 
         const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+        const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
-        const RGBF color                  = add_color(scale_color(opaque_color(ctx.albedo), 0.025f), emission);
+        const RGBF color                  = add_color(scale_color(albedo, 0.025f), emission);
 
         write_beauty_buffer_forced(color, pixel);
       } break;
