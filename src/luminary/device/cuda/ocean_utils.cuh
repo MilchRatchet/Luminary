@@ -487,7 +487,6 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, Devi
   ctx.instance_id = HIT_TYPE_OCEAN;
   ctx.tri_id      = 0;
   ctx.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
-  ctx.emission    = get_color(0.0f, 0.0f, 0.0f);
   ctx.normal      = normal;
   ctx.position    = task.origin;
   ctx.V           = scale_vector(task.ray, -1.0f);
@@ -497,6 +496,7 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, Devi
   ctx.ior_out     = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
 
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, BSDF_ROUGHNESS_CLAMP);
+  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
 
   return ctx;
 }

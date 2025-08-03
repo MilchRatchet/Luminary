@@ -690,11 +690,11 @@ static void _window_entity_properties_material_action(Window* window, Display* d
   if (material.emission_active) {
     if (material.luminance_tex != 0xFFFF) {
       update_data |= _window_entity_properties_add_slider(
-        data, "Emission Scale", &material.emission_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+        data, "Emission Scale", &material.emission_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1023.0f, 1.0f);
     }
     else {
       update_data |=
-        _window_entity_properties_add_slider(data, "Emission", &material.emission, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, FLT_MAX, 1.0f);
+        _window_entity_properties_add_slider(data, "Emission", &material.emission, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1023.0f, 1.0f);
     }
   }
 

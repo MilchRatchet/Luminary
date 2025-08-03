@@ -12,7 +12,7 @@ enum MaterialParamType {
   MATERIAL_PARAM_TYPE_IOR,                // [1,3]
   MATERIAL_PARAM_TYPE_ABBE,               // [9,91]
   MATERIAL_PARAM_TYPE_NORM_COLOR,         // [0,1]^3
-  MATERIAL_PARAM_TYPE_COLOR,              // [0,1000]^3
+  MATERIAL_PARAM_TYPE_COLOR,              // [0,1023]^3
 } typedef MaterialParamType;
 
 #define MATERIAL_GEOMETRY_PARAM_ALLOCATE(__name, __type, __bitcount)                                                                    \
@@ -52,7 +52,6 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   uint32_t instance_id;
   uint32_t tri_id;
   RGBAF albedo;
-  RGBF emission;
   vec3 position;
   vec3 V;
   vec3 normal;
@@ -102,9 +101,9 @@ __device__ uint32_t material_param_get_data(const MaterialContext<MATERIAL_GEOME
 
   uint32_t result = (ctx.data[first_index] >> first_shift) & first_mask;
 
-  if constexpr (((OFFSET & 0x1Fu) + SIZE) > 0x20u) {
+  if constexpr (((OFFSET & 0x1Fu) + SIZE) > 32u) {
     constexpr uint32_t second_index = first_index + 1u;
-    constexpr uint32_t second_mask  = (1u << (((OFFSET & 0x1Fu) + SIZE) - 5u)) - 1u;
+    constexpr uint32_t second_mask  = (1u << (((OFFSET & 0x1Fu) + SIZE) - 32u)) - 1u;
     constexpr uint32_t second_shift = 32u - (OFFSET & 0x1Fu);
 
     result |= (ctx.data[second_index] & second_mask) << second_shift;
@@ -124,7 +123,7 @@ __device__ void material_param_set_data(MaterialContext<MATERIAL_GEOMETRY>& ctx,
 
   ctx.data[first_index] = (ctx.data[first_index] & ~(first_src_mask << first_shift)) | ((value & first_src_mask) << first_shift);
 
-  if constexpr (((OFFSET & 0x1Fu) + SIZE) > 0x20u) {
+  if constexpr (((OFFSET & 0x1Fu) + SIZE) > 32u) {
     constexpr uint32_t second_index = first_index + 1u;
     constexpr uint32_t second_shift = 32u - (OFFSET & 0x1Fu);
 
@@ -182,6 +181,30 @@ __device__ RGBF material_get_color(const MaterialContext<MATERIAL_GEOMETRY>& ctx
     result.b = data_blue * (1.0f / 0x3FF);
   }
   else {
+    const uint32_t data_max_value       = data & 0x3FFF;
+    const uint32_t data_lower_relative  = (data >> 14) & 0xFF;
+    const uint32_t data_higher_relative = (data >> 22) & 0xFF;
+    const uint32_t max_component        = data >> 30;
+
+    float max_value       = (data_max_value > 0) ? __uint_as_float((data_max_value << 14) | 0x30000000) * (1023.0f / 2.0f) : 0.0f;
+    float lower_relative  = data_lower_relative * (1.0f / 0xFF) * max_value;
+    float higher_relative = data_higher_relative * (1.0f / 0xFF) * max_value;
+
+    if (max_component == 0) {
+      result.r = max_value;
+      result.g = lower_relative;
+      result.b = higher_relative;
+    }
+    else if (max_component == 1) {
+      result.r = lower_relative;
+      result.g = max_value;
+      result.b = higher_relative;
+    }
+    else {
+      result.r = lower_relative;
+      result.g = higher_relative;
+      result.b = max_value;
+    }
   }
 
   return result;
@@ -235,6 +258,39 @@ __device__ void material_set_color(MaterialContext<MATERIAL_GEOMETRY>& ctx, cons
     data = data_red | (data_green << 10) | (data_blue << 20);
   }
   else {
+    uint32_t max_component;
+    float max_value;
+    float lower_relative;
+    float higher_relative;
+
+    if (value.r > value.g && value.r > value.b) {
+      max_component   = 0;
+      max_value       = value.r;
+      lower_relative  = value.g;
+      higher_relative = value.b;
+    }
+    else if (value.g > value.b) {
+      max_component   = 1;
+      max_value       = value.g;
+      lower_relative  = value.r;
+      higher_relative = value.b;
+    }
+    else {
+      max_component   = 2;
+      max_value       = value.b;
+      lower_relative  = value.r;
+      higher_relative = value.g;
+    }
+
+    max_value       = __saturatef(max_value * (1.0f / 1023.0f)) * 2.0f;  // Map to [0,2]
+    lower_relative  = __saturatef(lower_relative * (2.0f / 1023.0f) * (1.0f / max_value));
+    higher_relative = __saturatef(higher_relative * (2.0f / 1023.0f) * (1.0f / max_value));
+
+    uint32_t data_max_value       = (__float_as_uint(max_value) >= 0x30000000) ? (__float_as_uint(max_value) >> 14) & 0x3FFF : 0;
+    uint32_t data_lower_relative  = (uint32_t) (lower_relative * 0xFF + 0.5f);
+    uint32_t data_higher_relative = (uint32_t) (higher_relative * 0xFF + 0.5f);
+
+    data = data_max_value | (data_lower_relative << 14) | (data_higher_relative << 22) | (max_component << 30);
   }
 
   material_param_set_data<PARAM>(ctx, data);
@@ -246,7 +302,6 @@ __device__ MaterialContextGeometry material_get_default_context() {
   ctx.instance_id = HIT_TYPE_INVALID;
   ctx.tri_id      = 0;
   ctx.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
-  ctx.emission    = get_color(0.0f, 0.0f, 0.0f);
   ctx.normal      = get_vector(0.0f, 0.0f, 1.0f);
   ctx.position    = get_vector(0.0f, 0.0f, 0.0f);
   ctx.V           = get_vector(0.0f, 0.0f, 1.0f);
@@ -256,6 +311,7 @@ __device__ MaterialContextGeometry material_get_default_context() {
   ctx.ior_out     = 1.0f;
 
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, 0.5f);
+  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
 
   return ctx;
 }
