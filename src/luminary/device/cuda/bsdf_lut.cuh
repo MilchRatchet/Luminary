@@ -26,8 +26,10 @@ LUMINARY_KERNEL void bsdf_generate_ss_lut(KernelArgsBSDFGenerateSSLUT args) {
   const uint32_t y = id / BSDF_LUT_SIZE;
   const uint32_t x = id - y * BSDF_LUT_SIZE;
 
-  const float NdotV     = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
-  const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
+  const float NdotV      = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
+  const float roughness  = y * (1.0f / (BSDF_LUT_SIZE - 1));
+  const float roughness2 = roughness * roughness;
+  const float roughness4 = roughness2 * roughness2;
 
   MaterialContextGeometry ctx = material_get_default_context();
   ctx.flags                   = MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE | MATERIAL_FLAG_METALLIC;
@@ -45,7 +47,7 @@ LUMINARY_KERNEL void bsdf_generate_ss_lut(KernelArgsBSDFGenerateSSLUT args) {
     const float NdotL = reflection.z;
 
     if (NdotL > 0.0f)
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, NdotL, NdotV);
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, roughness4, NdotL, NdotV);
   }
 
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
@@ -63,8 +65,10 @@ LUMINARY_KERNEL void bsdf_generate_glossy_lut(KernelArgsBSDFGenerateGlossyLUT ar
   const uint32_t y = id / BSDF_LUT_SIZE;
   const uint32_t x = id - y * BSDF_LUT_SIZE;
 
-  const float NdotV     = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
-  const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
+  const float NdotV      = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
+  const float roughness  = y * (1.0f / (BSDF_LUT_SIZE - 1));
+  const float roughness2 = roughness * roughness;
+  const float roughness4 = roughness2 * roughness2;
 
   MaterialContextGeometry ctx = material_get_default_context();
   ctx.flags                   = MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE | MATERIAL_FLAG_METALLIC;
@@ -86,7 +90,7 @@ LUMINARY_KERNEL void bsdf_generate_glossy_lut(KernelArgsBSDFGenerateGlossyLUT ar
     if (NdotL > 0.0f) {
       const float HdotV  = fabsf(dot_product(H, ctx.V));
       const RGBF fresnel = bsdf_fresnel_schlick(f0, bsdf_shadowed_F90(f0), HdotV);
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, NdotL, NdotV) * luminance(fresnel);
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, roughness4, NdotL, NdotV) * luminance(fresnel);
     }
   }
 
@@ -110,9 +114,11 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
   const uint32_t y = (id - z * (BSDF_LUT_SIZE * BSDF_LUT_SIZE)) / BSDF_LUT_SIZE;
   const uint32_t x = id - y * BSDF_LUT_SIZE - z * BSDF_LUT_SIZE * BSDF_LUT_SIZE;
 
-  const float NdotV     = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
-  const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
-  const float ior       = 1.0f + z * (1.0f / (BSDF_LUT_SIZE - 1)) * 2.0f;
+  const float NdotV      = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
+  const float roughness  = y * (1.0f / (BSDF_LUT_SIZE - 1));
+  const float roughness2 = roughness * roughness;
+  const float roughness4 = roughness2 * roughness2;
+  const float ior        = 1.0f + z * (1.0f / (BSDF_LUT_SIZE - 1)) * 2.0f;
 
   MaterialContextGeometry ctx = material_get_default_context();
   ctx.flags                   = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
@@ -136,7 +142,7 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
     const float NdotL = reflection.z;
 
     if (NdotL > 0.0f) {
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, NdotL, NdotV) * fresnel;
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, roughness4, NdotL, NdotV) * fresnel;
     }
 
     H          = bsdf_microfacet_refraction_sample(ctx, make_ushort2(0, 0), RANDOM_TARGET_BSDF_REFRACTION, i, 0);
@@ -150,8 +156,10 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
     if (NdotR > 0.0f) {
       const float HdotR = fabsf(dot_product(H, refraction));
       const float NdotH = fabsf(H.z);
-      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(ctx, HdotR, HdotV, NdotH, NdotR, NdotV, ctx.ior_in / ctx.ior_out)
-             * (1.0f - fresnel);
+      const float value = bsdf_microfacet_refraction_evaluate_sampled_microfacet(
+        ctx, roughness4, HdotR, HdotV, NdotH, NdotR, NdotV, ctx.ior_in / ctx.ior_out);
+
+      sum += value * (1.0f - fresnel);
     }
   }
 
@@ -175,7 +183,7 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
     const float NdotL = reflection.z;
 
     if (NdotL > 0.0f) {
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, NdotL, NdotV) * fresnel;
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx, roughness4, NdotL, NdotV) * fresnel;
     }
 
     H          = bsdf_microfacet_refraction_sample(ctx, make_ushort2(0, 0), RANDOM_TARGET_BSDF_REFRACTION, i, 0);
@@ -189,8 +197,10 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
     if (NdotR > 0.0f) {
       const float HdotR = fabsf(dot_product(H, refraction));
       const float NdotH = fabsf(H.z);
-      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(ctx, HdotR, HdotV, NdotH, NdotR, NdotV, ctx.ior_in / ctx.ior_out)
-             * (1.0f - fresnel);
+      const float value = bsdf_microfacet_refraction_evaluate_sampled_microfacet(
+        ctx, roughness4, HdotR, HdotV, NdotH, NdotR, NdotV, ctx.ior_in / ctx.ior_out);
+
+      sum += value * (1.0f - fresnel);
     }
   }
 

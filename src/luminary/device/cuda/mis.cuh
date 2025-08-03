@@ -26,7 +26,11 @@ __device__ float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec
     const float HdotV = dot_product(H, ctx.V);
     const float HdotL = dot_product(H, L);
 
-    gi_pdf = bsdf_microfacet_refraction_pdf(ctx, NdotH, NdotV, NdotL, HdotV, HdotL, refraction_index);
+    const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx);
+    const float roughness2 = roughness * roughness;
+    const float roughness4 = roughness2 * roughness2;
+
+    gi_pdf = bsdf_microfacet_refraction_pdf(ctx, roughness4, NdotH, NdotV, NdotL, HdotV, HdotL, refraction_index);
   }
   else {
     const vec3 H = normalize_vector(add_vector(L, ctx.V));
