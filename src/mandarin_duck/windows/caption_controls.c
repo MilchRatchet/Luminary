@@ -44,7 +44,7 @@ static void _window_caption_controls_action(Window* window, Display* display, Lu
                              .hover_color  = 0xFF13FF21,
                              .press_color  = 0xFF026200,
                              .tooltip_text = (const char*) 0})) {
-    display_handle_maximize(display, host);
+    display_handle_maximize(display, host, true);
   }
 }
 

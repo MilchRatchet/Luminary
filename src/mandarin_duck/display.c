@@ -9,7 +9,7 @@
 void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
 
 #define DISPLAY_MIN_FRAME_TIME_NS 16666666  // Nanoseconds frametime at 60 FPS
-#define DISPLAY_SCREEN_MARGIN 5
+#define DISPLAY_SCREEN_MARGIN 10
 
 #define DISPLAY_SPLASHSCREEN_WIDTH 640
 #define DISPLAY_SPLASHSCREEN_HEIGHT 180
@@ -586,7 +586,7 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
   }
 }
 
-void display_handle_maximize(Display* display, LuminaryHost* host) {
+void display_handle_maximize(Display* display, LuminaryHost* host, bool reinstate_position) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   uint32_t width;
@@ -617,8 +617,10 @@ void display_handle_maximize(Display* display, LuminaryHost* host) {
 
   display->is_maximized = !display->is_maximized;
 
-  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
-  SDL_SetWindowPosition(display->sdl_window, (int) x, (int) y);
+  display_resize(display, width, height);
+
+  if (reinstate_position)
+    SDL_SetWindowPosition(display->sdl_window, (int) x, (int) y);
 
   if (display->sync_render_resolution) {
     LuminaryRendererSettings settings;
@@ -647,13 +649,16 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
       }
     }
 
-    uint32_t splash_screen_x = (display->width - DISPLAY_SPLASHSCREEN_WIDTH) >> 1;
-    uint32_t splash_screen_y = (display->height - DISPLAY_SPLASHSCREEN_HEIGHT) >> 1;
+    // Render the splash screen, but only if the display is large enough.
+    if (display->width >= DISPLAY_SPLASHSCREEN_WIDTH && display->height >= DISPLAY_SPLASHSCREEN_HEIGHT) {
+      uint32_t splash_screen_x = (display->width - DISPLAY_SPLASHSCREEN_WIDTH) >> 1;
+      uint32_t splash_screen_y = (display->height - DISPLAY_SPLASHSCREEN_HEIGHT) >> 1;
 
-    for (uint32_t y = 0; y < DISPLAY_SPLASHSCREEN_HEIGHT; y++) {
-      uint32_t* dst = (uint32_t*) (display->buffer + (splash_screen_y + y) * display->pitch);
-      for (uint32_t x = 0; x < DISPLAY_SPLASHSCREEN_WIDTH; x++) {
-        dst[splash_screen_x + x] = display->splash_screen[(DISPLAY_SPLASHSCREEN_HEIGHT - y - 1) * DISPLAY_SPLASHSCREEN_WIDTH + x];
+      for (uint32_t y = 0; y < DISPLAY_SPLASHSCREEN_HEIGHT; y++) {
+        uint32_t* dst = (uint32_t*) (display->buffer + (splash_screen_y + y) * display->pitch);
+        for (uint32_t x = 0; x < DISPLAY_SPLASHSCREEN_WIDTH; x++) {
+          dst[splash_screen_x + x] = display->splash_screen[(DISPLAY_SPLASHSCREEN_HEIGHT - y - 1) * DISPLAY_SPLASHSCREEN_WIDTH + x];
+        }
       }
     }
 
@@ -695,6 +700,13 @@ void display_update(Display* display) {
   SDL_SetCursor(display->sdl_cursors[display->selected_cursor]);
 
   SDL_UpdateWindowSurface(display->sdl_window);
+}
+
+void display_resize(Display* display, uint32_t width, uint32_t height) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  // Display width and height will be updated through a resize event
+  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
 }
 
 void display_destroy(Display** display) {
