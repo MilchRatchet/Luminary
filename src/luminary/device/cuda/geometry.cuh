@@ -46,13 +46,15 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Update delta path state
     ////////////////////////////////////////////////////////////////////
 
+    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx);
+
     bool is_delta_distribution;
     if (bounce_info.is_transparent_pass) {
       const float refraction_scale = (ctx.ior_in > ctx.ior_out) ? ctx.ior_in / ctx.ior_out : ctx.ior_out / ctx.ior_in;
-      is_delta_distribution        = ctx.roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
+      is_delta_distribution        = roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
     }
     else {
-      is_delta_distribution = bounce_info.is_microfacet_based && (ctx.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
+      is_delta_distribution = bounce_info.is_microfacet_based && (roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
     const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info);

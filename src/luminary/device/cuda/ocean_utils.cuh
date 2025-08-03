@@ -491,11 +491,12 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, Devi
   ctx.normal      = normal;
   ctx.position    = task.origin;
   ctx.V           = scale_vector(task.ray, -1.0f);
-  ctx.roughness   = BSDF_ROUGHNESS_CLAMP;
   ctx.state       = task.state;
   ctx.flags       = flags;
   ctx.ior_in      = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
   ctx.ior_out     = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
+
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, BSDF_ROUGHNESS_CLAMP);
 
   return ctx;
 }

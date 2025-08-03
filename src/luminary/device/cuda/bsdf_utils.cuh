@@ -172,7 +172,8 @@ __device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float r
  * [EtoT23] K. Eto and Y. Tokuyoshi, "Bounded VNDF Sampling for Smith–GGX Reflections", ACM SIGGRAPH Asia, 2023.
  */
 __device__ vec3 bsdf_microfacet_sample_normal(const MaterialContextGeometry mat_ctx, const float2 random) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
   const vec3 v = normalize_vector(get_vector(roughness2 * mat_ctx.V.x, roughness2 * mat_ctx.V.y, mat_ctx.V.z));
@@ -193,7 +194,8 @@ __device__ vec3 bsdf_microfacet_sample_normal(const MaterialContextGeometry mat_
 
 __device__ float bsdf_microfacet_pdf(const MaterialContextGeometry mat_ctx, const float NdotH, const float NdotV) {
   // NdotV == data.V.z
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
   const float D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
@@ -210,8 +212,10 @@ __device__ float bsdf_microfacet_pdf(const MaterialContextGeometry mat_ctx, cons
 __device__ vec3 bsdf_microfacet_sample(
   const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target = RANDOM_TARGET_BSDF_REFLECTION,
   const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
-  if (mat_ctx.roughness > 0.0f) {
+  if (roughness > 0.0f) {
     const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
     H                   = bsdf_microfacet_sample_normal(mat_ctx, random);
   }
@@ -220,7 +224,8 @@ __device__ vec3 bsdf_microfacet_sample(
 }
 
 __device__ float bsdf_microfacet_evaluate(const MaterialContextGeometry mat_ctx, const float NdotH, const float NdotL, const float NdotV) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
@@ -231,7 +236,8 @@ __device__ float bsdf_microfacet_evaluate(const MaterialContextGeometry mat_ctx,
 }
 
 __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const MaterialContextGeometry mat_ctx, const float NdotL, const float NdotV) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
@@ -250,7 +256,8 @@ __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const MaterialConte
 
 __device__ float bsdf_microfacet_evaluate_sampled_diffuse(
   const MaterialContextGeometry mat_ctx, const float NdotH, const float NdotL, const float NdotV) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
@@ -265,7 +272,8 @@ __device__ float bsdf_microfacet_evaluate_sampled_diffuse(
  * [DupB23] J. Dupuy and A. Benyoub, "Sampling Visible GGX Normals with Spherical Caps", 2023. arXiv:2306.05044
  */
 __device__ vec3 bsdf_microfacet_refraction_sample_normal(const MaterialContextGeometry mat_ctx, const float2 random) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
 
   const vec3 v = normalize_vector(get_vector(roughness2 * mat_ctx.V.x, roughness2 * mat_ctx.V.y, mat_ctx.V.z));
 
@@ -282,7 +290,8 @@ __device__ vec3 bsdf_microfacet_refraction_sample_normal(const MaterialContextGe
 __device__ float bsdf_microfacet_refraction_pdf(
   const MaterialContextGeometry mat_ctx, const float NdotH, const float NdotV, const float NdotL, const float HdotV, const float HdotL,
   const float refraction_index) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G1         = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
@@ -297,8 +306,10 @@ __device__ float bsdf_microfacet_refraction_pdf(
 __device__ vec3 bsdf_microfacet_refraction_sample(
   const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target = RANDOM_TARGET_BSDF_REFRACTION,
   const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
-  if (mat_ctx.roughness > 0.0f) {
+  if (roughness > 0.0f) {
     const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
     H                   = bsdf_microfacet_refraction_sample_normal(mat_ctx, random);
   }
@@ -309,7 +320,8 @@ __device__ vec3 bsdf_microfacet_refraction_sample(
 __device__ float bsdf_microfacet_refraction_evaluate(
   const MaterialContextGeometry mat_ctx, const float HdotL, const float HdotV, const float NdotH, const float NdotL, const float NdotV,
   const float refraction_index) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
@@ -325,7 +337,8 @@ __device__ float bsdf_microfacet_refraction_evaluate(
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const MaterialContextGeometry mat_ctx, const float HdotL, const float HdotV, const float NdotH, const float NdotL, const float NdotV,
   const float refraction_index) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
@@ -355,7 +368,8 @@ __device__ float bsdf_diffuse_evaluate_sampled_diffuse() {
 
 __device__ float bsdf_diffuse_evaluate_sampled_microfacet(
   const MaterialContextGeometry mat_ctx, const float NdotL, const float NdotH, const float NdotV) {
-  const float roughness2 = mat_ctx.roughness * mat_ctx.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
 
@@ -406,7 +420,9 @@ __device__ RGBF bsdf_conductor(
       break;
   };
 
-  const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, mat_ctx.roughness);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
+  const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
 
   const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_conductor, ss_term);
   const RGBF ms_term_with_fresnel =
@@ -465,8 +481,10 @@ __device__ RGBF bsdf_glossy(
       break;
   };
 
-  const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, mat_ctx.roughness);
-  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, mat_ctx.roughness);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
+  const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
+  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, roughness);
 
   const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_glossy, ss_term / conductor_directional_albedo);
   const RGBF diff_term_with_color = scale_color(opaque_color(mat_ctx.albedo), diff_term * (1.0f - glossy_directional_albedo));
@@ -531,7 +549,9 @@ __device__ RGBF bsdf_dielectric(
     term *= ctx.fresnel_dielectric;
   }
 
-  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, mat_ctx.roughness, ctx.refraction_index);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
+  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, roughness, ctx.refraction_index);
   term /= dielectric_directional_albedo;
 
   if (ctx.refraction_index == 1.0f && ctx.is_refraction) {

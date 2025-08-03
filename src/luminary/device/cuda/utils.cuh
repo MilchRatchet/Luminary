@@ -32,7 +32,7 @@
 #endif /* eps */
 
 #define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)
-#define BSDF_ROUGHNESS_CLAMP (5e-3f)
+#define BSDF_ROUGHNESS_CLAMP (2e-2f)
 
 enum OptixTraceStatus { OPTIX_TRACE_STATUS_EXECUTE, OPTIX_TRACE_STATUS_ABORT, OPTIX_TRACE_STATUS_OPTIONAL_UNUSED } typedef OptixTraceStatus;
 
