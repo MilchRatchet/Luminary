@@ -97,7 +97,7 @@ static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const 
 
   const bool alt_down = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
 
-  return (mouse_hovers_background && !alt_down) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+  return (mouse_hovers_background && !alt_down && !display->is_maximized) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
 }
 
 static void _display_set_hittest(Display* display, bool enable) {
@@ -120,11 +120,6 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
 
   display->show_ui                = true;
   display->sync_render_resolution = sync_render_resolution;
-
-  if (display->sync_render_resolution && (width > display->screen_width || height > display->screen_height)) {
-    log_message("Luminary resolution exceeds screen size, turning off synchronization of render resolution.");
-    display->sync_render_resolution = false;
-  }
 
   uint32_t initial_window_width  = (int) width;
   uint32_t initial_window_height = (int) height;
@@ -728,6 +723,9 @@ void display_update(Display* display) {
 
 void display_resize(Display* display, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(display);
+
+  width  = min(display->screen_width, width);
+  height = min(display->screen_height, height);
 
   // Display width and height will be updated through a resize event
   SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
