@@ -9,7 +9,7 @@ enum MaterialType { MATERIAL_GEOMETRY, MATERIAL_VOLUME, MATERIAL_PARTICLE } type
 enum MaterialParamType {
   MATERIAL_PARAM_TYPE_NORM_FLOAT,         // [0,1]
   MATERIAL_PARAM_TYPE_SIGNED_NORM_FLOAT,  // [-1,1]
-  MATERIAL_PARAM_TYPE_IOR,                // [1,3]
+  MATERIAL_PARAM_TYPE_IOR,                // [0,3]
   MATERIAL_PARAM_TYPE_ABBE,               // [9,91]
   MATERIAL_PARAM_TYPE_NORM_COLOR,         // [0,1]^3
   MATERIAL_PARAM_TYPE_COLOR,              // [0,1023]^3
@@ -36,8 +36,7 @@ enum MaterialGeometryParam : uint32_t {
   MATERIAL_GEOMETRY_PARAM_ALLOCATE(OPACITY, MATERIAL_PARAM_TYPE_NORM_FLOAT, 8)                                   //
   MATERIAL_GEOMETRY_PARAM_ALLOCATE(EMISSION, MATERIAL_PARAM_TYPE_COLOR, MATERIAL_PARAM_TYPE_COLOR_SIZE)          //
   MATERIAL_GEOMETRY_PARAM_ALLOCATE(ROUGHNESS, MATERIAL_PARAM_TYPE_NORM_FLOAT, 10)                                //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR_IN, MATERIAL_PARAM_TYPE_IOR, 8)                                           //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR_OUT, MATERIAL_PARAM_TYPE_IOR, 8)                                          //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR, MATERIAL_PARAM_TYPE_IOR, 8)                                              //
 
   MATERIAL_GEOMETRY_PARAM_BITS_COUNT
 } typedef MaterialGeometryParam;
@@ -56,10 +55,6 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   vec3 normal;
   uint16_t state;
   uint8_t flags;
-  /* IOR of medium in direction of V. */
-  float ior_in;
-  /* IOR of medium on the other side. */
-  float ior_out;
   VolumeType volume_type;
 
   uint32_t data[MATERIAL_GEOM_NUM_UINTS];
@@ -151,7 +146,7 @@ __device__ float material_get_float(const MaterialContext<MATERIAL_GEOMETRY>& ct
     result = result * 2.0f - 1.0f;
   }
   else if constexpr (TYPE == MATERIAL_PARAM_TYPE_IOR) {
-    result = result * 2.0f + 1.0f;
+    result = result * 3.0f;
   }
   else if constexpr (TYPE == MATERIAL_PARAM_TYPE_ABBE) {
     result = result * 82.0f + 9.0f;
@@ -228,7 +223,7 @@ __device__ void material_set_float(MaterialContext<MATERIAL_GEOMETRY>& ctx, cons
     value_remapped = (value_remapped + 1.0f) * 0.5f;
   }
   else if constexpr (TYPE == MATERIAL_PARAM_TYPE_IOR) {
-    value_remapped = (value_remapped - 1.0f) * 0.5f;
+    value_remapped = value_remapped * (1.0f / 3.0f);
   }
   else if constexpr (TYPE == MATERIAL_PARAM_TYPE_ABBE) {
     value_remapped = (value_remapped - 9.0f) * (1.0f / 82.0f);
@@ -305,13 +300,12 @@ __device__ MaterialContextGeometry material_get_default_context() {
   ctx.V           = get_vector(0.0f, 0.0f, 1.0f);
   ctx.state       = 0;
   ctx.flags       = 0;
-  ctx.ior_in      = 1.0f;
-  ctx.ior_out     = 1.0f;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, 0.5f);
   material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, 1.0f);
 
   return ctx;
 }

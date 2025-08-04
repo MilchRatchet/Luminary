@@ -11,7 +11,6 @@ struct BSDFRayContext {
   float NdotH;
   float NdotL;
   float NdotV;
-  float refraction_index;
   float HdotL;
   float HdotV;
   float roughness4;
@@ -59,22 +58,23 @@ __device__ bool bsdf_is_pass_through_ray(const MaterialContext<TYPE> ctx, const 
 template <>
 __device__ bool bsdf_is_pass_through_ray<MATERIAL_GEOMETRY>(
   const MaterialContextGeometry ctx, const BSDFSampleInfo<MATERIAL_GEOMETRY> info) {
-  return info.is_transparent_pass && ((ctx.ior_in == ctx.ior_out) || (info.is_microfacet_based == false));
+  const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+  return info.is_transparent_pass && ((ior == 1.0f) || (info.is_microfacet_based == false));
 }
 
 ///////////////////////////////////////////////////
 // Fresnel
 ///////////////////////////////////////////////////
 
-__device__ float bsdf_fresnel(const vec3 normal, const vec3 V, const vec3 refraction, const float index_in, const float index_out) {
+__device__ float bsdf_fresnel(const vec3 normal, const vec3 V, const vec3 refraction, const float ior) {
   const float NdotV = dot_product(V, normal);
   const float NdotT = -dot_product(refraction, normal);
 
-  const float s_pol_term1 = index_in * NdotV;
-  const float s_pol_term2 = index_out * NdotT;
+  const float s_pol_term1 = ior * NdotV;
+  const float s_pol_term2 = 1.0f * NdotT;
 
-  const float p_pol_term1 = index_in * NdotT;
-  const float p_pol_term2 = index_out * NdotV;
+  const float p_pol_term1 = ior * NdotT;
+  const float p_pol_term2 = 1.0f * NdotV;
 
   float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
   float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
@@ -379,6 +379,10 @@ __device__ RGBF bsdf_conductor(
   if ((mat_ctx.flags & MATERIAL_FLAG_METALLIC) == 0)
     return splat_color(0.0f);
 
+  float ior = 1.0f;
+  if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
@@ -392,8 +396,7 @@ __device__ RGBF bsdf_conductor(
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(
-                  mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+                / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
@@ -427,6 +430,10 @@ __device__ RGBF bsdf_glossy(
   if ((mat_ctx.flags & MATERIAL_FLAG_METALLIC) != 0)
     return splat_color(0.0f);
 
+  float ior = 1.0f;
+  if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
@@ -440,8 +447,7 @@ __device__ RGBF bsdf_glossy(
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(
-                  mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+                / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
@@ -458,8 +464,7 @@ __device__ RGBF bsdf_glossy(
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       diff_term = bsdf_diffuse_evaluate(mat_ctx, ctx.NdotL)
-                  / bsdf_microfacet_refraction_pdf(
-                    mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+                  / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
@@ -497,17 +502,18 @@ __device__ RGBF bsdf_dielectric(
   if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(mat_ctx.flags) == false)
     return splat_color(0.0f);
 
+  const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   float term;
   if (ctx.is_refraction) {
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
-        term = bsdf_microfacet_refraction_evaluate(
-                 mat_ctx, ctx.roughness4, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index)
+        term = bsdf_microfacet_refraction_evaluate(mat_ctx, ctx.roughness4, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ior)
                * one_over_sampling_pdf;
         break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_refraction_evaluate_sampled_microfacet(
-          mat_ctx, ctx.roughness4, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index);
+          mat_ctx, ctx.roughness4, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ior);
         break;
       case BSDF_SAMPLING_MICROFACET:
       case BSDF_SAMPLING_DIFFUSE:
@@ -529,8 +535,7 @@ __device__ RGBF bsdf_dielectric(
         term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(mat_ctx, ctx.NdotL);
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-               / bsdf_microfacet_refraction_pdf(
-                 mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+               / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
         break;
     };
 
@@ -540,10 +545,10 @@ __device__ RGBF bsdf_dielectric(
   const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
-  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, roughness, ctx.refraction_index);
+  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, roughness, ior);
   term /= dielectric_directional_albedo;
 
-  if (ctx.refraction_index == 1.0f && ctx.is_refraction) {
+  if (ior == 1.0f && ctx.is_refraction) {
     // TODO: Energy conservation does not work correctly for dielectric, investigate.
     term = (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION) ? 1.0f : 0.0f;
   }

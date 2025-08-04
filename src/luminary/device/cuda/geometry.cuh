@@ -50,7 +50,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     bool is_delta_distribution;
     if (bounce_info.is_transparent_pass) {
-      const float refraction_scale = (ctx.ior_in > ctx.ior_out) ? ctx.ior_in / ctx.ior_out : ctx.ior_out / ctx.ior_in;
+      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+
+      const float refraction_scale = (ior >= 1.0f) ? ior : 1.0f / ior;
       is_delta_distribution        = roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
     }
     else {
@@ -75,9 +77,17 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     record = mul_color(record, bounce_info.weight);
 
     if (bounce_info.is_transparent_pass) {
-      const bool refraction_is_inside       = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
-      const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ior_stack, ctx.ior_out, ior_stack_method);
+      const bool refraction_is_inside = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+
+      const IORStackMethod ior_get_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+      const float ray_ior                 = ior_stack_interact(ior_stack, 1.0f, ior_get_method);
+
+      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+
+      const float new_ior = (refraction_is_inside) ? 1.0f : ray_ior / ior;
+
+      const IORStackMethod ior_set_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ior_stack, new_ior, ior_set_method);
     }
 
     ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);

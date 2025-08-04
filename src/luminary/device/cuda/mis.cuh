@@ -16,7 +16,7 @@ template <>
 __device__ float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
   float gi_pdf;
   if (is_refraction) {
-    const float refraction_index = ctx.ior_in / ctx.ior_out;
+    const float refraction_index = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
 
     const vec3 H = bsdf_normal_from_pair(L, ctx.V, refraction_index);
 

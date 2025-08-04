@@ -303,10 +303,8 @@ __device__ RGBF direct_lighting_sun_caustic(
   const vec3 normal = scale_vector(ocean_normal, (is_underwater) ? -1.0f : 1.0f);
 
   bool total_reflection;
-  const vec3 refraction_dir =
-    refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior_in / sampling_domain.ior_out, total_reflection);
-  const float reflection_coefficient =
-    ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior_in, sampling_domain.ior_out);
+  const vec3 refraction_dir          = refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior, total_reflection);
+  const float reflection_coefficient = ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior);
 
   light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 

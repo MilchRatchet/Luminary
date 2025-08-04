@@ -200,14 +200,13 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   ctx.V           = scale_vector(info.task.ray, -1.0f);
   ctx.state       = info.task.state;
   ctx.flags       = flags;
-  ctx.ior_in      = ior_in;
-  ctx.ior_out     = ior_out;
   ctx.volume_type = VolumeType(info.task.volume_id);
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, opaque_color(albedo));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, albedo.a);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, roughness);
   material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, emission);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, ior_in / ior_out);
 
   return ctx;
 }

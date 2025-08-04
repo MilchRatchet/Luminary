@@ -38,7 +38,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     if (bounce_info.is_transparent_pass) {
       const bool refraction_is_inside       = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
       const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ior_stack, ctx.ior_out, ior_stack_method);
+      ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
 
       const VolumeType above_water_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
 

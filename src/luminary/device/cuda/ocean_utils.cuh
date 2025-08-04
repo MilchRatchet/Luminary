@@ -444,16 +444,15 @@ __device__ float ocean_phase(const float cos_angle) {
  *  - The light is not polarized.
  *  - The IORs are wavelength independent.
  */
-__device__ float ocean_reflection_coefficient(
-  const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in, const float index_out) {
+__device__ float ocean_reflection_coefficient(const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in_over_out) {
   const float NdotV = -dot_product(ray, normal);
   const float NdotT = -dot_product(refraction, normal);
 
-  const float s_pol_term1 = index_in * NdotV;
-  const float s_pol_term2 = index_out * NdotT;
+  const float s_pol_term1 = index_in_over_out * NdotV;
+  const float s_pol_term2 = 1.0f * NdotT;
 
-  const float p_pol_term1 = index_in * NdotT;
-  const float p_pol_term2 = index_out * NdotV;
+  const float p_pol_term1 = index_in_over_out * NdotT;
+  const float p_pol_term2 = 1.0f * NdotV;
 
   float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
   float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
@@ -482,6 +481,9 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, Devi
   const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior                   = ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
 
+  const float ior_ratio =
+    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index / ray_ior : ray_ior / device.ocean.refractive_index;
+
   MaterialContextGeometry ctx;
 
   ctx.instance_id = HIT_TYPE_OCEAN;
@@ -491,13 +493,12 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, Devi
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
   ctx.flags       = flags;
-  ctx.ior_in      = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
-  ctx.ior_out     = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, BSDF_ROUGHNESS_CLAMP);
   material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, ior_ratio);
 
   return ctx;
 }

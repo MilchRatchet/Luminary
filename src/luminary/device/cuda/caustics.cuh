@@ -14,8 +14,7 @@ struct CausticsSamplingDomain {
   vec3 edge1;
   vec3 edge2;
   float area;
-  float ior_in;
-  float ior_out;
+  float ior;
   bool fast_path;
 } typedef CausticsSamplingDomain;
 
@@ -71,8 +70,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE
 
     domain.area = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(ctx.position));
 
-    domain.ior_in  = (is_underwater) ? device.ocean.refractive_index : 1.0f;
-    domain.ior_out = (is_underwater) ? 1.0f : device.ocean.refractive_index;
+    domain.ior = (is_underwater) ? device.ocean.refractive_index : 1.0f / device.ocean.refractive_index;
 
     domain.fast_path = true;
 
@@ -108,8 +106,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE
 
   domain.area = get_length(cross_product(domain.edge1, domain.edge2));
 
-  domain.ior_in  = (is_underwater) ? device.ocean.refractive_index : 1.0f;
-  domain.ior_out = (is_underwater) ? 1.0f : device.ocean.refractive_index;
+  domain.ior = (is_underwater) ? device.ocean.refractive_index : 1.0f / device.ocean.refractive_index;
 
   domain.fast_path = false;
 
