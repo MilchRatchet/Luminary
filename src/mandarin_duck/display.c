@@ -27,6 +27,45 @@ static void _display_handle_resize(Display* display) {
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
 }
 
+static void _display_handle_display_change(Display* display) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  int display_count;
+  SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+
+  if (display_count == 0) {
+    crash_message("No displays available.");
+  }
+
+  SDL_DisplayID curr_display_id = SDL_GetDisplayForWindow(display->sdl_window);
+
+  // If we get an invalid ID, just return and hope that we can just continue.
+  if (curr_display_id == 0) {
+    warn_message("Window is not present in a valid screen.");
+    return;
+  }
+
+  SDL_Rect rect;
+  for (uint32_t display_index = 0; display_index < (uint32_t) display_count; display_index++) {
+    if (displays[display_index] != curr_display_id)
+      continue;
+
+    SDL_GetDisplayUsableBounds(displays[display_index], &rect);
+    break;
+  }
+
+  rect.w = rect.w - 2 * DISPLAY_SCREEN_MARGIN;
+  rect.h = rect.h - 2 * DISPLAY_SCREEN_MARGIN;
+
+  display->screen_width  = (uint32_t) rect.w;
+  display->screen_height = (uint32_t) rect.h;
+
+  uint32_t width  = min(display->width, display->screen_width);
+  uint32_t height = min(display->height, display->screen_height);
+
+  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
+}
+
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
   uint8_t* buffer = image.buffer;
 
@@ -82,44 +121,25 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   display->show_ui                = true;
   display->sync_render_resolution = sync_render_resolution;
 
-  SDL_Rect rect;
-  SDL_Rect screen_size;
-
-  int display_count;
-  SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
-
-  if (display_count == 0) {
-    crash_message("No displays available.");
-  }
-
-  SDL_GetDisplayUsableBounds(displays[0], &rect);
-  SDL_GetDisplayBounds(displays[0], &screen_size);
-
-  rect.w = rect.w - 2 * DISPLAY_SCREEN_MARGIN;
-  rect.h = rect.h - 2 * DISPLAY_SCREEN_MARGIN;
-
-  display->screen_width  = (uint32_t) rect.w;
-  display->screen_height = (uint32_t) rect.h;
-
   if (display->sync_render_resolution && (width > display->screen_width || height > display->screen_height)) {
     log_message("Luminary resolution exceeds screen size, turning off synchronization of render resolution.");
     display->sync_render_resolution = false;
   }
 
-  rect.w = min(rect.w, (int) width);
-  rect.h = min(rect.h, (int) height);
+  uint32_t initial_window_width  = (int) width;
+  uint32_t initial_window_height = (int) height;
 
   // Make sure that the aspect ratio is maintained.
   const float aspect_ratio = ((float) width) / ((float) height);
 
-  rect.w = rect.h * aspect_ratio;
+  initial_window_width = initial_window_height * aspect_ratio;
 
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetStringProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "MandarinDuck - Using Luminary");
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
-  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, rect.w);
-  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, rect.h);
+  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, initial_window_width);
+  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, initial_window_height);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, false);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
@@ -134,6 +154,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
 
   SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
+  _display_handle_display_change(display);
   _display_handle_resize(display);
 
   keyboard_state_create(&display->keyboard_state);
@@ -249,6 +270,9 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
       case SDL_EVENT_WINDOW_FOCUS_LOST:
         break;
       case SDL_EVENT_WINDOW_HIT_TEST:
+        break;
+      case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+        _display_handle_display_change(display);
         break;
       case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
         break;
