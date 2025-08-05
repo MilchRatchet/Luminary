@@ -173,7 +173,7 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_set_output_dirty(Device* device);
-LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height);
+LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties);
 LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera);
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);

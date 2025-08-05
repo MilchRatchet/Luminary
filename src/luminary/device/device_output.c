@@ -19,12 +19,27 @@ LuminaryResult device_output_create(DeviceOutput** output) {
     __FAILURE_HANDLE(vault_object_create(&(*output)->buffer_objects[buffer_id]));
   }
 
-  // Default size
-  device_output_set_size(*output, 1920, 1080);
+  // Default properties
+  LuminaryOutputProperties properties;
+  memset(&properties, 0, sizeof(LuminaryOutputProperties));
+
+  properties.enabled = false;
+  properties.width   = 1920;
+  properties.height  = 1080;
+
+  device_output_set_properties(*output, properties);
 
   (*output)->color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
   (*output)->agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
   (*output)->filter           = LUMINARY_FILTER_NONE;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_output_get_recurring_enabled(DeviceOutput* output, bool* recurring_enabled) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  *recurring_enabled = output->recurring_outputs_enabled;
 
   return LUMINARY_SUCCESS;
 }
@@ -61,8 +76,13 @@ static LuminaryResult _device_output_allocate_device_buffer(DeviceOutput* output
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height) {
+LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutputProperties properties) {
   __CHECK_NULL_ARGUMENT(output);
+
+  output->recurring_outputs_enabled = properties.enabled;
+
+  uint32_t width  = (properties.enabled) ? properties.width : 0;
+  uint32_t height = (properties.enabled) ? properties.height : 0;
 
   if ((output->width != width) || (output->height != height)) {
     output->width  = width;
@@ -180,7 +200,15 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   return LUMINARY_SUCCESS;
 }
 
-static bool _device_output_recurring_needs_queueing(const uint32_t current_sample_count) {
+static bool _device_output_recurring_needs_queueing(DeviceOutput* output, const uint32_t current_sample_count) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  if (output->recurring_outputs_enabled == false)
+    return false;
+
+  if (output->output_is_dirty)
+    return true;
+
   const uint32_t base_threshold = 4;
 
   if (current_sample_count < (1 << base_threshold))
@@ -219,9 +247,9 @@ LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, b
 
   const uint32_t current_sample_count = device->aggregate_sample_count;
 
-  bool generate_output = output->output_is_dirty;
+  bool generate_output = false;
 
-  generate_output |= _device_output_recurring_needs_queueing(current_sample_count);
+  generate_output |= _device_output_recurring_needs_queueing(output, current_sample_count);
 
   uint32_t num_output_requests;
   __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
@@ -240,10 +268,6 @@ LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, b
 LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
-
-  if (output->width == 0 || output->height == 0) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device output is set to a size of 0.");
-  }
 
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
 
@@ -270,21 +294,25 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_output, output->event_output_ready, CU_EVENT_WAIT_DEFAULT));
 
-  DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
+  if (_device_output_recurring_needs_queueing(output, current_sample_count) == true) {
+    __DEBUG_ASSERT(output->width > 0 && output->height > 0);
 
-  data->render_event_id                      = render_event_id;
-  data->descriptor.is_recurring_output       = true;
-  data->descriptor.meta_data.width           = output->width;
-  data->descriptor.meta_data.height          = output->height;
-  data->descriptor.meta_data.sample_count    = current_sample_count;
-  data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
+    DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
-  __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output->buffer_objects[output->buffer_index]));
+    data->render_event_id                      = render_event_id;
+    data->descriptor.is_recurring_output       = true;
+    data->descriptor.meta_data.width           = output->width;
+    data->descriptor.meta_data.height          = output->height;
+    data->descriptor.meta_data.sample_count    = current_sample_count;
+    data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
 
-  __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
+    __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output->buffer_objects[output->buffer_index]));
 
-  output->buffer_index   = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
-  output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
+    __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
+
+    output->buffer_index   = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
+    output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
+  }
 
   uint32_t num_output_requests;
   __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
@@ -297,7 +325,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     if (_device_output_request_needs_queueing(output_request, current_sample_count) == false)
       continue;
 
-    data = output->callback_data + output->callback_index;
+    DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
     data->render_event_id                      = render_event_id;
     data->descriptor.is_recurring_output       = false;

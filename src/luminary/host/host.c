@@ -870,7 +870,7 @@ LuminaryResult luminary_host_set_output_properties(Host* host, LuminaryOutputPro
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_set_properties(host->output_handler, properties));
-  __FAILURE_HANDLE(device_manager_set_output_properties(host->device_manager, properties.width, properties.height));
+  __FAILURE_HANDLE(device_manager_set_output_properties(host->device_manager, properties));
 
   return LUMINARY_SUCCESS;
 }

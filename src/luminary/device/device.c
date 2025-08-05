@@ -1530,11 +1530,16 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
 
   DEVICE_ASSERT_AVAILABLE
 
+  bool recurring_enabled;
+  __FAILURE_HANDLE(device_output_get_recurring_enabled(device->output, &recurring_enabled));
+
   device->undersampling_state = 0;
 
   device->undersampling_state |= UNDERSAMPLING_FIRST_SAMPLE_MASK;
 
-  if (undersampling > 0) {
+  // No need to undersample if we don't have recurring outputs.
+  // Output requests can never request undersampled outputs.
+  if (undersampling > 0 && recurring_enabled) {
     device->undersampling_state |= 0b11 & UNDERSAMPLING_ITERATION_MASK;
     device->undersampling_state |= (undersampling << 2) & UNDERSAMPLING_STAGE_MASK;
   }
@@ -1568,14 +1573,14 @@ LuminaryResult device_set_output_dirty(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height) {
+LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties) {
   __CHECK_NULL_ARGUMENT(device);
 
   DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(device_output_set_size(device->output, width, height));
+  __FAILURE_HANDLE(device_output_set_properties(device->output, properties));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1799,6 +1804,13 @@ LuminaryResult device_query_gbuffer_meta(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   DEVICE_ASSERT_AVAILABLE
+
+  bool recurring_outputs_enabled;
+  __FAILURE_HANDLE(device_output_get_recurring_enabled(device->output, &recurring_outputs_enabled));
+
+  // GBuffer meta data is only available for recurring outputs (i.e. interactive rendering)
+  if (recurring_outputs_enabled == false)
+    return LUMINARY_SUCCESS;
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 

@@ -19,6 +19,7 @@ struct DeviceOutputRequest {
 } typedef DeviceOutputRequest;
 
 struct DeviceOutput {
+  bool recurring_outputs_enabled;
   uint32_t width;
   uint32_t height;
   CUevent event_output_ready;
@@ -39,8 +40,9 @@ struct DeviceOutput {
 } typedef DeviceOutput;
 
 DEVICE_CTX_FUNC LuminaryResult device_output_create(DeviceOutput** output);
+LuminaryResult device_output_get_recurring_enabled(DeviceOutput* output, bool* recurring_enabled);
 LuminaryResult device_output_set_output_dirty(DeviceOutput* output);
-DEVICE_CTX_FUNC LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height);
+DEVICE_CTX_FUNC LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutputProperties properties);
 DEVICE_CTX_FUNC LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camera* camera);
 DEVICE_CTX_FUNC LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProperties props);
 DEVICE_CTX_FUNC LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data);

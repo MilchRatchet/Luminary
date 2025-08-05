@@ -7,7 +7,7 @@ struct DeviceRendererWork {
   uint32_t event_id;
   uint32_t launch_id;
   SampleCountSlice* sample_count;
-  bool is_gbuffer_meta_query;
+  bool allow_gbuffer_meta_query;
   DeviceRenderCallbackData* shared_callback_data;
 } typedef DeviceRendererWork;
 
@@ -373,9 +373,9 @@ static LuminaryResult _device_renderer_handle_queue_action(
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
       __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
 
-      if (work->is_gbuffer_meta_query && (action->mem_update.depth > 0)) {
+      const bool allow_gbuffer_meta_query = work->allow_gbuffer_meta_query && (action->mem_update.depth > 0);
+      if (allow_gbuffer_meta_query && (device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY)) {
         __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-        work->is_gbuffer_meta_query = false;
       }
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION:
@@ -420,7 +420,7 @@ static LuminaryResult _device_renderer_handle_queue_action(
 
       renderer->event_id++;
 
-      if (work->is_gbuffer_meta_query) {
+      if (work->allow_gbuffer_meta_query && device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY) {
         __FAILURE_HANDLE(device_query_gbuffer_meta(device));
       }
 
@@ -485,8 +485,7 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   const uint32_t tile_count = (internal_pixels_this_sample + allocated_tasks - 1) / allocated_tasks;
 
   // Query only during the first sample and if enough samples have been computed after this iteration.
-  const bool is_gbuffer_meta_query =
-    (sample_count->current_sample_count == 0) && (undersampling_stage <= (1 + device->constant_memory->settings.supersampling));
+  const bool allow_gbuffer_meta_query = undersampling_stage <= (1 + device->constant_memory->settings.supersampling);
 
   renderer->is_rendering_first_sample = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
 
@@ -495,11 +494,11 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   ////////////////////////////////////////////////////////////////////
 
   DeviceRendererWork work;
-  work.event_id              = event_id;
-  work.launch_id             = 0;
-  work.sample_count          = sample_count;
-  work.is_gbuffer_meta_query = is_gbuffer_meta_query;
-  work.shared_callback_data  = shared_callback_data;
+  work.event_id                 = event_id;
+  work.launch_id                = 0;
+  work.sample_count             = sample_count;
+  work.allow_gbuffer_meta_query = allow_gbuffer_meta_query;
+  work.shared_callback_data     = shared_callback_data;
 
   ////////////////////////////////////////////////////////////////////
   // Execute

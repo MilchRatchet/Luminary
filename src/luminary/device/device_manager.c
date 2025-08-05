@@ -581,8 +581,7 @@ static LuminaryResult _device_manager_enable_device_queue_work(DeviceManager* de
 }
 
 struct DeviceManagerSetOutputPropertiesArgs {
-  uint32_t width;
-  uint32_t height;
+  LuminaryOutputProperties properties;
 } typedef DeviceManagerSetOutputPropertiesArgs;
 
 static LuminaryResult _device_manager_set_output_properties_clear_work(
@@ -602,7 +601,7 @@ static LuminaryResult _device_manager_set_output_properties_queue_work(
 
   Device* device = device_manager->devices[device_manager->main_device_index];
 
-  __FAILURE_HANDLE(device_update_output_properties(device, args->width, args->height));
+  __FAILURE_HANDLE(device_update_output_properties(device, args->properties));
 
   return LUMINARY_SUCCESS;
 }
@@ -992,14 +991,13 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height) {
+LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, LuminaryOutputProperties properties) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
   DeviceManagerSetOutputPropertiesArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputPropertiesArgs), (void**) &args));
 
-  args->width  = width;
-  args->height = height;
+  args->properties = properties;
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
