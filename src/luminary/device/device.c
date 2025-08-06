@@ -1519,7 +1519,10 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
   DEVICE_ASSERT_AVAILABLE
 
   if (device->sample_count.current_sample_count == device->sample_count.end_sample_count) {
-    __FAILURE_HANDLE(sample_count_get_slice(sample_count, 32, &device->sample_count));
+    uint32_t recommended_sample_count;
+    __FAILURE_HANDLE(device_get_recommended_sample_queue_counts(device, &recommended_sample_count));
+
+    __FAILURE_HANDLE(sample_count_get_slice(sample_count, recommended_sample_count, &device->sample_count));
   }
 
   return LUMINARY_SUCCESS;
@@ -1754,6 +1757,18 @@ LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterfac
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32_t* recommended_count) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(recommended_count);
+
+  uint32_t tile_count;
+  __FAILURE_HANDLE(device_renderer_get_tile_count(device->renderer, device, 0, &tile_count));
+
+  *recommended_count = (2048 + tile_count - 1) / tile_count;
 
   return LUMINARY_SUCCESS;
 }

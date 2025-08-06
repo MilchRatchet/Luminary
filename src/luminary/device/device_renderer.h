@@ -114,6 +114,7 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time);
 LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id);
 LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* status_flags);
+LuminaryResult device_renderer_get_tile_count(DeviceRenderer* renderer, Device* device, uint32_t undersampling_stage, uint32_t* tile_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 
 #endif /* LUMINARY_DEVICE_RENDERER_H */

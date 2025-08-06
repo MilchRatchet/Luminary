@@ -96,7 +96,10 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
 
   __DEBUG_ASSERT(device->is_main_device == false);
 
-  if (device->aggregate_sample_count < 32)
+  uint32_t recommended_sample_count;
+  __FAILURE_HANDLE(device_get_recommended_sample_queue_counts(device, &recommended_sample_count));
+
+  if (device->aggregate_sample_count < recommended_sample_count)
     return LUMINARY_SUCCESS;
 
   uint32_t currently_allocated_results;

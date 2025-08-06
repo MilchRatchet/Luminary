@@ -471,18 +471,8 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
 
   const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
-  uint32_t width;
-  uint32_t height;
-  __FAILURE_HANDLE(device_get_internal_resolution(device, &width, &height));
-
-  const uint32_t internal_width_this_sample  = (width + (1 << undersampling_stage) - 1) >> undersampling_stage;
-  const uint32_t internal_height_this_sample = (height + (1 << undersampling_stage) - 1) >> undersampling_stage;
-  const uint32_t internal_pixels_this_sample = internal_width_this_sample * internal_height_this_sample;
-
-  uint32_t allocated_tasks;
-  __FAILURE_HANDLE(device_get_allocated_task_count(device, &allocated_tasks));
-
-  const uint32_t tile_count = (internal_pixels_this_sample + allocated_tasks - 1) / allocated_tasks;
+  uint32_t tile_count;
+  __FAILURE_HANDLE(device_renderer_get_tile_count(renderer, device, undersampling_stage, &tile_count));
 
   // Query only during the first sample and if enough samples have been computed after this iteration.
   const bool allow_gbuffer_meta_query = undersampling_stage <= (1 + device->constant_memory->settings.supersampling);
@@ -629,6 +619,27 @@ LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* st
   if (renderer->is_rendering_first_sample) {
     *status |= DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE;
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_get_tile_count(
+  DeviceRenderer* renderer, Device* device, uint32_t undersampling_stage, uint32_t* tile_count) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(tile_count);
+
+  uint32_t width;
+  uint32_t height;
+  __FAILURE_HANDLE(device_get_internal_resolution(device, &width, &height));
+
+  const uint32_t internal_width_this_sample  = (width + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t internal_height_this_sample = (height + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t internal_pixels_this_sample = internal_width_this_sample * internal_height_this_sample;
+
+  uint32_t allocated_tasks;
+  __FAILURE_HANDLE(device_get_allocated_task_count(device, &allocated_tasks));
+
+  *tile_count = (internal_pixels_this_sample + allocated_tasks - 1) / allocated_tasks;
 
   return LUMINARY_SUCCESS;
 }

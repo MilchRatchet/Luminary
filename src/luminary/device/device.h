@@ -182,6 +182,7 @@ LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* 
 LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);
+LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32_t* recommended_count);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
 LuminaryResult device_query_gbuffer_meta(Device* device);
