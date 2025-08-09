@@ -96,12 +96,16 @@ enum ShadingTaskIndex {
 // STATE_FLAG_MIS_EMISSION: This flag is set for rays that are allowed to include emission through MIS weighting.
 //                          This flag is overruled by STATE_FLAG_ALLOW_EMISSION.
 //
+// STATE_FLAG_ALLOW_AMBIENT: This flag is set for rays that are allowed to include sky contribution
+//
+
 enum StateFlag {
   STATE_FLAG_DELTA_PATH       = 0b00000001u,
   STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
   STATE_FLAG_VOLUME_SCATTERED = 0b00000100u,
   STATE_FLAG_ALLOW_EMISSION   = 0b00001000u,
-  STATE_FLAG_MIS_EMISSION     = 0b00010000u
+  STATE_FLAG_MIS_EMISSION     = 0b00010000u,
+  STATE_FLAG_ALLOW_AMBIENT    = 0b00100000u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {

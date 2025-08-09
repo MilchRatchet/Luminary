@@ -88,7 +88,7 @@ LUMINARY_KERNEL void tasks_create() {
     ////////////////////////////////////////////////////////////////////
 
     DeviceTask task;
-    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION;
+    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
 

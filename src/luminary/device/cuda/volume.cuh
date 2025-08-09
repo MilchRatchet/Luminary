@@ -69,7 +69,7 @@ LUMINARY_KERNEL void volume_process_events() {
       volume          = volume_get_descriptor_preset(volume.type);
       VolumePath path = volume_compute_path(volume, task.origin, task.ray, depth, true);
 
-      float volume_intersection_probability = (task.state & STATE_FLAG_CAMERA_DIRECTION) ? 0.75f : 1.0f;
+      float volume_intersection_probability = (task.state & STATE_FLAG_CAMERA_DIRECTION) ? 0.5f : 1.0f;
 
       const bool sky_fast_path = handle.instance_id == HIT_TYPE_SKY && device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
 
@@ -190,6 +190,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     new_state &= ~STATE_FLAG_ALLOW_EMISSION;
     new_state &= ~STATE_FLAG_MIS_EMISSION;
+    new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
 
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
 

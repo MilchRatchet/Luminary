@@ -19,17 +19,16 @@ extern "C" __global__ void __raygen__optix() {
     return;
 #endif
 
-  const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
-  const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_VOLUME];
-  const uint32_t task_id     = TASK_ID;
+  const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
+  const uint32_t task_id    = TASK_ID;
 
   if (task_id >= task_count)
     return;
 
-  const uint32_t task_base_address      = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
-  DeviceTask task                       = task_load(task_base_address);
-  const DeviceTaskTrace trace           = task_trace_load(task_base_address);
-  const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+  const uint32_t task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+  DeviceTask task                  = task_load(task_base_address);
+  const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+  DeviceTaskThroughput throughput  = task_throughput_load(task_base_address);
 
   const VolumeType volume_type = VolumeType(task.volume_id);
 
@@ -38,11 +37,9 @@ extern "C" __global__ void __raygen__optix() {
     return;
 #endif
 
-  task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
-
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-  MaterialContextVolume ctx = volume_get_context(task, volume, 0.0f);
+  MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
 
   RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
@@ -51,6 +48,8 @@ extern "C" __global__ void __raygen__optix() {
 #endif
 
 #ifdef OPTIX_ENABLE_SKY_DL
+  volume_sample_sky_dl_initial_vertex(ctx, task.index, throughput);
+
   accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx, task.index));
   accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
 #endif

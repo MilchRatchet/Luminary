@@ -32,6 +32,7 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(CAUSTIC_INITIAL, LIGHT_SUN_CAUSTICS_MAX_SAMPLES)                                   //
   RANDOM_ALLOCATE(CAUSTIC_RESAMPLING, 1)                                                             //
   RANDOM_ALLOCATE(CAUSTIC_SUN_RAY, 1)                                                                //
+  RANDOM_ALLOCATE(LIGHT_SUN_INITIAL_VERTEX, 1)                                                       //
   RANDOM_ALLOCATE(LIGHT_SUN_BSDF, 1)                                                                 //
   RANDOM_ALLOCATE(LIGHT_SUN_RAY, 1)                                                                  //
   RANDOM_ALLOCATE(LIGHT_SUN_RESAMPLING, 1)                                                           //

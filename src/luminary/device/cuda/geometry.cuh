@@ -92,7 +92,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
-    uint16_t new_state = task.state;
+    uint16_t new_state = task.state | STATE_FLAG_ALLOW_AMBIENT;
 
     if (!is_delta_distribution) {
       new_state &= ~STATE_FLAG_DELTA_PATH;

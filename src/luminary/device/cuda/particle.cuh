@@ -29,7 +29,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
 
     const vec3 bounce_ray = volume_sample_ray<MATERIAL_PARTICLE>(ctx, task.index);
 
-    uint16_t new_state = task.state;
+    uint16_t new_state = task.state | STATE_FLAG_ALLOW_AMBIENT;
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
