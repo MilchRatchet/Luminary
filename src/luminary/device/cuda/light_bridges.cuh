@@ -296,7 +296,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   if (sample_path_pdf == 0.0f)
     return result;
 
-  sample_weight *= 1.0f / (sample_path_pdf * initial_pdf);
+  sample_weight *= 1.0f / sample_path_pdf;
 
   ////////////////////////////////////////////////////////////////////
   // Modify path
