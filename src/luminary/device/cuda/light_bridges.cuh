@@ -18,6 +18,7 @@
 
 // This must correspond to the G term used when computing the LUT.
 #define BRIDGES_HG_G_TERM (0.85f)
+#define BRIDGES_INITIAL_VERTEX_FORWARD_PROB (0.95f)
 
 __device__ vec3 bridges_phase_sample(const vec3 ray, const float2 r_dir) {
   const float cos_angle = henyey_greenstein_phase_sample(BRIDGES_HG_G_TERM, r_dir.x);
@@ -228,9 +229,36 @@ __device__ RGBF bridges_sample_bridge(
 
 __device__ vec3 bridges_sample_initial_vertex(
   MaterialContextVolume ctx, const vec3 point_on_light, const ushort2 pixel, const uint32_t output_id, RGBF& attenuation, float& pdf) {
-  const float random_intersection = random_1D(RANDOM_TARGET_LIGHT_GEO_INITIAL_VERTEX + output_id, pixel);
+  float random_intersection = random_1D(RANDOM_TARGET_LIGHT_GEO_INITIAL_VERTEX + output_id, pixel);
 
-  const float t = volume_sample_intersection_bounded(ctx.descriptor, 0.0f, ctx.max_dist, random_intersection);
+  const vec3 PO             = sub_vector(point_on_light, ctx.position);
+  const float dist_to_light = -dot_product(PO, ctx.V);
+
+  // We sample points in front of the light with a very high probability, the rest is only for unbiasedness.
+  const float forward_prob = (dist_to_light < ctx.max_dist) ? BRIDGES_INITIAL_VERTEX_FORWARD_PROB : 1.0f;
+
+  float max_dist;
+  float t_offset;
+
+  if (random_intersection < forward_prob) {
+    random_intersection = random_intersection / forward_prob;
+
+    max_dist = clampf(dist_to_light, 0.0f, ctx.max_dist);
+    t_offset = 0.0f;
+
+    pdf = forward_prob;
+  }
+  else {
+    random_intersection = (random_intersection - forward_prob) / (1.0f - forward_prob);
+
+    // This path is only ever hit if ctx.max_dist > dist_to_light;
+    max_dist = ctx.max_dist - dist_to_light;
+    t_offset = dist_to_light;
+
+    pdf = 1.0f - forward_prob;
+  }
+
+  const float t = t_offset + volume_sample_intersection_bounded(ctx.descriptor, max_dist, random_intersection);
 
   const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
 
@@ -238,7 +266,7 @@ __device__ vec3 bridges_sample_initial_vertex(
   attenuation.g = expf(-t * volume_transmittance.g) * ctx.descriptor.scattering.g;
   attenuation.b = expf(-t * volume_transmittance.b) * ctx.descriptor.scattering.b;
 
-  pdf = volume_sample_intersection_bounded_pdf(ctx.descriptor, 0.0f, ctx.max_dist, t);
+  pdf *= volume_sample_intersection_bounded_pdf(ctx.descriptor, max_dist, t - t_offset);
 
   return add_vector(ctx.position, scale_vector(ctx.V, -t));
 }

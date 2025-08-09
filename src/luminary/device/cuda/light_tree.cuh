@@ -112,7 +112,7 @@ __device__ float light_tree_importance<MATERIAL_VOLUME>(
   const float dist_along_ray = -dot_product(PO, ctx.V);
 
   // Clamp the distance if the ray is shortened by geometry.
-  const float clamped_dist_along_ray = fminf(dist_along_ray, ctx.max_dist);
+  const float clamped_dist_along_ray = clampf(dist_along_ray, 0.0f, ctx.max_dist);
 
   float perpendicular_dist = get_length(sub_vector(mean, add_vector(ctx.position, scale_vector(ctx.V, -clamped_dist_along_ray))));
   perpendicular_dist       = fmaxf(perpendicular_dist - LIGHT_TREE_STD_DEV_FACTOR * std_dev, 0.0f);

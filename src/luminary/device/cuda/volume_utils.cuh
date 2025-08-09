@@ -196,21 +196,19 @@ __device__ float volume_sample_intersection_miss_probability(const VolumeDescrip
   return expf(-volume.max_scattering * depth);
 }
 
-__device__ float volume_sample_intersection_bounded(
-  const VolumeDescriptor volume, const float start, const float max_length, const float random) {
+__device__ float volume_sample_intersection_bounded(const VolumeDescriptor volume, const float max_length, const float random) {
   const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
 
   // [FonWKH17] Equation 15
   const float t = -logf(1.0f - random * prob_hit_at_max) / volume.max_scattering;
 
-  return start + t;
+  return t;
 }
 
-__device__ float volume_sample_intersection_bounded_pdf(
-  const VolumeDescriptor volume, const float start, const float max_length, const float t) {
+__device__ float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const float max_length, const float t) {
   const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
 
-  return volume.max_scattering * expf(-volume.max_scattering * (t - start)) / prob_hit_at_max;
+  return volume.max_scattering * expf(-volume.max_scattering * t) / prob_hit_at_max;
 }
 
 template <MaterialType TYPE>
