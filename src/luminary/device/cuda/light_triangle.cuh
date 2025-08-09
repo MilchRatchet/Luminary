@@ -221,8 +221,7 @@ __device__ bool light_triangle_sample_microtriangle_finalize(
   return success;
 }
 
-__device__ bool light_triangle_sample_finalize_bridges(
-  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist, float& area) {
+__device__ vec3 light_triangle_sample_bridges(TriangleLight& triangle, const float2 random) {
   const float r1 = sqrtf(random.x);
   const float r2 = random.y;
 
@@ -233,6 +232,12 @@ __device__ bool light_triangle_sample_finalize_bridges(
   const vec3 point_on_light =
     add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
 
+  return point_on_light;
+}
+
+__device__ bool light_triangle_sample_finalize_bridges(
+  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const vec3 point_on_light, vec3& ray, float& dist,
+  float& area) {
   area = get_length(cross_product(triangle.edge1, triangle.edge2)) * 0.5f;
 
   ray = normalize_vector(sub_vector(point_on_light, origin));

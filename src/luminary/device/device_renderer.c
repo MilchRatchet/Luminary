@@ -70,6 +70,12 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
+    if (args->render_volumes) {
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_GEO;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
     action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
     action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
@@ -109,10 +115,6 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     }
 
     if (args->render_volumes) {
-      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_GEO;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
       action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
       action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_SKY;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));

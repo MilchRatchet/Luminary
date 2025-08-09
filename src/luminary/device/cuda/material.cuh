@@ -67,6 +67,7 @@ struct MaterialContext<MATERIAL_VOLUME> {
   vec3 V;
   uint16_t state;
   VolumeType volume_type;
+  float max_dist;
 };
 
 template <>

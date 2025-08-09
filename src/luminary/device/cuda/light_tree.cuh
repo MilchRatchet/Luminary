@@ -13,6 +13,9 @@
 #define LIGHT_TREE_SELECTED_PTR_MASK LIGHT_TREE_INVALID_NODE
 // #define LIGHT_TREE_DEBUG_TRAVERSAL
 
+#define LIGHT_TREE_STD_DEV_FACTOR (2.0f)
+#define LIGHT_TREE_STD_DEV_PERCENTILE (0.05f)
+
 static_assert(LIGHT_TREE_NUM_OUTPUTS <= LIGHT_GEO_MAX_SAMPLES, "Update random allocations if you increase number of output samples.");
 
 struct LightTreeContinuation {
@@ -86,6 +89,7 @@ __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
 template <>
 __device__ float light_tree_importance<MATERIAL_VOLUME>(
   const MaterialContextVolume ctx, const float power, const vec3 mean, const float std_dev) {
+#if 0
   const vec3 PO    = sub_vector(mean, ctx.position);
   const float dist = sqrtf(dot_product(PO, PO));
 
@@ -100,6 +104,45 @@ __device__ float light_tree_importance<MATERIAL_VOLUME>(
   const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.V, -2.0f * std_dev)), ctx.position));
   float NdotL  = __saturatef(-dot_product(L, ctx.V));
   NdotL        = NdotL * 0.95f + 0.05f;
+
+#else
+  const vec3 PO = sub_vector(mean, ctx.position);
+
+  // Distance to the mean projected onto the ray
+  const float dist_along_ray = -dot_product(PO, ctx.V);
+
+  // Clamp the distance if the ray is shortened by geometry.
+  const float clamped_dist_along_ray = fminf(dist_along_ray, ctx.max_dist);
+
+  float perpendicular_dist = get_length(sub_vector(mean, add_vector(ctx.position, scale_vector(ctx.V, -clamped_dist_along_ray))));
+  perpendicular_dist       = fmaxf(perpendicular_dist - LIGHT_TREE_STD_DEV_FACTOR * std_dev, 0.0f);
+
+  // Compute a domain of the light cluster projected onto the ray based on the std dev.
+  const float minimum_dist = clampf(dist_along_ray - LIGHT_TREE_STD_DEV_FACTOR * std_dev, 0.0f, ctx.max_dist);
+  const float maximum_dist = clampf(dist_along_ray + LIGHT_TREE_STD_DEV_FACTOR * std_dev, 0.0f, ctx.max_dist);
+
+  // This should be pre-computed.
+  const float extinction = color_importance(ctx.descriptor.absorption) + color_importance(ctx.descriptor.scattering);
+
+  // Surprisingly simple expession given by the root of the derivative of the transmittance function.
+  const float transmittance_maximizer = 1.0f / extinction;
+
+  // Compute the maximizer within the target domain
+  const float dist = clampf(transmittance_maximizer, minimum_dist, maximum_dist);
+
+  // Integral of the transmittance term using the triangle inequality as an upper bound
+  const float transmittance = expf(-extinction * (dist + perpendicular_dist)) * dist;
+
+  // N^TL term is taken out by approximating it using its center value
+  const vec3 half_point = add_vector(ctx.position, scale_vector(ctx.V, -dist * 0.5f));
+
+  // Compute a favourable L so that N^TL is roughly as large as it gets over the set of directions towards the light cluster
+  const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.V, -LIGHT_TREE_STD_DEV_FACTOR * std_dev)), half_point));
+
+  // N^TL can't be zero as the light cluster is given through a distribution with infinite support
+  float NdotL = __saturatef(-dot_product(L, ctx.V));
+  NdotL       = NdotL * (1.0f - LIGHT_TREE_STD_DEV_PERCENTILE) + LIGHT_TREE_STD_DEV_PERCENTILE;
+#endif
 
   return power * NdotL * transmittance;
 }

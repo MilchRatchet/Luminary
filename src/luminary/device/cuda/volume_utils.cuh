@@ -196,6 +196,23 @@ __device__ float volume_sample_intersection_miss_probability(const VolumeDescrip
   return expf(-volume.max_scattering * depth);
 }
 
+__device__ float volume_sample_intersection_bounded(
+  const VolumeDescriptor volume, const float start, const float max_length, const float random) {
+  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
+
+  // [FonWKH17] Equation 15
+  const float t = -logf(1.0f - random * prob_hit_at_max) / volume.max_scattering;
+
+  return start + t;
+}
+
+__device__ float volume_sample_intersection_bounded_pdf(
+  const VolumeDescriptor volume, const float start, const float max_length, const float t) {
+  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
+
+  return volume.max_scattering * expf(-volume.max_scattering * (t - start)) / prob_hit_at_max;
+}
+
 template <MaterialType TYPE>
 __device__ float volume_phase_evaluate(const MaterialContext<TYPE> ctx, const vec3 ray);
 
@@ -316,13 +333,14 @@ __device__ vec3 volume_sample_ray<MATERIAL_PARTICLE>(const MaterialContextPartic
   return scatter_ray;
 }
 
-__device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume) {
+__device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume, const float max_dist) {
   MaterialContextVolume ctx;
   ctx.descriptor  = volume;
   ctx.position    = task.origin;
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
   ctx.volume_type = volume.type;
+  ctx.max_dist    = max_dist;
 
   return ctx;
 }

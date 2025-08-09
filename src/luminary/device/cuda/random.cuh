@@ -35,6 +35,7 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(LIGHT_SUN_BSDF, 1)                                                                 //
   RANDOM_ALLOCATE(LIGHT_SUN_RAY, 1)                                                                  //
   RANDOM_ALLOCATE(LIGHT_SUN_RESAMPLING, 1)                                                           //
+  RANDOM_ALLOCATE(LIGHT_GEO_INITIAL_VERTEX, LIGHT_GEO_MAX_SAMPLES)                                   //
   RANDOM_ALLOCATE(LIGHT_GEO_RAY, LIGHT_GEO_MAX_SAMPLES)                                              //
   RANDOM_ALLOCATE(LIGHT_GEO_RESAMPLING, 1)                                                           //
   RANDOM_ALLOCATE(LIGHT_GEO_TREE_PREPASS, LIGHT_GEO_MAX_SAMPLES)                                     //

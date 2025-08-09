@@ -180,7 +180,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     const VolumeType volume_type  = VOLUME_HIT_TYPE(trace.handle.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    MaterialContextVolume ctx = volume_get_context(task, volume);
+    MaterialContextVolume ctx = volume_get_context(task, volume, 0.0f);
 
     const vec3 bounce_ray = volume_sample_ray<MATERIAL_VOLUME>(ctx, task.index);
 

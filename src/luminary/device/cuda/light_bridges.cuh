@@ -152,11 +152,10 @@ __device__ uint32_t
 }
 
 __device__ RGBF bridges_sample_bridge(
-  MaterialContextVolume ctx, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf, vec3& end_vertex,
-  float& scale) {
-  const vec3 initial_vertex = ctx.position;
-  const vec3 light_vector   = sub_vector(light_point, initial_vertex);
-  const float target_scale  = get_length(light_vector);
+  MaterialContextVolume ctx, const vec3 light_point, const vec3 initial_vertex, const uint32_t seed, const ushort2 pixel, float& path_pdf,
+  vec3& end_vertex, float& scale) {
+  const vec3 light_vector  = sub_vector(light_point, initial_vertex);
+  const float target_scale = get_length(light_vector);
 
   ////////////////////////////////////////////////////////////////////
   // Sample vertex count
@@ -227,17 +226,43 @@ __device__ RGBF bridges_sample_bridge(
   return path_weight;
 }
 
+__device__ vec3 bridges_sample_initial_vertex(
+  MaterialContextVolume ctx, const vec3 point_on_light, const ushort2 pixel, const uint32_t output_id, RGBF& attenuation, float& pdf) {
+  const float random_intersection = random_1D(RANDOM_TARGET_LIGHT_GEO_INITIAL_VERTEX + output_id, pixel);
+
+  const float t = volume_sample_intersection_bounded(ctx.descriptor, 0.0f, ctx.max_dist, random_intersection);
+
+  const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
+
+  attenuation.r = expf(-t * volume_transmittance.r) * ctx.descriptor.scattering.r;
+  attenuation.g = expf(-t * volume_transmittance.g) * ctx.descriptor.scattering.g;
+  attenuation.b = expf(-t * volume_transmittance.b) * ctx.descriptor.scattering.b;
+
+  pdf = volume_sample_intersection_bounded_pdf(ctx.descriptor, 0.0f, ctx.max_dist, t);
+
+  return add_vector(ctx.position, scale_vector(ctx.V, -t));
+}
+
 __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   MaterialContextVolume ctx, TriangleLight light, const TriangleHandle light_handle, const uint3 light_uv_packed, const ushort2 pixel,
   const uint32_t output_id, float2& target_and_weight) {
   const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + output_id, pixel);
 
-  vec3 light_dir;
-  float area, light_dist;
-  light_triangle_sample_finalize_bridges(light, light_uv_packed, ctx.position, random_light_point, light_dir, light_dist, area);
+  const vec3 point_on_light = light_triangle_sample_bridges(light, random_light_point);
+
+  RGBF initial_attenuation;
+  float initial_pdf;
+  const vec3 initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, output_id, initial_attenuation, initial_pdf);
 
   LightSampleResult<MATERIAL_VOLUME> result;
   result.handle = triangle_handle_get(INSTANCE_ID_INVALID, 0);
+
+  if (initial_pdf == 0.0f || color_importance(initial_attenuation) == 0.0f)
+    return result;
+
+  vec3 light_dir;
+  float area, light_dist;
+  light_triangle_sample_finalize_bridges(light, light_uv_packed, initial_vertex, point_on_light, light_dir, light_dist, area);
 
   target_and_weight.x = 0.0f;
   target_and_weight.y = 1.0f;
@@ -245,18 +270,18 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   if (light_dist == FLT_MAX || area < eps)
     return result;
 
-  RGBF light_color = light_get_color(light);
+  RGBF light_color = mul_color(light_get_color(light), initial_attenuation);
 
   // We sampled a point that emits no light, skip.
   if (color_importance(light_color) == 0.0f)
     return result;
 
-  const vec3 light_point = add_vector(ctx.position, scale_vector(light_dir, light_dist));
+  const vec3 light_point = add_vector(initial_vertex, scale_vector(light_dir, light_dist));
 
   if (light_point.y < ctx.descriptor.min_height || light_point.y > ctx.descriptor.max_height)
     return result;
 
-  float sample_weight = area;
+  float sample_weight = area / initial_pdf;
 
   ////////////////////////////////////////////////////////////////////
   // Sample path
@@ -266,18 +291,18 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   float sample_path_scale;
   vec3 sample_path_end_vertex;
   RGBF sample_path_weight =
-    bridges_sample_bridge(ctx, light_point, output_id, pixel, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
+    bridges_sample_bridge(ctx, light_point, initial_vertex, output_id, pixel, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
   if (sample_path_pdf == 0.0f)
     return result;
 
-  sample_weight *= 1.0f / sample_path_pdf;
+  sample_weight *= 1.0f / (sample_path_pdf * initial_pdf);
 
   ////////////////////////////////////////////////////////////////////
   // Modify path
   ////////////////////////////////////////////////////////////////////
 
-  const Quaternion sample_rotation = bridges_compute_rotation(ctx.position, light_point, sample_path_end_vertex);
+  const Quaternion sample_rotation = bridges_compute_rotation(initial_vertex, light_point, sample_path_end_vertex);
 
   const vec3 rotation_initial_direction = quaternion_apply(sample_rotation, light_dir);
   const float cos_angle                 = -dot_product(rotation_initial_direction, ctx.V);
@@ -315,18 +340,25 @@ __device__ RGBF
 
   OptixTraceStatus trace_status = (bridge_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
   vec3 light_vector             = get_vector(0.0f, 0.0f, 1.0f);
+  vec3 initial_vertex           = get_vector(0.0f, 0.0f, 0.0f);
 
   if (bridge_is_valid) {
     const DeviceTransform light_transform = load_transform(sample.handle.instance_id);
 
-    uint3 light_packed_uv;
-    TriangleLight light = light_triangle_sample_init(sample.handle, light_transform, light_packed_uv);
+    uint3 light_uv_packed;
+    TriangleLight light = light_triangle_sample_init(sample.handle, light_transform, light_uv_packed);
 
     const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + sample.seed, pixel);
 
+    const vec3 point_on_light = light_triangle_sample_bridges(light, random_light_point);
+
+    RGBF initial_attenuation;
+    float initial_pdf;
+    initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, sample.seed, initial_attenuation, initial_pdf);
+
     vec3 light_dir;
-    float light_dist, area;
-    light_triangle_sample_finalize_bridges(light, light_packed_uv, ctx.position, random_light_point, light_dir, light_dist, area);
+    float area, light_dist;
+    light_triangle_sample_finalize_bridges(light, light_uv_packed, initial_vertex, point_on_light, light_dir, light_dist, area);
 
     light_vector = scale_vector(light_dir, light_dist);
   }
@@ -348,10 +380,11 @@ __device__ RGBF
   // Compute visibility of path
   ////////////////////////////////////////////////////////////////////
 
-  vec3 current_vertex            = ctx.position;
+  vec3 current_vertex            = initial_vertex;
   vec3 current_direction_sampled = normalize_vector(light_vector);
   vec3 current_direction         = quaternion_apply(sample.rotation, current_direction_sampled);
 
+  // We don't need to trace visibility to the initial vertex as it was sampled with an interval that we know has no intersections
   RGBF shadow_term = splat_color(1.0f);
 
   float sum_dist = 0.0f;
