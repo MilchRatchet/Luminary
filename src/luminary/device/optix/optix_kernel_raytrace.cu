@@ -127,6 +127,19 @@ __device__ void optix_raytrace_particles(const DeviceTask task, OptixRaytraceRes
   }
 }
 
+__device__ void optix_raytrace_ocean(const DeviceTask task, OptixRaytraceResult& result) {
+  if (device.ocean.active == false)
+    return;
+
+  const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, result.depth);
+
+  if (ocean_depth < result.depth) {
+    result.depth              = ocean_depth;
+    result.handle.instance_id = HIT_TYPE_OCEAN;
+    result.handle.tri_id      = 0;
+  }
+}
+
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
@@ -145,6 +158,7 @@ extern "C" __global__ void __raygen__optix() {
 
   optix_raytrace_geometry(task, result);
   optix_raytrace_particles(task, result);
+  optix_raytrace_ocean(task, result);
 
   task_trace_handle_store(task_base_address, result.handle);
   task_trace_depth_store(task_base_address, result.depth);

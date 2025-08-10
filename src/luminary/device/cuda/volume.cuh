@@ -41,26 +41,17 @@ LUMINARY_KERNEL void volume_process_events() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
-    DeviceTask task                  = task_load(task_base_address);
-    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
+    const uint32_t pixel = get_pixel_id(task.index);
 
     TriangleHandle handle = trace.handle;
     float depth           = trace.depth;
 
-    if (device.ocean.active) {
-      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
-
-      if (ocean_depth < depth) {
-        depth              = ocean_depth;
-        handle.instance_id = HIT_TYPE_OCEAN;
-        handle.tri_id      = 0;
-      }
-    }
-
-    const uint32_t pixel                  = get_pixel_id(task.index);
-    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
-    RGBF record                           = record_unpack(throughput.record);
+    RGBF record = record_unpack(throughput.record);
 
     VolumeDescriptor volume;
     volume.type = VolumeType(task.volume_id);
