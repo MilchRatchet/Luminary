@@ -250,7 +250,6 @@ struct LuminarySky {
   LuminaryVec3 hdri_origin;
   bool aerial_perspective;
   LuminaryRGBF constant_color;
-  bool ambient_sampling;
   LuminarySkyMode mode;
 } typedef LuminarySky;
 

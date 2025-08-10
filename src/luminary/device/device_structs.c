@@ -89,7 +89,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->ozone_absorption   = sky->ozone_absorption;
   device_sky->steps              = sky->steps;
   device_sky->aerial_perspective = sky->aerial_perspective;
-  device_sky->ambient_sampling   = sky->ambient_sampling;
   device_sky->mode               = sky->mode;
 
   device_sky->geometry_offset        = sky->geometry_offset;

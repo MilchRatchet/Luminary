@@ -64,7 +64,6 @@ struct DeviceSky {
   uint32_t ozone_absorption : 1;
   uint32_t steps : 10;
   uint32_t aerial_perspective : 1;
-  uint32_t ambient_sampling : 1;
   uint32_t mode : 2;
 
   vec3 geometry_offset;

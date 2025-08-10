@@ -38,7 +38,6 @@ LuminaryResult sky_get_default(Sky* sky) {
   sky->constant_color.r       = 1.0f;
   sky->constant_color.g       = 1.0f;
   sky->constant_color.b       = 1.0f;
-  sky->ambient_sampling       = true;
   sky->mode                   = LUMINARY_SKY_MODE_DEFAULT;
 
   return LUMINARY_SUCCESS;
@@ -84,8 +83,6 @@ LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* passi
   __SKY_DIRTY_PASSIVE_HDRI(hdri_origin.x);
   __SKY_DIRTY_PASSIVE_HDRI(hdri_origin.y);
   __SKY_DIRTY_PASSIVE_HDRI(hdri_origin.z);
-
-  __SKY_DIRTY(ambient_sampling);
 
   switch (input->mode) {
     case LUMINARY_SKY_MODE_DEFAULT:

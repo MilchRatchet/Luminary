@@ -210,7 +210,7 @@ static void _window_entity_properties_renderer_settings_action(
   update_data |=
     _window_entity_properties_add_slider(data, "Max Depth", &settings.max_ray_depth, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 8.0f, 1.0f);
+    data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 8.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
   update_data |=
@@ -477,8 +477,6 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
         _window_entity_properties_add_slider(data, "Color", &sky.constant_color, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, FLT_MAX, 1.0f);
       break;
   }
-
-  update_data |= _window_entity_properties_add_checkbox(data, "Ambient Sampling", &sky.ambient_sampling);
 
   if (update_data) {
     sky.mode = (LuminarySkyMode) mode;
