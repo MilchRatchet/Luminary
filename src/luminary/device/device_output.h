@@ -36,7 +36,7 @@ struct DeviceOutput {
   RGBF color_correction;
   AGXCustomParams agx_params;
   LuminaryFilter filter;
-  bool output_is_dirty;
+  bool recurring_output_is_dirty;
 } typedef DeviceOutput;
 
 DEVICE_CTX_FUNC LuminaryResult device_output_create(DeviceOutput** output);

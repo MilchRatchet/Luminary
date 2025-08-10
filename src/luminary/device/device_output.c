@@ -47,7 +47,7 @@ LuminaryResult device_output_get_recurring_enabled(DeviceOutput* output, bool* r
 LuminaryResult device_output_set_output_dirty(DeviceOutput* output) {
   __CHECK_NULL_ARGUMENT(output);
 
-  output->output_is_dirty = true;
+  output->recurring_output_is_dirty = true;
 
   return LUMINARY_SUCCESS;
 }
@@ -206,7 +206,7 @@ static bool _device_output_recurring_needs_queueing(DeviceOutput* output, const 
   if (output->recurring_outputs_enabled == false)
     return false;
 
-  if (output->output_is_dirty)
+  if (output->recurring_output_is_dirty)
     return true;
 
   const uint32_t base_threshold = 4;
@@ -273,12 +273,10 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   // TODO: There is a bug where the undersampling breaks if we update the constant memory here, so we can only do it afterwards.
   // This is only important if sample times are high which is not the case during undersampling so this is not very important.
-  if (output->output_is_dirty && device->undersampling_state == 0) {
+  if (output->recurring_output_is_dirty && device->undersampling_state == 0) {
     // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
     __FAILURE_HANDLE(device_sync_constant_memory(device));
   }
-
-  output->output_is_dirty = false;
 
   const uint32_t current_sample_count = device->aggregate_sample_count;
 
@@ -296,6 +294,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   if (_device_output_recurring_needs_queueing(output, current_sample_count) == true) {
     __DEBUG_ASSERT(output->width > 0 && output->height > 0);
+
+    output->recurring_output_is_dirty = false;
 
     DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
