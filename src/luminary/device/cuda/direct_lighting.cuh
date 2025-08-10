@@ -417,6 +417,18 @@ __device__ RGBF direct_lighting_ambient_sample(MaterialContext<TYPE> ctx, const 
 
   const vec3 task_origin = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
+  // No ocean caustics sampling for ambient DL
+  if ((ctx.volume_type == VOLUME_TYPE_OCEAN) && (bounce_info.ray.y > 0.0f)) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
+  // No ocean caustics sampling for ambient DL
+  if ((ctx.volume_type != VOLUME_TYPE_OCEAN) && device.ocean.active && (bounce_info.ray.y < 0.0f)) {
+    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    return splat_color(0.0f);
+  }
+
   RGBF light_color = sky_color_no_compute(task_origin, bounce_info.ray, 0);
   light_color      = mul_color(light_color, bounce_info.weight);
 
