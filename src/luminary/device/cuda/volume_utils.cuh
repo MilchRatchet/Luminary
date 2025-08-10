@@ -51,8 +51,21 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
   }
 }
 
-__device__ bool volume_should_do_direct_lighting(const VolumeType type, const uint8_t state) {
-  if (((state & STATE_FLAG_DELTA_PATH) == 0) || (!device.ocean.triangle_light_contribution && type == VOLUME_TYPE_OCEAN))
+__device__ bool volume_should_do_geometry_direct_lighting(const VolumeType type, const uint8_t state) {
+  if ((state & STATE_FLAG_DELTA_PATH) == 0)
+    return false;
+
+  if (type == VOLUME_TYPE_NONE)
+    return false;
+
+  if (type == VOLUME_TYPE_OCEAN && (device.ocean.triangle_light_contribution == false))
+    return false;
+
+  return true;
+}
+
+__device__ bool volume_should_do_sky_direct_lighting(const VolumeType type, const uint8_t state) {
+  if (type == VOLUME_TYPE_NONE)
     return false;
 
   return true;

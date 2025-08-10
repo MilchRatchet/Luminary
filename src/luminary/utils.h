@@ -40,7 +40,7 @@
 #define LUMINARY_WORK_QUEUE_STATS_PRINT
 #define LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD 0.01
 
-enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFF } typedef VolumeType;
 
 typedef LuminaryResult (*QueueEntryFunction)(void* worker, void* args);
 typedef LuminaryResult (*QueueEntryDeferringFunction)(void* worker, void* args, bool* defer_execution);

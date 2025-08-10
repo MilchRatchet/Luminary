@@ -17,7 +17,7 @@ extern "C" __global__ void __raygen__optix() {
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   if (LIGHTS_ARE_PRESENT == false)
     return;
-#endif
+#endif /* OPTIX_ENABLE_GEOMETRY_DL */
 
   const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
   const uint32_t task_id    = TASK_ID;
@@ -33,9 +33,14 @@ extern "C" __global__ void __raygen__optix() {
   const VolumeType volume_type = VolumeType(task.volume_id);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  if (volume_should_do_direct_lighting(volume_type, task.state) == false)
+  if (volume_should_do_geometry_direct_lighting(volume_type, task.state) == false)
     return;
-#endif
+#endif /* OPTIX_ENABLE_GEOMETRY_DL */
+
+#ifdef OPTIX_ENABLE_SKY_DL
+  if (volume_should_do_sky_direct_lighting(volume_type, task.state) == false)
+    return;
+#endif /* OPTIX_ENABLE_SKY_DL */
 
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
@@ -45,14 +50,14 @@ extern "C" __global__ void __raygen__optix() {
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   accumulated_light = add_color(accumulated_light, direct_lighting_geometry(ctx, task.index));
-#endif
+#endif /* OPTIX_ENABLE_GEOMETRY_DL */
 
 #ifdef OPTIX_ENABLE_SKY_DL
   volume_sample_sky_dl_initial_vertex(ctx, task.index, throughput);
 
   accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx, task.index));
   accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
-#endif
+#endif /* OPTIX_ENABLE_SKY_DL */
 
   accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
