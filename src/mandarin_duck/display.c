@@ -664,7 +664,7 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
     for (uint32_t y = 0; y < display->height; y++) {
       uint32_t* dst = (uint32_t*) (display->buffer + y * display->pitch);
       for (uint32_t x = 0; x < display->width; x++) {
-        dst[x] = MD_COLOR_DISPLAY_BACKGROUND;
+        dst[x] = MD_COLOR_WINDOW_BACKGROUND;
       }
     }
 
