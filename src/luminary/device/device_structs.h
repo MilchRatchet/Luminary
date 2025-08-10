@@ -82,10 +82,9 @@ struct DeviceSky {
   float multiscattering_factor;
   vec3 sun_pos;
   vec3 moon_pos;
-  vec3 hdri_origin;
   RGBF constant_color;
 } typedef DeviceSky;
-LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x74u);
+LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x68u);
 
 struct DeviceCloudLayer {
   float height_max;

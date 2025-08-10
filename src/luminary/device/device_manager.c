@@ -402,7 +402,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     Sky sky;
     __FAILURE_HANDLE_CRITICAL(scene_get(scene, &sky, SCENE_ENTITY_SKY));
 
-    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky));
+    Camera camera;
+    __FAILURE_HANDLE_CRITICAL(scene_get(scene, &camera, SCENE_ENTITY_CAMERA));
+
+    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky, &camera));
     __FAILURE_HANDLE_CRITICAL(device_build_sky_hdri(device_manager->devices[device_manager->main_device_index], device_manager->sky_hdri));
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {

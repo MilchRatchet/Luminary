@@ -247,7 +247,6 @@ struct LuminarySky {
   float multiscattering_factor;
   uint32_t hdri_dim;
   uint32_t hdri_samples;
-  LuminaryVec3 hdri_origin;
   bool aerial_perspective;
   LuminaryRGBF constant_color;
   LuminarySkyMode mode;

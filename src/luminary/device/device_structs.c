@@ -105,7 +105,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->ground_visibility      = sky->ground_visibility;
   device_sky->ozone_layer_thickness  = sky->ozone_layer_thickness;
   device_sky->multiscattering_factor = sky->multiscattering_factor;
-  device_sky->hdri_origin            = sky->hdri_origin;
   device_sky->constant_color         = sky->constant_color;
 
   ////////////////////////////////////////////////////////////////////

@@ -524,7 +524,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
   return inscattering;
 }
 
-__device__ RGBF sky_color_no_compute(const vec3 ray, const uint8_t state) {
+__device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint8_t state) {
   RGBF sky;
   switch (device.sky.mode) {
     default:
@@ -536,7 +536,7 @@ __device__ RGBF sky_color_no_compute(const vec3 ray, const uint8_t state) {
 
       const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
       if (include_sun) {
-        const vec3 sky_origin = world_to_sky_transform(device.sky.hdri_origin);
+        const vec3 sky_origin = world_to_sky_transform(origin);
 
         // HDRI does not include the sun, compute sun visibility
         const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
@@ -572,7 +572,7 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t 
 
       const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
       if (include_sun) {
-        const vec3 sky_origin = world_to_sky_transform(device.sky.hdri_origin);
+        const vec3 sky_origin = world_to_sky_transform(origin);
 
         // HDRI does not include the sun, compute sun visibility
         const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);

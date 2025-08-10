@@ -243,7 +243,7 @@ LuminaryResult sky_hdri_create(SkyHDRI** hdri) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky) {
+LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(sky);
 
@@ -252,9 +252,16 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky) {
   bool hdri_dirty        = false;
   __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
 
+  // Check if the camera moved
+  passive_dirty |= camera->pos.x != hdri->origin.x;
+  passive_dirty |= camera->pos.y != hdri->origin.y;
+  passive_dirty |= camera->pos.z != hdri->origin.z;
+
   if (passive_dirty || integration_dirty) {
     memcpy(&hdri->sky, sky, sizeof(Sky));
     hdri->sky_is_dirty = true;
+
+    hdri->origin = camera->pos;
 
     // A dimension of 0 can cause issues in the allocation, so we don't allow it (and why would we)
     const uint32_t width  = max(sky->hdri_dim, 1);
@@ -290,7 +297,7 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   args.dim          = hdri->width;
   args.ld_color     = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
   args.ld_shadow    = device_hdri->shadow_tex->pitch / device_hdri->shadow_tex->pixel_size;
-  args.origin       = hdri->sky.hdri_origin;
+  args.origin       = hdri->origin;
   args.sample_count = hdri->sample_count.end_sample_count;
 
   for (uint32_t sample_id = 0; sample_id < hdri->sky.hdri_samples; sample_id++) {

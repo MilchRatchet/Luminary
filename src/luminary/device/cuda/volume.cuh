@@ -77,7 +77,7 @@ LUMINARY_KERNEL void volume_process_events() {
       sky_fast_path &= (task.state & STATE_FLAG_ALLOW_AMBIENT) != 0;
 
       if (sky_fast_path) {
-        RGBF sky_color = sky_color_no_compute(task.ray, task.state);
+        RGBF sky_color = sky_color_no_compute(task.origin, task.ray, task.state);
         sky_color      = mul_color(sky_color, record);
 
         sky_color = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.length));

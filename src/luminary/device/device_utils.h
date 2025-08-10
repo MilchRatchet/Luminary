@@ -50,7 +50,7 @@
 // Failure handles
 ////////////////////////////////////////////////////////////////////
 
-// #define CUDA_STALL_VALIDATION
+#define CUDA_STALL_VALIDATION
 
 #ifdef CUDA_STALL_VALIDATION
 

@@ -403,8 +403,6 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
         window, mouse_state, (ElementSeparatorArgs) {.text = "HDRI Settings", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
       update_data |=
-        _window_entity_properties_add_slider(data, "Origin", &sky.hdri_origin, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
-      update_data |=
         _window_entity_properties_add_slider(data, "Resolution", &sky.hdri_dim, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 1.0f);
       update_data |=
         _window_entity_properties_add_slider(data, "Sample Count", &sky.hdri_samples, ELEMENT_SLIDER_DATA_TYPE_UINT, 0, FLT_MAX, 1.0f);
