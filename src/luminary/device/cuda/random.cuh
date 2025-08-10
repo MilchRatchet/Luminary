@@ -20,6 +20,8 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(BSDF_REFRACTION, 1)                                                                //
   RANDOM_ALLOCATE(BSDF_RESAMPLING, 1)                                                                //
   RANDOM_ALLOCATE(BSDF_OPACITY, 1)                                                                   //
+  RANDOM_ALLOCATE(BSDF_AMBIENT_RESAMPLING, 1)                                                        //
+  RANDOM_ALLOCATE(BSDF_AMBIENT_DIFFUSE, 1)                                                           //
   RANDOM_ALLOCATE(VOLUME_INTERSECTION, 1)                                                            //
   RANDOM_ALLOCATE(RUSSIAN_ROULETTE, 1)                                                               //
   RANDOM_ALLOCATE(CAMERA_JITTER, 1)                                                                  //

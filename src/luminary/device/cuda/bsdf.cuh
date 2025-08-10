@@ -297,8 +297,13 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
 
 template <>
 __device__ BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 pixel) {
+#ifndef OPTIX_ENABLE_SKY_DL
   const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
   const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
+#else  /* !OPTIX_ENABLE_SKY_DL */
+  const float random_choice = random_1D(RANDOM_TARGET_BSDF_AMBIENT_RESAMPLING, pixel);
+  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_AMBIENT_DIFFUSE, pixel);
+#endif /* OPTIX_ENABLE_SKY_DL */
 
   const vec3 I = scale_vector(ctx.V, -1.0f);
 
@@ -313,8 +318,13 @@ __device__ BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(const Ma
 
 template <>
 __device__ BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const ushort2 pixel) {
+#ifndef OPTIX_ENABLE_SKY_DL
   const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
   const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
+#else  /* !OPTIX_ENABLE_SKY_DL */
+  const float random_choice = random_1D(RANDOM_TARGET_BSDF_AMBIENT_RESAMPLING, pixel);
+  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_AMBIENT_DIFFUSE, pixel);
+#endif /* OPTIX_ENABLE_SKY_DL */
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
   info.ray = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);

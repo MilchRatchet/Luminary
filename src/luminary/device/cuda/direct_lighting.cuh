@@ -397,7 +397,7 @@ __device__ RGBF direct_lighting_ambient_sample(MaterialContext<TYPE> ctx, const 
   ////////////////////////////////////////////////////////////////////
   // Early exit
   ////////////////////////////////////////////////////////////////////
-  if ((device.state.depth < device.settings.max_ray_depth && (TYPE != MATERIAL_VOLUME)) || !device.sky.ambient_sampling) {
+  if ((device.state.depth < device.settings.max_ray_depth && (TYPE == MATERIAL_GEOMETRY)) || (device.sky.ambient_sampling == false)) {
     task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
