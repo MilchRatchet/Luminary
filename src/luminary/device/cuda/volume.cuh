@@ -84,6 +84,11 @@ LUMINARY_KERNEL void volume_process_events() {
         handle.instance_id              = HIT_TYPE_INVALID;
       }
 
+      // Turn off multiscattering for ocean volume
+      if (volume.type == VOLUME_TYPE_OCEAN && device.ocean.multiscattering == false && (task.state & STATE_FLAG_DELTA_PATH) == 0) {
+        volume_intersection_probability = 0.0f;
+      }
+
       const float2 randoms = random_2D(RANDOM_TARGET_VOLUME_INTERSECTION, task.index);
 
       bool sampled_volume_intersection = false;
