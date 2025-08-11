@@ -393,19 +393,18 @@ __device__ RGBF
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ RGBF direct_lighting_ambient_sample(MaterialContext<TYPE> ctx, const ushort2 index, DirectLightingShadowTask& task) {
+__device__ RGBF direct_lighting_ambient_sample(
+  MaterialContext<TYPE> ctx, const ushort2 index, DirectLightingShadowTask& task1, DirectLightingShadowTask& task2) {
   ////////////////////////////////////////////////////////////////////
   // Early exit
   ////////////////////////////////////////////////////////////////////
   if (device.state.depth < device.settings.max_ray_depth && (TYPE == MATERIAL_GEOMETRY)) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
 
   // We don't support compute based sky due to register/performance reasons and because
   // we would have to include clouds then aswell.
   if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
 
@@ -417,15 +416,8 @@ __device__ RGBF direct_lighting_ambient_sample(MaterialContext<TYPE> ctx, const 
 
   const vec3 task_origin = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
-  // No ocean caustics sampling for ambient DL
-  if ((ctx.volume_type == VOLUME_TYPE_OCEAN) && (bounce_info.ray.y > 0.0f)) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
-  }
-
-  // No ocean caustics sampling for ambient DL
+  // No ocean caustics reflection sampling for ambient DL
   if ((ctx.volume_type != VOLUME_TYPE_OCEAN) && device.ocean.active && (bounce_info.ray.y < 0.0f)) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
 
@@ -433,7 +425,6 @@ __device__ RGBF direct_lighting_ambient_sample(MaterialContext<TYPE> ctx, const 
   light_color      = mul_color(light_color, bounce_info.weight);
 
   if (color_importance(light_color) == 0.0f) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     return splat_color(0.0f);
   }
 
@@ -441,12 +432,43 @@ __device__ RGBF direct_lighting_ambient_sample(MaterialContext<TYPE> ctx, const 
   // Create shadow task
   ////////////////////////////////////////////////////////////////////
 
-  task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task.origin       = task_origin;
-  task.ray          = bounce_info.ray;
-  task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
-  task.limit        = FLT_MAX;
-  task.volume_type  = ctx.volume_type;
+  task1.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+  task1.origin       = task_origin;
+  task1.ray          = bounce_info.ray;
+  task1.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
+  task1.limit        = FLT_MAX;
+  task1.volume_type  = ctx.volume_type;
+
+  ////////////////////////////////////////////////////////////////////
+  // Ocean caustic refraction task
+  ////////////////////////////////////////////////////////////////////
+
+  // Add a second ray for ocean refraction
+  if ((ctx.volume_type == VOLUME_TYPE_OCEAN) && (bounce_info.ray.y > 0.0f)) {
+    const float ocean_intersection_dist = ocean_intersection_solver(task_origin, bounce_info.ray, 0.0f, FLT_MAX);
+
+    const vec3 ocean_intersection = add_vector(task_origin, scale_vector(bounce_info.ray, ocean_intersection_dist));
+
+    const vec3 ocean_normal = ocean_get_normal(ocean_intersection);
+
+    bool total_reflection;
+    const vec3 refraction = refract_vector(
+      scale_vector(bounce_info.ray, -1.0f), scale_vector(ocean_normal, -1.0f), device.ocean.refractive_index, total_reflection);
+
+    if (total_reflection) {
+      task1.trace_status = OPTIX_TRACE_STATUS_ABORT;
+      return splat_color(0.0f);
+    }
+
+    task1.limit = ocean_intersection_dist;
+
+    task2.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
+    task2.origin       = ocean_intersection;
+    task2.ray          = refraction;
+    task2.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
+    task2.limit        = FLT_MAX;
+    task2.volume_type  = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+  }
 
   return light_color;
 }
@@ -530,10 +552,14 @@ __device__ RGBF direct_lighting_geometry<MATERIAL_VOLUME>(const MaterialContextV
 
 template <MaterialType TYPE>
 __device__ RGBF direct_lighting_ambient(const MaterialContext<TYPE> ctx, const ushort2 index) {
-  DirectLightingShadowTask task;
-  RGBF light = direct_lighting_ambient_sample(ctx, index, task);
+  DirectLightingShadowTask task1;
+  task1.trace_status = OPTIX_TRACE_STATUS_ABORT;
+  DirectLightingShadowTask task2;
+  task2.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
+  RGBF light         = direct_lighting_ambient_sample(ctx, index, task1, task2);
 
-  light = mul_color(light, direct_lighting_sun_shadowing(task));
+  light = mul_color(light, direct_lighting_sun_shadowing(task1));
+  light = mul_color(light, direct_lighting_sun_shadowing(task2));
 
   return light;
 }

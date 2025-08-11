@@ -47,7 +47,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
-    uint16_t new_state = task.state | STATE_FLAG_ALLOW_AMBIENT;
+    uint16_t new_state = task.state;
 
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     new_state &= ~STATE_FLAG_MIS_EMISSION;
