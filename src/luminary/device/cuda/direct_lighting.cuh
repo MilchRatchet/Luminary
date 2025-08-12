@@ -449,16 +449,21 @@ __device__ RGBF direct_lighting_ambient_sample(
 
     const vec3 ocean_intersection = add_vector(task_origin, scale_vector(bounce_info.ray, ocean_intersection_dist));
 
-    const vec3 ocean_normal = ocean_get_normal(ocean_intersection);
+    // Ocean normal points up, we come from below, so flip it
+    const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_intersection), -1.0f);
+    const vec3 ocean_V      = scale_vector(bounce_info.ray, -1.0f);
 
     bool total_reflection;
-    const vec3 refraction = refract_vector(
-      scale_vector(bounce_info.ray, -1.0f), scale_vector(ocean_normal, -1.0f), device.ocean.refractive_index, total_reflection);
+    const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
 
     if (total_reflection) {
       task1.trace_status = OPTIX_TRACE_STATUS_ABORT;
       return splat_color(0.0f);
     }
+
+    const float fresnel_term = bsdf_fresnel(ocean_normal, ocean_V, refraction, device.ocean.refractive_index);
+
+    light_color = scale_color(light_color, 1.0f - fresnel_term);
 
     task1.limit = ocean_intersection_dist;
 
