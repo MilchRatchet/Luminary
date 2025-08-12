@@ -44,15 +44,17 @@ struct DeviceRendererQueueAction {
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
 
 #define DEVICE_RENDERER_MAX_TIMED_KERNELS 256
+#define DEVICE_RENDERER_MAX_TIMED_TILES 128
 
 struct DeviceRendererKernelTimer {
   const char* name;
-  CUevent time_start;
-  CUevent time_end;
+  CUevent time_start[DEVICE_RENDERER_MAX_TIMED_TILES];
+  CUevent time_end[DEVICE_RENDERER_MAX_TIMED_TILES];
+  uint32_t num_queued_tile_executions;
 } typedef DeviceRendererKernelTimer;
 
 struct DeviceRendererPerKernelTimings {
-  ARRAY DeviceRendererKernelTimer* kernels;
+  DeviceRendererKernelTimer kernels[DEVICE_RENDERER_MAX_TIMED_KERNELS];
   uint32_t num_kernel_launches;
 } typedef DeviceRendererPerKernelTimings;
 
