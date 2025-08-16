@@ -398,9 +398,6 @@ __device__ RGBF direct_lighting_ambient_sample(
   ////////////////////////////////////////////////////////////////////
   // Early exit
   ////////////////////////////////////////////////////////////////////
-  if (device.state.depth < device.settings.max_ray_depth && (TYPE == MATERIAL_GEOMETRY)) {
-    return splat_color(0.0f);
-  }
 
   // We don't support compute based sky due to register/performance reasons and because
   // we would have to include clouds then aswell.
