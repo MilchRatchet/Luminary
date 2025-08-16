@@ -485,8 +485,11 @@ __device__ RGBF direct_lighting_sun(const MaterialContext<TYPE> ctx, const ushor
   // Decide on method
   ////////////////////////////////////////////////////////////////////
 
-  const vec3 sky_pos     = world_to_sky_transform(ctx.position);
-  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const vec3 sky_pos = world_to_sky_transform(ctx.position);
+
+  const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const bool inside_earth      = get_length(sky_pos) < SKY_EARTH_RADIUS;
+  const bool sun_visible       = (sun_below_horizon == false) && (inside_earth == false);
 
   bool sample_direct  = true;
   bool sample_caustic = false;
@@ -499,7 +502,7 @@ __device__ RGBF direct_lighting_sun(const MaterialContext<TYPE> ctx, const ushor
   }
 
   // Sun is not present
-  if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR || !sun_visible) {
+  if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR || sun_visible == false) {
     sample_direct  = false;
     sample_caustic = false;
   }
