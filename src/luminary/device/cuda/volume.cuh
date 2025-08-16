@@ -4,6 +4,7 @@
 #include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
+#include "particle_utils.cuh"
 #include "sky.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -60,8 +61,6 @@ LUMINARY_KERNEL void volume_process_events() {
       volume          = volume_get_descriptor_preset(volume.type);
       VolumePath path = volume_compute_path(volume, task.origin, task.ray, depth, true);
 
-      float volume_intersection_probability = (task.state & STATE_FLAG_DELTA_PATH) ? 0.5f : 1.0f;
-
       bool sky_fast_path = true;
       sky_fast_path &= handle.instance_id == HIT_TYPE_SKY;
       sky_fast_path &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
@@ -80,8 +79,15 @@ LUMINARY_KERNEL void volume_process_events() {
           write_beauty_buffer(sky_color, pixel, task.state);
         }
 
-        volume_intersection_probability = 1.0f;
-        handle.instance_id              = HIT_TYPE_INVALID;
+        handle.instance_id = HIT_TYPE_INVALID;
+      }
+
+      float volume_intersection_probability = 1.0f;
+
+      // Geometry hits can cause bright highlights that are still visible through thick dense volume,
+      // we bound the intersection probability to bound the variance in this case.
+      if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (particle_is_hit(handle) == false)) {
+        volume_intersection_probability = 0.5f;
       }
 
       // Turn off multiscattering for ocean volume
@@ -142,7 +148,7 @@ LUMINARY_KERNEL void volume_process_events() {
     else if (VOLUME_HIT_CHECK(handle.instance_id)) {
       volume_task_count++;
     }
-    else if (handle.instance_id <= HIT_TYPE_PARTICLE_MAX && handle.instance_id >= HIT_TYPE_PARTICLE_MIN) {
+    else if (particle_is_hit(handle)) {
       particle_task_count++;
     }
     else if (handle.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
