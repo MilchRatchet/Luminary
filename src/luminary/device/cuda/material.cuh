@@ -48,6 +48,11 @@ struct MaterialContext {};
 
 template <>
 struct MaterialContext<MATERIAL_GEOMETRY> {
+  using RANDOM_GI         = RandomSet::BSDF<0>;
+  using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<0>;
+  using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<0>;
+  using RANDOM_DL_AMBIENT = RandomSet::BSDF<1>;
+
   uint32_t instance_id;
   uint32_t tri_id;
   vec3 position;
@@ -62,6 +67,11 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
 
 template <>
 struct MaterialContext<MATERIAL_VOLUME> {
+  using RANDOM_GI         = RandomSet::BSDF<0>;
+  using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<1>;
+  using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<1>;
+  using RANDOM_DL_AMBIENT = RandomSet::BSDF<2>;
+
   VolumeDescriptor descriptor;
   vec3 position;
   vec3 V;
@@ -72,6 +82,11 @@ struct MaterialContext<MATERIAL_VOLUME> {
 
 template <>
 struct MaterialContext<MATERIAL_PARTICLE> {
+  using RANDOM_GI         = RandomSet::BSDF<0>;
+  using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<0>;
+  using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<0>;
+  using RANDOM_DL_AMBIENT = RandomSet::BSDF<1>;
+
   uint32_t particle_id;
   vec3 position;
   vec3 V;

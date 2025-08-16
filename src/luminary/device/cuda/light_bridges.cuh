@@ -274,7 +274,7 @@ __device__ vec3 bridges_sample_initial_vertex(
 __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   MaterialContextVolume ctx, TriangleLight light, const TriangleHandle light_handle, const uint3 light_uv_packed, const ushort2 pixel,
   const uint32_t output_id, float2& target_and_weight) {
-  const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + output_id, pixel);
+  const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + output_id, pixel);
 
   const vec3 point_on_light = light_triangle_sample_bridges(light, random_light_point);
 
@@ -376,7 +376,7 @@ __device__ RGBF
     uint3 light_uv_packed;
     TriangleLight light = light_triangle_sample_init(sample.handle, light_transform, light_uv_packed);
 
-    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_RAY + sample.seed, pixel);
+    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + sample.seed, pixel);
 
     const vec3 point_on_light = light_triangle_sample_bridges(light, random_light_point);
 

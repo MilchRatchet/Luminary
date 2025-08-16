@@ -181,7 +181,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     MaterialContextVolume ctx = volume_get_context(task, volume, 0.0f);
 
-    const vec3 bounce_ray = volume_sample_ray<MATERIAL_VOLUME>(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_GI>(ctx, task.index);
 
     uint16_t new_state = task.state;
 
@@ -205,7 +205,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     DeviceTask bounce_task;
     bounce_task.state     = new_state;
     bounce_task.origin    = ctx.position;
-    bounce_task.ray       = bounce_ray;
+    bounce_task.ray       = bounce_info.ray;
     bounce_task.index     = task.index;
     bounce_task.volume_id = task.volume_id;
 

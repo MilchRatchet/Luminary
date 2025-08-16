@@ -27,7 +27,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
 
     const MaterialContextParticle ctx = particle_get_context(task, trace.handle.instance_id);
 
-    const vec3 bounce_ray = volume_sample_ray<MATERIAL_PARTICLE>(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_PARTICLE> bounce_info = bsdf_sample<MaterialContextParticle::RANDOM_GI>(ctx, task.index);
 
     uint16_t new_state = task.state;
 
@@ -44,12 +44,12 @@ LUMINARY_KERNEL void particle_process_tasks() {
     DeviceTask bounce_task;
     bounce_task.state     = new_state;
     bounce_task.origin    = ctx.position;
-    bounce_task.ray       = bounce_ray;
+    bounce_task.ray       = bounce_info.ray;
     bounce_task.index     = task.index;
     bounce_task.volume_id = task.volume_id;
 
     RGBF record = record_unpack(throughput.record);
-    record      = mul_color(record, device.particles.albedo);
+    record      = mul_color(record, bounce_info.weight);
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);

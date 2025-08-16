@@ -28,7 +28,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     DeviceIORStack ior_stack    = trace.ior_stack;
     MaterialContextGeometry ctx = ocean_get_context(task, ior_stack);
 
-    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.index);
 
     RGBF record = record_unpack(throughput.record);
     record      = mul_color(record, bounce_info.weight);

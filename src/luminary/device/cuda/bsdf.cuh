@@ -124,15 +124,15 @@ __device__ BSDFRayContext bsdf_sample_context(const MaterialContextGeometry mat_
   return context;
 }
 
-template <MaterialType TYPE>
+template <MaterialType TYPE, typename RANDOM_SET>
 __device__ BSDFSampleInfo<TYPE> bsdf_sample(const MaterialContext<TYPE> mat_ctx, const ushort2 pixel);
 
-template <>
+template <typename RANDOM_SET>
 __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(const MaterialContextGeometry mat_ctx, const ushort2 pixel) {
   const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx);
 
   if (opacity < 1.0f) {
-    const float transparency_random = random_1D(RANDOM_TARGET_BSDF_OPACITY, pixel);
+    const float transparency_random = random_1D(RANDOM_SET::OPACITY, pixel);
 
     if (transparency_random > opacity) {
       const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
@@ -173,13 +173,13 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
   float sum_weights  = 0.0f;
   RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 
-  float resampling_random = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
+  float resampling_random = random_1D(RANDOM_SET::RESAMPLING, pixel);
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx);
 
   // Microfacet based sample
   if (true) {
-    const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel);
+    const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel, RANDOM_SET::REFLECTION);
     const vec3 ray           = reflect_vector(mat_ctx_local.V, microfacet);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
     const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET);
@@ -206,7 +206,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
 
   // Diffuse based sample
   if (include_diffuse) {
-    const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel));
+    const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_SET::DIFFUSE, pixel));
     const vec3 microfacet      = normalize_vector(add_vector(mat_ctx_local.V, ray));
     const BSDFRayContext ctx   = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
     const RGBF eval            = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_DIFFUSE);
@@ -243,7 +243,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
   // Microfacet refraction based sample
   if (include_refraction) {
     bool total_reflection;
-    const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel);
+    const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel, RANDOM_SET::REFRACTION);
     const vec3 ray           = refract_vector(mat_ctx_local.V, microfacet, ior, total_reflection);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, !total_reflection);
     const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION);
@@ -295,15 +295,10 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
   return info;
 }
 
-template <>
+template <typename RANDOM_SET>
 __device__ BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 pixel) {
-#ifndef OPTIX_ENABLE_SKY_DL
-  const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
-#else  /* !OPTIX_ENABLE_SKY_DL */
-  const float random_choice = random_1D(RANDOM_TARGET_BSDF_AMBIENT_RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_AMBIENT_DIFFUSE, pixel);
-#endif /* OPTIX_ENABLE_SKY_DL */
+  const float random_choice = random_1D(RANDOM_SET::RESAMPLING, pixel);
+  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, pixel);
 
   const vec3 I = scale_vector(ctx.V, -1.0f);
 
@@ -316,18 +311,14 @@ __device__ BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(const Ma
   return info;
 }
 
-template <>
+template <typename RANDOM_SET>
 __device__ BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const ushort2 pixel) {
-#ifndef OPTIX_ENABLE_SKY_DL
-  const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
-#else  /* !OPTIX_ENABLE_SKY_DL */
-  const float random_choice = random_1D(RANDOM_TARGET_BSDF_AMBIENT_RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_AMBIENT_DIFFUSE, pixel);
-#endif /* OPTIX_ENABLE_SKY_DL */
+  const float random_choice = random_1D(RANDOM_SET::RESAMPLING, pixel);
+  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, pixel);
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
-  info.ray = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);
+  info.ray    = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);
+  info.weight = device.particles.albedo;
 
   return info;
 }
@@ -383,12 +374,11 @@ __device__ void bsdf_sample_for_light_probabilities(
 }
 
 template <MaterialType TYPE>
-__device__ vec3 bsdf_sample_for_light(
-  const MaterialContext<TYPE> mat_ctx, const ushort2 pixel, const RandomTarget random_target, bool& is_refraction, bool& is_valid);
+__device__ vec3 bsdf_sample_for_sun(const MaterialContext<TYPE> mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid);
 
 template <>
-__device__ vec3 bsdf_sample_for_light<MATERIAL_GEOMETRY>(
-  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const RandomTarget random_target, bool& is_refraction, bool& is_valid) {
+__device__ vec3
+  bsdf_sample_for_sun<MATERIAL_GEOMETRY>(const MaterialContextGeometry mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
   const vec3 V_local             = quaternion_apply(rotation_to_z, mat_ctx.V);
 
@@ -400,19 +390,19 @@ __device__ vec3 bsdf_sample_for_light<MATERIAL_GEOMETRY>(
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(mat_ctx_local, reflection_probability, refraction_probability, diffuse_probability);
 
-  const float random_method = random_1D(random_target + 1, pixel);
+  const float random_method = random_1D(MaterialContextGeometry::RANDOM_DL_SUN::BSDF_METHOD, pixel);
 
   vec3 ray_local;
   if (random_method < reflection_probability) {
-    ray_local     = bsdf_sample_microfacet_reflection(mat_ctx_local, pixel, random_target);
+    ray_local     = bsdf_sample_microfacet_reflection(mat_ctx_local, pixel, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
     is_refraction = false;
   }
   else if (random_method < reflection_probability + refraction_probability) {
-    ray_local     = bsdf_sample_microfacet_refraction(mat_ctx_local, pixel, random_target);
+    ray_local     = bsdf_sample_microfacet_refraction(mat_ctx_local, pixel, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
     is_refraction = true;
   }
   else {
-    ray_local     = bsdf_sample_diffuse(mat_ctx_local, pixel, random_target);
+    ray_local     = bsdf_sample_diffuse(mat_ctx_local, pixel, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
     is_refraction = false;
   }
 
@@ -422,10 +412,10 @@ __device__ vec3 bsdf_sample_for_light<MATERIAL_GEOMETRY>(
 }
 
 template <>
-__device__ vec3 bsdf_sample_for_light<MATERIAL_VOLUME>(
-  const MaterialContextVolume mat_ctx, const ushort2 pixel, const RandomTarget random_target, bool& is_refraction, bool& is_valid) {
-  const float2 random_dir   = random_2D(random_target, pixel);
-  const float random_method = random_1D(random_target + 1, pixel);
+__device__ vec3
+  bsdf_sample_for_sun<MATERIAL_VOLUME>(const MaterialContextVolume mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
+  const float2 random_dir   = random_2D(MaterialContextVolume::RANDOM_DL_SUN::BSDF, pixel);
+  const float random_method = random_1D(MaterialContextVolume::RANDOM_DL_SUN::BSDF_METHOD, pixel);
 
   const vec3 I = scale_vector(mat_ctx.V, -1.0f);
 
@@ -440,10 +430,10 @@ __device__ vec3 bsdf_sample_for_light<MATERIAL_VOLUME>(
 }
 
 template <>
-__device__ vec3 bsdf_sample_for_light<MATERIAL_PARTICLE>(
-  const MaterialContextParticle mat_ctx, const ushort2 pixel, const RandomTarget random_target, bool& is_refraction, bool& is_valid) {
-  const float2 random_dir   = random_2D(random_target, pixel);
-  const float random_method = random_1D(random_target + 1, pixel);
+__device__ vec3
+  bsdf_sample_for_sun<MATERIAL_PARTICLE>(const MaterialContextParticle mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
+  const float2 random_dir   = random_2D(MaterialContextParticle::RANDOM_DL_SUN::BSDF, pixel);
+  const float random_method = random_1D(MaterialContextParticle::RANDOM_DL_SUN::BSDF_METHOD, pixel);
 
   is_refraction = true;
   is_valid      = true;
@@ -452,10 +442,10 @@ __device__ vec3 bsdf_sample_for_light<MATERIAL_PARTICLE>(
 }
 
 template <MaterialType TYPE>
-__device__ float bsdf_sample_for_light_pdf(const MaterialContext<TYPE> mat_ctx, const vec3 L);
+__device__ float bsdf_sample_for_sun_pdf(const MaterialContext<TYPE> mat_ctx, const vec3 L);
 
 template <>
-__device__ float bsdf_sample_for_light_pdf<MATERIAL_GEOMETRY>(const MaterialContextGeometry mat_ctx, const vec3 L) {
+__device__ float bsdf_sample_for_sun_pdf<MATERIAL_GEOMETRY>(const MaterialContextGeometry mat_ctx, const vec3 L) {
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(mat_ctx, reflection_probability, refraction_probability, diffuse_probability);
 
@@ -477,7 +467,7 @@ __device__ float bsdf_sample_for_light_pdf<MATERIAL_GEOMETRY>(const MaterialCont
 }
 
 template <>
-__device__ float bsdf_sample_for_light_pdf<MATERIAL_VOLUME>(const MaterialContextVolume mat_ctx, const vec3 L) {
+__device__ float bsdf_sample_for_sun_pdf<MATERIAL_VOLUME>(const MaterialContextVolume mat_ctx, const vec3 L) {
   const float cos_angle = -dot_product(mat_ctx.V, L);
 
   float pdf;
@@ -493,7 +483,7 @@ __device__ float bsdf_sample_for_light_pdf<MATERIAL_VOLUME>(const MaterialContex
 }
 
 template <>
-__device__ float bsdf_sample_for_light_pdf<MATERIAL_PARTICLE>(const MaterialContextParticle mat_ctx, const vec3 L) {
+__device__ float bsdf_sample_for_sun_pdf<MATERIAL_PARTICLE>(const MaterialContextParticle mat_ctx, const vec3 L) {
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.particles.phase_diameter);
 
   return jendersie_eon_phase_function(-dot_product(mat_ctx.V, L), params);

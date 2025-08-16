@@ -7,48 +7,98 @@
 #define BLUENOISE_TEX_DIM 256
 #define BLUENOISE_TEX_DIM_MASK 0xFF
 
-#define RANDOM_ALLOCATE(__name, __count)                                                                                  \
+#define RANDOM_SET_LIGHT_SUN_COUNT 2
+#define RANDOM_SET_LIGHT_GEO_COUNT 2
+#define RANDOM_SET_BSDF_COUNT 3
+
+#define RANDOM_MAX_NUM_SHADING_CONTEXTS 3
+
+#define RANDOM_ALLOCATE(__name, __count, __set_count)                                                                     \
   RANDOM_TARGET_ALLOCATION_START_##__name,                                                                                \
     RANDOM_TARGET_ALLOCATION_SIZE_##__name = (__count), RANDOM_TARGET_##__name = RANDOM_TARGET_ALLOCATION_START_##__name, \
-    RANDOM_TARGET_ALLOCATION_END_##__name = RANDOM_TARGET_ALLOCATION_START_##__name + RANDOM_TARGET_ALLOCATION_SIZE_##__name,
+    RANDOM_TARGET_ALLOCATION_END_##__name =                                                                               \
+      RANDOM_TARGET_ALLOCATION_START_##__name + RANDOM_TARGET_ALLOCATION_SIZE_##__name * (__set_count),
 
 enum RandomTarget : uint16_t {
-  RANDOM_ALLOCATE(LENS, 1)                                                                           //
-  RANDOM_ALLOCATE(LENS_BLADE, 1)                                                                     //
-  RANDOM_ALLOCATE(BSDF_REFLECTION, 1)                                                                //
-  RANDOM_ALLOCATE(BSDF_DIFFUSE, 1)                                                                   //
-  RANDOM_ALLOCATE(BSDF_REFRACTION, 1)                                                                //
-  RANDOM_ALLOCATE(BSDF_RESAMPLING, 1)                                                                //
-  RANDOM_ALLOCATE(BSDF_OPACITY, 1)                                                                   //
-  RANDOM_ALLOCATE(BSDF_AMBIENT_RESAMPLING, 1)                                                        //
-  RANDOM_ALLOCATE(BSDF_AMBIENT_DIFFUSE, 1)                                                           //
-  RANDOM_ALLOCATE(VOLUME_INTERSECTION, 1)                                                            //
-  RANDOM_ALLOCATE(RUSSIAN_ROULETTE, 1)                                                               //
-  RANDOM_ALLOCATE(CAMERA_JITTER, 1)                                                                  //
-  RANDOM_ALLOCATE(CAMERA_TIME, 1)                                                                    //
-  RANDOM_ALLOCATE(CLOUD_STEP_OFFSET, 3)                                                              //
-  RANDOM_ALLOCATE(CLOUD_STEP_COUNT, 3)                                                               //
-  RANDOM_ALLOCATE(CLOUD_DIR, 1)                                                                      //
-  RANDOM_ALLOCATE(SKY_STEP_OFFSET, 1)                                                                //
-  RANDOM_ALLOCATE(SKY_INSCATTERING_STEP, 1)                                                          //
-  RANDOM_ALLOCATE(CAUSTIC_INITIAL, LIGHT_SUN_CAUSTICS_MAX_SAMPLES)                                   //
-  RANDOM_ALLOCATE(CAUSTIC_RESAMPLING, 1)                                                             //
-  RANDOM_ALLOCATE(CAUSTIC_SUN_RAY, 1)                                                                //
-  RANDOM_ALLOCATE(LIGHT_SUN_INITIAL_VERTEX, 1)                                                       //
-  RANDOM_ALLOCATE(LIGHT_SUN_BSDF, 1)                                                                 //
-  RANDOM_ALLOCATE(LIGHT_SUN_RAY, 1)                                                                  //
-  RANDOM_ALLOCATE(LIGHT_SUN_RESAMPLING, 1)                                                           //
-  RANDOM_ALLOCATE(LIGHT_GEO_INITIAL_VERTEX, LIGHT_GEO_MAX_SAMPLES)                                   //
-  RANDOM_ALLOCATE(LIGHT_GEO_RAY, LIGHT_GEO_MAX_SAMPLES)                                              //
-  RANDOM_ALLOCATE(LIGHT_GEO_RESAMPLING, 1)                                                           //
-  RANDOM_ALLOCATE(LIGHT_GEO_TREE_PREPASS, LIGHT_GEO_MAX_SAMPLES)                                     //
-  RANDOM_ALLOCATE(LIGHT_GEO_TREE_POSTPASS, LIGHT_GEO_MAX_SAMPLES)                                    //
-  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_DISTANCE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH))  //
-  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_PHASE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH))     //
-  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_VERTEX_COUNT, LIGHT_GEO_MAX_SAMPLES)                              //
+  RANDOM_ALLOCATE(LENS, 1, 1)                                                                           //
+  RANDOM_ALLOCATE(LENS_BLADE, 1, 1)                                                                     //
+  RANDOM_ALLOCATE(BSDF_REFLECTION, 1, RANDOM_SET_BSDF_COUNT)                                            //
+  RANDOM_ALLOCATE(BSDF_DIFFUSE, 1, RANDOM_SET_BSDF_COUNT)                                               //
+  RANDOM_ALLOCATE(BSDF_REFRACTION, 1, RANDOM_SET_BSDF_COUNT)                                            //
+  RANDOM_ALLOCATE(BSDF_RESAMPLING, 1, RANDOM_SET_BSDF_COUNT)                                            //
+  RANDOM_ALLOCATE(BSDF_OPACITY, 1, RANDOM_SET_BSDF_COUNT)                                               //
+  RANDOM_ALLOCATE(VOLUME_INTERSECTION, 1, 1)                                                            //
+  RANDOM_ALLOCATE(RUSSIAN_ROULETTE, 1, 1)                                                               //
+  RANDOM_ALLOCATE(CAMERA_JITTER, 1, 1)                                                                  //
+  RANDOM_ALLOCATE(CAMERA_TIME, 1, 1)                                                                    //
+  RANDOM_ALLOCATE(CLOUD_STEP_OFFSET, 3, 1)                                                              //
+  RANDOM_ALLOCATE(CLOUD_STEP_COUNT, 3, 1)                                                               //
+  RANDOM_ALLOCATE(CLOUD_DIR, 1, 1)                                                                      //
+  RANDOM_ALLOCATE(SKY_STEP_OFFSET, 1, 1)                                                                //
+  RANDOM_ALLOCATE(SKY_INSCATTERING_STEP, 1, 1)                                                          //
+  RANDOM_ALLOCATE(CAUSTIC_INITIAL, LIGHT_SUN_CAUSTICS_MAX_SAMPLES, RANDOM_SET_LIGHT_SUN_COUNT)          //
+  RANDOM_ALLOCATE(CAUSTIC_RESAMPLING, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                    //
+  RANDOM_ALLOCATE(CAUSTIC_SUN_RAY, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                       //
+  RANDOM_ALLOCATE(LIGHT_SUN_INITIAL_VERTEX, 1, 1)                                                       //
+  RANDOM_ALLOCATE(LIGHT_SUN_BSDF, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                        //
+  RANDOM_ALLOCATE(LIGHT_SUN_BSDF_METHOD, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                 //
+  RANDOM_ALLOCATE(LIGHT_SUN_RAY, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                         //
+  RANDOM_ALLOCATE(LIGHT_SUN_RESAMPLING, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                  //
+  RANDOM_ALLOCATE(LIGHT_GEO_INITIAL_VERTEX, LIGHT_GEO_MAX_SAMPLES, 1)                                   //
+  RANDOM_ALLOCATE(LIGHT_GEO_RAY, LIGHT_GEO_MAX_SAMPLES, RANDOM_SET_LIGHT_GEO_COUNT)                     //
+  RANDOM_ALLOCATE(LIGHT_GEO_RESAMPLING, 1, RANDOM_SET_LIGHT_GEO_COUNT)                                  //
+  RANDOM_ALLOCATE(LIGHT_GEO_TREE_PREPASS, LIGHT_GEO_MAX_SAMPLES, RANDOM_SET_LIGHT_GEO_COUNT)            //
+  RANDOM_ALLOCATE(LIGHT_GEO_TREE_POSTPASS, LIGHT_GEO_MAX_SAMPLES, RANDOM_SET_LIGHT_GEO_COUNT)           //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_DISTANCE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH), 1)  //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_PHASE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH), 1)     //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_LIGHT_POINT, LIGHT_GEO_MAX_SAMPLES, 1)                               //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_VERTEX_COUNT, LIGHT_GEO_MAX_SAMPLES, 1)                              //
 
   RANDOM_TARGET_COUNT
 } typedef RandomTarget;
+
+////////////////////////////////////////////////////////////////////
+// Sets
+////////////////////////////////////////////////////////////////////
+
+#define RANDOM_SET_ELEMENT(__name) (const RandomTarget)(RANDOM_TARGET_##__name + RANDOM_SET_ID * RANDOM_TARGET_ALLOCATION_SIZE_##__name)
+
+struct RandomSet {
+  template <uint32_t RANDOM_SET_ID>
+  struct LIGHT_SUN {
+    static_assert(RANDOM_SET_ID < RANDOM_SET_LIGHT_SUN_COUNT, "RANDOM_SET_ID is out of bounds");
+
+    static constexpr RandomTarget BSDF               = RANDOM_SET_ELEMENT(LIGHT_SUN_BSDF);
+    static constexpr RandomTarget BSDF_METHOD        = RANDOM_SET_ELEMENT(LIGHT_SUN_BSDF_METHOD);
+    static constexpr RandomTarget RAY                = RANDOM_SET_ELEMENT(LIGHT_SUN_RAY);
+    static constexpr RandomTarget RESAMPLING         = RANDOM_SET_ELEMENT(LIGHT_SUN_RESAMPLING);
+    static constexpr RandomTarget CAUSTIC_INITIAL    = RANDOM_SET_ELEMENT(CAUSTIC_INITIAL);
+    static constexpr RandomTarget CAUSTIC_RESAMPLING = RANDOM_SET_ELEMENT(CAUSTIC_RESAMPLING);
+    static constexpr RandomTarget CAUSTIC_SUN_RAY    = RANDOM_SET_ELEMENT(CAUSTIC_SUN_RAY);
+  };
+
+  template <uint32_t RANDOM_SET_ID>
+  struct LIGHT_GEO {
+    static_assert(RANDOM_SET_ID < RANDOM_SET_LIGHT_GEO_COUNT, "RANDOM_SET_ID is out of bounds");
+
+    static constexpr RandomTarget RAY           = RANDOM_SET_ELEMENT(LIGHT_GEO_RAY);
+    static constexpr RandomTarget RESAMPLING    = RANDOM_SET_ELEMENT(LIGHT_GEO_RESAMPLING);
+    static constexpr RandomTarget TREE_PREPASS  = RANDOM_SET_ELEMENT(LIGHT_GEO_TREE_PREPASS);
+    static constexpr RandomTarget TREE_POSTPASS = RANDOM_SET_ELEMENT(LIGHT_GEO_TREE_POSTPASS);
+  };
+
+  template <uint32_t RANDOM_SET_ID>
+  struct BSDF {
+    static_assert(RANDOM_SET_ID < RANDOM_SET_BSDF_COUNT, "RANDOM_SET_ID is out of bounds");
+
+    static constexpr RandomTarget REFLECTION = RANDOM_SET_ELEMENT(BSDF_REFLECTION);
+    static constexpr RandomTarget DIFFUSE    = RANDOM_SET_ELEMENT(BSDF_DIFFUSE);
+    static constexpr RandomTarget REFRACTION = RANDOM_SET_ELEMENT(BSDF_REFRACTION);
+    static constexpr RandomTarget RESAMPLING = RANDOM_SET_ELEMENT(BSDF_RESAMPLING);
+    static constexpr RandomTarget OPACITY    = RANDOM_SET_ELEMENT(BSDF_OPACITY);
+  };
+
+} typedef RandomSet;
 
 ////////////////////////////////////////////////////////////////////
 // Literature

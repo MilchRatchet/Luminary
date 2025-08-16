@@ -221,7 +221,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
   RISLane ris_lane[LIGHT_TREE_NUM_OUTPUTS];
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    ris_lane[lane_id] = ris_lane_init(random_1D(RANDOM_TARGET_LIGHT_GEO_TREE_PREPASS + lane_id, pixel));
+    ris_lane[lane_id] = ris_lane_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_PREPASS + lane_id, pixel));
   }
 
   uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
@@ -287,7 +287,7 @@ __device__ LightTreeResult
 
   DeviceLightTreeNode node = load_light_tree_node(continuation.child_index);
 
-  const float random     = random_1D(RANDOM_TARGET_LIGHT_GEO_TREE_POSTPASS + lane_id, pixel);
+  const float random     = random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_POSTPASS + lane_id, pixel);
   RISReservoir reservoir = ris_reservoir_init(random);
 
   while (result.light_id == 0xFFFFFFFF) {

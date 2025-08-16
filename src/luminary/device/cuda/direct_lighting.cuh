@@ -91,7 +91,7 @@ __device__ RGBF
   ////////////////////////////////////////////////////////////////////
 
   bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
-  const vec3 dir_bsdf = bsdf_sample_for_light(ctx, index, RANDOM_TARGET_LIGHT_SUN_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+  const vec3 dir_bsdf = bsdf_sample_for_sun(ctx, index, bsdf_sample_is_refraction, bsdf_sample_is_valid);
 
   RGBF light_bsdf         = get_color(0.0f, 0.0f, 0.0f);
   bool is_refraction_bsdf = false;
@@ -106,7 +106,7 @@ __device__ RGBF
   // Sample a direction in the sun's solid angle
   ////////////////////////////////////////////////////////////////////
 
-  const float2 random = random_2D(RANDOM_TARGET_LIGHT_SUN_RAY, index);
+  const float2 random = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::RAY, index);
 
   float solid_angle;
   const vec3 dir_solid_angle = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
@@ -124,8 +124,8 @@ __device__ RGBF
   const float target_pdf_solid_angle = color_importance(light_solid_angle);
 
   // MIS weight multiplied with PDF
-  const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(ctx, dir_bsdf) * solid_angle + 1.0f);
-  const float mis_weight_solid_angle = solid_angle / (bsdf_sample_for_light_pdf(ctx, dir_solid_angle) * solid_angle + 1.0f);
+  const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_sun_pdf(ctx, dir_bsdf) * solid_angle + 1.0f);
+  const float mis_weight_solid_angle = solid_angle / (bsdf_sample_for_sun_pdf(ctx, dir_solid_angle) * solid_angle + 1.0f);
 
   const float weight_bsdf        = target_pdf_bsdf * mis_weight_bsdf;
   const float weight_solid_angle = target_pdf_solid_angle * mis_weight_solid_angle;
@@ -141,7 +141,7 @@ __device__ RGBF
   vec3 dir;
   RGBF light_color;
   bool is_refraction;
-  if (random_1D(RANDOM_TARGET_LIGHT_SUN_RESAMPLING, index) * sum_weights < weight_bsdf) {
+  if (random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::RESAMPLING, index) * sum_weights < weight_bsdf) {
     dir           = dir_bsdf;
     target_pdf    = target_pdf_bsdf;
     light_color   = light_bsdf;
@@ -189,7 +189,7 @@ __device__ RGBF direct_lighting_sun_caustic(
   ////////////////////////////////////////////////////////////////////
 
   float solid_angle;
-  const float2 sun_dir_random                  = random_2D(RANDOM_TARGET_CAUSTIC_SUN_RAY, index);
+  const float2 sun_dir_random                  = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_SUN_RAY, index);
   const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(ctx, sun_dir, is_underwater);
 
@@ -218,7 +218,7 @@ __device__ RGBF direct_lighting_sun_caustic(
     uint32_t index_front = (uint32_t) -1;
     uint32_t index_back  = num_samples;
 
-    const float resampling_random = random_1D(RANDOM_TARGET_CAUSTIC_RESAMPLING, index);
+    const float resampling_random = random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_RESAMPLING, index);
 
     for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
       const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
@@ -409,7 +409,7 @@ __device__ RGBF direct_lighting_ambient_sample(
   // Sample ray
   ////////////////////////////////////////////////////////////////////
 
-  const BSDFSampleInfo<TYPE> bounce_info = bsdf_sample(ctx, index);
+  const BSDFSampleInfo<TYPE> bounce_info = bsdf_sample<MaterialContext<TYPE>::RANDOM_DL_AMBIENT>(ctx, index);
 
   const vec3 task_origin = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 

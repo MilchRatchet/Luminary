@@ -316,34 +316,6 @@ __device__ RGBF volume_integrate_transmittance(const VolumeType volume_type, con
   return transmittance;
 }
 
-template <MaterialType TYPE>
-__device__ vec3 volume_sample_ray(const MaterialContext<TYPE> ctx, const ushort2 pixel);
-
-template <>
-__device__ vec3 volume_sample_ray<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 pixel) {
-  const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
-
-  const vec3 ray = scale_vector(ctx.V, -1.0f);
-
-  const vec3 scatter_ray = (ctx.descriptor.type != VOLUME_TYPE_OCEAN)
-                             ? jendersie_eon_phase_sample(ray, device.fog.droplet_diameter, random_dir, random_choice)
-                             : ocean_phase_sampling(ray, random_dir, random_choice);
-
-  return scatter_ray;
-}
-
-template <>
-__device__ vec3 volume_sample_ray<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const ushort2 pixel) {
-  const float random_choice = random_1D(RANDOM_TARGET_BSDF_RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_TARGET_BSDF_DIFFUSE, pixel);
-
-  const vec3 ray         = scale_vector(ctx.V, -1.0f);
-  const vec3 scatter_ray = jendersie_eon_phase_sample(ray, device.particles.phase_diameter, random_dir, random_choice);
-
-  return scatter_ray;
-}
-
 __device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume, const float max_dist) {
   MaterialContextVolume ctx;
   ctx.descriptor  = volume;

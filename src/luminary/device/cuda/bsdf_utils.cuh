@@ -28,12 +28,7 @@ struct BSDFDirectionalAlbedos {
 enum BSDFMaterial { BSDF_CONDUCTOR = 0, BSDF_GLOSSY = 1, BSDF_DIELECTRIC = 2 } typedef BSDFMaterial;
 
 template <MaterialType TYPE>
-struct BSDFSampleInfo {
-  vec3 ray;
-  static constexpr RGBF weight              = {1.0f, 1.0f, 1.0f};
-  static constexpr bool is_transparent_pass = false;
-  static constexpr bool is_microfacet_based = false;
-};
+struct BSDFSampleInfo {};
 
 template <>
 struct BSDFSampleInfo<MATERIAL_GEOMETRY> {
@@ -41,6 +36,22 @@ struct BSDFSampleInfo<MATERIAL_GEOMETRY> {
   RGBF weight;
   bool is_transparent_pass;
   bool is_microfacet_based;
+};
+
+template <>
+struct BSDFSampleInfo<MATERIAL_VOLUME> {
+  vec3 ray;
+  static constexpr RGBF weight              = {1.0f, 1.0f, 1.0f};
+  static constexpr bool is_transparent_pass = false;
+  static constexpr bool is_microfacet_based = false;
+};
+
+template <>
+struct BSDFSampleInfo<MATERIAL_PARTICLE> {
+  vec3 ray;
+  RGBF weight;
+  static constexpr bool is_transparent_pass = false;
+  static constexpr bool is_microfacet_based = false;
 };
 
 enum BSDFSamplingHint {
@@ -207,8 +218,8 @@ __device__ float bsdf_microfacet_pdf(const MaterialContextGeometry mat_ctx, cons
 }
 
 __device__ vec3 bsdf_microfacet_sample(
-  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target = RANDOM_TARGET_BSDF_REFLECTION,
-  const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
+  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
+  const uint32_t depth = device.state.depth) {
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
@@ -289,8 +300,8 @@ __device__ float bsdf_microfacet_refraction_pdf(
 }
 
 __device__ vec3 bsdf_microfacet_refraction_sample(
-  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target = RANDOM_TARGET_BSDF_REFRACTION,
-  const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
+  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
+  const uint32_t depth = device.state.depth) {
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
