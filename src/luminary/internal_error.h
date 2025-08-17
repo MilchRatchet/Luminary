@@ -75,7 +75,7 @@
 
 #else /* LUM_DEBUG */
 
-#define __DEBUG_ASSERT(condition)
+#define __DEBUG_ASSERT(condition) (void) (condition)
 
 #endif /* !LUM_DEBUG */
 

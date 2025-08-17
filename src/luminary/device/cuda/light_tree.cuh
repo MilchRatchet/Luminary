@@ -78,9 +78,10 @@ __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
 
   float NdotL = 1.0f;
   if (MATERIAL_IS_SUBSTRATE_OPAQUE(ctx.flags)) {
-    const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.normal, 2.0f * std_dev)), ctx.position));
-    NdotL        = __saturatef(dot_product(L, ctx.normal));
-    NdotL        = NdotL * 0.95f + 0.05f;
+    const vec3 reference_point = add_vector(mean, scale_vector(ctx.normal, LIGHT_TREE_STD_DEV_FACTOR * std_dev));
+    const vec3 L               = normalize_vector(sub_vector(reference_point, ctx.position));
+    NdotL                      = __saturatef(dot_product(L, ctx.normal));
+    NdotL                      = NdotL * (1.0f - LIGHT_TREE_STD_DEV_PERCENTILE) + LIGHT_TREE_STD_DEV_PERCENTILE;
   }
 
   return power * NdotL * (1.0f / dist_sq);
@@ -89,23 +90,6 @@ __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
 template <>
 __device__ float light_tree_importance<MATERIAL_VOLUME>(
   const MaterialContextVolume ctx, const float power, const vec3 mean, const float std_dev) {
-#if 0
-  const vec3 PO    = sub_vector(mean, ctx.position);
-  const float dist = sqrtf(dot_product(PO, PO));
-
-  float transmittance = 1.0f;
-  if (dist > std_dev) {
-    const float t = dist - std_dev;
-
-    const float extinction = color_importance(ctx.descriptor.absorption) + color_importance(ctx.descriptor.scattering);
-    transmittance          = expf(-extinction * t);
-  }
-
-  const vec3 L = normalize_vector(sub_vector(add_vector(mean, scale_vector(ctx.V, -2.0f * std_dev)), ctx.position));
-  float NdotL  = __saturatef(-dot_product(L, ctx.V));
-  NdotL        = NdotL * 0.95f + 0.05f;
-
-#else
   const vec3 PO = sub_vector(mean, ctx.position);
 
   // Distance to the mean projected onto the ray
@@ -142,7 +126,6 @@ __device__ float light_tree_importance<MATERIAL_VOLUME>(
   // N^TL can't be zero as the light cluster is given through a distribution with infinite support
   float NdotL = __saturatef(-dot_product(L, ctx.V));
   NdotL       = NdotL * (1.0f - LIGHT_TREE_STD_DEV_PERCENTILE) + LIGHT_TREE_STD_DEV_PERCENTILE;
-#endif
 
   return power * NdotL * transmittance;
 }
