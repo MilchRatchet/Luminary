@@ -111,6 +111,8 @@ LUMINARY_API struct LuminaryImage {
 // Camera
 ////////////////////////////////////////////////////////////////////
 
+LUMINARY_API enum LuminaryLensModel { LUMINARY_LENS_MODEL_THIN = 0, LUMINARY_LENS_MODEL_COUNT } typedef LuminaryLensModel;
+
 // 3 bits reserved
 LUMINARY_API enum LuminaryFilter {
   LUMINARY_FILTER_NONE       = 0,
@@ -144,6 +146,15 @@ LUMINARY_API enum LuminaryApertureShape {
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
+
+  LuminaryLensModel lens_model;
+  float thin_lens_ior;
+  float thin_lens_thickness;
+  float thin_lens_radius1;
+  float thin_lens_radius2;
+
+  float camera_scale;
+
   float fov;
   float focal_length;
   float aperture_size;

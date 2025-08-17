@@ -239,11 +239,32 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   uint32_t tonemap        = (uint32_t) camera.tonemap;
   uint32_t filter         = (uint32_t) camera.filter;
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
+  uint32_t lens_model     = (uint32_t) camera.lens_model;
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Camera", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
+
+  // TODO: This is just placeholder debug UI
+  update_data |=
+    _window_entity_properties_add_dropdown(data, "Model", LUMINARY_LENS_MODEL_COUNT, (char**) luminary_strings_lens_model, &lens_model);
+
+  if (lens_model == (uint32_t) LUMINARY_LENS_MODEL_THIN) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "IOR", &camera.thin_lens_ior, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Radius 1", &camera.thin_lens_radius1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 1000.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Radius 2", &camera.thin_lens_radius2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 1000.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Thickness", &camera.thin_lens_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, 3.0f, 1.0f);
+  }
+
+  update_data |=
+    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+  // TODO: End of placeholder UI
 
   update_data |=
     _window_entity_properties_add_slider(data, "Position", &camera.pos, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
@@ -322,6 +343,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
     camera.tonemap        = (LuminaryToneMap) tonemap;
     camera.filter         = (LuminaryFilter) filter;
     camera.aperture_shape = (LuminaryApertureShape) aperture_shape;
+    camera.lens_model     = (LuminaryLensModel) lens_model;
 
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }

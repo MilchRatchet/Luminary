@@ -45,6 +45,12 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->do_firefly_rejection       = false;
   camera->indirect_only              = false;
   camera->film_grain                 = 0.0f;
+  camera->lens_model                 = LUMINARY_LENS_MODEL_THIN;
+  camera->thin_lens_ior              = 1.33f;
+  camera->thin_lens_radius1          = 100.0f;
+  camera->thin_lens_radius2          = 100.0f;
+  camera->thin_lens_thickness        = 1.0f;
+  camera->camera_scale               = 1.0f;
 
   return LUMINARY_SUCCESS;
 }
@@ -83,6 +89,12 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_STANDARD_DIRTY(fov);
   __CAMERA_STANDARD_DIRTY(aperture_size);
   __CAMERA_STANDARD_DIRTY(russian_roulette_threshold);
+  __CAMERA_STANDARD_DIRTY(lens_model);
+  __CAMERA_STANDARD_DIRTY(thin_lens_ior);
+  __CAMERA_STANDARD_DIRTY(thin_lens_radius1);
+  __CAMERA_STANDARD_DIRTY(thin_lens_radius2);
+  __CAMERA_STANDARD_DIRTY(thin_lens_thickness);
+  __CAMERA_STANDARD_DIRTY(camera_scale);
 
   if (input->aperture_size > 0.0f) {
     __CAMERA_STANDARD_DIRTY(focal_length);
