@@ -20,6 +20,7 @@
 #define ENDIAN_ORDER ('ABCD')
 
 #define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size")
+#define LUM_ASSUME(assumption) static_assert((assumption), "Assumption: " #assumption " was violated.");
 
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
@@ -32,29 +33,27 @@
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
 #define MATERIAL_ID_INVALID 0xFFFF
-#define INSTANCE_ID_INVALID 0xFFFF
+#define INSTANCE_ID_INVALID 0xFFFFFFFF
 #define DEPTH_INVALID -1.0f
-
-#define LIGHT_ID_SUN (0xffffffffu)
-#define LIGHT_ID_NONE (0xfffffff1u)
-#define LIGHT_ID_ANY (0xfffffff0u)
-#define LIGHT_ID_TRIANGLE_ID_LIMIT (0x7fffffffu)
 
 // Print stats for the work queues
 #define LUMINARY_WORK_QUEUE_STATS_PRINT
 #define LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD 0.01
 
-enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFF } typedef VolumeType;
 
 typedef LuminaryResult (*QueueEntryFunction)(void* worker, void* args);
+typedef LuminaryResult (*QueueEntryDeferringFunction)(void* worker, void* args, bool* defer_execution);
 
 struct QueueEntry {
   const char* name;
-  LuminaryResult (*function)(void* worker, void* args);
-  LuminaryResult (*clear_func)(void* worker, void* args);
+  QueueEntryFunction function;
+  QueueEntryFunction clear_func;
+  QueueEntryDeferringFunction deferring_func;
   void* args;
   bool remove_duplicates;
   bool queuer_cannot_execute;  // Used to avoid self execution on CUDA callback threads.
+  bool skip_execution;         // Used to skip the actual work function but still execute the clear func.
 } typedef QueueEntry;
 
 struct Quaternion {
@@ -144,21 +143,6 @@ struct TraversalTriangle {
   float padding2;
 } typedef TraversalTriangle;
 
-/*
- * This struct is computed on the device when needed, it is not stored in memory.
- * The expectation is that the vertex positions are already transformed and the UV
- * is already transformed using the triangle transforms.
- */
-struct TriangleLight {
-  vec3 vertex;
-  vec3 edge1;
-  vec3 edge2;
-  uint16_t material_id;
-  uint16_t padding;
-  UV tex_coords;
-} typedef TriangleLight;
-LUM_STATIC_SIZE_ASSERT(TriangleLight, 0x30u);
-
 struct Star {
   float altitude;
   float azimuth;
@@ -183,17 +167,5 @@ struct BVHNode8 {
   uint8_t high_y[8];
   uint8_t high_z[8];
 } typedef BVHNode8;
-
-struct OutputDescriptor {
-  bool is_recurring_output;
-  struct {
-    uint32_t width;
-    uint32_t height;
-    uint32_t sample_count;
-    bool is_first_output;
-    float time;
-  } meta_data;
-  void* data;
-} typedef OutputDescriptor;
 
 #endif /* LUMINARY_UTILS_H */

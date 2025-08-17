@@ -105,7 +105,7 @@ void luminary_write_log() {
 
   mtx_unlock(&mutex);
 
-  luminary_print_info("Log written to file.");
+  luminary_print_info(false, "Log written to file.");
 }
 
 static void exit_program() {
@@ -177,7 +177,7 @@ void luminary_print_log(const char* format, ...) {
   mtx_unlock(&mutex);
 }
 
-void luminary_print_info(const char* format, ...) {
+void luminary_print_info(bool log, const char* format, ...) {
   if (!log_initialized)
     return;
 
@@ -187,7 +187,9 @@ void luminary_print_info(const char* format, ...) {
   va_start(args, format);
   int size = format_string(format, args);
   va_end(args);
-  write_to_log_buffer(size);
+
+  if (log)
+    write_to_log_buffer(size);
 
   if (volatile_line)
     printf("\33[2K\r");
@@ -200,7 +202,7 @@ void luminary_print_info(const char* format, ...) {
   mtx_unlock(&mutex);
 }
 
-void luminary_print_info_inline(const char* format, ...) {
+void luminary_print_info_inline(bool log, const char* format, ...) {
   if (!log_initialized)
     return;
 
@@ -210,7 +212,9 @@ void luminary_print_info_inline(const char* format, ...) {
   va_start(args, format);
   int size = format_string(format, args);
   va_end(args);
-  write_to_log_buffer(size);
+
+  if (log)
+    write_to_log_buffer(size);
 
   if (volatile_line)
     printf("\33[2K\r");

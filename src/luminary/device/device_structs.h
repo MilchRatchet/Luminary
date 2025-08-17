@@ -9,9 +9,8 @@ struct DeviceRendererSettings {
   uint32_t max_ray_depth : 6;
   uint32_t shading_mode : 3;
   uint32_t bridge_max_num_vertices : 4;
-  uint32_t bridge_num_ris_samples : 6;
-  uint32_t light_num_ris_samples : 6;
   uint32_t supersampling : 2;
+  // 12 bits spare
 
   uint16_t width;
   uint16_t height;
@@ -65,7 +64,6 @@ struct DeviceSky {
   uint32_t ozone_absorption : 1;
   uint32_t steps : 10;
   uint32_t aerial_perspective : 1;
-  uint32_t ambient_sampling : 1;
   uint32_t mode : 2;
 
   vec3 geometry_offset;
@@ -84,10 +82,9 @@ struct DeviceSky {
   float multiscattering_factor;
   vec3 sun_pos;
   vec3 moon_pos;
-  vec3 hdri_origin;
   RGBF constant_color;
 } typedef DeviceSky;
-LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x74u);
+LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x68u);
 
 struct DeviceCloudLayer {
   float height_max;

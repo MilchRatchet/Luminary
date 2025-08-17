@@ -156,23 +156,45 @@ static LuminaryResult _host_propagate_scene_changes_queue_work(Host* host, void*
 
 static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor* args) {
   __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
 
-  uint32_t handle;
-  if (args->is_recurring_output) {
-    __FAILURE_HANDLE(output_handler_acquire_new(host->output_handler, *args, &handle));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_handle_lock(args->data_handle));
+
+  STAGING void* data;
+  __FAILURE_HANDLE(vault_handle_get(args->data_handle, &data));
+
+  // If the data pointer is NULL, then it was freed and we need to drop this output.
+  if (data != (STAGING void*) 0) {
+    uint32_t handle;
+    if (args->is_recurring_output) {
+      __FAILURE_HANDLE_CRITICAL(output_handler_acquire_new(host->output_handler, *args, &handle));
+    }
+    else {
+      __FAILURE_HANDLE_CRITICAL(output_handler_acquire_from_request_new(host->output_handler, *args, &handle));
+    }
+
+    Image dst;
+    __FAILURE_HANDLE_CRITICAL(output_handler_get_image(host->output_handler, handle, &dst));
+
+    memcpy(dst.buffer, data, args->meta_data.width * args->meta_data.height * sizeof(ARGB8));
+
+    __FAILURE_HANDLE_CRITICAL(output_handler_release_new(host->output_handler, handle));
   }
-  else {
-    __FAILURE_HANDLE(output_handler_acquire_from_request_new(host->output_handler, *args, &handle));
-  }
 
-  Image dst;
-  __FAILURE_HANDLE(output_handler_get_image(host->output_handler, handle, &dst));
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_handle_unlock(args->data_handle));
 
-  memcpy(dst.buffer, args->data, args->meta_data.width * args->meta_data.height * sizeof(ARGB8));
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
-  __FAILURE_HANDLE(output_handler_release_new(host->output_handler, handle));
+  return LUMINARY_SUCCESS;
+}
 
-  // Clean up
+static LuminaryResult _host_copy_output_clear_work(Host* host, OutputDescriptor* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(vault_handle_destroy(&args->data_handle));
   __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(OutputDescriptor)));
 
   return LUMINARY_SUCCESS;
@@ -226,6 +248,29 @@ static LuminaryResult _host_save_png_queue_work(Host* host, HostSavePNGArgs* arg
   __FAILURE_HANDLE(luminary_host_get_image(host, args->handle, &output_image));
 
   __FAILURE_HANDLE(png_store_image(output_image, args->path));
+
+  return LUMINARY_SUCCESS;
+}
+
+struct HostEnableDeviceArgs {
+  bool enable;
+  uint32_t device_id;
+} typedef HostEnableDeviceArgs;
+
+static LuminaryResult _host_enable_device_clear_work(Host* host, HostEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostEnableDeviceArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _host_enable_device_queue_work(Host* host, HostEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(device_manager_enable_device(host->device_manager, args->device_id, args->enable));
 
   return LUMINARY_SUCCESS;
 }
@@ -287,33 +332,33 @@ static LuminaryResult _host_set_scene_entity_entry(Host* host, void* object, Sce
 // External API implementation
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult luminary_host_create(Host** _host) {
-  __CHECK_NULL_ARGUMENT(_host);
+LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
+  __CHECK_NULL_ARGUMENT(host);
 
-  Host* host;
-  __FAILURE_HANDLE(host_malloc(&host, sizeof(Host)));
-  memset(host, 0, sizeof(Host));
+  __FAILURE_HANDLE(host_malloc(host, sizeof(Host)));
+  memset(*host, 0, sizeof(Host));
 
-  __FAILURE_HANDLE(output_handler_create(&host->output_handler));
+  __FAILURE_HANDLE(output_handler_create(&(*host)->output_handler));
 
-  __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
-  __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
+  __FAILURE_HANDLE(array_create(&(*host)->meshes, sizeof(Mesh*), 16));
+  __FAILURE_HANDLE(array_create(&(*host)->textures, sizeof(Texture*), 16));
 
-  __FAILURE_HANDLE(scene_create(&host->scene_caller));
-  __FAILURE_HANDLE(scene_create(&host->scene_host));
+  __FAILURE_HANDLE(scene_create(&(*host)->scene_caller));
+  __FAILURE_HANDLE(scene_create(&(*host)->scene_host));
 
-  __FAILURE_HANDLE(thread_create(&host->work_thread));
-  __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
-  __FAILURE_HANDLE(ringbuffer_create(&host->ringbuffer, HOST_RINGBUFFER_SIZE));
-  __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
+  __FAILURE_HANDLE(thread_create(&(*host)->work_thread));
+  __FAILURE_HANDLE(queue_create(&(*host)->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
+  __FAILURE_HANDLE(ringbuffer_create(&(*host)->ringbuffer, HOST_RINGBUFFER_SIZE));
+  __FAILURE_HANDLE(wall_time_create(&(*host)->queue_wall_time));
 
-  __FAILURE_HANDLE(device_manager_create(&host->device_manager, host));
+  DeviceManagerCreateInfo device_manager_create_info;
+  device_manager_create_info.device_mask = info.device_mask;
 
-  host->enable_output = false;
+  __FAILURE_HANDLE(device_manager_create(&(*host)->device_manager, *host, device_manager_create_info));
 
-  __FAILURE_HANDLE(thread_start(host->work_thread, (ThreadMainFunc) _host_queue_worker, host));
+  (*host)->enable_output = false;
 
-  *_host = host;
+  __FAILURE_HANDLE(thread_start((*host)->work_thread, (ThreadMainFunc) _host_queue_worker, *host));
 
   return LUMINARY_SUCCESS;
 }
@@ -393,10 +438,14 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
   __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, &num_devices));
 
   if (device_id >= num_devices) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device ID exceeds number of devices.");
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Device ID exceeds number of devices.");
   }
 
   Device* device = host->device_manager->devices[device_id];
+
+  info->is_main_device = device->is_main_device;
+  info->is_unavailable = device->state == DEVICE_STATE_UNAVAILABLE;
+  info->is_enabled     = device->state == DEVICE_STATE_ENABLED;
 
   static_assert(sizeof(info->name) >= 256 && sizeof(device->properties.name) >= 256, "Name buffers are too small.");
   memcpy(info->name, device->properties.name, 256);
@@ -408,7 +457,56 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t device_id, bool enable) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, &num_devices));
+
+  if (device_id >= num_devices) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Device ID exceeds number of devices.");
+  }
+
+  Device* device = host->device_manager->devices[device_id];
+
+  if (device->is_main_device && enable == false) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Main device cannot be disabled.");
+  }
+
+  // Device is already in the requested state
+  if ((device->state == DEVICE_STATE_ENABLED) == enable)
+    return LUMINARY_SUCCESS;
+
+  if (device->state == DEVICE_STATE_UNAVAILABLE) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Device is not available.");
+  }
+
+  // TODO: This needs to do the following: Queue a job that sets the state and then sets the Integration dirty flag.
+  device->state = (enable) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
+
+  HostEnableDeviceArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
+
+  args->enable    = enable;
+  args->device_id = device_id;
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Enabling device";
+  entry.function   = (QueueEntryFunction) _host_enable_device_queue_work;
+  entry.clear_func = (QueueEntryFunction) _host_enable_device_clear_work;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments wavefront_args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
   HostLoadObjArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
 
@@ -772,7 +870,7 @@ LuminaryResult luminary_host_set_output_properties(Host* host, LuminaryOutputPro
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_set_properties(host->output_handler, properties));
-  __FAILURE_HANDLE(device_manager_set_output_properties(host->device_manager, properties.width, properties.height));
+  __FAILURE_HANDLE(device_manager_set_output_properties(host->device_manager, properties));
 
   return LUMINARY_SUCCESS;
 }
@@ -884,7 +982,7 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
 
   entry.name       = "Copy Output";
   entry.function   = (QueueEntryFunction) _host_copy_output_queue_work;
-  entry.clear_func = (QueueEntryFunction) 0;
+  entry.clear_func = (QueueEntryFunction) _host_copy_output_clear_work;
   entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));

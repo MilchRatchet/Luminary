@@ -4,6 +4,8 @@
 #include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
+#include "particle_utils.cuh"
+#include "sky.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
@@ -38,73 +40,100 @@ LUMINARY_KERNEL void volume_process_events() {
   uint16_t sky_task_count      = 0;
 
   for (int i = 0; i < task_count; i++) {
-    const int offset      = get_task_address(i);
-    DeviceTask task       = task_load(offset);
-    float depth           = trace_depth_load(offset);
-    TriangleHandle handle = triangle_handle_load(offset);
+    HANDLE_DEVICE_ABORT();
+
+    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
     const uint32_t pixel = get_pixel_id(task.index);
 
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
+    TriangleHandle handle = trace.handle;
+    float depth           = trace.depth;
 
-    const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
+    RGBF record = record_unpack(throughput.record);
 
-    if (device.fog.active) {
-      const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+    VolumeDescriptor volume;
+    volume.type = VolumeType(task.volume_id);
 
-      if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
+    if (volume.type != VOLUME_TYPE_NONE) {
+      volume          = volume_get_descriptor_preset(volume.type);
+      VolumePath path = volume_compute_path(volume, task.origin, task.ray, depth, true);
+
+      bool sky_fast_path = true;
+      sky_fast_path &= handle.instance_id == HIT_TYPE_SKY;
+      sky_fast_path &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
+      sky_fast_path &= (task.state & STATE_FLAG_ALLOW_AMBIENT) != 0;
+
+      if (sky_fast_path) {
+        RGBF sky_color = sky_color_no_compute(task.origin, task.ray, task.state);
+        sky_color      = mul_color(sky_color, record);
+
+        sky_color = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.length));
+
+        if (device.state.depth <= 1) {
+          write_beauty_buffer_direct(sky_color, pixel);
+        }
+        else {
+          write_beauty_buffer(sky_color, pixel, task.state);
+        }
+
+        handle.instance_id = HIT_TYPE_INVALID;
+      }
+
+      float volume_intersection_probability = 1.0f;
+
+      // Geometry hits can cause bright highlights that are still visible through thick dense volume,
+      // we bound the intersection probability to bound the variance in this case.
+      if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (particle_is_hit(handle) == false)) {
+        volume_intersection_probability = 0.5f;
+      }
+
+      // Turn off multiscattering for ocean volume
+      if (volume.type == VOLUME_TYPE_OCEAN && device.ocean.multiscattering == false && (task.state & STATE_FLAG_DELTA_PATH) == 0) {
+        volume_intersection_probability = 0.0f;
+      }
+
+      const float2 randoms = random_2D(RANDOM_TARGET_VOLUME_INTERSECTION, task.index);
+
+      bool sampled_volume_intersection = false;
+
+      float pdf = 1.0f;
+      if (randoms.y < volume_intersection_probability) {
+        const float volume_dist = volume_sample_intersection(volume, path.start, path.length, randoms.x);
 
         if (volume_dist < depth) {
+          const float sample_pdf = volume_sample_intersection_pdf(volume, path.start, volume_dist);
+
           depth              = volume_dist;
-          handle.instance_id = HIT_TYPE_VOLUME_FOG;
+          handle.instance_id = VOLUME_TYPE_TO_HIT(volume.type);
           handle.tri_id      = 0;
+
+          record = mul_color(record, volume.scattering);
+
+          pdf *= volume_intersection_probability;
+          pdf *= sample_pdf;
+
+          sampled_volume_intersection = true;
+
+          path.length = depth - path.start;
         }
       }
-    }
 
-    if (device.ocean.active) {
-      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+      if (sampled_volume_intersection == false && sky_fast_path == false) {
+        const float miss_probability = volume_sample_intersection_miss_probability(volume, path.length);
 
-      if (ocean_depth < depth) {
-        depth              = ocean_depth;
-        handle.instance_id = HIT_TYPE_OCEAN;
-        handle.tri_id      = 0;
+        pdf *= (1.0f - volume_intersection_probability) + volume_intersection_probability * miss_probability;
       }
 
-      const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
-
-      if (path.x >= 0.0f) {
-        float integration_depth = path.y;
-
-        const bool allow_ocean_volume_hit = device.ocean.multiscattering || !(task.state & STATE_FLAG_VOLUME_SCATTERED);
-
-        if (allow_ocean_volume_hit) {
-          const float volume_dist = volume_sample_intersection(volume, path.x, path.y, random);
-
-          if (volume_dist < depth) {
-            depth              = volume_dist;
-            handle.instance_id = HIT_TYPE_VOLUME_OCEAN;
-            handle.tri_id      = 0;
-
-            integration_depth = depth - path.x;
-
-            const float sampling_pdf = volume.max_scattering * expf(-integration_depth * volume.max_scattering);
-            record                   = mul_color(record, scale_color(volume.scattering, 1.0f / sampling_pdf));
-          }
-        }
-
-        record.r *= expf(-integration_depth * (volume.absorption.r + volume.scattering.r));
-        record.g *= expf(-integration_depth * (volume.absorption.g + volume.scattering.g));
-        record.b *= expf(-integration_depth * (volume.absorption.b + volume.scattering.b));
-      }
+      record = mul_color(record, volume_integrate_transmittance_precomputed(volume, path.length));
+      record = scale_color(record, 1.0f / pdf);
     }
 
-    trace_depth_store(depth, offset);
-    triangle_handle_store(handle, offset);
-    store_RGBF(device.ptrs.records, pixel, record);
+    task_trace_handle_store(task_base_address, handle);
+    task_trace_depth_store(task_base_address, depth);
+    task_throughput_record_store(task_base_address, record_pack(record));
 
     ////////////////////////////////////////////////////////////////////
     // Increment counts
@@ -119,7 +148,7 @@ LUMINARY_KERNEL void volume_process_events() {
     else if (VOLUME_HIT_CHECK(handle.instance_id)) {
       volume_task_count++;
     }
-    else if (handle.instance_id <= HIT_TYPE_PARTICLE_MAX && handle.instance_id >= HIT_TYPE_PARTICLE_MIN) {
+    else if (particle_is_hit(handle)) {
       particle_task_count++;
     }
     else if (handle.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
@@ -142,32 +171,51 @@ LUMINARY_KERNEL void volume_process_tasks() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset       = get_task_address(task_offset + i);
-    DeviceTask task             = task_load(offset);
-    const TriangleHandle handle = triangle_handle_load(offset);
-    const float depth           = trace_depth_load(offset);
-    const uint32_t pixel        = get_pixel_id(task.index);
+    HANDLE_DEVICE_ABORT();
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    const VolumeType volume_type  = VOLUME_HIT_TYPE(handle.instance_id);
+    const uint32_t pixel = get_pixel_id(task.index);
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
+
+    const VolumeType volume_type  = VOLUME_HIT_TYPE(trace.handle.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    GBufferData data = volume_generate_g_buffer(task, handle.instance_id, pixel, volume);
+    MaterialContextVolume ctx = volume_get_context(task, volume, 0.0f);
 
-    const vec3 bounce_ray = bsdf_sample_volume(data, task.index);
+    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_GI>(ctx, task.index);
 
-    uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+    uint16_t new_state = task.state;
+
+    new_state &= ~STATE_FLAG_DELTA_PATH;
+    new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~STATE_FLAG_ALLOW_EMISSION;
+    new_state &= ~STATE_FLAG_MIS_EMISSION;
+
+    if (device.sky.mode != LUMINARY_SKY_MODE_DEFAULT)
+      new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
+    else
+      new_state |= STATE_FLAG_ALLOW_AMBIENT;
 
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
 
-    DeviceTask bounce_task;
-    bounce_task.state  = new_state;
-    bounce_task.origin = data.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
+    const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
-    task_store(bounce_task, get_task_address(trace_count++));
+    task_trace_ior_stack_store(dst_task_base_address, trace.ior_stack);
+    task_throughput_record_store(dst_task_base_address, throughput.record);
+
+    DeviceTask bounce_task;
+    bounce_task.state     = new_state;
+    bounce_task.origin    = ctx.position;
+    bounce_task.ray       = bounce_info.ray;
+    bounce_task.index     = task.index;
+    bounce_task.volume_id = task.volume_id;
+
+    task_store(dst_task_base_address, bounce_task);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;

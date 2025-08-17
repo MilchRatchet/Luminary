@@ -331,7 +331,7 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool 
 
   RGBF sun_color = sky_compute_color_from_spectrum(radiance);
 
-  if (include_cloud_hdri && device.sky.mode == LUMINARY_SKY_MODE_HDRI) {
+  if (include_cloud_hdri && device.cloud.active && device.sky.mode == LUMINARY_SKY_MODE_HDRI) {
     const float cloud_alpha = sky_hdri_sample_alpha(ray);
     sun_color               = scale_color(sun_color, cloud_alpha);
   }

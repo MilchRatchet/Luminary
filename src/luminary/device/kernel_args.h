@@ -3,6 +3,13 @@
 
 #include "device_utils.h"
 
+struct KernelArgsBufferAdd {
+  float* dst;
+  const float* src;
+  uint32_t base_offset;
+  uint32_t num_elements;
+} typedef KernelArgsBufferAdd;
+
 struct KernelArgsBSDFGenerateSSLUT {
   uint16_t* dst;
 } typedef KernelArgsBSDFGenerateSSLUT;
@@ -38,7 +45,8 @@ struct KernelArgsSkyComputeHDRI {
   float4* dst_color;
   float* dst_shadow;
   uint32_t dim;
-  uint32_t ld;
+  uint32_t ld_color;
+  uint32_t ld_shadow;
   vec3 origin;
   uint32_t sample_count;
 } typedef KernelArgsSkyComputeHDRI;
@@ -68,7 +76,7 @@ struct KernelArgsLightComputeIntensity {
   const uint32_t* mesh_ids;
   const uint32_t* triangle_ids;
   uint32_t lights_count;
-  float* dst_average_intensities;
+  float* dst_intensities;
 } typedef KernelArgsLightComputeIntensity;
 
 struct KernelArgsGenerateFinalImage {

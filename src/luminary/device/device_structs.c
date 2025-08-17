@@ -3,7 +3,9 @@
 #include <math.h>
 
 #include "device_mesh.h"
+#include "device_packing.h"
 #include "device_texture.h"
+#include "host_math.h"
 #include "internal_error.h"
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings) {
@@ -13,8 +15,6 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->max_ray_depth           = settings->max_ray_depth;
   device_settings->shading_mode            = settings->shading_mode;
   device_settings->bridge_max_num_vertices = settings->bridge_max_num_vertices;
-  device_settings->bridge_num_ris_samples  = settings->bridge_num_ris_samples;
-  device_settings->light_num_ris_samples   = settings->light_num_ris_samples;
   device_settings->supersampling           = settings->supersampling;
 
   device_settings->width  = settings->width << settings->supersampling;
@@ -36,31 +36,6 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   return LUMINARY_SUCCESS;
 }
 
-/*
- * Computes a rotation quaternion from euler angles.
- * @param rotation Euler angles defining the rotation.
- * @result Rotation quaternion
- */
-static LuminaryResult _device_struct_get_quaternion(Quaternion* q, const vec3 rotation) {
-  const float alpha = rotation.x;
-  const float beta  = rotation.y;
-  const float gamma = rotation.z;
-
-  const float cy = cosf(gamma * 0.5f);
-  const float sy = sinf(gamma * 0.5f);
-  const float cp = cosf(beta * 0.5f);
-  const float sp = sinf(beta * 0.5f);
-  const float cr = cosf(alpha * 0.5f);
-  const float sr = sinf(alpha * 0.5f);
-
-  q->w = cr * cp * cy + sr * sp * sy;
-  q->x = sr * cp * cy - cr * sp * sy;
-  q->y = cr * sp * cy + sr * cp * sy;
-  q->z = cr * cp * sy - sr * sp * cy;
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera) {
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(device_camera);
@@ -74,8 +49,8 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->do_firefly_rejection = camera->do_firefly_rejection;
   device_camera->indirect_only        = camera->indirect_only;
 
-  device_camera->pos = camera->pos;
-  __FAILURE_HANDLE(_device_struct_get_quaternion(&device_camera->rotation, camera->rotation));
+  device_camera->pos                        = camera->pos;
+  device_camera->rotation                   = rotation_euler_angles_to_quaternion(camera->rotation);
   device_camera->fov                        = camera->fov;
   device_camera->focal_length               = camera->focal_length;
   device_camera->aperture_size              = camera->aperture_size;
@@ -114,7 +89,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->ozone_absorption   = sky->ozone_absorption;
   device_sky->steps              = sky->steps;
   device_sky->aerial_perspective = sky->aerial_perspective;
-  device_sky->ambient_sampling   = sky->ambient_sampling;
   device_sky->mode               = sky->mode;
 
   device_sky->geometry_offset        = sky->geometry_offset;
@@ -131,7 +105,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->ground_visibility      = sky->ground_visibility;
   device_sky->ozone_layer_thickness  = sky->ozone_layer_thickness;
   device_sky->multiscattering_factor = sky->multiscattering_factor;
-  device_sky->hdri_origin            = sky->hdri_origin;
   device_sky->constant_color         = sky->constant_color;
 
   ////////////////////////////////////////////////////////////////////
@@ -351,47 +324,6 @@ LuminaryResult device_struct_scene_entity_convert(const void* restrict source, v
   return LUMINARY_SUCCESS;
 }
 
-// Octahedron encoding, for example: https://www.shadertoy.com/view/clXXD8
-static uint32_t _device_vec3_to_uint(const vec3 normal) {
-  double x = normal.x;
-  double y = normal.y;
-  double z = normal.z;
-
-  const double recip_norm = 1.0 / (fabs(x) + fabs(y) + fabs(z));
-
-  x *= recip_norm;
-  y *= recip_norm;
-  z *= recip_norm;
-
-  const double t = fmax(fmin(-z, 1.0f), 0.0f);
-
-  x += (x >= 0.0) ? t : -t;
-  y += (y >= 0.0) ? t : -t;
-
-  x = fmax(fmin(x, 1.0), -1.0);
-  y = fmax(fmin(y, 1.0), -1.0);
-
-  x = (x + 1.0) * 0.5;
-  y = (y + 1.0) * 0.5;
-
-  const uint32_t x_u16 = (uint32_t) (x * 0xFFFF + 0.5);
-  const uint32_t y_u16 = (uint32_t) (y * 0xFFFF + 0.5);
-
-  return (y_u16 << 16) | x_u16;
-}
-
-/*
- * Each component gets 1 sign bit, 8 exponent bit and 7 mantissa bits.
- */
-static uint32_t _device_UV_to_uint(const UV uv) {
-  const uint32_t u = *((uint32_t*) (&uv.u));
-  const uint32_t v = *((uint32_t*) (&uv.v));
-
-  const uint32_t compressed = (u & 0xFFFF0000) | (v >> 16);
-
-  return compressed;
-}
-
 LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle) {
   __CHECK_NULL_ARGUMENT(triangle);
   __CHECK_NULL_ARGUMENT(device_triangle);
@@ -400,7 +332,7 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
   device_triangle->edge1  = triangle->edge1;
   device_triangle->edge2  = triangle->edge2;
 
-  device_triangle->vertex_normal = _device_vec3_to_uint(triangle->vertex_normal);
+  device_triangle->vertex_normal = device_pack_normal(triangle->vertex_normal);
 
   const vec3 vertex1_normal = (vec3) {.x = triangle->vertex_normal.x + triangle->edge1_normal.x,
                                       .y = triangle->vertex_normal.y + triangle->edge1_normal.y,
@@ -410,8 +342,8 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
                                       .y = triangle->vertex_normal.y + triangle->edge2_normal.y,
                                       .z = triangle->vertex_normal.z + triangle->edge2_normal.z};
 
-  device_triangle->vertex1_normal = _device_vec3_to_uint(vertex1_normal);
-  device_triangle->vertex2_normal = _device_vec3_to_uint(vertex2_normal);
+  device_triangle->vertex1_normal = device_pack_normal(vertex1_normal);
+  device_triangle->vertex2_normal = device_pack_normal(vertex2_normal);
 
   const UV vertex1_texture =
     (UV) {.u = triangle->vertex_texture.u + triangle->edge1_texture.u, .v = triangle->vertex_texture.v + triangle->edge1_texture.v};
@@ -419,9 +351,9 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
   const UV vertex2_texture =
     (UV) {.u = triangle->vertex_texture.u + triangle->edge2_texture.u, .v = triangle->vertex_texture.v + triangle->edge2_texture.v};
 
-  device_triangle->vertex_texture  = _device_UV_to_uint(triangle->vertex_texture);
-  device_triangle->vertex1_texture = _device_UV_to_uint(vertex1_texture);
-  device_triangle->vertex2_texture = _device_UV_to_uint(vertex2_texture);
+  device_triangle->vertex_texture  = device_pack_uv(triangle->vertex_texture);
+  device_triangle->vertex1_texture = device_pack_uv(vertex1_texture);
+  device_triangle->vertex2_texture = device_pack_uv(vertex2_texture);
 
   device_triangle->material_id = triangle->material_id;
   device_triangle->padding     = 0;
@@ -458,9 +390,11 @@ LuminaryResult device_struct_instance_transform_convert(const MeshInstance* inst
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(device_transform);
 
+  const Quaternion rotation = rotation_euler_angles_to_quaternion(instance->rotation);
+
   device_transform->translation = instance->translation;
   device_transform->scale       = instance->scale;
-  __FAILURE_HANDLE(_device_struct_quaternion_to_quaternion16(&device_transform->rotation, &instance->rotation));
+  __FAILURE_HANDLE(_device_struct_quaternion_to_quaternion16(&device_transform->rotation, &rotation));
 
   return LUMINARY_SUCCESS;
 }

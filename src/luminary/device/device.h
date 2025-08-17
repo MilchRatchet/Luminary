@@ -11,6 +11,7 @@
 #include "device_particle.h"
 #include "device_post.h"
 #include "device_renderer.h"
+#include "device_result_interface.h"
 #include "device_sky.h"
 #include "device_staging_manager.h"
 #include "device_utils.h"
@@ -25,10 +26,12 @@ enum DeviceArch {
   DEVICE_ARCH_PASCAL,
   DEVICE_ARCH_VOLTA,
   DEVICE_ARCH_TURING,
-  DEVICE_ARCH_AMPERE,
+  DEVICE_ARCH_AMPERE_HPC,
+  DEVICE_ARCH_AMPERE_CONSUMER,
   DEVICE_ARCH_ADA,
   DEVICE_ARCH_HOPPER,
-  DEVICE_ARCH_BLACKWELL,
+  DEVICE_ARCH_BLACKWELL_HPC,
+  DEVICE_ARCH_BLACKWELL_CONSUMER,
   DEVICE_ARCH_COUNT
 } typedef DeviceArch;
 
@@ -37,6 +40,14 @@ struct DeviceProperties {
   DeviceArch arch;
   uint32_t rt_core_version;
   size_t memory_size;
+  uint32_t major;
+  uint32_t minor;
+  uint32_t sm_count;
+  size_t l2_cache_size;
+  uint32_t max_block_count;
+  uint32_t max_blocks_per_sm;
+  uint32_t max_threads_per_sm;
+  uint32_t optimal_block_count;
 } typedef DeviceProperties;
 
 struct DeviceConstantMemoryDirtyProperties {
@@ -60,12 +71,16 @@ struct DeviceOptixProperties {
 
 enum GBufferMetaState { GBUFFER_META_STATE_NOT_READY, GBUFFER_META_STATE_QUEUED, GBUFFER_META_STATE_READY } typedef GBufferMetaState;
 
+enum DeviceState { DEVICE_STATE_DISABLED, DEVICE_STATE_ENABLED, DEVICE_STATE_UNAVAILABLE } typedef DeviceState;
+
 struct Device {
+  DeviceState state;
   uint32_t index;
   DeviceProperties properties;
   DeviceOptixProperties optix_properties;
   SampleCountSlice sample_count;
   uint32_t undersampling_state;
+  uint32_t aggregate_sample_count;
   bool exit_requested;
   bool optix_callback_error;
   bool is_main_device;
@@ -99,7 +114,6 @@ struct Device {
   bool meshes_need_building;
   OptixBVHInstanceCache* optix_instance_cache;
   OptixBVH* optix_bvh_ias;
-  OptixBVH* optix_bvh_light;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
   DeviceSkyStars* sky_stars;
@@ -124,10 +138,15 @@ void _device_shutdown(void);
 LuminaryResult device_create(Device** device, uint32_t index);
 LuminaryResult device_register_as_main(Device* device);
 LuminaryResult device_unregister_as_main(Device* device);
+LuminaryResult device_set_enable(Device* device, bool enable);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
+LuminaryResult device_get_internal_resolution(Device* device, uint32_t* width, uint32_t* height);
+LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_count);
+LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pixels_per_thread);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
 LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y);
+LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id);
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
 LuminaryResult device_sync_constant_memory(Device* device);
 LuminaryResult device_allocate_work_buffers(Device* device);
@@ -138,6 +157,7 @@ LuminaryResult device_apply_material_updates(
   Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials);
 LuminaryResult device_build_light_tree(Device* device, LightTree* tree);
 LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree);
+LuminaryResult device_unload_light_tree(Device* device, LightTree* tree);
 LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut);
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
@@ -153,12 +173,16 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_set_output_dirty(Device* device);
-LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height);
+LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties);
 LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera);
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
-LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid);
+LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);
+LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32_t* recommended_count);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
 LuminaryResult device_query_gbuffer_meta(Device* device);

@@ -26,11 +26,12 @@
 struct LuminaryHost;
 typedef struct LuminaryHost LuminaryHost;
 
-LUMINARY_API LuminaryResult luminary_host_create(LuminaryHost** host);
+LUMINARY_API LuminaryResult luminary_host_create(LuminaryHost** host, LuminaryHostCreateInfo info);
 LUMINARY_API LuminaryResult luminary_host_destroy(LuminaryHost** host);
 
 LUMINARY_API LuminaryResult luminary_host_get_device_count(LuminaryHost* host, uint32_t* device_count);
 LUMINARY_API LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device_id, LuminaryDeviceInfo* info);
+LUMINARY_API LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t device_id, bool enable);
 
 LUMINARY_API LuminaryResult luminary_host_start_device(LuminaryHost* host, uint32_t index);
 LUMINARY_API LuminaryResult luminary_host_shutdown_device(LuminaryHost* host, uint32_t index);

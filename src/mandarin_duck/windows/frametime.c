@@ -18,16 +18,15 @@ static void _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = "Luminary:",
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.35f, .rel_height = 1.0f},
+                         .text         = "Luminary:",
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     char text[256];
 
@@ -38,31 +37,29 @@ static void _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = false,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.325f, .rel_height = 1.0f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = false,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * time);
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = false,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.325f, .rel_height = 1.0f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = false,
+                         .auto_size    = false,
+                         .is_clickable = false});
   }
   window_pop_section(window);
 
@@ -72,16 +69,15 @@ static void _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.35f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = "Mandarin Duck:",
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = true,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.35f, .rel_height = 1.0f},
+                         .text         = "Mandarin Duck:",
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = true,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     char text[256];
 
@@ -89,31 +85,29 @@ static void _window_frametime_action(Window* window, Display* display, LuminaryH
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = false,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.325f, .rel_height = 1.0f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = false,
+                         .auto_size    = false,
+                         .is_clickable = false});
 
     sprintf(text, "(%.2fms)", 1000.0 * display->frametime);
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {
-        .color    = 0xFFFFFFFF,
-        .size     = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 0.325f, .height = ELEMENT_SIZE_INVALID, .rel_height = 1.0f},
-        .text     = text,
-        .center_x = false,
-        .center_y = true,
-        .highlighting = false,
-        .cache_text   = false,
-        .auto_size    = false,
-        .is_clickable = false});
+      (ElementTextArgs) {.color        = 0xFFFFFFFF,
+                         .size         = (ElementSize) {.rel_width = 0.325f, .rel_height = 1.0f},
+                         .text         = text,
+                         .center_x     = false,
+                         .center_y     = true,
+                         .highlighting = false,
+                         .cache_text   = false,
+                         .auto_size    = false,
+                         .is_clickable = false});
   }
   window_pop_section(window);
 }

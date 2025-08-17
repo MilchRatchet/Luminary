@@ -102,6 +102,22 @@ LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags)
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult scene_set_dirty_flags(Scene* scene, SceneDirtyFlags flags) {
+  __CHECK_NULL_ARGUMENT(scene);
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock_all(scene))
+
+  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= flags;
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock_all(scene));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult scene_unlock(Scene* scene, SceneEntityType entity_mutex) {
   __CHECK_NULL_ARGUMENT(scene);
 

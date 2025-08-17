@@ -100,7 +100,7 @@ __device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const floa
   return make_float2(start, distance);
 }
 
-#ifndef SHADING_KERNEL
+#ifndef OPTIX_KERNEL
 
 ////////////////////////////////////////////////////////////////////
 // Sky LUT function
@@ -325,7 +325,7 @@ LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(KernelArgsSkyComp
   args.dst_high[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
 }
 
-#endif /* SHADING_KERNEL */
+#endif /* !OPTIX_KERNEL */
 
 ////////////////////////////////////////////////////////////////////
 // Atmosphere Integration
@@ -348,7 +348,7 @@ __device__ Spectrum sky_compute_atmosphere(
     float step_size;
 
     const float light_angle   = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, origin);
-    const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
+    const float random_offset = random_1D(RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
 
     const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.sky.mie_diameter);
 
@@ -512,8 +512,8 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   const float base_range = (IS_PRIMARY_RAY) ? 40.0f : 80.0f;
 
-  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6)
-                    + quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
+  const int steps =
+    fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6) + random_1D(RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, pixel);
 
@@ -524,7 +524,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
   return inscattering;
 }
 
-__device__ RGBF sky_color_no_compute(const vec3 ray) {
+__device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint8_t state) {
   RGBF sky;
   switch (device.sky.mode) {
     default:
@@ -533,31 +533,10 @@ __device__ RGBF sky_color_no_compute(const vec3 ray) {
     } break;
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);
-    } break;
-    case LUMINARY_SKY_MODE_CONSTANT_COLOR: {
-      sky = device.sky.constant_color;
-    } break;
-  }
-
-  return sky;
-}
-
-__device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const uint32_t pixel, const ushort2 index) {
-  RGBF sky;
-  switch (device.sky.mode) {
-    default:
-    case LUMINARY_SKY_MODE_DEFAULT: {
-      const vec3 sky_origin  = world_to_sky_transform(origin);
-      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
-
-      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, index);
-    } break;
-    case LUMINARY_SKY_MODE_HDRI: {
-      sky = sky_hdri_sample(ray);
 
       const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
       if (include_sun) {
-        const vec3 sky_origin = world_to_sky_transform(device.sky.hdri_origin);
+        const vec3 sky_origin = world_to_sky_transform(origin);
 
         // HDRI does not include the sun, compute sun visibility
         const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
@@ -578,7 +557,43 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t 
   return sky;
 }
 
-#ifndef SHADING_KERNEL
+__device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const ushort2 index) {
+  RGBF sky;
+  switch (device.sky.mode) {
+    default:
+    case LUMINARY_SKY_MODE_DEFAULT: {
+      const vec3 sky_origin  = world_to_sky_transform(origin);
+      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+
+      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, index);
+    } break;
+    case LUMINARY_SKY_MODE_HDRI: {
+      sky = sky_hdri_sample(ray);
+
+      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+      if (include_sun) {
+        const vec3 sky_origin = world_to_sky_transform(origin);
+
+        // HDRI does not include the sun, compute sun visibility
+        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
+
+        if (ray_hits_sun && !ray_hits_earth) {
+          const RGBF sun_color = sky_get_sun_color(sky_origin, ray);
+
+          sky = add_color(sky, sun_color);
+        }
+      }
+    } break;
+    case LUMINARY_SKY_MODE_CONSTANT_COLOR: {
+      sky = device.sky.constant_color;
+    } break;
+  }
+
+  return sky;
+}
+
+#ifndef OPTIX_KERNEL
 
 ////////////////////////////////////////////////////////////////////
 // Kernel
@@ -591,14 +606,19 @@ LUMINARY_KERNEL void sky_process_tasks() {
   const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset = get_task_address(task_offset + i);
-    const DeviceTask task = task_load(offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    HANDLE_DEVICE_ABORT();
 
-    const RGBF record = load_RGBF(device.ptrs.records + pixel);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task                 = task_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    RGBF sky = sky_color_main(task.origin, task.ray, task.state, pixel, task.index);
-    sky      = mul_color(sky, record);
+    if ((task.state & STATE_FLAG_ALLOW_AMBIENT) == 0)
+      continue;
+
+    RGBF sky = sky_color_main(task.origin, task.ray, task.state, task.index);
+    sky      = mul_color(sky, record_unpack(throughput.record));
+
+    const uint32_t pixel = get_pixel_id(task.index);
 
     if (device.state.depth <= 1) {
       write_beauty_buffer_direct(sky, pixel);
@@ -616,23 +636,24 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
   const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset = get_task_address(task_offset + i);
-    const DeviceTask task = task_load(offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    HANDLE_DEVICE_ABORT();
+
+    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task            = task_load(task_base_address);
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, pixel, task.index);
-      write_beauty_buffer_forced(sky, pixel);
+      RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, task.index);
+      write_beauty_buffer_forced(sky, get_pixel_id(task.index));
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), pixel);
+      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), get_pixel_id(task.index));
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), pixel);
+      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), get_pixel_id(task.index));
     }
   }
 }
 
-#endif /* !SHADING_KERNEL */
+#endif /* !OPTIX_KERNEL */
 
 #endif /* CU_SKY_H */

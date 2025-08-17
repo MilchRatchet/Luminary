@@ -38,7 +38,10 @@ struct SkyHDRI {
   bool sky_is_dirty;
   bool output_is_dirty;
   Sky sky;
+  vec3 origin;
   uint32_t id;
+  uint32_t width;
+  uint32_t height;
   SampleCountSlice sample_count;
   Texture* color_tex;
   Texture* shadow_tex;
@@ -52,7 +55,7 @@ struct DeviceSkyHDRI {
 } typedef DeviceSkyHDRI;
 
 LuminaryResult sky_hdri_create(SkyHDRI** hdri);
-LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky);
+LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* camera);
 DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device);
 LuminaryResult sky_hdri_destroy(SkyHDRI** hdri);
 

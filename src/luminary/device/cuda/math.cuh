@@ -7,6 +7,72 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+__device__ float bfloat_unpack(const BFloat16 val) {
+  const uint32_t data = val;
+
+  return __uint_as_float(data << 16);
+}
+
+__device__ BFloat16 bfloat_pack(const float val) {
+  return __float_as_uint(val) >> 16;
+}
+
+__device__ float unsigned_bfloat_unpack(const UnsignedBFloat16 val) {
+  const uint32_t data = val;
+
+  return __uint_as_float(data << 15);
+}
+
+__device__ UnsignedBFloat16 unsigned_bfloat_pack(const float val) {
+  return (__float_as_uint(val) >> 15) & 0xFFFF;
+}
+
+__device__ RGBF record_unpack(const PackedRecord packed) {
+  // 21 bits each
+  const uint32_t red   = packed.x & 0x1FFFFF;
+  const uint32_t green = (packed.x >> 21) | ((packed.y & 0x3FF) << 11);
+  const uint32_t blue  = packed.y >> 10;
+
+  RGBF record;
+  record.r = __uint_as_float(red << 10);
+  record.g = __uint_as_float(green << 10);
+  record.b = __uint_as_float(blue << 10);
+
+  return record;
+}
+
+__device__ PackedRecord record_pack(const RGBF record) {
+  const uint32_t red   = (__float_as_uint(record.r) >> 10) & 0x1FFFFF;
+  const uint32_t green = (__float_as_uint(record.g) >> 10) & 0x1FFFFF;
+  const uint32_t blue  = (__float_as_uint(record.b) >> 10) & 0x1FFFFF;
+
+  PackedRecord packed;
+  packed.x = red | (green << 21);
+  packed.y = (green >> 11) | (blue << 10);
+
+  return packed;
+}
+
+__device__ MISPayload mis_payload_unpack(const PackedMISPayload packed) {
+  MISPayload payload;
+  payload.origin.x             = bfloat_unpack(packed.x & 0xFFFF);
+  payload.origin.y             = bfloat_unpack(packed.x >> 16);
+  payload.origin.z             = bfloat_unpack(packed.y & 0xFFFF);
+  payload.sampling_probability = unsigned_bfloat_unpack(packed.y >> 16);
+
+  return payload;
+}
+
+__device__ PackedMISPayload mis_payload_pack(const MISPayload payload) {
+  PackedMISPayload packed;
+  packed.x = (uint32_t) bfloat_pack(payload.origin.x);
+  packed.x |= ((uint32_t) bfloat_pack(payload.origin.y)) << 16;
+  packed.y = (uint32_t) bfloat_pack(payload.origin.z);
+  packed.y |= ((uint32_t) unsigned_bfloat_pack(payload.sampling_probability)) << 16;
+
+  return packed;
+}
+
 __device__ float difference_of_products(const float a, const float b, const float c, const float d) {
   const float cd = c * d;
 
@@ -66,6 +132,24 @@ __device__ float smoothstep(const float x, const float edge0, const float edge1)
   // return 0.5f * (1.0f - cosf(PI * x));
   return t * t * (3.0f - 2.0f * t);
 }
+
+// (exp(x) - 1)/x with cancellation of rounding errors.
+__device__ float expm1_over_x(const float x) {
+  const float u = expf(x);
+
+  if (u == 1.0f) {
+    return 1.0f;
+  }
+
+  const float y = u - 1.0f;
+  const float z = (fabsf(x) < 1.0f) ? logf(u) : x;
+
+  return y / z;
+}
+
+////////////////////////////////////////////////////////////////////
+// Vector API
+////////////////////////////////////////////////////////////////////
 
 __device__ vec3 get_vector(const float x, const float y, const float z) {
   vec3 result;
@@ -235,6 +319,15 @@ __device__ UV uv_sub(const UV a, const UV b) {
 
   uv.u = a.u - b.u;
   uv.v = a.v - b.v;
+
+  return uv;
+}
+
+__device__ UV uv_scale(const UV a, const float b) {
+  UV uv;
+
+  uv.u = a.u * b;
+  uv.v = a.v * b;
 
   return uv;
 }
@@ -481,6 +574,125 @@ __device__ vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
 
 __device__ vec3 transform_apply_inv(const DeviceTransform trans, const vec3 v) {
   return transform_apply_relative_inv(trans, transform_apply_absolute_inv(trans, v));
+}
+
+////////////////////////////////////////////////////////////////////
+// Matrix API
+////////////////////////////////////////////////////////////////////
+
+struct mat3 {
+  vec3 col0;
+  vec3 col1;
+  vec3 col2;
+} typedef mat3;
+
+__device__ mat3 mat3_get(const vec3 col0, const vec3 col1, const vec3 col2) {
+  mat3 result;
+
+  result.col0 = col0;
+  result.col1 = col1;
+  result.col2 = col2;
+
+  return result;
+}
+
+__device__ mat3 mat3_transpose(const mat3 mat) {
+  mat3 result;
+
+  result.col0.x = mat.col0.x;
+  result.col0.y = mat.col1.x;
+  result.col0.z = mat.col2.x;
+
+  result.col1.x = mat.col0.y;
+  result.col1.y = mat.col1.y;
+  result.col1.z = mat.col2.y;
+
+  result.col2.x = mat.col0.z;
+  result.col2.y = mat.col1.z;
+  result.col2.z = mat.col2.z;
+
+  return result;
+}
+
+__device__ mat3 mat3_lerp(const mat3 a, const mat3 b, const float t) {
+  mat3 result;
+
+  result.col0 = add_vector(scale_vector(a.col0, 1.0f - t), scale_vector(b.col0, t));
+  result.col1 = add_vector(scale_vector(a.col1, 1.0f - t), scale_vector(b.col1, t));
+  result.col2 = add_vector(scale_vector(a.col2, 1.0f - t), scale_vector(b.col2, t));
+
+  return result;
+}
+
+__device__ vec3 mat3_mul_vec(const mat3 a, const vec3 b) {
+  vec3 result;
+
+  result.x = a.col0.x * b.x + a.col1.x * b.y + a.col2.x * b.z;
+  result.y = a.col0.y * b.x + a.col1.y * b.y + a.col2.y * b.z;
+  result.z = a.col0.z * b.x + a.col1.z * b.y + a.col2.z * b.z;
+
+  return result;
+}
+
+__device__ mat3 mat3_mul_mat(const mat3 a, const mat3 b) {
+  mat3 result;
+
+  result.col0 = mat3_mul_vec(a, b.col0);
+  result.col1 = mat3_mul_vec(a, b.col1);
+  result.col2 = mat3_mul_vec(a, b.col2);
+
+  return result;
+}
+
+__device__ mat3 mat3_identity() {
+  mat3 result;
+
+  result.col0 = get_vector(1.0f, 0.0f, 0.0f);
+  result.col1 = get_vector(0.0f, 1.0f, 0.0f);
+  result.col2 = get_vector(0.0f, 0.0f, 1.0f);
+
+  return result;
+}
+
+__device__ mat3 mat3_scale(const mat3 mat, const float scale) {
+  mat3 result;
+
+  result.col0 = scale_vector(mat.col0, scale);
+  result.col1 = scale_vector(mat.col1, scale);
+  result.col2 = scale_vector(mat.col2, scale);
+
+  return result;
+}
+
+__device__ float mat3_determinant(const mat3 mat) {
+  float det = 0.0f;
+
+  det += mat.col0.x * (mat.col1.y * mat.col2.z - mat.col2.y * mat.col1.z);
+  det -= mat.col1.x * (mat.col0.y * mat.col2.z - mat.col2.y * mat.col0.z);
+  det += mat.col2.x * (mat.col0.y * mat.col1.z - mat.col1.y * mat.col0.z);
+
+  return det;
+}
+
+__device__ mat3 mat3_inverse(const mat3 mat) {
+  const float determinant = mat3_determinant(mat);
+
+  if (determinant == 0.0f)
+    return mat3_identity();
+
+  mat3 result;
+
+  result.col0.x = mat.col1.y * mat.col2.z - mat.col2.y * mat.col1.z;
+  result.col0.y = mat.col2.y * mat.col0.z - mat.col0.y * mat.col2.z;
+  result.col0.z = mat.col0.y * mat.col1.z - mat.col1.y * mat.col0.z;
+  result.col1.x = mat.col2.x * mat.col1.z - mat.col1.x * mat.col2.z;
+  result.col1.y = mat.col0.x * mat.col2.z - mat.col2.x * mat.col0.z;
+  result.col1.z = mat.col1.x * mat.col0.z - mat.col0.x * mat.col1.z;
+  result.col2.x = mat.col1.x * mat.col2.y - mat.col2.x * mat.col1.y;
+  result.col2.y = mat.col2.x * mat.col0.y - mat.col0.x * mat.col2.y;
+  result.col2.z = mat.col0.x * mat.col1.y - mat.col1.x * mat.col0.y;
+
+  return mat3_scale(result, 1.0f / determinant);
 }
 
 /*
@@ -816,6 +1028,17 @@ __device__ RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }
 
+__device__ RGBAF transparent_color(const RGBF a, const float alpha) {
+  RGBAF result;
+
+  result.r = a.r;
+  result.g = a.g;
+  result.b = a.b;
+  result.a = alpha;
+
+  return result;
+}
+
 __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const float a) {
   RGBAF result;
 
@@ -823,6 +1046,28 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   result.g = g;
   result.b = b;
   result.a = a;
+
+  return result;
+}
+
+__device__ RGBAF RGBAF_add(const RGBAF a, const RGBAF b) {
+  RGBAF result;
+
+  result.r = a.r + b.r;
+  result.g = a.g + b.g;
+  result.b = a.b + b.b;
+  result.a = a.a + b.a;
+
+  return result;
+}
+
+__device__ RGBAF RGBAF_scale(const RGBAF a, const float b) {
+  RGBAF result;
+
+  result.r = a.r * b;
+  result.g = a.g * b;
+  result.b = a.b * b;
+  result.a = a.a * b;
 
   return result;
 }
@@ -1192,32 +1437,6 @@ __device__ float clampf(const float x, const float a, const float b) {
 }
 
 /*
- * Computes solid angle when sampling a triangle using the formula in "The Solid Angle of a Plane Triangle" (1983) by A. Van Oosterom and J.
- * Strackee.
- * @param triangle Triangle.
- * @param origin Point from which you sample.
- * @param normal Normalized normal of surface from which you sample.
- * @result Solid angle of triangle.
- */
-__device__ float light_get_solid_angle(const TriangleLight triangle, const vec3 origin) {
-  vec3 a       = sub_vector(triangle.vertex, origin);
-  const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
-  const vec3 c = normalize_vector(add_vector(triangle.edge2, a));
-  a            = normalize_vector(a);
-
-  const float num   = fabsf(dot_product(a, cross_product(b, c)));
-  const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
-
-  float solid_angle = 2.0f * atan2f(num, denom);
-
-  if (is_non_finite(solid_angle) || solid_angle < 1e-7f) {
-    solid_angle = 0.0f;
-  }
-
-  return solid_angle;
-}
-
-/*
  * A more numerically stable version of normalize(b-a).
  * Whether this is actually is any better, I don't know, I just pretend.
  */
@@ -1237,26 +1456,6 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
   vec3 d = sub_vector(a, b);
 
   return normalize_vector(d);
-}
-
-/*
- * Surface sample a triangle light.
- * @param triangle Triangle.
- * @param seed Random number used to sample the triangle.
- * @result Point on the triangle.
- */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const float2 random, float2& uv) {
-  float r1 = sqrtf(random.x);
-  float r2 = random.y;
-
-  // Map random numbers uniformly into [0.025,0.975].
-  r1 = 0.025f + 0.95f * r1;
-  r2 = 0.025f + 0.95f * r2;
-
-  uv.x = 1.0f - r1;
-  uv.y = r1 * r2;
-
-  return add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
 }
 
 /*

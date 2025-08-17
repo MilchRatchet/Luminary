@@ -8,6 +8,7 @@ struct DeviceMemoryHeader {
   CUdeviceptr ptr;  // Important that this comes second.
   size_t size;
   size_t pitch;
+  CUdevice device;
 };
 
 // LUMDEVIM
@@ -15,6 +16,8 @@ struct DeviceMemoryHeader {
 #define DEVICE_MEMORY_HEADER_FREED_MAGIC (69ull)
 
 static size_t total_memory_allocation[LUMINARY_MAX_NUM_DEVICES];
+
+static_assert(sizeof(CUdevice) == sizeof(int), "This code assumes that CUDevice is just an alias for int.");
 
 void _device_memory_init(void) {
   memset(total_memory_allocation, 0, sizeof(size_t) * LUMINARY_MAX_NUM_DEVICES);
@@ -41,17 +44,15 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
     header->ptr = (CUdeviceptr) 0;
   }
 
-  header->magic = DEVICE_MEMORY_HEADER_MAGIC;
-  header->size  = size;
-  header->pitch = 0;
-
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
-  int current_device_id;
-  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
+  header->magic  = DEVICE_MEMORY_HEADER_MAGIC;
+  header->size   = size;
+  header->pitch  = 0;
+  header->device = device;
 
-  total_memory_allocation[current_device_id] += size;
+  total_memory_allocation[device] += size;
 
   *_ptr = (void**) header;
 
@@ -69,17 +70,15 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
 
   const size_t size = pitch * height;
 
-  header->magic = DEVICE_MEMORY_HEADER_MAGIC;
-  header->size  = size;
-  header->pitch = pitch;
-
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
-  int current_device_id;
-  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
+  header->magic  = DEVICE_MEMORY_HEADER_MAGIC;
+  header->size   = size;
+  header->pitch  = pitch;
+  header->device = device;
 
-  total_memory_allocation[current_device_id] += size;
+  total_memory_allocation[device] += size;
 
   *_ptr = (void**) header;
 
@@ -305,16 +304,19 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
-  int current_device_id;
-  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
-
-  if (header->size > total_memory_allocation[current_device_id]) {
+  if (device != header->device) {
     __RETURN_ERROR(
-      LUMINARY_ERROR_MEMORY_LEAK, "Device memory allocation is %llu bytes large but only %llu bytes are allocated in total.", header->size,
-      total_memory_allocation[current_device_id]);
+      LUMINARY_ERROR_API_EXCEPTION, "Device memory allocation belongs to device %u but was attempted to be freed for device %u.",
+      header->device, device);
   }
 
-  total_memory_allocation[current_device_id] -= header->size;
+  if (header->size > total_memory_allocation[device]) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_MEMORY_LEAK, "Device memory allocation is %llu bytes large but only %llu bytes are allocated in total.", header->size,
+      total_memory_allocation[device]);
+  }
+
+  total_memory_allocation[device] -= header->size;
 
   if (header->ptr) {
     CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
@@ -330,10 +332,7 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 LuminaryResult device_memory_get_total_allocation_size(CUdevice device, size_t* size) {
   __CHECK_NULL_ARGUMENT(size);
 
-  int current_device_id;
-  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
-
-  *size = total_memory_allocation[current_device_id];
+  *size = total_memory_allocation[device];
 
   return LUMINARY_SUCCESS;
 }

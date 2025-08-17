@@ -32,35 +32,32 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
   uint32_t num_available_arguments;
   LUM_FAILURE_HANDLE(array_get_num_elements(parser->descriptors, &num_available_arguments));
 
-  printf("OVERVIEW: Mandarin Duck Frontend for Luminary\n\n");
+  info_message("OVERVIEW: Mandarin Duck Frontend for Luminary\n\n");
 
 #ifdef _WIN32
-  printf("USAGE: MandarinDuck.exe [options] file...\n\n");
+  info_message("USAGE: MandarinDuck.exe [options] file...\n\n");
 #else
-  printf("USAGE: MandarinDuck [options] file...\n\n");
+  info_message("USAGE: MandarinDuck [options] file...\n\n");
 #endif
 
-  printf("OPTIONS:\n");
+  info_message("OPTIONS:\n");
 
   for (uint32_t argument_id = 0; argument_id < num_available_arguments; argument_id++) {
     const ArgumentDescriptor* argument = parser->descriptors + argument_id;
 
-    printf("\t--%s", argument->long_name);
+    info_message("\t--%s", argument->long_name);
     if (argument->short_name) {
-      printf(", -%s", argument->short_name);
+      info_message(", -%s", argument->short_name);
     }
 
-    printf("\n\t\t%s\n", argument->description);
+    info_message("\n\t\t%s\n", argument->description);
   }
 
   parser->results.dry_run_requested = true;
 }
 
 static void _argument_parser_arg_func_output(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
-  UNUSED_ARG(parser);
   UNUSED_ARG(host);
-  UNUSED_ARG(num_arguments);
-  UNUSED_ARG(arguments);
 
   if (num_arguments > 0) {
     parser->results.output_directory = arguments[0];
@@ -73,11 +70,24 @@ static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHo
   UNUSED_ARG(num_arguments);
   UNUSED_ARG(arguments);
 
-  printf("Mandarin Duck Frontend\n");
-  printf("Luminary %s (Branch: %s)\n", LUMINARY_VERSION_DATE, LUMINARY_BRANCH_NAME);
-  printf("(%s, %s, CUDA %s, OptiX %s)\n", LUMINARY_COMPILER, LUMINARY_OS, LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
+  info_message("Mandarin Duck for Luminary %s", MANDARIN_DUCK_VERSION);
+  info_message("Build: %s (%s) - %s", MANDARIN_DUCK_BRANCH_NAME, MANDARIN_DUCK_VERSION_HASH, MANDARIN_DUCK_VERSION_DATE);
 
   parser->results.dry_run_requested = true;
+}
+
+static void _argument_parser_arg_func_device(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(host);
+
+  if (num_arguments > 0) {
+    const uint32_t device_id = atoi(arguments[0]);
+
+    // If a device was selected, deselect all devices and only use the onces specified by the user.
+    if (parser->results.device_mask == LUMINARY_HOST_CREATE_INFO_DEVICE_MASK_ALL_DEVICES)
+      parser->results.device_mask = 0;
+
+    parser->results.device_mask |= 1 << device_id;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -146,6 +156,8 @@ void argument_parser_create(ArgumentParser** parser) {
   LUM_FAILURE_HANDLE(array_create(&(*parser)->inputs, sizeof(char*), 16));
   LUM_FAILURE_HANDLE(array_create(&(*parser)->parsed_arguments, sizeof(ParsedArgument), 16));
 
+  (*parser)->results.device_mask = LUMINARY_HOST_CREATE_INFO_DEVICE_MASK_ALL_DEVICES;
+
   // Add descriptors sorted by category and alphabetically.
 
   ArgumentDescriptor descriptor;
@@ -187,6 +199,16 @@ void argument_parser_create(ArgumentParser** parser) {
   descriptor.subargument_count = 0;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_version;
   descriptor.pre_execute       = true;
+
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor.category          = ARGUMENT_CATEGORY_LUMINARY;
+  descriptor.long_name         = "device";
+  descriptor.short_name        = (char*) 0;
+  descriptor.description       = "Specify a device that should be enabled for rendering, specify multiple times for multiple devices";
+  descriptor.subargument_count = 1;
+  descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_device;
+  descriptor.pre_execute       = false;
 
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 }
@@ -233,6 +255,7 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
 
       ParsedArgument parsed_argument;
 
+      parsed_argument.category          = result.matched_argument->category;
       parsed_argument.handler_func      = result.matched_argument->handler_func;
       parsed_argument.subargument_count = 0;
 
@@ -255,6 +278,7 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
       if (subargs_left == 0) {
         ParsedArgument parsed_argument;
 
+        parsed_argument.category          = subarg_target.matched_argument->category;
         parsed_argument.handler_func      = subarg_target.matched_argument->handler_func;
         parsed_argument.subargument_count = subarg_target.matched_argument->subargument_count;
 
@@ -278,24 +302,27 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
   LUM_FAILURE_HANDLE(array_destroy(&subargs));
 }
 
-void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host) {
+void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host, ArgumentCategory category) {
   MD_CHECK_NULL_ARGUMENT(parser);
-  MD_CHECK_NULL_ARGUMENT(host);
 
-  uint32_t num_inputs;
-  LUM_FAILURE_HANDLE(array_get_num_elements(parser->inputs, &num_inputs));
+  if (category == ARGUMENT_CATEGORY_DEFAULT) {
+    MD_CHECK_NULL_ARGUMENT(host);
 
-  for (uint32_t input_id = 0; input_id < num_inputs; input_id++) {
-    const char* input = parser->inputs[input_id];
+    uint32_t num_inputs;
+    LUM_FAILURE_HANDLE(array_get_num_elements(parser->inputs, &num_inputs));
 
-    // TODO: Handle obj file inputs
-    LuminaryPath* lum_path;
-    LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
-    LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, input));
+    for (uint32_t input_id = 0; input_id < num_inputs; input_id++) {
+      const char* input = parser->inputs[input_id];
 
-    LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, lum_path));
+      // TODO: Handle obj file inputs
+      LuminaryPath* lum_path;
+      LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
+      LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, input));
 
-    LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+      LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, lum_path));
+
+      LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+    }
   }
 
   uint32_t num_arguments;
@@ -303,6 +330,9 @@ void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host) {
 
   for (uint32_t argument_id = 0; argument_id < num_arguments; argument_id++) {
     const ParsedArgument* argument = parser->parsed_arguments + argument_id;
+
+    if (argument->category != category)
+      continue;
 
     argument->handler_func(parser, host, argument->subargument_count, (const char**) argument->subarguments);
   }

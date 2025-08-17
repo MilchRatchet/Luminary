@@ -24,6 +24,10 @@ inline void spinlock_unlock(SpinLockObject* lock) {
   atomic_store_explicit(lock, false, memory_order_release);
 }
 
+inline bool spinlock_is_locked(SpinLockObject* lock) {
+  return atomic_load_explicit(lock, memory_order_relaxed);
+}
+
 #define SpinLockCounter _Atomic uint32_t
 
 inline void spinlock_counter_pop(SpinLockCounter* lock) {

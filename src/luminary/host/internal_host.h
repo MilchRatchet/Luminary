@@ -5,6 +5,7 @@
 #include "host_output_handler.h"
 #include "mesh.h"
 #include "mutex.h"
+#include "output_descriptor.h"
 #include "scene.h"
 #include "texture.h"
 #include "thread.h"

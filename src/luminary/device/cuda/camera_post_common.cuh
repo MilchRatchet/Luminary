@@ -55,16 +55,16 @@ __device__ RGBF sample_pixel_clamp(const RGBF* image, float x, float y, const in
   return sample_pixel(image, x, y, width, height, mem_scale);
 }
 
-__device__ RGBF sample_pixel_border(const RGBF* image, float x, float y, const int width, const int height) {
+__device__ RGBAF sample_pixel_border(const RGBF* image, float x, float y, const int width, const int height) {
   if (x > __uint_as_float(0b00111111011111111111111111111111) || x < 0.0f) {
-    return get_color(0.0f, 0.0f, 0.0f);
+    return RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
   }
 
   if (y > __uint_as_float(0b00111111011111111111111111111111) || y < 0.0f) {
-    return get_color(0.0f, 0.0f, 0.0f);
+    return RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
   }
 
-  return sample_pixel(image, x, y, width, height);
+  return transparent_color(sample_pixel(image, x, y, width, height), 1.0f);
 }
 
 LUMINARY_KERNEL void camera_post_image_downsample(const KernelArgsCameraPostImageDownsample args) {
@@ -82,26 +82,26 @@ LUMINARY_KERNEL void camera_post_image_downsample(const KernelArgsCameraPostImag
     const float sx = scale_x * x;
     const float sy = scale_y * y;
 
-    const RGBF a1 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
-    const RGBF a2 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
-    const RGBF a3 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
-    const RGBF a4 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a1 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a2 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a3 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a4 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
 
-    RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
+    RGBAF pixel = RGBAF_add(RGBAF_add(a1, a2), RGBAF_add(a3, a4));
 
-    pixel = add_color(pixel, sample_pixel_border(args.src, sx, sy, args.sw, args.sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy - step_y, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy + step_y, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, sample_pixel_border(args.src, sx, sy, args.sw, args.sh));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy - step_y, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy + step_y, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh), 0.25f));
 
-    pixel = scale_color(pixel, 0.125f);
+    const RGBF result = (pixel.a > 0.0f) ? scale_color(opaque_color(pixel), 1.0f / pixel.a) : splat_color(0.0f);
 
-    store_RGBF(args.dst, x + y * args.tw, pixel);
+    store_RGBF(args.dst, x + y * args.tw, result);
 
     id += blockDim.x * gridDim.x;
   }
@@ -122,28 +122,27 @@ LUMINARY_KERNEL void camera_post_image_downsample_threshold(const KernelArgsCame
     const float sx = scale_x * x;
     const float sy = scale_y * y;
 
-    const RGBF a1 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
-    const RGBF a2 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
-    const RGBF a3 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
-    const RGBF a4 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a1 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a2 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a3 = sample_pixel_border(args.src, sx - 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
+    const RGBAF a4 = sample_pixel_border(args.src, sx + 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
 
-    RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
+    RGBAF pixel = RGBAF_add(RGBAF_add(a1, a2), RGBAF_add(a3, a4));
 
-    pixel = add_color(pixel, sample_pixel_border(args.src, sx, sy, args.sw, args.sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy - step_y, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy + step_y, args.sw, args.sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, sample_pixel_border(args.src, sx, sy, args.sw, args.sh));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy - step_y, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy + step_y, args.sw, args.sh), 0.5f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh), 0.25f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh), 0.25f));
 
-    pixel = scale_color(pixel, 0.125f);
+    RGBF result = (pixel.a > 0.0f) ? scale_color(opaque_color(pixel), 1.0f / pixel.a) : splat_color(0.0f);
+    result      = max_color(sub_color(result, splat_color(args.threshold)), splat_color(0.0f));
 
-    pixel = max_color(sub_color(pixel, splat_color(args.threshold)), splat_color(0.0f));
-
-    store_RGBF(args.dst, x + y * args.tw, pixel);
+    store_RGBF(args.dst, x + y * args.tw, result);
 
     id += blockDim.x * gridDim.x;
   }
@@ -164,24 +163,24 @@ LUMINARY_KERNEL void camera_post_image_upsample(const KernelArgsCameraPostImageU
     const float sx = scale_x * x;
     const float sy = scale_y * y;
 
-    RGBF pixel = sample_pixel_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh);
+    RGBAF pixel = sample_pixel_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh);
 
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy - step_y, args.sw, args.sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx - step_x, sy, args.sw, args.sh), 2.0f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy, args.sw, args.sh), 4.0f));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx + step_x, sy, args.sw, args.sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_border(args.src, sx, sy + step_y, args.sw, args.sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy - step_y, args.sw, args.sh), 2.0f));
+    pixel = RGBAF_add(pixel, sample_pixel_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx - step_x, sy, args.sw, args.sh), 2.0f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy, args.sw, args.sh), 4.0f));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx + step_x, sy, args.sw, args.sh), 2.0f));
+    pixel = RGBAF_add(pixel, sample_pixel_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh));
+    pixel = RGBAF_add(pixel, RGBAF_scale(sample_pixel_border(args.src, sx, sy + step_y, args.sw, args.sh), 2.0f));
+    pixel = RGBAF_add(pixel, sample_pixel_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh));
 
-    pixel = scale_color(pixel, 0.0625f * args.sa);
+    RGBF result = (pixel.a > 0.0f) ? scale_color(opaque_color(pixel), args.sa / pixel.a) : splat_color(0.0f);
 
     RGBF base_pixel = load_RGBF(args.base + x + y * args.tw);
     base_pixel      = scale_color(base_pixel, args.sb);
-    pixel           = add_color(pixel, base_pixel);
+    result          = add_color(result, base_pixel);
 
-    store_RGBF(args.dst, x + y * args.tw, pixel);
+    store_RGBF(args.dst, x + y * args.tw, result);
 
     id += blockDim.x * gridDim.x;
   }

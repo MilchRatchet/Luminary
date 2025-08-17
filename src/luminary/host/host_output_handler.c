@@ -304,11 +304,11 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, OutputDescripto
 
   if (requires_allocation) {
     if (selected_output->allocated) {
-      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].descriptor.data));
+      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].data));
     }
 
-    __FAILURE_HANDLE_CRITICAL(host_malloc(
-      &output->objects[selected_handle].descriptor.data, sizeof(ARGB8) * descriptor.meta_data.width * descriptor.meta_data.height));
+    __FAILURE_HANDLE_CRITICAL(
+      host_malloc(&output->objects[selected_handle].data, sizeof(ARGB8) * descriptor.meta_data.width * descriptor.meta_data.height));
   }
 
   selected_output->populated                      = false;
@@ -390,11 +390,11 @@ LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, Ou
 
   if (requires_allocation) {
     if (selected_output->allocated) {
-      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].descriptor.data));
+      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].data));
     }
 
-    __FAILURE_HANDLE_CRITICAL(host_malloc(
-      &output->objects[selected_handle].descriptor.data, sizeof(ARGB8) * descriptor.meta_data.width * descriptor.meta_data.height));
+    __FAILURE_HANDLE_CRITICAL(
+      host_malloc(&output->objects[selected_handle].data, sizeof(ARGB8) * descriptor.meta_data.width * descriptor.meta_data.height));
   }
 
   selected_output->populated                      = false;
@@ -469,7 +469,7 @@ LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, 
 
   OutputObject* object = output->objects + handle;
 
-  *image = (Image) {.buffer                 = object->descriptor.data,
+  *image = (Image) {.buffer                 = object->data,
                     .width                  = object->descriptor.meta_data.width,
                     .height                 = object->descriptor.meta_data.height,
                     .ld                     = object->descriptor.meta_data.width,
@@ -498,7 +498,7 @@ LuminaryResult output_handler_destroy(OutputHandler** output) {
     OutputObject* object = (*output)->objects + output_id;
 
     if (object->allocated) {
-      __FAILURE_HANDLE_CRITICAL(host_free(&object->descriptor.data));
+      __FAILURE_HANDLE_CRITICAL(host_free(&object->data));
     }
   }
 

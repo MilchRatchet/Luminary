@@ -16,46 +16,55 @@ LUMINARY_KERNEL void ocean_process_tasks() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset = get_task_address(task_offset + i);
-    DeviceTask task       = task_load(offset);
-    const float depth     = trace_depth_load(offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
-    RGBF record           = load_RGBF(device.ptrs.records + pixel);
+    HANDLE_DEVICE_ABORT();
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    GBufferData data = ocean_generate_g_buffer(task, pixel);
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    BSDFSampleInfo bounce_info;
-    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+    DeviceIORStack ior_stack    = trace.ior_stack;
+    MaterialContextGeometry ctx = ocean_get_context(task, ior_stack);
 
-    record = mul_color(record, bounce_info.weight);
+    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.index);
 
-    const bool is_pass_through = bsdf_is_pass_through_ray(bounce_info.is_transparent_pass, data.ior_in, data.ior_out);
+    RGBF record = record_unpack(throughput.record);
+    record      = mul_color(record, bounce_info.weight);
+
+    uint16_t volume_id = task.volume_id;
 
     if (bounce_info.is_transparent_pass) {
-      const IORStackMethod ior_stack_method =
-        (data.flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(data.ior_out, pixel, ior_stack_method);
+      const bool refraction_is_inside       = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+      const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
+
+      const VolumeType above_water_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+
+      volume_id = (refraction_is_inside) ? above_water_volume : VOLUME_TYPE_OCEAN;
     }
 
-    data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
+    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
 
     uint16_t new_state = task.state;
 
-    if (!is_pass_through) {
-      new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    }
+    new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~STATE_FLAG_MIS_EMISSION;
 
     DeviceTask bounce_task;
-    bounce_task.state  = new_state;
-    bounce_task.origin = data.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
+    bounce_task.state     = new_state;
+    bounce_task.origin    = ctx.position;
+    bounce_task.ray       = bounce_info.ray;
+    bounce_task.index     = task.index;
+    bounce_task.volume_id = volume_id;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
-      task_store(bounce_task, get_task_address(trace_count++));
-      store_RGBF(device.ptrs.records, pixel, record);
+      const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+      task_store(dst_task_base_address, bounce_task);
+      task_trace_ior_stack_store(dst_task_base_address, ior_stack);
+      task_throughput_record_store(dst_task_base_address, record_pack(record));
     }
   }
 
@@ -69,16 +78,19 @@ LUMINARY_KERNEL void ocean_process_tasks_debug() {
   const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_OCEAN];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset = get_task_address(task_offset + i);
-    DeviceTask task       = task_load(offset);
-    const float depth     = trace_depth_load(offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    HANDLE_DEVICE_ABORT();
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                  = task_load(task_base_address);
+    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+
+    const uint32_t pixel = get_pixel_id(task.index);
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_DEPTH: {
-        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / depth) * 2.0f)), pixel);
+        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
         vec3 normal = ocean_get_normal(task.origin);

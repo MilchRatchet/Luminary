@@ -1,6 +1,8 @@
 #ifndef CU_LUMINARY_OPTIX_COMMON_H
 #define CU_LUMINARY_OPTIX_COMMON_H
 
+#if defined(OPTIX_KERNEL)
+
 #include "ior_stack.cuh"
 #include "memory.cuh"
 #include "optix_utils.cuh"
@@ -62,7 +64,6 @@ __device__ bool particle_opacity_cutout(const float2 coord) {
   return (r > 0.25f);
 }
 
-#ifdef SHADING_KERNEL
 __device__ RGBF optix_geometry_shadowing(
   const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const OptixTraceStatus status) {
   // For triangle lights, we cannot rely on fully opaque OMMs because if we first hit the target light and then execute the closest hit for
@@ -92,6 +93,7 @@ __device__ RGBF optix_sun_shadowing(const vec3 position, const vec3 dir, const f
 
   return payload.throughput;
 }
-#endif
+
+#endif /* OPTIX_KERNEL */
 
 #endif /* CU_LUMINARY_OPTIX_COMMON_H */

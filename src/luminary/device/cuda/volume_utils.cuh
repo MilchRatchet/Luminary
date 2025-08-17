@@ -1,20 +1,11 @@
 #ifndef CU_VOLUME_UTILS_H
 #define CU_VOLUME_UTILS_H
 
+#include "material.cuh"
 #include "ocean_utils.cuh"
 #include "utils.cuh"
 
 #define FOG_DENSITY (0.001f * device.fog.density)
-
-struct VolumeDescriptor {
-  VolumeType type;
-  RGBF absorption;
-  RGBF scattering;
-  float max_scattering;
-  float dist;
-  float max_height;
-  float min_height;
-} typedef VolumeDescriptor;
 
 __device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
   return add_color(volume.absorption, volume.scattering);
@@ -41,7 +32,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.absorption = ocean_jerlov_absorption_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.scattering = ocean_jerlov_scattering_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.dist       = 10000.0f;
-  volume.max_height = OCEAN_MAX_HEIGHT;
+  volume.max_height = 65535.0f;
   volume.min_height = -65535.0f;
 
   volume.max_scattering = color_importance(volume.scattering);
@@ -60,26 +51,43 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
   }
 }
 
-__device__ VolumeType volume_get_type_at_position(const vec3 pos) {
-  VolumeType type = VOLUME_TYPE_NONE;
+__device__ bool volume_should_do_geometry_direct_lighting(const VolumeType type, const uint8_t state) {
+  if ((state & STATE_FLAG_DELTA_PATH) == 0)
+    return false;
 
-  if (device.fog.active) {
-    const VolumeDescriptor volume_fog = volume_get_descriptor_preset_fog();
+  if (type == VOLUME_TYPE_NONE)
+    return false;
 
-    if (pos.y <= volume_fog.max_height && pos.y >= volume_fog.min_height) {
-      type = VOLUME_TYPE_FOG;
-    }
-  }
+  if (type == VOLUME_TYPE_OCEAN && (device.ocean.triangle_light_contribution == false))
+    return false;
 
-  if (device.ocean.active) {
-    const VolumeDescriptor volume_ocean = volume_get_descriptor_preset_ocean();
+  return true;
+}
 
-    if (pos.y <= volume_ocean.max_height && pos.y >= volume_ocean.min_height) {
-      type = VOLUME_TYPE_OCEAN;
-    }
-  }
+__device__ bool volume_should_do_sky_direct_lighting(const VolumeType type, const uint8_t state) {
+  if (type == VOLUME_TYPE_NONE)
+    return false;
 
-  return type;
+  return true;
+}
+
+struct VolumePath {
+  union {
+    float2 data;
+    struct {
+      float start;
+      float length;
+    };
+  };
+} typedef VolumePath;
+
+__device__ VolumePath make_volume_path(const float start, const float length) {
+  VolumePath path;
+
+  path.start  = start;
+  path.length = length;
+
+  return path;
 }
 
 /*
@@ -93,35 +101,23 @@ __device__ VolumeType volume_get_type_at_position(const vec3 pos) {
  *                  - [x] = Start in world space.
  *                  - [y] = Distance through fog in world space.
  */
-__device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+__device__ VolumePath volume_compute_path(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, const bool ocean_fast_path = false) {
   if (limit <= 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   if (volume.max_height <= volume.min_height)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
+
+  if (volume.type == VOLUME_TYPE_NONE)
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   // Vertical intersection
   float start_y;
   float end_y;
   if (volume.type == VOLUME_TYPE_OCEAN) {
-    const bool above_surface = ocean_get_relative_height(origin, OCEAN_ITERATIONS_INTERSECTION) > 0.0f;
-
-    // Without loss of generality, we can simply assume that the end of the volume is at our closest intersection
-    // as long as we are below the surface.
-#ifdef SHADING_KERNEL
-    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
-#else
-    const float surface_intersect = (above_surface) ? ocean_intersection_distance(origin, ray, limit) : limit;
-#endif
-
-    if (above_surface) {
-      start_y = surface_intersect;
-      end_y   = FLT_MAX;
-    }
-    else {
-      start_y = 0.0f;
-      end_y   = surface_intersect;
-    }
+    start_y = 0.0f;
+    end_y   = (ocean_fast_path == false) ? ocean_intersection_distance(origin, ray, limit) : limit;
   }
   else {
     if (fabsf(ray.y) < 0.005f) {
@@ -130,7 +126,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
         end_y   = volume.dist;
       }
       else {
-        return make_float2(-FLT_MAX, 0.0f);
+        return make_volume_path(-FLT_MAX, 0.0f);
       }
     }
     else {
@@ -163,7 +159,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   const float d = r2 - (kx * kx + kz * kz);
 
   if (d < 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   const float sd = sqrtf(d);
   const float q  = -dot - copysignf(sd, dot);
@@ -175,15 +171,15 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   const float end_xz   = fmaxf(t0, t1);
 
   if (end_xz < start_xz || limit < start_xz)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
   const float start = fmaxf(start_xz, start_y);
   const float dist  = fminf(fminf(end_xz, end_y) - start, limit - start);
 
   if (dist < 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
+    return make_volume_path(-FLT_MAX, 0.0f);
 
-  return make_float2(start, dist);
+  return make_volume_path(start, dist);
 }
 
 /*
@@ -192,14 +188,14 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  *
  * @param volume VolumeDescriptor of the corresponding volume.
  * @param start Start offset of ray.
- * @param max_dist Maximum dist ray may travel after start.
+ * @param max_length Maximum distance ray may travel after start.
  * @result Distance of intersection point and origin in world space.
  */
-__device__ float volume_sample_intersection(const VolumeDescriptor volume, const float start, const float max_dist, const float random) {
+__device__ float volume_sample_intersection(const VolumeDescriptor volume, const float start, const float max_length, const float random) {
   // [FonWKH17] Equation 15
   const float t = (-logf(random)) / volume.max_scattering;
 
-  if (t > max_dist)
+  if (t > max_length)
     return FLT_MAX;
 
   return start + t;
@@ -209,20 +205,63 @@ __device__ float volume_sample_intersection_pdf(const VolumeDescriptor volume, c
   return volume.max_scattering * expf(-volume.max_scattering * (t - start));
 }
 
-__device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
-  const float cos_angle = -dot_product(data.V, ray);
+__device__ float volume_sample_intersection_miss_probability(const VolumeDescriptor volume, const float depth) {
+  return expf(-volume.max_scattering * depth);
+}
+
+__device__ float volume_sample_intersection_bounded(const VolumeDescriptor volume, const float max_length, const float random) {
+  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
+
+  // [FonWKH17] Equation 15
+  const float t = -logf(1.0f - random * prob_hit_at_max) / volume.max_scattering;
+
+  return t;
+}
+
+__device__ float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const float max_length, const float t) {
+  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
+
+  return volume.max_scattering * expf(-volume.max_scattering * t) / prob_hit_at_max;
+}
+
+template <MaterialType TYPE>
+__device__ float volume_phase_evaluate(const MaterialContext<TYPE> ctx, const vec3 ray);
+
+template <>
+__device__ float volume_phase_evaluate<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const vec3 ray) {
+  const float cos_angle = -dot_product(ctx.V, ray);
 
   float phase;
-  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+  if (ctx.descriptor.type == VOLUME_TYPE_OCEAN) {
     phase = ocean_phase(cos_angle);
   }
   else {
-    const float diameter            = (volume_hit_type == VOLUME_TYPE_FOG) ? device.fog.droplet_diameter : device.particles.phase_diameter;
+    const float diameter            = device.fog.droplet_diameter;
     const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
     phase                           = jendersie_eon_phase_function(cos_angle, params);
   }
 
-  return scale_color(opaque_color(data.albedo), phase);
+  return phase;
+}
+
+template <>
+__device__ float volume_phase_evaluate<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const vec3 ray) {
+  const float cos_angle = -dot_product(ctx.V, ray);
+
+  const float diameter            = device.particles.phase_diameter;
+  const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
+  return jendersie_eon_phase_function(cos_angle, params);
+}
+
+__device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float length) {
+  const RGBF volume_transmittance = volume_get_transmittance(volume);
+
+  RGBF result;
+  result.r = expf(-length * volume_transmittance.r);
+  result.g = expf(-length * volume_transmittance.g);
+  result.b = expf(-length * volume_transmittance.b);
+
+  return result;
 }
 
 __device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const vec3 ray, const float depth, const bool force_path = false) {
@@ -230,14 +269,14 @@ __device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const ve
 
   if (device.ocean.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-    const float2 path             = (force_path) ? make_float2(0.0f, depth) : volume_compute_path(volume, origin, ray, depth);
+    const VolumePath path         = (force_path) ? make_volume_path(0.0f, depth) : volume_compute_path(volume, origin, ray, depth);
 
-    if (path.x >= 0.0f) {
+    if (path.start >= 0.0f) {
       RGBF volume_transmittance = volume_get_transmittance(volume);
 
-      ocean_transmittance.r = expf(-path.y * volume_transmittance.r);
-      ocean_transmittance.g = expf(-path.y * volume_transmittance.g);
-      ocean_transmittance.b = expf(-path.y * volume_transmittance.b);
+      ocean_transmittance.r = expf(-path.length * volume_transmittance.r);
+      ocean_transmittance.g = expf(-path.length * volume_transmittance.g);
+      ocean_transmittance.b = expf(-path.length * volume_transmittance.b);
     }
   }
 
@@ -249,46 +288,64 @@ __device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec
 
   if (device.fog.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+    const VolumePath path         = volume_compute_path(volume, origin, ray, depth);
 
-    if (path.x >= 0.0f) {
-      fog_transmittance = expf(-path.y * volume.max_scattering);
+    if (path.start >= 0.0f) {
+      fog_transmittance = expf(-path.length * volume.max_scattering);
     }
   }
 
   return fog_transmittance;
 }
 
-__device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray, const float depth) {
-  const float fog_transmittance  = volume_integrate_transmittance_fog(origin, ray, depth);
-  const RGBF ocean_transmittance = volume_integrate_transmittance_ocean(origin, ray, depth);
+__device__ RGBF volume_integrate_transmittance(const VolumeType volume_type, const vec3 origin, const vec3 ray, const float depth) {
+  const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-  return scale_color(ocean_transmittance, fog_transmittance);
+  const VolumePath path = volume_compute_path(volume, origin, ray, depth);
+
+  RGBF transmittance = splat_color(1.0f);
+
+  if (path.start >= 0.0f) {
+    RGBF volume_transmittance = volume_get_transmittance(volume);
+
+    transmittance.r = expf(-path.length * volume_transmittance.r);
+    transmittance.g = expf(-path.length * volume_transmittance.g);
+    transmittance.b = expf(-path.length * volume_transmittance.b);
+  }
+
+  return transmittance;
 }
 
-__device__ GBufferData
-  volume_generate_g_buffer(const DeviceTask task, const uint32_t instance_id, const int pixel, const VolumeDescriptor volume) {
-  const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
+__device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume, const float max_dist) {
+  MaterialContextVolume ctx;
+  ctx.descriptor  = volume;
+  ctx.position    = task.origin;
+  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.state       = task.state;
+  ctx.volume_type = volume.type;
+  ctx.max_dist    = max_dist;
 
-  const float ray_ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
+  return ctx;
+}
 
-  GBufferData data;
-  data.instance_id = instance_id;
-  data.tri_id      = 0;
-  data.albedo      = RGBAF_set(
-    volume.scattering.r * scattering_normalization, volume.scattering.g * scattering_normalization,
-    volume.scattering.b * scattering_normalization, 0.0f);
-  data.emission  = get_color(0.0f, 0.0f, 0.0f);
-  data.normal    = get_vector(0.0f, 0.0f, 0.0f);
-  data.position  = task.origin;
-  data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = device.fog.droplet_diameter;
-  data.state     = task.state;
-  data.flags     = 0;
-  data.ior_in    = ray_ior;
-  data.ior_out   = ray_ior;
+__device__ void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, DeviceTaskThroughput& throughput) {
+  const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, pixel);
 
-  return data;
+  const float t = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
+
+  const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
+
+  RGBF record = record_unpack(throughput.record);
+
+  record.r *= expf(-t * volume_transmittance.r) * ctx.descriptor.scattering.r;
+  record.g *= expf(-t * volume_transmittance.g) * ctx.descriptor.scattering.g;
+  record.b *= expf(-t * volume_transmittance.b) * ctx.descriptor.scattering.b;
+
+  record = scale_color(record, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.max_dist, t));
+
+  throughput.record = record_pack(record);
+
+  ctx.position = add_vector(ctx.position, scale_vector(ctx.V, -t));
 }
 
 #endif /* CU_VOLUME_UTILS_H */

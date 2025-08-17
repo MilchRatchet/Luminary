@@ -15,8 +15,19 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_ready, CU_EVENT_DISABLE_TIMING));
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_finished, CU_EVENT_DISABLE_TIMING));
 
-  // Default size
-  device_output_set_size(*output, 1920, 1080);
+  for (uint32_t buffer_id = 0; buffer_id < DEVICE_OUTPUT_BUFFER_COUNT; buffer_id++) {
+    __FAILURE_HANDLE(vault_object_create(&(*output)->buffer_objects[buffer_id]));
+  }
+
+  // Default properties
+  LuminaryOutputProperties properties;
+  memset(&properties, 0, sizeof(LuminaryOutputProperties));
+
+  properties.enabled = false;
+  properties.width   = 1920;
+  properties.height  = 1080;
+
+  device_output_set_properties(*output, properties);
 
   (*output)->color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
   (*output)->agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
@@ -25,10 +36,18 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_output_get_recurring_enabled(DeviceOutput* output, bool* recurring_enabled) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  *recurring_enabled = output->recurring_outputs_enabled;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_output_set_output_dirty(DeviceOutput* output) {
   __CHECK_NULL_ARGUMENT(output);
 
-  output->output_is_dirty = true;
+  output->recurring_output_is_dirty = true;
 
   return LUMINARY_SUCCESS;
 }
@@ -57,20 +76,38 @@ static LuminaryResult _device_output_allocate_device_buffer(DeviceOutput* output
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height) {
+LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutputProperties properties) {
   __CHECK_NULL_ARGUMENT(output);
+
+  output->recurring_outputs_enabled = properties.enabled;
+
+  uint32_t width  = (properties.enabled) ? properties.width : 0;
+  uint32_t height = (properties.enabled) ? properties.height : 0;
 
   if ((output->width != width) || (output->height != height)) {
     output->width  = width;
     output->height = height;
 
     for (uint32_t buffer_id = 0; buffer_id < DEVICE_OUTPUT_BUFFER_COUNT; buffer_id++) {
+      __FAILURE_HANDLE_LOCK_CRITICAL();
+      __FAILURE_HANDLE(vault_object_lock(output->buffer_objects[buffer_id]));
+
       if (output->buffers[buffer_id]) {
-        __FAILURE_HANDLE(device_free_staging(&output->buffers[buffer_id]));
+        __FAILURE_HANDLE_CRITICAL(device_free_staging(&output->buffers[buffer_id]));
       }
 
-      __FAILURE_HANDLE(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
+      __FAILURE_HANDLE_CRITICAL(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
+
+      __FAILURE_HANDLE_CRITICAL(
+        vault_object_set(output->buffer_objects[buffer_id], output->buffer_allocation_count, output->buffers[buffer_id]));
+
+      __FAILURE_HANDLE_UNLOCK_CRITICAL();
+      __FAILURE_HANDLE(vault_object_unlock(output->buffer_objects[buffer_id]));
+
+      __FAILURE_HANDLE_CHECK_CRITICAL();
     }
+
+    output->buffer_allocation_count++;
 
     __FAILURE_HANDLE(_device_output_allocate_device_buffer(output, width, height));
   }
@@ -97,7 +134,18 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
 
   output_request.queued = false;
   __FAILURE_HANDLE(device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, false));
+  __FAILURE_HANDLE(vault_object_create(&output_request.buffer_object));
   output_request.props = props;
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_object_lock(output_request.buffer_object));
+
+  __FAILURE_HANDLE_CRITICAL(vault_object_set(output_request.buffer_object, 0, output_request.buffer));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(vault_object_unlock(output_request.buffer_object));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   __FAILURE_HANDLE(array_push(&output->output_requests, &output_request));
 
@@ -127,7 +175,10 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   const uint32_t width  = callback_data->descriptor.meta_data.width;
   const uint32_t height = callback_data->descriptor.meta_data.height;
 
-  STAGING void* dst_buffer = callback_data->descriptor.data;
+  // We access the buffer without locking because the handle will only be available to other threads
+  // once the callback has happened which is when the download has finished.
+  STAGING void* dst_buffer;
+  __FAILURE_HANDLE(vault_handle_get(callback_data->descriptor.data_handle, &dst_buffer));
 
   KernelArgsConvertRGBFToARGB8 args;
   args.dst    = DEVICE_PTR(output->device_buffer);
@@ -149,7 +200,15 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   return LUMINARY_SUCCESS;
 }
 
-static bool _device_output_recurring_needs_queueing(const uint32_t current_sample_count) {
+static bool _device_output_recurring_needs_queueing(DeviceOutput* output, const uint32_t current_sample_count) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  if (output->recurring_outputs_enabled == false)
+    return false;
+
+  if (output->recurring_output_is_dirty)
+    return true;
+
   const uint32_t base_threshold = 4;
 
   if (current_sample_count < (1 << base_threshold))
@@ -186,11 +245,11 @@ LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, b
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(does_output);
 
-  const uint32_t current_sample_count = device->sample_count.current_sample_count;
+  const uint32_t current_sample_count = device->aggregate_sample_count;
 
-  bool generate_output = output->output_is_dirty;
+  bool generate_output = false;
 
-  generate_output |= _device_output_recurring_needs_queueing(current_sample_count);
+  generate_output |= _device_output_recurring_needs_queueing(output, current_sample_count);
 
   uint32_t num_output_requests;
   __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
@@ -210,22 +269,16 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
-  if (output->width == 0 || output->height == 0) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device output is set to a size of 0.");
-  }
-
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
 
   // TODO: There is a bug where the undersampling breaks if we update the constant memory here, so we can only do it afterwards.
   // This is only important if sample times are high which is not the case during undersampling so this is not very important.
-  if (output->output_is_dirty && device->undersampling_state == 0) {
+  if (output->recurring_output_is_dirty && device->undersampling_state == 0) {
     // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
     __FAILURE_HANDLE(device_sync_constant_memory(device));
   }
 
-  output->output_is_dirty = false;
-
-  const uint32_t current_sample_count = device->sample_count.current_sample_count;
+  const uint32_t current_sample_count = device->aggregate_sample_count;
 
   KernelArgsGenerateFinalImage generate_final_image_args;
 
@@ -239,20 +292,27 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_output, output->event_output_ready, CU_EVENT_WAIT_DEFAULT));
 
-  DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
+  if (_device_output_recurring_needs_queueing(output, current_sample_count) == true) {
+    __DEBUG_ASSERT(output->width > 0 && output->height > 0);
 
-  data->render_event_id                      = render_event_id;
-  data->descriptor.is_recurring_output       = true;
-  data->descriptor.meta_data.width           = output->width;
-  data->descriptor.meta_data.height          = output->height;
-  data->descriptor.meta_data.sample_count    = current_sample_count;
-  data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
-  data->descriptor.data                      = output->buffers[output->buffer_index];
+    output->recurring_output_is_dirty = false;
 
-  __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
+    DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
-  output->buffer_index   = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
-  output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
+    data->render_event_id                      = render_event_id;
+    data->descriptor.is_recurring_output       = true;
+    data->descriptor.meta_data.width           = output->width;
+    data->descriptor.meta_data.height          = output->height;
+    data->descriptor.meta_data.sample_count    = current_sample_count;
+    data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
+
+    __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output->buffer_objects[output->buffer_index]));
+
+    __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
+
+    output->buffer_index   = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
+    output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
+  }
 
   uint32_t num_output_requests;
   __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
@@ -260,10 +320,12 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
     DeviceOutputRequest* output_request = output->output_requests + output_request_id;
 
+    // TODO: If the output request has already been processed, mark it for deletion, else we leak precious staging memory.
+
     if (_device_output_request_needs_queueing(output_request, current_sample_count) == false)
       continue;
 
-    data = output->callback_data + output->callback_index;
+    DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
     data->render_event_id                      = render_event_id;
     data->descriptor.is_recurring_output       = false;
@@ -271,7 +333,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     data->descriptor.meta_data.height          = output_request->props.height;
     data->descriptor.meta_data.sample_count    = current_sample_count;
     data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
-    data->descriptor.data                      = output_request->buffer;
+
+    __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output_request->buffer_object));
 
     __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
 
@@ -289,9 +352,13 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
   __CHECK_NULL_ARGUMENT(output);
 
   for (uint32_t buffer_id = 0; buffer_id < DEVICE_OUTPUT_BUFFER_COUNT; buffer_id++) {
+    __FAILURE_HANDLE(vault_object_reset((*output)->buffer_objects[buffer_id]));
+
     if ((*output)->buffers[buffer_id]) {
       __FAILURE_HANDLE(device_free_staging(&(*output)->buffers[buffer_id]));
     }
+
+    __FAILURE_HANDLE(vault_object_destroy(&(*output)->buffer_objects[buffer_id]));
   }
 
   if ((*output)->device_buffer) {
@@ -302,7 +369,13 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
   __FAILURE_HANDLE(array_get_num_elements((*output)->output_requests, &num_output_requests));
 
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
-    __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id].buffer));
+    __FAILURE_HANDLE(vault_object_reset((*output)->output_requests[output_request_id].buffer_object));
+
+    if ((*output)->output_requests[output_request_id].buffer) {
+      __FAILURE_HANDLE(device_free_staging(&(*output)->output_requests[output_request_id].buffer));
+    }
+
+    __FAILURE_HANDLE(vault_object_destroy(&(*output)->output_requests[output_request_id].buffer_object));
   }
 
   CUDA_FAILURE_HANDLE(cuEventDestroy((*output)->event_output_ready));

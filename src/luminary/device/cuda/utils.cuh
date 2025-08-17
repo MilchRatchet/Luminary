@@ -6,7 +6,13 @@
 #include "../device_utils.h"
 #include "../kernel_args.h"
 
-#define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
+#define NUM_THREADS (THREADS_PER_BLOCK * device.config.num_blocks)
+
+#define WARP_SIZE_LOG 5
+#define WARP_SIZE (1 << WARP_SIZE_LOG)
+#define WARP_SIZE_MASK (WARP_SIZE - 1)
+
+#define NUM_WARPS (NUM_THREADS >> WARP_SIZE_LOG)
 
 #ifndef OPTIX_KERNEL
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
@@ -26,7 +32,9 @@
 #endif /* eps */
 
 #define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)
-#define BSDF_ROUGHNESS_CLAMP (0.025f)
+#define BSDF_ROUGHNESS_CLAMP (2e-2f)
+
+enum OptixTraceStatus { OPTIX_TRACE_STATUS_EXECUTE, OPTIX_TRACE_STATUS_ABORT, OPTIX_TRACE_STATUS_OPTIONAL_UNUSED } typedef OptixTraceStatus;
 
 enum HitType : uint32_t {
   HIT_TYPE_INVALID           = 0xFFFFFFFFu,
@@ -50,8 +58,8 @@ enum ShadingTaskIndex {
   SHADING_TASK_INDEX_VOLUME,
   SHADING_TASK_INDEX_PARTICLE,
   SHADING_TASK_INDEX_SKY,
-  SHADING_TASK_INDEX_INVALID,
-  SHADING_TASK_INDEX_TOTAL_WITH_INVALID
+  SHADING_TASK_INDEX_TOTAL,
+  SHADING_TASK_INDEX_INVALID = 0xFF
 } typedef ShadingTaskIndex;
 
 #define TASK_ADDRESS_OFFSET_IMPL(__internal_macro_shading_task_index) (NUM_THREADS * __internal_macro_shading_task_index + THREAD_ID)
@@ -64,6 +72,7 @@ enum ShadingTaskIndex {
 
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
 #define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
+#define VOLUME_TYPE_TO_HIT(X) ((X == VOLUME_TYPE_FOG || X == VOLUME_TYPE_OCEAN) ? (HIT_TYPE_VOLUME_FOG + X) : HIT_TYPE_INVALID)
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
 #define IS_PRIMARY_RAY (device.state.depth == 0)
 
@@ -84,11 +93,19 @@ enum ShadingTaskIndex {
 // STATE_FLAG_ALLOW_EMISSION: This flag is set for rays that are allowed to include emission in bounce rays.
 //                            This flag is used on the ocean surface because there is no DL on it.
 //
+// STATE_FLAG_MIS_EMISSION: This flag is set for rays that are allowed to include emission through MIS weighting.
+//                          This flag is overruled by STATE_FLAG_ALLOW_EMISSION.
+//
+// STATE_FLAG_ALLOW_AMBIENT: This flag is set for rays that are allowed to include sky contribution
+//
+
 enum StateFlag {
   STATE_FLAG_DELTA_PATH       = 0b00000001u,
   STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
   STATE_FLAG_VOLUME_SCATTERED = 0b00000100u,
-  STATE_FLAG_ALLOW_EMISSION   = 0b00001000u
+  STATE_FLAG_ALLOW_EMISSION   = 0b00001000u,
+  STATE_FLAG_MIS_EMISSION     = 0b00010000u,
+  STATE_FLAG_ALLOW_AMBIENT    = 0b00100000u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {
@@ -127,26 +144,12 @@ __device__ bool is_selected_pixel_lenient(const ushort2 index) {
   return is_selected_pixel(index);
 }
 
+__device__ bool is_center_pixel(const ushort2 index) {
+  return ((index.x == device.settings.width >> 1) && (index.y == device.settings.height >> 1));
+}
+
 __device__ uint32_t get_pixel_id(const ushort2 pixel) {
   return pixel.x + device.settings.width * pixel.y;
-}
-
-__device__ uint32_t get_task_address_of_thread(const uint32_t thread_id, const uint32_t block_id, const uint32_t number) {
-  static_assert(THREADS_PER_BLOCK == 128, "I wrote this using that we have 4 warps per block, this is also used in the 0x3!");
-
-  const uint32_t threads_per_warp  = 32;
-  const uint32_t warp_id           = ((thread_id >> 5) & 0x3) + block_id * 4;
-  const uint32_t thread_id_in_warp = (thread_id & 0x1f);
-  return threads_per_warp * device.pixels_per_thread * warp_id + threads_per_warp * number + thread_id_in_warp;
-}
-
-__device__ uint32_t get_task_address(const uint32_t number) {
-#ifndef OPTIX_KERNEL
-  return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
-#else
-  const uint3 idx = optixGetLaunchIndex();
-  return get_task_address_of_thread(idx.x, idx.y, number);
-#endif
 }
 
 __device__ bool is_non_finite(const float a) {
@@ -160,7 +163,7 @@ __device__ bool is_non_finite(const float a) {
 #endif
 }
 
-#define LIGHTS_ARE_PRESENT (device.ptrs.light_tree_nodes != nullptr)
+#define LIGHTS_ARE_PRESENT (device.ptrs.light_tree_root != nullptr)
 
 #define HANDLE_DEVICE_ABORT()                                                                                         \
   if (__ldcv(device.ptrs.abort_flag) != 0 && ((device.state.undersampling & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0)) { \

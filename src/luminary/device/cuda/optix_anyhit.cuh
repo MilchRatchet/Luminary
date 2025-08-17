@@ -1,6 +1,8 @@
 #ifndef CU_LUMINARY_OPTIX_ANYHIT_H
 #define CU_LUMINARY_OPTIX_ANYHIT_H
 
+#if defined(OPTIX_KERNEL)
+
 #include "optix_common.cuh"
 #include "optix_utils.cuh"
 
@@ -32,15 +34,6 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
   if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
     optixIgnoreIntersection();
   }
-}
-
-////////////////////////////////////////////////////////////////////
-// OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE
-////////////////////////////////////////////////////////////////////
-
-extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
-  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE);
-  // TODO: Add support to check for fully transparent hits, we want to ignore those.
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -128,5 +121,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_sun_trace)() {
 
   optixIgnoreIntersection();
 }
+
+#endif /* OPTIX_KERNEL */
 
 #endif /* CU_LUMINARY_OPTIX_ANYHIT_H */

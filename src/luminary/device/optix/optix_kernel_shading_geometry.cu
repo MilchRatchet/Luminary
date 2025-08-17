@@ -25,24 +25,24 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= task_count)
     return;
 
-  const uint32_t offset                = get_task_address(task_offset + task_id);
-  DeviceTask task                      = task_load(offset);
-  const TriangleHandle triangle_handle = triangle_handle_load(offset);
-  const float depth                    = trace_depth_load(offset);
+  const uint32_t task_base_address = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
+  DeviceTask task                  = task_load(task_base_address);
+  const DeviceTaskTrace trace      = task_trace_load(task_base_address);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   if (direct_lighting_geometry_is_valid(task) == false)
     return;
 #endif
 
-  const uint32_t pixel = get_pixel_id(task.index);
+  task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-  task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+  GeometryContextCreationInfo ctx_creation_info;
+  ctx_creation_info.task      = task;
+  ctx_creation_info.handle    = trace.handle;
+  ctx_creation_info.ior_stack = trace.ior_stack;
+  ctx_creation_info.hints     = GEOMETRY_CONTEXT_CREATION_HINT_DL;
 
-  GBufferData data = geometry_generate_g_buffer(task, triangle_handle, pixel);
-
-  // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
+  const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
 
   ////////////////////////////////////////////////////////////////////
   // Light Ray Sampling
@@ -51,17 +51,18 @@ extern "C" __global__ void __raygen__optix() {
   RGBF accumulated_light = splat_color(0.0f);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(ctx, task.index));
 #endif
 
 #ifdef OPTIX_ENABLE_SKY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_sun(data, task.index));
-  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
 #endif
 
-  const RGBF record = load_RGBF(device.ptrs.records + pixel);
+  const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-  accumulated_light = mul_color(accumulated_light, record);
+  accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
+  const uint32_t pixel = get_pixel_id(task.index);
   write_beauty_buffer(accumulated_light, pixel, task.state);
 }

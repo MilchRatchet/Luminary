@@ -7,91 +7,98 @@
 #define BLUENOISE_TEX_DIM 256
 #define BLUENOISE_TEX_DIM_MASK 0xFF
 
-enum QuasiRandomTargetAllocation : uint32_t {
-  QUASI_RANDOM_TARGET_ALLOCATION_LENS                     = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_MICROFACET          = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_DIFFUSE             = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_REFRACTION          = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_DIR_CHOICE        = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_DIR               = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BOUNCE_OPACITY           = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_LENS_BLADE               = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_VOLUME_DIST              = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_RUSSIAN_ROULETTE         = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_CAMERA_JITTER            = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_CAMERA_TIME              = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_CLOUD_STEP_OFFSET        = 3,
-  QUASI_RANDOM_TARGET_ALLOCATION_CLOUD_STEP_COUNT         = 3,
-  QUASI_RANDOM_TARGET_ALLOCATION_CLOUD_DIR                = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_SKY_STEP_OFFSET          = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_SKY_INSCATTERING_STEP    = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_RIS_DIFFUSE         = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BSDF_RIS_REFRACTION      = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_RIS_LIGHT_ID             = 32,
-  QUASI_RANDOM_TARGET_ALLOCATION_RIS_RAY_DIR              = 32,
-  QUASI_RANDOM_TARGET_ALLOCATION_RIS_RESAMPLING           = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_RIS_LIGHT_TREE           = 32,
-  QUASI_RANDOM_TARGET_ALLOCATION_CAUSTIC_INITIAL          = 128,
-  QUASI_RANDOM_TARGET_ALLOCATION_CAUSTIC_RESAMPLE         = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_CAUSTIC_SUN_DIR          = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_BSDF           = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_BSDF               = 2,
-  QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_RAY            = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_LIGHT_SUN_RIS_RESAMPLING = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_PREFIX            = 1,
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_LIGHT_TREE        = 32,
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_LIGHT_POINT       = 32,
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_DISTANCE          = (32 * 8),
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_PHASE             = (32 * 8),
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_VERTEX_COUNT      = 32,
-  QUASI_RANDOM_TARGET_ALLOCATION_BRIDGE_RESAMPLING        = 1
-} typedef QuasiRandomTargetAllocation;
+#define RANDOM_SET_LIGHT_SUN_COUNT 2
+#define RANDOM_SET_LIGHT_GEO_COUNT 2
+#define RANDOM_SET_BSDF_COUNT 3
 
-#define QUASI_RANDOM_TARGET_ALLOC(name) (QUASI_RANDOM_TARGET_##name + QUASI_RANDOM_TARGET_ALLOCATION_##name)
+#define RANDOM_MAX_NUM_SHADING_CONTEXTS 3
 
-enum QuasiRandomTarget : uint32_t {
-  QUASI_RANDOM_TARGET_LENS                     = 0,
-  QUASI_RANDOM_TARGET_BSDF_MICROFACET          = QUASI_RANDOM_TARGET_ALLOC(LENS),
-  QUASI_RANDOM_TARGET_BSDF_DIFFUSE             = QUASI_RANDOM_TARGET_ALLOC(BSDF_MICROFACET),
-  QUASI_RANDOM_TARGET_BSDF_REFRACTION          = QUASI_RANDOM_TARGET_ALLOC(BSDF_DIFFUSE),
-  QUASI_RANDOM_TARGET_BOUNCE_OPACITY           = QUASI_RANDOM_TARGET_ALLOC(BSDF_REFRACTION),
-  QUASI_RANDOM_TARGET_LENS_BLADE               = QUASI_RANDOM_TARGET_ALLOC(BOUNCE_OPACITY),
-  QUASI_RANDOM_TARGET_VOLUME_DIST              = QUASI_RANDOM_TARGET_ALLOC(LENS_BLADE),
-  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE         = QUASI_RANDOM_TARGET_ALLOC(VOLUME_DIST),
-  QUASI_RANDOM_TARGET_CAMERA_JITTER            = QUASI_RANDOM_TARGET_ALLOC(RUSSIAN_ROULETTE),
-  QUASI_RANDOM_TARGET_CAMERA_TIME              = QUASI_RANDOM_TARGET_ALLOC(CAMERA_JITTER),
-  QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET        = QUASI_RANDOM_TARGET_ALLOC(CAMERA_TIME),
-  QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT         = QUASI_RANDOM_TARGET_ALLOC(CLOUD_STEP_OFFSET),
-  QUASI_RANDOM_TARGET_CLOUD_DIR                = QUASI_RANDOM_TARGET_ALLOC(CLOUD_STEP_COUNT),
-  QUASI_RANDOM_TARGET_SKY_STEP_OFFSET          = QUASI_RANDOM_TARGET_ALLOC(CLOUD_DIR),
-  QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP    = QUASI_RANDOM_TARGET_ALLOC(SKY_STEP_OFFSET),
-  QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE         = QUASI_RANDOM_TARGET_ALLOC(SKY_INSCATTERING_STEP),
-  QUASI_RANDOM_TARGET_BSDF_RIS_REFRACTION      = QUASI_RANDOM_TARGET_ALLOC(BSDF_RIS_DIFFUSE),
-  QUASI_RANDOM_TARGET_RIS_LIGHT_ID             = QUASI_RANDOM_TARGET_ALLOC(BSDF_RIS_REFRACTION),
-  QUASI_RANDOM_TARGET_RIS_RAY_DIR              = QUASI_RANDOM_TARGET_ALLOC(RIS_LIGHT_ID),
-  QUASI_RANDOM_TARGET_RIS_RESAMPLING           = QUASI_RANDOM_TARGET_ALLOC(RIS_RAY_DIR),
-  QUASI_RANDOM_TARGET_RIS_LIGHT_TREE           = QUASI_RANDOM_TARGET_ALLOC(RIS_RESAMPLING),
-  QUASI_RANDOM_TARGET_CAUSTIC_INITIAL          = QUASI_RANDOM_TARGET_ALLOC(RIS_LIGHT_TREE),
-  QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE         = QUASI_RANDOM_TARGET_ALLOC(CAUSTIC_INITIAL),
-  QUASI_RANDOM_TARGET_CAUSTIC_SUN_DIR          = QUASI_RANDOM_TARGET_ALLOC(CAUSTIC_RESAMPLE),
-  QUASI_RANDOM_TARGET_LIGHT_SUN_BSDF           = QUASI_RANDOM_TARGET_ALLOC(CAUSTIC_SUN_DIR),
-  QUASI_RANDOM_TARGET_LIGHT_BSDF               = QUASI_RANDOM_TARGET_ALLOC(LIGHT_SUN_BSDF),
-  QUASI_RANDOM_TARGET_LIGHT_SUN_RAY            = QUASI_RANDOM_TARGET_ALLOC(LIGHT_BSDF),
-  QUASI_RANDOM_TARGET_LIGHT_SUN_RIS_RESAMPLING = QUASI_RANDOM_TARGET_ALLOC(LIGHT_SUN_RAY),
-  QUASI_RANDOM_TARGET_BRIDGE_PREFIX            = QUASI_RANDOM_TARGET_ALLOC(LIGHT_SUN_RIS_RESAMPLING),
-  QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE        = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_PREFIX),
-  QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT       = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_LIGHT_TREE),
-  QUASI_RANDOM_TARGET_BRIDGE_DISTANCE          = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_LIGHT_POINT),
-  QUASI_RANDOM_TARGET_BRIDGE_PHASE             = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_DISTANCE),
-  QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT      = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_PHASE),
-  QUASI_RANDOM_TARGET_BRIDGE_RESAMPLING        = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_VERTEX_COUNT),
+#define RANDOM_ALLOCATE(__name, __count, __set_count)                                                                     \
+  RANDOM_TARGET_ALLOCATION_START_##__name,                                                                                \
+    RANDOM_TARGET_ALLOCATION_SIZE_##__name = (__count), RANDOM_TARGET_##__name = RANDOM_TARGET_ALLOCATION_START_##__name, \
+    RANDOM_TARGET_ALLOCATION_END_##__name =                                                                               \
+      RANDOM_TARGET_ALLOCATION_START_##__name + RANDOM_TARGET_ALLOCATION_SIZE_##__name * (__set_count),
 
-  QUASI_RANDOM_TARGET_COUNT = QUASI_RANDOM_TARGET_ALLOC(BRIDGE_RESAMPLING)
-} typedef QuasiRandomTarget;
+enum RandomTarget : uint16_t {
+  RANDOM_ALLOCATE(LENS, 1, 1)                                                                           //
+  RANDOM_ALLOCATE(LENS_BLADE, 1, 1)                                                                     //
+  RANDOM_ALLOCATE(BSDF_REFLECTION, 1, RANDOM_SET_BSDF_COUNT)                                            //
+  RANDOM_ALLOCATE(BSDF_DIFFUSE, 1, RANDOM_SET_BSDF_COUNT)                                               //
+  RANDOM_ALLOCATE(BSDF_REFRACTION, 1, RANDOM_SET_BSDF_COUNT)                                            //
+  RANDOM_ALLOCATE(BSDF_RESAMPLING, 1, RANDOM_SET_BSDF_COUNT)                                            //
+  RANDOM_ALLOCATE(BSDF_OPACITY, 1, RANDOM_SET_BSDF_COUNT)                                               //
+  RANDOM_ALLOCATE(VOLUME_INTERSECTION, 1, 1)                                                            //
+  RANDOM_ALLOCATE(RUSSIAN_ROULETTE, 1, 1)                                                               //
+  RANDOM_ALLOCATE(CAMERA_JITTER, 1, 1)                                                                  //
+  RANDOM_ALLOCATE(CAMERA_TIME, 1, 1)                                                                    //
+  RANDOM_ALLOCATE(CLOUD_STEP_OFFSET, 3, 1)                                                              //
+  RANDOM_ALLOCATE(CLOUD_STEP_COUNT, 3, 1)                                                               //
+  RANDOM_ALLOCATE(CLOUD_DIR, 1, 1)                                                                      //
+  RANDOM_ALLOCATE(SKY_STEP_OFFSET, 1, 1)                                                                //
+  RANDOM_ALLOCATE(SKY_INSCATTERING_STEP, 1, 1)                                                          //
+  RANDOM_ALLOCATE(CAUSTIC_INITIAL, LIGHT_SUN_CAUSTICS_MAX_SAMPLES, RANDOM_SET_LIGHT_SUN_COUNT)          //
+  RANDOM_ALLOCATE(CAUSTIC_RESAMPLING, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                    //
+  RANDOM_ALLOCATE(CAUSTIC_SUN_RAY, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                       //
+  RANDOM_ALLOCATE(LIGHT_SUN_INITIAL_VERTEX, 1, 1)                                                       //
+  RANDOM_ALLOCATE(LIGHT_SUN_BSDF, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                        //
+  RANDOM_ALLOCATE(LIGHT_SUN_BSDF_METHOD, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                 //
+  RANDOM_ALLOCATE(LIGHT_SUN_RAY, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                         //
+  RANDOM_ALLOCATE(LIGHT_SUN_RESAMPLING, 1, RANDOM_SET_LIGHT_SUN_COUNT)                                  //
+  RANDOM_ALLOCATE(LIGHT_GEO_INITIAL_VERTEX, LIGHT_GEO_MAX_SAMPLES, 1)                                   //
+  RANDOM_ALLOCATE(LIGHT_GEO_RAY, LIGHT_GEO_MAX_SAMPLES, RANDOM_SET_LIGHT_GEO_COUNT)                     //
+  RANDOM_ALLOCATE(LIGHT_GEO_RESAMPLING, 1, RANDOM_SET_LIGHT_GEO_COUNT)                                  //
+  RANDOM_ALLOCATE(LIGHT_GEO_TREE_PREPASS, LIGHT_GEO_MAX_SAMPLES, RANDOM_SET_LIGHT_GEO_COUNT)            //
+  RANDOM_ALLOCATE(LIGHT_GEO_TREE_POSTPASS, LIGHT_GEO_MAX_SAMPLES, RANDOM_SET_LIGHT_GEO_COUNT)           //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_DISTANCE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH), 1)  //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_PHASE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH), 1)     //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_LIGHT_POINT, LIGHT_GEO_MAX_SAMPLES, 1)                               //
+  RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_VERTEX_COUNT, LIGHT_GEO_MAX_SAMPLES, 1)                              //
 
-// Target reuse, these targets are used mutually exclusive with the other
-#define QUASI_RANDOM_TARGET_BSDF_VOLUME QUASI_RANDOM_TARGET_BSDF_MICROFACET
-#define QUASI_RANDOM_TARGET_BSDF_VOLUME_CHOISE QUASI_RANDOM_TARGET_BSDF_DIFFUSE
+  RANDOM_TARGET_COUNT
+} typedef RandomTarget;
+
+////////////////////////////////////////////////////////////////////
+// Sets
+////////////////////////////////////////////////////////////////////
+
+#define RANDOM_SET_ELEMENT(__name) (const RandomTarget)(RANDOM_TARGET_##__name + RANDOM_SET_ID * RANDOM_TARGET_ALLOCATION_SIZE_##__name)
+
+struct RandomSet {
+  template <uint32_t RANDOM_SET_ID>
+  struct LIGHT_SUN {
+    static_assert(RANDOM_SET_ID < RANDOM_SET_LIGHT_SUN_COUNT, "RANDOM_SET_ID is out of bounds");
+
+    static constexpr RandomTarget BSDF               = RANDOM_SET_ELEMENT(LIGHT_SUN_BSDF);
+    static constexpr RandomTarget BSDF_METHOD        = RANDOM_SET_ELEMENT(LIGHT_SUN_BSDF_METHOD);
+    static constexpr RandomTarget RAY                = RANDOM_SET_ELEMENT(LIGHT_SUN_RAY);
+    static constexpr RandomTarget RESAMPLING         = RANDOM_SET_ELEMENT(LIGHT_SUN_RESAMPLING);
+    static constexpr RandomTarget CAUSTIC_INITIAL    = RANDOM_SET_ELEMENT(CAUSTIC_INITIAL);
+    static constexpr RandomTarget CAUSTIC_RESAMPLING = RANDOM_SET_ELEMENT(CAUSTIC_RESAMPLING);
+    static constexpr RandomTarget CAUSTIC_SUN_RAY    = RANDOM_SET_ELEMENT(CAUSTIC_SUN_RAY);
+  };
+
+  template <uint32_t RANDOM_SET_ID>
+  struct LIGHT_GEO {
+    static_assert(RANDOM_SET_ID < RANDOM_SET_LIGHT_GEO_COUNT, "RANDOM_SET_ID is out of bounds");
+
+    static constexpr RandomTarget RAY           = RANDOM_SET_ELEMENT(LIGHT_GEO_RAY);
+    static constexpr RandomTarget RESAMPLING    = RANDOM_SET_ELEMENT(LIGHT_GEO_RESAMPLING);
+    static constexpr RandomTarget TREE_PREPASS  = RANDOM_SET_ELEMENT(LIGHT_GEO_TREE_PREPASS);
+    static constexpr RandomTarget TREE_POSTPASS = RANDOM_SET_ELEMENT(LIGHT_GEO_TREE_POSTPASS);
+  };
+
+  template <uint32_t RANDOM_SET_ID>
+  struct BSDF {
+    static_assert(RANDOM_SET_ID < RANDOM_SET_BSDF_COUNT, "RANDOM_SET_ID is out of bounds");
+
+    static constexpr RandomTarget REFLECTION = RANDOM_SET_ELEMENT(BSDF_REFLECTION);
+    static constexpr RandomTarget DIFFUSE    = RANDOM_SET_ELEMENT(BSDF_DIFFUSE);
+    static constexpr RandomTarget REFRACTION = RANDOM_SET_ELEMENT(BSDF_REFRACTION);
+    static constexpr RandomTarget RESAMPLING = RANDOM_SET_ELEMENT(BSDF_RESAMPLING);
+    static constexpr RandomTarget OPACITY    = RANDOM_SET_ELEMENT(BSDF_OPACITY);
+  };
+
+} typedef RandomSet;
 
 ////////////////////////////////////////////////////////////////////
 // Literature
@@ -142,8 +149,11 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 // Utils
 ////////////////////////////////////////////////////////////////////
 
+#define RANDOM_MAX (__uint_as_float(0x3F7FFFFFu))
+#define RANDOM_MIN (0.0f)
+
 __device__ float random_saturate(const float random) {
-  return fminf(fmaxf(random, 0.0f), 1.0f - 8.0f * eps);
+  return fminf(fmaxf(random, RANDOM_MIN), RANDOM_MAX);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -299,9 +309,8 @@ __device__ uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
 // Warning: The lowest bit is always 0 for these random numbers.
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint2
-  quasirandom_sequence_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  uint32_t dimension_index = target + depth * QUASI_RANDOM_TARGET_COUNT;
+__device__ uint2 random_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+  uint32_t dimension_index = target + depth * RANDOM_TARGET_COUNT;
 
   uint2 quasi = random_sobol(sequence_id, dimension_index);
 
@@ -314,39 +323,36 @@ __device__ uint2
   return quasi;
 }
 
-__device__ float2
-  quasirandom_sequence_2D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  const uint2 quasi = quasirandom_sequence_2D_base(target, pixel, sequence_id, depth);
+__device__ float2 random_2D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+  const uint2 quasi = random_2D_base(target, pixel, sequence_id, depth);
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
 
-__device__ uint32_t
-  quasirandom_sequence_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  return quasirandom_sequence_2D_base(target, pixel, sequence_id, depth).x;
+__device__ uint32_t random_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+  return random_2D_base(target, pixel, sequence_id, depth).x;
 }
 
-__device__ float quasirandom_sequence_1D_base_float(
-  const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  return random_uint32_t_to_float(quasirandom_sequence_1D_base(target, pixel, sequence_id, depth));
+__device__ float random_1D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+  return random_uint32_t_to_float(random_1D_base(target, pixel, sequence_id, depth));
 }
 
-__device__ float quasirandom_sequence_1D(const uint32_t target, const ushort2 pixel) {
-  return quasirandom_sequence_1D_base_float(target, pixel, device.state.sample_id, device.state.depth);
-}
-
-// This is a global version that is constant within a given frame.
-__device__ float quasirandom_sequence_1D_global(const uint32_t target) {
-  return quasirandom_sequence_1D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
-}
-
-__device__ float2 quasirandom_sequence_2D(const uint32_t target, const ushort2 pixel) {
-  return quasirandom_sequence_2D_base_float(target, pixel, device.state.sample_id, device.state.depth);
+__device__ float random_1D(const uint32_t target, const ushort2 pixel) {
+  return random_1D_base_float(target, pixel, device.state.sample_id, device.state.depth);
 }
 
 // This is a global version that is constant within a given frame.
-__device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
-  return quasirandom_sequence_2D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
+__device__ float random_1D_global(const uint32_t target) {
+  return random_1D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
+}
+
+__device__ float2 random_2D(const uint32_t target, const ushort2 pixel) {
+  return random_2D_base_float(target, pixel, device.state.sample_id, device.state.depth);
+}
+
+// This is a global version that is constant within a given frame.
+__device__ float2 random_2D_global(const uint32_t target) {
+  return random_2D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
 }
 
 __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {

@@ -26,13 +26,13 @@ __device__ float ior_decompress(const uint32_t compressed_ior) {
   return ((__uint_as_float(0x3F800000u | (compressed_ior << 15)) - 1.0f) * 2.0f) + 1.0f;
 }
 
-__device__ float ior_stack_interact(const float ior, const uint32_t pixel, const IORStackMethod method) {
+__device__ float ior_stack_interact(DeviceIORStack& stack, const float ior, const IORStackMethod method) {
   uint32_t current_stack;
   if (method == IOR_STACK_METHOD_RESET) {
     current_stack = 0;
   }
   else {
-    current_stack = device.ptrs.ior_stack[pixel];
+    current_stack = stack;
   }
 
   float out_ior = ior;
@@ -51,7 +51,7 @@ __device__ float ior_stack_interact(const float ior, const uint32_t pixel, const
     out_ior = ior_decompress(compressed_ior);
   }
 
-  device.ptrs.ior_stack[pixel] = current_stack;
+  stack = current_stack;
 
   return out_ior;
 }

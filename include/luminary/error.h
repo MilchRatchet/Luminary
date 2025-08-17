@@ -79,6 +79,21 @@ typedef uint64_t LuminaryResult;
 #define LUMINARY_ERROR_PREVIOUS_ERROR (10ull)
 
 /*
+ * Error due to a debug condition being violated.
+ */
+#define LUMINARY_ERROR_DEBUG_ASSERT (11ull)
+
+/*
+ * Error due to embedded data missing.
+ */
+#define LUMINARY_ERROR_MISSING_DATA (12ull)
+
+/*
+ * Error due to specifying an invalid device.
+ */
+#define LUMINARY_ERROR_INVALID_DEVICE (13ull)
+
+/*
  * Error was propagated from an internal function returning an error.
  */
 #define LUMINARY_ERROR_PROPAGATED (0x8000000000000000ull)

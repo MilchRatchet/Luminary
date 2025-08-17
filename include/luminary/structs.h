@@ -21,6 +21,18 @@
 #include <luminary/api_utils.h>
 
 ////////////////////////////////////////////////////////////////////
+// Host
+////////////////////////////////////////////////////////////////////
+
+#define LUMINARY_HOST_CREATE_INFO_DEVICE_MASK_ALL_DEVICES (0xFFFFFFFF)
+
+struct LuminaryHostCreateInfo {
+  /// A bitmask to define which device should be enabled. Any bits
+  /// above the number of available devices are ignored.
+  uint32_t device_mask;
+} typedef LuminaryHostCreateInfo;
+
+////////////////////////////////////////////////////////////////////
 // General
 ////////////////////////////////////////////////////////////////////
 
@@ -40,8 +52,6 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t height;
   uint32_t max_ray_depth;
   uint32_t bridge_max_num_vertices;
-  uint32_t bridge_num_ris_samples;
-  uint32_t light_num_ris_samples;
   uint32_t undersampling;
   uint32_t supersampling;
   LuminaryShadingMode shading_mode;
@@ -53,6 +63,9 @@ LUMINARY_API struct LuminaryRendererSettings {
 } typedef LuminaryRendererSettings;
 
 LUMINARY_API struct LuminaryDeviceInfo {
+  bool is_main_device;
+  bool is_unavailable;
+  bool is_enabled;
   char name[256];
   size_t memory_size;
   size_t allocated_memory_size;
@@ -234,10 +247,8 @@ struct LuminarySky {
   float multiscattering_factor;
   uint32_t hdri_dim;
   uint32_t hdri_samples;
-  LuminaryVec3 hdri_origin;
   bool aerial_perspective;
   LuminaryRGBF constant_color;
-  bool ambient_sampling;
   LuminarySkyMode mode;
 } typedef LuminarySky;
 

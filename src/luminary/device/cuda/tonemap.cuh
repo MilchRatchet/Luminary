@@ -200,7 +200,7 @@ __device__ RGBF
   pixel.g *= device.camera.exposure;
   pixel.b *= device.camera.exposure;
 
-  const float grain = device.camera.film_grain * (random_grain_mask(x, y) - 0.5f) * fminf(1.0f, device.state.sample_id);
+  const float grain = device.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 
   pixel.r = fmaxf(0.0f, pixel.r + grain);
   pixel.g = fmaxf(0.0f, pixel.g + grain);

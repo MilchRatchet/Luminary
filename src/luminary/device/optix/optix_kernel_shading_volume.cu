@@ -17,51 +17,52 @@ extern "C" __global__ void __raygen__optix() {
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
   if (LIGHTS_ARE_PRESENT == false)
     return;
-#endif
+#endif /* OPTIX_ENABLE_GEOMETRY_DL */
 
-  const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
-  const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_VOLUME];
-  const uint32_t task_id     = TASK_ID;
+  const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
+  const uint32_t task_id    = TASK_ID;
 
   if (task_id >= task_count)
     return;
 
-  const uint32_t offset       = get_task_address(task_offset + task_id);
-  DeviceTask task             = task_load(offset);
-  const TriangleHandle handle = triangle_handle_load(offset);
+  const uint32_t task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+  const DeviceTask task            = task_load(task_base_address);
 
-  const VolumeType volume_type = VOLUME_HIT_TYPE(handle.instance_id);
+  const VolumeType volume_type = VolumeType(task.volume_id);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  if (((task.state & STATE_FLAG_DELTA_PATH) == 0) || (!device.ocean.triangle_light_contribution && volume_type == VOLUME_TYPE_OCEAN))
+  if (volume_should_do_geometry_direct_lighting(volume_type, task.state) == false)
     return;
-#endif
+#endif /* OPTIX_ENABLE_GEOMETRY_DL */
 
-  const float depth    = trace_depth_load(offset);
-  const uint32_t pixel = get_pixel_id(task.index);
-
-  task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+#ifdef OPTIX_ENABLE_SKY_DL
+  if (volume_should_do_sky_direct_lighting(volume_type, task.state) == false)
+    return;
+#endif /* OPTIX_ENABLE_SKY_DL */
 
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-#ifdef OPTIX_ENABLE_SKY_DL
-  GBufferData data = volume_generate_g_buffer(task, handle.instance_id, pixel, volume);
-#endif
+  const DeviceTaskTrace trace = task_trace_load(task_base_address);
+
+  MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
 
   RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
 #ifdef OPTIX_ENABLE_GEOMETRY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_geometry_bridges(task, volume_type, volume));
-#endif
+  accumulated_light = add_color(accumulated_light, direct_lighting_geometry(ctx, task.index));
+#endif /* OPTIX_ENABLE_GEOMETRY_DL */
+
+  DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
 #ifdef OPTIX_ENABLE_SKY_DL
-  accumulated_light = add_color(accumulated_light, direct_lighting_sun_phase(data, task.index));
-  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(data, task.index));
-#endif
+  volume_sample_sky_dl_initial_vertex(ctx, task.index, throughput);
 
-  const RGBF record = load_RGBF(device.ptrs.records + pixel);
+  accumulated_light = add_color(accumulated_light, direct_lighting_sun(ctx, task.index));
+  accumulated_light = add_color(accumulated_light, direct_lighting_ambient(ctx, task.index));
+#endif /* OPTIX_ENABLE_SKY_DL */
 
-  accumulated_light = mul_color(accumulated_light, record);
+  accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
+  const uint32_t pixel = get_pixel_id(task.index);
   write_beauty_buffer_indirect(accumulated_light, pixel);
 }

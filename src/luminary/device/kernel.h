@@ -6,9 +6,8 @@
 struct Device typedef Device;
 
 enum CUDAKernelType {
-  CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS,
-  CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS,
-  CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS,
+  CUDA_KERNEL_TYPE_TASKS_CREATE,
+  CUDA_KERNEL_TYPE_TASKS_SORT,
   CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS,
   CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG,
   CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT,
@@ -47,6 +46,7 @@ enum CUDAKernelType {
   CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4,
   CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4,
   CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4,
+  CUDA_KERNEL_TYPE_BUFFER_ADD,
 
   CUDA_KERNEL_TYPE_COUNT
 } typedef CUDAKernelType;
@@ -56,6 +56,7 @@ struct CUDAKernel {
   CUkernel cuda_kernel;
   uint32_t shared_memory_size;
   size_t param_size;
+  uint32_t default_block_count;
 } typedef CUDAKernel;
 
 DEVICE_CTX_FUNC LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type);

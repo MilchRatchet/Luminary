@@ -5,7 +5,15 @@
 #include <string.h>
 #include <time.h>
 
+// TODO: Let Mandarin Duck have its own embedded files.
+void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
+
 #define DISPLAY_MIN_FRAME_TIME_NS 16666666  // Nanoseconds frametime at 60 FPS
+#define DISPLAY_SCREEN_MARGIN 10
+
+#define DISPLAY_SPLASHSCREEN_WIDTH 640
+#define DISPLAY_SPLASHSCREEN_HEIGHT 180
+#define DISPLAY_SPLASHSCREEN_DATA_OFFSET 0x8A
 
 static uint32_t __num_displays = 0;
 
@@ -17,6 +25,45 @@ static void _display_handle_resize(Display* display) {
   display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
   display->buffer      = display->sdl_surface->pixels;
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
+}
+
+static void _display_handle_display_change(Display* display) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  int display_count;
+  SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+
+  if (display_count == 0) {
+    crash_message("No displays available.");
+  }
+
+  SDL_DisplayID curr_display_id = SDL_GetDisplayForWindow(display->sdl_window);
+
+  // If we get an invalid ID, just return and hope that we can just continue.
+  if (curr_display_id == 0) {
+    warn_message("Window is not present in a valid screen.");
+    return;
+  }
+
+  SDL_Rect rect;
+  for (uint32_t display_index = 0; display_index < (uint32_t) display_count; display_index++) {
+    if (displays[display_index] != curr_display_id)
+      continue;
+
+    SDL_GetDisplayUsableBounds(displays[display_index], &rect);
+    break;
+  }
+
+  rect.w = rect.w - 2 * DISPLAY_SCREEN_MARGIN;
+  rect.h = rect.h - 2 * DISPLAY_SCREEN_MARGIN;
+
+  display->screen_width  = (uint32_t) rect.w;
+  display->screen_height = (uint32_t) rect.h;
+
+  uint32_t width  = min(display->width, display->screen_width);
+  uint32_t height = min(display->height, display->screen_height);
+
+  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
 }
 
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
@@ -50,14 +97,14 @@ static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const 
 
   const bool alt_down = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
 
-  return (mouse_hovers_background && !alt_down) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+  return (mouse_hovers_background && !alt_down && !display->is_maximized) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
 }
 
 static void _display_set_hittest(Display* display, bool enable) {
   SDL_SetWindowHitTest(display->sdl_window, (SDL_HitTest) enable ? _display_sdl_hittestcallback : 0, (void*) display);
 }
 
-void display_create(Display** _display, uint32_t width, uint32_t height) {
+void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution) {
   MD_CHECK_NULL_ARGUMENT(_display);
 
   if (__num_displays == 0) {
@@ -71,45 +118,26 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   LUM_FAILURE_HANDLE(host_malloc(&display, sizeof(Display)));
   memset(display, 0, sizeof(Display));
 
-  display->show_ui = true;
+  display->show_ui                = true;
+  display->sync_render_resolution = sync_render_resolution;
 
-  SDL_Rect rect;
-  SDL_Rect screen_size;
-
-  int display_count;
-  SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
-
-  if (display_count == 0) {
-    crash_message("No displays available.");
-  }
-
-  SDL_GetDisplayUsableBounds(displays[0], &rect);
-  SDL_GetDisplayBounds(displays[0], &screen_size);
-
-  // Add some margin to the usable bounds.
-  const uint32_t margin = 5;
-
-  rect.w = rect.w - 2 * margin;
-  rect.h = rect.h - 2 * margin;
-
-  rect.w = min(rect.w, (int) width);
-  rect.h = min(rect.h, (int) height);
+  uint32_t initial_window_width  = (int) width;
+  uint32_t initial_window_height = (int) height;
 
   // Make sure that the aspect ratio is maintained.
   const float aspect_ratio = ((float) width) / ((float) height);
 
-  rect.w = rect.h * aspect_ratio;
-
-  info_message("Size: %d %d", rect.w, rect.h);
+  initial_window_width = initial_window_height * aspect_ratio;
 
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetStringProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "MandarinDuck - Using Luminary");
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
-  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, rect.w);
-  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, rect.h);
+  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, initial_window_width);
+  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, initial_window_height);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
   SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, false);
+  SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
 
   display->sdl_window = SDL_CreateWindowWithProperties(sdl_properties);
 
@@ -121,6 +149,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 
   SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
+  _display_handle_display_change(display);
   _display_handle_resize(display);
 
   keyboard_state_create(&display->keyboard_state);
@@ -141,6 +170,17 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   display_set_mouse_visible(display, display->show_ui);
 
   display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
+
+  uint8_t* splash_screen_data;
+  int64_t splash_screen_size;
+  uint64_t info;
+  ceb_access("SplashScreen.bmp", (void**) &splash_screen_data, &splash_screen_size, &info);
+
+  if (info || splash_screen_size < (DISPLAY_SPLASHSCREEN_WIDTH * DISPLAY_SPLASHSCREEN_HEIGHT * 3 + DISPLAY_SPLASHSCREEN_DATA_OFFSET)) {
+    crash_message("Splash screen is corrupted. Luminary needs to be rebuild. Ceb Error Code: %zu", info);
+  }
+
+  display->splash_screen = (const uint32_t*) (splash_screen_data + DISPLAY_SPLASHSCREEN_DATA_OFFSET);
 
   *_display = display;
 }
@@ -201,16 +241,35 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
       case SDL_EVENT_QUIT:
         *exit_requested = true;
         break;
+      case SDL_EVENT_WINDOW_SHOWN:
+      case SDL_EVENT_WINDOW_HIDDEN:
+      case SDL_EVENT_WINDOW_EXPOSED:
+      case SDL_EVENT_WINDOW_MOVED:
+        break;
       case SDL_EVENT_WINDOW_RESIZED:
         _display_handle_resize(display);
         *dirty = true;
+        break;
+      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        break;
+      case SDL_EVENT_WINDOW_MINIMIZED:
+      case SDL_EVENT_WINDOW_MAXIMIZED:
+      case SDL_EVENT_WINDOW_RESTORED:
         break;
       case SDL_EVENT_WINDOW_MOUSE_ENTER:
         break;
       case SDL_EVENT_WINDOW_MOUSE_LEAVE:
         mouse_state_invalidate(display->mouse_state);
         break;
+      case SDL_EVENT_WINDOW_FOCUS_GAINED:
+      case SDL_EVENT_WINDOW_FOCUS_LOST:
+        break;
       case SDL_EVENT_WINDOW_HIT_TEST:
+        break;
+      case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+        _display_handle_display_change(display);
+        break;
+      case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
         break;
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP:
@@ -226,8 +285,15 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
       case SDL_EVENT_MOUSE_WHEEL:
         mouse_state_update_wheel(display->mouse_state, event.wheel);
         break;
+      case SDL_EVENT_CLIPBOARD_UPDATE:
+        break;
       case SDL_EVENT_DROP_FILE:
         _display_handle_drop_event(file_drop_array, event.drop);
+        break;
+      case SDL_EVENT_DROP_TEXT:
+      case SDL_EVENT_DROP_BEGIN:
+      case SDL_EVENT_DROP_COMPLETE:
+      case SDL_EVENT_DROP_POSITION:
         break;
       default:
         warn_message("Unhandled SDL event type: %u.", event.type);
@@ -539,6 +605,54 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
   }
 }
 
+void display_handle_maximize(Display* display, LuminaryHost* host, bool reinstate_position) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  uint32_t width;
+  uint32_t height;
+  uint32_t x;
+  uint32_t y;
+
+  if (display->is_maximized) {
+    width  = display->unmaximize_width;
+    height = display->unmaximize_height;
+
+    x = display->unmaximize_x;
+    y = display->unmaximize_y;
+  }
+  else {
+    // Store the current size so we can restore it later again.
+    display->unmaximize_width  = display->width;
+    display->unmaximize_height = display->height;
+
+    width  = display->screen_width;
+    height = display->screen_height;
+
+    SDL_GetWindowPosition(display->sdl_window, (int*) &display->unmaximize_x, (int*) &display->unmaximize_y);
+
+    x = SDL_WINDOWPOS_CENTERED;
+    y = SDL_WINDOWPOS_CENTERED;
+  }
+
+  display->is_maximized = !display->is_maximized;
+
+  display_resize(display, width, height);
+
+  if (reinstate_position)
+    SDL_SetWindowPosition(display->sdl_window, (int) x, (int) y);
+
+  if (display->sync_render_resolution) {
+    LuminaryRendererSettings settings;
+    LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+    if (settings.width != width || settings.height != height) {
+      settings.width  = width;
+      settings.height = height;
+      LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
+    }
+  }
+}
+
 static void _display_render_output(Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -548,7 +662,23 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
 
   if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID) {
     for (uint32_t y = 0; y < display->height; y++) {
-      memset(display->buffer + y * display->pitch, 0xFF, sizeof(uint8_t) * 4 * display->width);
+      uint32_t* dst = (uint32_t*) (display->buffer + y * display->pitch);
+      for (uint32_t x = 0; x < display->width; x++) {
+        dst[x] = MD_COLOR_WINDOW_BACKGROUND;
+      }
+    }
+
+    // Render the splash screen, but only if the display is large enough.
+    if (display->width >= DISPLAY_SPLASHSCREEN_WIDTH && display->height >= DISPLAY_SPLASHSCREEN_HEIGHT) {
+      uint32_t splash_screen_x = (display->width - DISPLAY_SPLASHSCREEN_WIDTH) >> 1;
+      uint32_t splash_screen_y = (display->height - DISPLAY_SPLASHSCREEN_HEIGHT) >> 1;
+
+      for (uint32_t y = 0; y < DISPLAY_SPLASHSCREEN_HEIGHT; y++) {
+        uint32_t* dst = (uint32_t*) (display->buffer + (splash_screen_y + y) * display->pitch);
+        for (uint32_t x = 0; x < DISPLAY_SPLASHSCREEN_WIDTH; x++) {
+          dst[splash_screen_x + x] = display->splash_screen[(DISPLAY_SPLASHSCREEN_HEIGHT - y - 1) * DISPLAY_SPLASHSCREEN_WIDTH + x];
+        }
+      }
     }
 
     return;
@@ -589,6 +719,16 @@ void display_update(Display* display) {
   SDL_SetCursor(display->sdl_cursors[display->selected_cursor]);
 
   SDL_UpdateWindowSurface(display->sdl_window);
+}
+
+void display_resize(Display* display, uint32_t width, uint32_t height) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  width  = min(display->screen_width, width);
+  height = min(display->screen_height, height);
+
+  // Display width and height will be updated through a resize event
+  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
 }
 
 void display_destroy(Display** display) {

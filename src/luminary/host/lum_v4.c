@@ -364,6 +364,7 @@ static LuminaryResult parse_sky_settings(Sky* sky, char* line) {
     /* HDRIDIM_ */
     case 6867225564446606408u:
       sscanf(value, "%u\n", &sky->hdri_dim);
+      sky->hdri_dim = (sky->hdri_dim > 0) ? sky->hdri_dim : 1;
       break;
     /* HDRISAMP */
     case 5786352922209174600u:
@@ -375,7 +376,8 @@ static LuminaryResult parse_sky_settings(Sky* sky, char* line) {
       break;
     /* HDRIORIG */
     case 5136727350478783560u:
-      sscanf(value, "%f %f %f\n", &sky->hdri_origin.x, &sky->hdri_origin.y, &sky->hdri_origin.z);
+      // Legacy
+      // sscanf(value, "%f %f %f\n", &sky->hdri_origin.x, &sky->hdri_origin.y, &sky->hdri_origin.z);
       break;
     /* COLORCON */
     case 5642802878915301187u:

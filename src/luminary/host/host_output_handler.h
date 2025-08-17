@@ -2,6 +2,7 @@
 #define LUMINARY_HOST_OUTPUT_HANDLER_H
 
 #include "mutex.h"
+#include "output_descriptor.h"
 #include "utils.h"
 
 struct OutputObject {
@@ -11,6 +12,7 @@ struct OutputObject {
   uint32_t reference_count;
   OutputDescriptor descriptor;
   uint32_t promise_reference;
+  void* data;
 } typedef OutputObject;
 
 struct OutputPromise {

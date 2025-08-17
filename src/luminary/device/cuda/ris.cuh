@@ -1,171 +1,172 @@
 #ifndef CU_RIS_H
 #define CU_RIS_H
 
-#include "light.cuh"
 #include "math.cuh"
 #include "random.cuh"
 #include "utils.cuh"
-#include "volume_utils.cuh"
-
-#if defined(SHADING_KERNEL) && !defined(VOLUME_KERNEL)
 
 ////////////////////////////////////////////////////////////////////
 // Literature
 ////////////////////////////////////////////////////////////////////
 
-// [Bit20]
-// B. Bitterli, C. Wyman, M. Pharr, P. Shirley, A. Lefohn, W. Jarosz,
-// "Spatiotemporal reservoir resampling for real-time ray tracing with dynamic direct lighting",
-// ACM Transactions on Graphics (Proceedings of SIGGRAPH), 39(4), 2020.
+// [Cik22]
+// E. Ciklabakkal, A. Gruson, I. Georgiev, D. Nowrouzezahrai, T. Hachisuka, "Single-pass stratified importance resampling",
+// Computer Graphics Forum (Proceedings of EGSR), 2022
 
-// [Wym21]
-// C. Wyman, A. Panteleev, "Rearchitecting Spatiotemporal Resampling for Production",
-// High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
+// For light tree based technique, we stratify the RIS light tree random number dimensions using 1D latin hypercube sampling
+// to achieve the desired ordered stratification. The other dimensions are entirely dependent on this first dimension so it makes no
+// sense to apply any further stratification for those within RIS.
+__device__ float ris_transform_stratum(const uint32_t index, const uint32_t num_samples, const float random) {
+  const float section_length = 1.0f / num_samples;
 
-__device__ TriangleHandle ris_sample_light(
-  const GBufferData data, const ushort2 pixel, const uint32_t bsdf_sample_light_key, const vec3 bsdf_sample_ray,
-  const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
-  TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
-
-  float sum_weight = 0.0f;
-
-  selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
-  selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
-  selected_dist          = 1.0f;
-  selected_is_refraction = false;
-
-  const int reservoir_size = (IS_PRIMARY_RAY) ? device.settings.light_num_ris_samples : 1;
-
-  // Don't allow triangles to sample themselves.
-  const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
-
-  ////////////////////////////////////////////////////////////////////
-  // Initialize reservoir with an initial sample
-  ////////////////////////////////////////////////////////////////////
-
-  TriangleHandle bsdf_sample_handle = blocked_handle;
-  if (bsdf_sample_light_key != HIT_TYPE_LIGHT_BSDF_HINT) {
-    bsdf_sample_handle = device.ptrs.light_tree_tri_handle_map[bsdf_sample_light_key];
-  }
-
-  if (!triangle_handle_equal(bsdf_sample_handle, blocked_handle)) {
-    const DeviceTransform trans = load_transform(bsdf_sample_handle.instance_id);
-
-    float dist;
-    const TriangleLight triangle_light = light_load(bsdf_sample_handle, data.position, bsdf_sample_ray, trans, dist);
-    const float solid_angle            = light_get_solid_angle(triangle_light, data.position);
-
-    if (dist < FLT_MAX && solid_angle > 0.0f) {
-      RGBF light_color = light_get_color(triangle_light);
-
-      bool is_refraction;
-      const RGBF bsdf_weight = bsdf_evaluate(data, bsdf_sample_ray, BSDF_SAMPLING_GENERAL, is_refraction);
-      light_color            = mul_color(light_color, bsdf_weight);
-
-      const float target_pdf = color_importance(light_color);
-
-      const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, bsdf_sample_ray);
-
-      float mis_weight;
-      if (reservoir_size > 0) {
-        const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_light_key);
-        const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
-
-        // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
-        mis_weight = bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf
-                     / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
-      }
-      else {
-        mis_weight = 1.0f / bsdf_sample_pdf;
-      }
-
-      const float weight = target_pdf * mis_weight;
-
-      sum_weight += weight;
-
-      selected_handle        = bsdf_sample_handle;
-      selected_light_color   = (target_pdf > 0.0f) ? scale_color(light_color, 1.0f / target_pdf) : get_color(0.0f, 0.0f, 0.0f);
-      selected_ray           = bsdf_sample_ray;
-      selected_dist          = dist;
-      selected_is_refraction = initial_is_refraction;
-    }
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Resample NEE samples
-  ////////////////////////////////////////////////////////////////////
-
-  float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING, pixel);
-
-  for (int i = 0; i < reservoir_size; i++) {
-    const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + i, pixel);
-
-    float light_tree_pdf;
-    DeviceTransform trans;
-    const TriangleHandle light_handle = light_tree_query(data, light_tree_random, light_tree_pdf, trans);
-
-    if (triangle_handle_equal(light_handle, blocked_handle))
-      continue;
-
-    uint3 light_uv_packed;
-    TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
-
-    const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + i, pixel);
-
-    vec3 ray;
-    float dist, solid_angle;
-    light_load_sample_finalize(triangle_light, light_uv_packed, data.position, ray_random, ray, dist, solid_angle);
-
-    if (dist == FLT_MAX || solid_angle == 0.0f)
-      continue;
-
-    RGBF light_color = light_get_color(triangle_light);
-
-    bool is_refraction;
-    const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
-    light_color            = mul_color(light_color, bsdf_weight);
-    const float target_pdf = color_importance(light_color);
-
-    if (target_pdf == 0.0f)
-      continue;
-
-    const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
-    const float one_over_nee_sample_pdf = solid_angle / ((float) reservoir_size * light_tree_pdf);
-
-    const float mis_weight =
-      one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
-
-    const float weight = target_pdf * mis_weight;
-
-    sum_weight += weight;
-
-    const float resampling_probability = weight / sum_weight;
-
-    if (resampling_random < resampling_probability) {
-      selected_handle        = light_handle;
-      selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
-      selected_ray           = ray;
-      selected_dist          = dist;
-      selected_is_refraction = is_refraction;
-
-      resampling_random = resampling_random / resampling_probability;
-    }
-    else {
-      resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
-    }
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
-  ////////////////////////////////////////////////////////////////////
-
-  // Selected light color already includes 1 / target_pdf.
-  selected_light_color = scale_color(selected_light_color, sum_weight);
-
-  UTILS_CHECK_NANS(pixel, selected_light_color);
-
-  return selected_handle;
+  return (index + random) * section_length;
 }
-#endif /* SHADING_KERNEL && !VOLUME_KERNEL */
+
+__device__ float2 ris_transform_stratum_2D(const uint32_t index, const uint32_t num_samples, const float2 random) {
+  return make_float2(ris_transform_stratum(index, num_samples, random.x), random.y);
+}
+
+#define RIS_COLLECT_SAMPLE_COUNT
+
+struct RISReservoir {
+  float sum_weight;
+  float selected_target;
+  float random;
+#ifdef RIS_COLLECT_SAMPLE_COUNT
+  uint32_t num_samples;
+#endif  // RIS_COLLECT_SAMPLE_COUNT
+} typedef RISReservoir;
+
+__device__ void ris_reservoir_reset(RISReservoir& reservoir) {
+  reservoir.sum_weight      = 0.0f;
+  reservoir.selected_target = 0.0f;
+
+#ifdef RIS_COLLECT_SAMPLE_COUNT
+  reservoir.num_samples = 0;
+#endif  // RIS_COLLECT_SAMPLE_COUNT
+}
+
+__device__ RISReservoir ris_reservoir_init(const float random) {
+  RISReservoir reservoir;
+
+  reservoir.random = random;
+
+  ris_reservoir_reset(reservoir);
+
+  return reservoir;
+}
+
+__device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float target, const float sampling_weight) {
+  const float weight = target * sampling_weight;
+
+  reservoir.sum_weight += weight;
+
+#ifdef RIS_COLLECT_SAMPLE_COUNT
+  reservoir.num_samples++;
+#endif  // RIS_COLLECT_SAMPLE_COUNT
+
+  if (weight == 0.0f)
+    return false;
+
+  const float resampling_probability = weight / reservoir.sum_weight;
+
+  if (resampling_probability == 0.0f)
+    return false;
+
+  const bool sample_accepted = (reservoir.random < resampling_probability);
+
+  reservoir.selected_target = (sample_accepted) ? target : reservoir.selected_target;
+  const float random_shift  = (sample_accepted) ? 0.0f : resampling_probability;
+  const float random_scale  = (sample_accepted) ? resampling_probability : 1.0f - resampling_probability;
+
+  reservoir.random = random_saturate((reservoir.random - random_shift) / random_scale);
+
+  return sample_accepted;
+}
+
+__device__ float ris_reservoir_get_sampling_weight(const RISReservoir reservoir) {
+  return (reservoir.selected_target > 0.0f) ? reservoir.sum_weight / reservoir.selected_target : 0.0f;
+}
+
+__device__ float ris_reservoir_get_sampling_prob(const RISReservoir reservoir) {
+  return (reservoir.sum_weight > 0.0f) ? reservoir.selected_target / reservoir.sum_weight : 1.0f;
+}
+
+struct RISAggregator {
+  float sum_weight;
+} typedef RISAggregator;
+
+struct RISSampleHandle {
+  float resampling_probability;
+  float target;
+} typedef RISSampleHandle;
+
+struct RISLane {
+  float selected_target;
+  float random;
+} typedef RISLane;
+
+__device__ void ris_aggregator_reset(RISAggregator& aggregator) {
+  aggregator.sum_weight = 0.0f;
+}
+
+__device__ RISAggregator ris_aggregator_init(void) {
+  RISAggregator aggregator;
+
+  ris_aggregator_reset(aggregator);
+
+  return aggregator;
+}
+
+__device__ RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggregator, const float target, const float sampling_weight) {
+  const float weight = target * sampling_weight;
+
+  aggregator.sum_weight += weight;
+
+  RISSampleHandle handle;
+  handle.resampling_probability = (weight > 0.0f) ? weight / aggregator.sum_weight : 0.0f;
+  handle.target                 = target;
+
+  return handle;
+}
+
+__device__ void ris_lane_reset(RISLane& lane) {
+  lane.selected_target = 0.0f;
+}
+
+__device__ RISLane ris_lane_init(const float random) {
+  RISLane lane;
+
+  lane.random = random;
+
+  ris_lane_reset(lane);
+
+  return lane;
+}
+
+__device__ bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample) {
+  const float resampling_probability = sample.resampling_probability;
+
+  if (resampling_probability == 0.0f)
+    return false;
+
+  const bool sample_accepted = (lane.random < resampling_probability);
+
+  lane.selected_target     = (sample_accepted) ? sample.target : lane.selected_target;
+  const float random_shift = (sample_accepted) ? 0.0f : resampling_probability;
+  const float random_scale = (sample_accepted) ? resampling_probability : 1.0f - resampling_probability;
+
+  lane.random = random_saturate((lane.random - random_shift) / random_scale);
+
+  return sample_accepted;
+}
+
+__device__ float ris_lane_get_sampling_weight(const RISLane lane, const RISAggregator aggregator) {
+  return (lane.selected_target > 0.0f) ? aggregator.sum_weight / lane.selected_target : 0.0f;
+}
+
+__device__ float ris_lane_get_sampling_prob(const RISLane lane, const RISAggregator aggregator) {
+  return (aggregator.sum_weight > 0.0f) ? (lane.selected_target / aggregator.sum_weight) : 0.0f;
+}
 
 #endif /* CU_RIS_H */

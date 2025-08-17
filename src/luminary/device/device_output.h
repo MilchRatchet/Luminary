@@ -4,6 +4,7 @@
 #include "device_callback.h"
 #include "device_memory.h"
 #include "device_utils.h"
+#include "vault_object.h"
 
 struct Device typedef Device;
 
@@ -13,15 +14,19 @@ struct Device typedef Device;
 struct DeviceOutputRequest {
   bool queued;
   STAGING void* buffer;
+  VaultObject* buffer_object;
   OutputRequestProperties props;
 } typedef DeviceOutputRequest;
 
 struct DeviceOutput {
+  bool recurring_outputs_enabled;
   uint32_t width;
   uint32_t height;
   CUevent event_output_ready;
   CUevent event_output_finished;
+  uint32_t buffer_allocation_count;
   STAGING void* buffers[DEVICE_OUTPUT_BUFFER_COUNT];
+  VaultObject* buffer_objects[DEVICE_OUTPUT_BUFFER_COUNT];
   uint32_t buffer_index;
   DEVICE ARGB8* device_buffer;
   CUhostFn registered_callback_func;
@@ -31,12 +36,13 @@ struct DeviceOutput {
   RGBF color_correction;
   AGXCustomParams agx_params;
   LuminaryFilter filter;
-  bool output_is_dirty;
+  bool recurring_output_is_dirty;
 } typedef DeviceOutput;
 
 DEVICE_CTX_FUNC LuminaryResult device_output_create(DeviceOutput** output);
+LuminaryResult device_output_get_recurring_enabled(DeviceOutput* output, bool* recurring_enabled);
 LuminaryResult device_output_set_output_dirty(DeviceOutput* output);
-DEVICE_CTX_FUNC LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height);
+DEVICE_CTX_FUNC LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutputProperties properties);
 DEVICE_CTX_FUNC LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camera* camera);
 DEVICE_CTX_FUNC LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProperties props);
 DEVICE_CTX_FUNC LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data);

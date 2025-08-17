@@ -10,9 +10,8 @@ struct CUDAKernelConfig {
 } typedef CUDAKernelConfig;
 
 static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
-  [CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS]         = {.name = "generate_trace_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS]          = {.name = "balance_trace_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS]      = {.name = "postprocess_trace_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_CREATE]                 = {.name = "tasks_create", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_SORT]                   = {.name = "tasks_sort", .param_size = 0},
   [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]       = {.name = "geometry_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG] = {.name = "geometry_process_tasks_debug", .param_size = 0},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT]         = {.name = "bsdf_generate_ss_lut", .param_size = sizeof(KernelArgsBSDFGenerateSSLUT)},
@@ -59,11 +58,11 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "camera_post_lens_flare_ghosts", .param_size = sizeof(KernelArgsCameraPostLensFlareGhosts)},
   [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO] =
     {.name = "camera_post_lens_flare_halo", .param_size = sizeof(KernelArgsCameraPostLensFlareHalo)},
-  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4]      = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
-  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]       = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
-  [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] = {
-    .name       = "omm_gather_array_format_4",
-    .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)}};
+  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4] = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
+  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]  = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
+  [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] =
+    {.name = "omm_gather_array_format_4", .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)},
+  [CUDA_KERNEL_TYPE_BUFFER_ADD] = {.name = "buffer_add", .param_size = sizeof(KernelArgsBufferAdd)}};
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 
 LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type) {
@@ -90,7 +89,8 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
   CUDA_FAILURE_HANDLE(
     cuKernelGetAttribute((int*) &shared_memory_size, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, (*kernel)->cuda_kernel, device->cuda_device));
 
-  (*kernel)->shared_memory_size = shared_memory_size;
+  (*kernel)->shared_memory_size  = shared_memory_size;
+  (*kernel)->default_block_count = device->properties.optimal_block_count;
 
   return LUMINARY_SUCCESS;
 }
@@ -103,7 +103,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream) {
   launch_config.blockDimX      = THREADS_PER_BLOCK;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
-  launch_config.gridDimX       = BLOCKS_PER_GRID;
+  launch_config.gridDimX       = kernel->default_block_count;
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
   launch_config.sharedMemBytes = kernel->shared_memory_size;
@@ -124,7 +124,7 @@ LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CU
   launch_config.blockDimX      = THREADS_PER_BLOCK;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
-  launch_config.gridDimX       = BLOCKS_PER_GRID;
+  launch_config.gridDimX       = kernel->default_block_count;
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
   launch_config.sharedMemBytes = kernel->shared_memory_size;

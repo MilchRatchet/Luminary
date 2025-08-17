@@ -24,6 +24,8 @@ enum ElementButtonImage {
   ELEMENT_BUTTON_IMAGE_FOCUS,
   ELEMENT_BUTTON_IMAGE_SYNC,
   ELEMENT_BUTTON_IMAGE_REGION,
+  ELEMENT_BUTTON_IMAGE_ERROR,
+  ELEMENT_BUTTON_IMAGE_STAR,
   ELEMENT_BUTTON_IMAGE_COUNT
 } typedef ElementButtonImage;
 
@@ -47,6 +49,7 @@ struct ElementButtonArgs {
   uint32_t hover_color;
   uint32_t press_color;
   const char* tooltip_text;
+  bool is_not_interactive;
 } typedef ElementButtonArgs;
 
 bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args);

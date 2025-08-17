@@ -1,6 +1,5 @@
 #include "device_manager.h"
 
-#include "ceb.h"
 #include "device_structs.h"
 #include "device_utils.h"
 #include "host/internal_host.h"
@@ -23,6 +22,15 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
 
     if (!success)
       return LUMINARY_SUCCESS;
+
+    if (entry.deferring_func) {
+      bool defer_execution;
+      __FAILURE_HANDLE(entry.deferring_func(device_manager, entry.args, &defer_execution));
+      if (defer_execution) {
+        __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+        continue;
+      }
+    }
 
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(device_manager->queue_wall_time));
@@ -56,6 +64,41 @@ static bool _device_manager_queue_entry_equal_operator(QueueEntry* left, QueueEn
 ////////////////////////////////////////////////////////////////////
 // Internal utility functions
 ////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _device_manager_select_main_device(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
+
+  DeviceArch max_arch      = DEVICE_ARCH_UNKNOWN;
+  size_t max_memory        = 0;
+  uint32_t selected_device = 0xFFFFFFFF;
+
+  for (uint32_t device_id = 0; device_id < num_devices; device_id++) {
+    const Device* device = device_manager->devices[device_id];
+
+    if (device->state != DEVICE_STATE_ENABLED)
+      continue;
+
+    if ((device->properties.arch > max_arch) || (device->properties.arch == max_arch && device->properties.memory_size > max_memory)) {
+      max_arch   = device->properties.arch;
+      max_memory = device->properties.memory_size;
+
+      selected_device = device_id;
+    }
+  }
+
+  if (selected_device == 0xFFFFFFFF) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "No device could be selected as the main device.");
+  }
+
+  device_manager->main_device_index = selected_device;
+
+  __FAILURE_HANDLE(device_register_as_main(device_manager->devices[device_manager->main_device_index]));
+
+  return LUMINARY_SUCCESS;
+}
 
 static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManager* device_manager, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(device_manager);
@@ -141,7 +184,15 @@ static LuminaryResult _device_manager_handle_device_render_continue(DeviceManage
 
   Device* device = device_manager->devices[data->common.device_index];
 
-  __FAILURE_HANDLE(device_continue_render(device, &device_manager->sample_count, data));
+  bool callback_is_valid = false;
+  __FAILURE_HANDLE(device_validate_render_callback(device, data, &callback_is_valid));
+
+  if (callback_is_valid == false)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(device_finish_render_iteration(device, &device_manager->sample_count, data));
+  __FAILURE_HANDLE(device_handle_result_sharing(device, device_manager->result_interface));
+  __FAILURE_HANDLE(device_continue_render(device));
 
   return LUMINARY_SUCCESS;
 }
@@ -174,6 +225,12 @@ static LuminaryResult _device_manager_handle_device_render_finished(DeviceManage
 
   Device* device = device_manager->devices[data->common.device_index];
 
+  if (device->state != DEVICE_STATE_ENABLED)
+    return LUMINARY_SUCCESS;
+
+  if (device->state_abort && device->is_main_device == false)
+    return LUMINARY_SUCCESS;
+
   __FAILURE_HANDLE(device_update_render_time(device, data));
   __FAILURE_HANDLE(sample_time_set_time(device_manager->sample_time, data->common.device_index, device->renderer->last_time));
 
@@ -202,7 +259,7 @@ static void _device_manager_render_finished_callback(DeviceRenderCallbackData* d
   }
 }
 
-static LuminaryResult _device_manager_handle_device_output(DeviceManager* device_manager, DeviceOutputCallbackData* data) {
+static LuminaryResult _device_manager_handle_device_output_queue_work(DeviceManager* device_manager, DeviceOutputCallbackData* data) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
@@ -211,26 +268,38 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
   __FAILURE_HANDLE(device_renderer_get_render_time(device->renderer, data->render_event_id, &data->descriptor.meta_data.time));
   __FAILURE_HANDLE(host_queue_output_copy_from_device(device_manager->host, data->descriptor));
 
+  // The host is now the owner of the handle.
+  data->descriptor.data_handle = (VaultHandle*) 0;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_handle_device_output_clear_work(DeviceManager* device_manager, DeviceOutputCallbackData* data) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(data);
+
+  // If we skipped execution, it is our job to destroy the handle, else the handle would be destroyed by the host.
+  if (data->descriptor.data_handle != (VaultHandle*) 0) {
+    __FAILURE_HANDLE(vault_handle_destroy(&data->descriptor.data_handle));
+  }
+
   return LUMINARY_SUCCESS;
 }
 
 static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
-  // Ignore callbacks if we are shutting down.
-  if (data->common.device_manager->is_shutdown)
-    return;
-
   // Don't output aborted outputs unless it is the first output.
-  if (data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output)
-    return;
+  const bool skip_execution =
+    data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output;
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
 
   entry.name                  = "Handle Device Output";
-  entry.function              = (QueueEntryFunction) _device_manager_handle_device_output;
-  entry.clear_func            = (QueueEntryFunction) 0;
+  entry.function              = (QueueEntryFunction) _device_manager_handle_device_output_queue_work;
+  entry.clear_func            = (QueueEntryFunction) _device_manager_handle_device_output_clear_work;
   entry.args                  = (void*) data;
   entry.queuer_cannot_execute = true;
+  entry.skip_execution        = skip_execution;
 
   LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
 
@@ -243,6 +312,21 @@ static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
 ////////////////////////////////////////////////////////////////////
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _device_manager_handle_scene_updates_deferred_work(DeviceManager* device_manager, void* args, bool* defer_execution) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  LUM_UNUSED(args);
+
+  Device* device = device_manager->devices[device_manager->main_device_index];
+
+  uint32_t renderer_status;
+  __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
+
+  *defer_execution = (renderer_status & DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE) != 0;
+
+  return LUMINARY_SUCCESS;
+}
 
 static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceManager* device_manager, void* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
@@ -318,7 +402,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     Sky sky;
     __FAILURE_HANDLE_CRITICAL(scene_get(scene, &sky, SCENE_ENTITY_SKY));
 
-    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky));
+    Camera camera;
+    __FAILURE_HANDLE_CRITICAL(scene_get(scene, &camera, SCENE_ENTITY_CAMERA));
+
+    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky, &camera));
     __FAILURE_HANDLE_CRITICAL(device_build_sky_hdri(device_manager->devices[device_manager->main_device_index], device_manager->sky_hdri));
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
@@ -368,7 +455,11 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       __FAILURE_HANDLE_CRITICAL(device_allocate_work_buffers(device));
     }
 
-    // TODO: Reallocate buffers on all devices
+    uint32_t width;
+    uint32_t height;
+    __FAILURE_HANDLE(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
+
+    __FAILURE_HANDLE(device_result_interface_set_pixel_count(device_manager->result_interface, width, height))
   }
 
   if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
@@ -413,6 +504,9 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
 
+      if (device->state != DEVICE_STATE_ENABLED)
+        continue;
+
       __FAILURE_HANDLE_CRITICAL(device_update_sample_count(device, &device_manager->sample_count));
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
       __FAILURE_HANDLE_CRITICAL(device_clear_lighting_buffers(device));
@@ -430,9 +524,67 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
   return LUMINARY_SUCCESS;
 }
 
+struct DeviceManagerEnableDeviceArgs {
+  uint32_t device_id;
+  bool enable;
+} typedef DeviceManagerEnableDeviceArgs;
+
+static LuminaryResult _device_manager_enable_device_clear_work(DeviceManager* device_manager, DeviceManagerEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerEnableDeviceArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_enable_device_queue_work(DeviceManager* device_manager, DeviceManagerEnableDeviceArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  Device* device = device_manager->devices[args->device_id];
+
+  if (device->state == DEVICE_STATE_UNAVAILABLE && args->enable) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Tried to enable an unavailable device.");
+  }
+
+  const bool integration_dirty = ((device->state == DEVICE_STATE_ENABLED) == args->enable);
+
+  bool select_new_main_device = false;
+
+  if (device->is_main_device && args->enable == false) {
+    __FAILURE_HANDLE(device_unregister_as_main(device));
+    select_new_main_device = true;
+  }
+
+  __FAILURE_HANDLE(device_set_enable(device, args->enable));
+
+  if (select_new_main_device) {
+    __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
+  }
+
+  if (integration_dirty == false)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(scene_set_dirty_flags(device_manager->scene_device, SCENE_DIRTY_FLAG_INTEGRATION));
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name              = "Update device scene";
+  entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.deferring_func    = (QueueEntryDeferringFunction) _device_manager_handle_scene_updates_deferred_work;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = true;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 struct DeviceManagerSetOutputPropertiesArgs {
-  uint32_t width;
-  uint32_t height;
+  LuminaryOutputProperties properties;
 } typedef DeviceManagerSetOutputPropertiesArgs;
 
 static LuminaryResult _device_manager_set_output_properties_clear_work(
@@ -452,7 +604,7 @@ static LuminaryResult _device_manager_set_output_properties_queue_work(
 
   Device* device = device_manager->devices[device_manager->main_device_index];
 
-  __FAILURE_HANDLE(device_update_output_properties(device, args->width, args->height));
+  __FAILURE_HANDLE(device_update_output_properties(device, args->properties));
 
   return LUMINARY_SUCCESS;
 }
@@ -510,8 +662,11 @@ static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, 
 
     for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
       __FAILURE_HANDLE(device_update_mesh(device, args->meshes[mesh_id]));
-      __FAILURE_HANDLE(light_tree_update_cache_mesh(device_manager->light_tree, args->meshes[mesh_id]));
     }
+  }
+
+  for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
+    __FAILURE_HANDLE(light_tree_update_cache_mesh(device_manager->light_tree, args->meshes[mesh_id]));
   }
 
   return LUMINARY_SUCCESS;
@@ -567,54 +722,29 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
   __CHECK_NULL_ARGUMENT(device_manager);
 
   ////////////////////////////////////////////////////////////////////
-  // Load CUBIN
-  ////////////////////////////////////////////////////////////////////
-
-  uint64_t info = 0;
-
-  void* cuda_kernels_data;
-  int64_t cuda_kernels_data_length;
-  ceb_access("cuda_kernels.cubin", &cuda_kernels_data, &cuda_kernels_data_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load cuda_kernels cubin. Luminary was not compiled correctly.");
-  }
-
-  // Tells CUDA that we keep the cubin data unchanged which allows CUDA to not create a copy.
-  CUlibraryOption library_option = CU_LIBRARY_BINARY_IS_PRESERVED;
-
-  CUDA_FAILURE_HANDLE(cuLibraryLoadData(&device_manager->cuda_library, cuda_kernels_data, 0, 0, 0, &library_option, 0, 1));
-
-  ////////////////////////////////////////////////////////////////////
-  // Gather library content
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t kernel_count;
-  CUDA_FAILURE_HANDLE(cuLibraryGetKernelCount(&kernel_count, device_manager->cuda_library));
-
-  CUkernel* kernels;
-  __FAILURE_HANDLE(host_malloc(&kernels, sizeof(CUkernel) * kernel_count));
-
-  CUDA_FAILURE_HANDLE(cuLibraryEnumerateKernels(kernels, kernel_count, device_manager->cuda_library));
-
-  for (uint32_t kernel_id = 0; kernel_id < kernel_count; kernel_id++) {
-    const char* kernel_name;
-    CUDA_FAILURE_HANDLE(cuKernelGetName(&kernel_name, kernels[kernel_id]));
-
-    log_message("CUDA Kernel: %s", kernel_name);
-  }
-
-  __FAILURE_HANDLE(host_free(&kernels));
-
-  ////////////////////////////////////////////////////////////////////
-  // Compile kernels
+  // Load CUBINs for each present architecture
   ////////////////////////////////////////////////////////////////////
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_compile_kernels(device_manager->devices[device_id], device_manager->cuda_library));
+    Device* device = device_manager->devices[device_id];
+
+    __FAILURE_HANDLE(device_library_add(device_manager->library, device->properties.major, device->properties.minor));
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Compile kernels
+  ////////////////////////////////////////////////////////////////////
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    Device* device = device_manager->devices[device_id];
+
+    CUlibrary cuda_library;
+    __FAILURE_HANDLE(device_library_get(device_manager->library, device->properties.major, device->properties.minor, &cuda_library));
+
+    __FAILURE_HANDLE(device_compile_kernels(device, cuda_library));
   }
 
   return LUMINARY_SUCCESS;
@@ -651,39 +781,11 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_select_main_device(DeviceManager* device_manager) {
-  __CHECK_NULL_ARGUMENT(device_manager);
-
-  uint32_t num_devices;
-  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
-
-  DeviceArch max_arch      = DEVICE_ARCH_UNKNOWN;
-  size_t max_memory        = 0;
-  uint32_t selected_device = 0;
-
-  for (uint32_t device_id = 0; device_id < num_devices; device_id++) {
-    const Device* device = device_manager->devices[device_id];
-
-    if ((device->properties.arch > max_arch) || (device->properties.arch == max_arch && device->properties.memory_size > max_memory)) {
-      max_arch   = device->properties.arch;
-      max_memory = device->properties.memory_size;
-
-      selected_device = device_id;
-    }
-  }
-
-  device_manager->main_device_index = selected_device;
-
-  __FAILURE_HANDLE(device_register_as_main(device_manager->devices[device_manager->main_device_index]));
-
-  return LUMINARY_SUCCESS;
-}
-
 ////////////////////////////////////////////////////////////////////
 // API functions
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host) {
+LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host, DeviceManagerCreateInfo info) {
   __CHECK_NULL_ARGUMENT(_device_manager);
   __CHECK_NULL_ARGUMENT(host);
 
@@ -695,18 +797,25 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
 
   __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
 
+  __FAILURE_HANDLE(device_library_create(&device_manager->library));
+
   int32_t device_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
 
   __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
 
   for (int32_t device_id = 0; device_id < device_count; device_id++) {
+    // Skip devices that are not supposed to be used.
+    if ((info.device_mask & (1 << device_id)) == 0)
+      continue;
+
     Device* device;
     __FAILURE_HANDLE(device_create(&device, device_id));
 
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
 
+  __FAILURE_HANDLE(device_result_interface_create(&device_manager->result_interface));
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
   __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
@@ -780,12 +889,18 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(entry);
 
-  bool device_thread_is_running;
-  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+  // TODO: This must be guarded with a mutex for when the device manager is shutting down.
 
-  const bool skip_work = device_manager->is_shutdown || ((device_thread_is_running == false) && (entry->queuer_cannot_execute == true));
+  bool cannot_execute           = device_manager->is_shutdown;
+  bool device_thread_is_running = device_manager->is_shutdown == false;
 
-  if (skip_work) {
+  if (device_manager->is_shutdown == false) {
+    __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+
+    cannot_execute |= (device_thread_is_running == false) && (entry->queuer_cannot_execute == true);
+  }
+
+  if (cannot_execute || entry->skip_execution) {
     if (entry->clear_func) {
       __FAILURE_HANDLE(entry->clear_func(device_manager, entry->args));
     }
@@ -837,6 +952,28 @@ LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_manager_enable_device(DeviceManager* device_manager, uint32_t device_id, bool enable) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerEnableDeviceArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerEnableDeviceArgs), (void**) &args));
+
+  args->device_id = device_id;
+  args->enable    = enable;
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Enable device";
+  entry.function   = (QueueEntryFunction) _device_manager_enable_device_queue_work;
+  entry.clear_func = (QueueEntryFunction) _device_manager_enable_device_clear_work;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
@@ -848,6 +985,7 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   entry.name              = "Update device scene";
   entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
   entry.clear_func        = (QueueEntryFunction) 0;
+  entry.deferring_func    = (QueueEntryDeferringFunction) _device_manager_handle_scene_updates_deferred_work;
   entry.args              = (void*) 0;
   entry.remove_duplicates = true;
 
@@ -856,14 +994,13 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height) {
+LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, LuminaryOutputProperties properties) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
   DeviceManagerSetOutputPropertiesArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputPropertiesArgs), (void**) &args));
 
-  args->width  = width;
-  args->height = height;
+  args->properties = properties;
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
@@ -976,13 +1113,20 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
+  const uint32_t main_device_index = (*device_manager)->main_device_index;
+  __FAILURE_HANDLE(device_unload_light_tree((*device_manager)->devices[main_device_index], (*device_manager)->light_tree));
+
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
+
+  __FAILURE_HANDLE(device_result_interface_destroy(&(*device_manager)->result_interface));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
+
+  __FAILURE_HANDLE(device_library_destroy(&(*device_manager)->library));
 
   __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
   __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));

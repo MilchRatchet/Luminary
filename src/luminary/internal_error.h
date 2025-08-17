@@ -62,4 +62,21 @@
     goto __UNLOCKING_CRITICAL_LABEL;                   \
   }
 
+////////////////////////////////////////////////////////////////////
+// Debugging
+////////////////////////////////////////////////////////////////////
+
+#ifdef LUM_DEBUG
+
+#define __DEBUG_ASSERT(condition)                                                           \
+  if ((condition) == false) {                                                               \
+    __RETURN_ERROR(LUMINARY_ERROR_DEBUG_ASSERT, "Condition: " #condition " was violated."); \
+  }
+
+#else /* LUM_DEBUG */
+
+#define __DEBUG_ASSERT(condition) (void) (condition)
+
+#endif /* !LUM_DEBUG */
+
 #endif /* LUMINARY_INTERNAL_ERROR_H */

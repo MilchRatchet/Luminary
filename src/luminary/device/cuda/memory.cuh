@@ -24,108 +24,214 @@ __device__ void* triangle_get_entry_address(
 }
 
 ////////////////////////////////////////////////////////////////////
-// Task IO
+// Interthread IO
 ////////////////////////////////////////////////////////////////////
 
-__device__ void stream_uint2(const uint2* source, uint2* target) {
-  __stcs(target, __ldcs(source));
+template <typename T>
+__device__ T warp_reduce_sum(T sum) {
+  const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
+  sum += __shfl_xor_sync(mask, sum, 16);
+  sum += __shfl_xor_sync(mask, sum, 8);
+  sum += __shfl_xor_sync(mask, sum, 4);
+  sum += __shfl_xor_sync(mask, sum, 2);
+  sum += __shfl_xor_sync(mask, sum, 1);
+  return sum;
 }
 
-__device__ void stream_float(const float* source, float* target) {
-  __stcs(target, __ldcs(source));
+template <typename T>
+__device__ T warp_reduce_max(T max_value) {
+  const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 4));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 2));
+  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 1));
+  return max_value;
 }
 
-__device__ void stream_float4(const float4* source, float4* target) {
-  __stcs(target, __ldcs(source));
+template <typename T>
+__device__ T warp_reduce_prefixsum(T value) {
+  // It is important that all threads are participating. In theory, this should also work as long as all threads enter this function but
+  // then some are predicated off. However, I had issues with that. The intention now is to pass in a 0 if a thread does not want to
+  // participate.
+  const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+  // Example code to enable predicating
+  // const uint32_t mask              = __ballot_sync(0xFFFFFFFF, thread_predicate);
+  // const uint32_t rank              = __popc(mask & ((1u << thread_id_in_warp) - 1));
+
+  for (uint32_t stride = 1; stride < WARP_SIZE; stride = stride << 1) {
+    const T shuffledValue = __shfl_up_sync(0xFFFFFFFF, value, stride);
+
+    if (thread_id_in_warp >= stride)
+      value += shuffledValue;
+  }
+
+  return value;
 }
 
-__device__ void swap_trace_data(const uint32_t index0, const uint32_t index1) {
-  const uint32_t offset0 = get_task_address(index0);
+////////////////////////////////////////////////////////////////////
+// Generic Scene Data IO
+////////////////////////////////////////////////////////////////////
 
-  const float4 data0 = __ldcs(device.ptrs.tasks0 + offset0);
-  const float4 data1 = __ldcs(device.ptrs.tasks1 + offset0);
-  const float depth  = __ldcs((float*) (device.ptrs.trace_depths + offset0));
-  const uint2 handle = __ldcs((uint2*) (device.ptrs.triangle_handles + offset0));
+template <typename DATA_TYPE, typename LOAD_TYPE, typename STRIDE_TYPE = DATA_TYPE>
+__device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
+  static_assert(
+    (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)) * sizeof(LOAD_TYPE) == sizeof(DATA_TYPE), "DATA_TYPE must be a multiple of LOAD_TYPE in size.");
+  const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const STRIDE_TYPE*) src) + offset);
 
-  const uint32_t offset1 = get_task_address(index1);
-  stream_float4(device.ptrs.tasks0 + offset1, device.ptrs.tasks0 + offset0);
-  stream_float4(device.ptrs.tasks1 + offset1, device.ptrs.tasks1 + offset0);
-  stream_float((float*) (device.ptrs.trace_depths + offset1), (float*) (device.ptrs.trace_depths + offset0));
-  stream_uint2((uint2*) (device.ptrs.triangle_handles + offset1), (uint2*) (device.ptrs.triangle_handles + offset0));
+  union {
+    DATA_TYPE dst_type;
+    struct {
+      LOAD_TYPE data[sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)];
+    };
+  } converter;
 
-  __stcs(device.ptrs.tasks0 + offset1, data0);
-  __stcs(device.ptrs.tasks1 + offset1, data1);
-  __stcs((float*) (device.ptrs.trace_depths + offset1), depth);
-  __stcs((uint2*) (device.ptrs.triangle_handles + offset1), handle);
+  for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)); i++) {
+    converter.data[i] = __ldg(ptr + i);
+  }
+
+  return converter.dst_type;
 }
 
-__device__ DeviceTask task_load(const uint32_t offset) {
-  const float4 data0 = __ldcs(device.ptrs.tasks0 + offset);
-  const float4 data1 = __ldcs(device.ptrs.tasks1 + offset);
+#define load_light_tree_node(offset) load_generic<DeviceLightTreeNode, float4>(device.ptrs.light_tree_nodes, offset)
+#define load_light_tree_root() load_generic<DeviceLightTreeRootHeader, float4>(device.ptrs.light_tree_root, 0)
+#define load_light_tree_root_section(offset)                                   \
+  load_generic<DeviceLightTreeRootSection, float4, DeviceLightTreeRootHeader>( \
+    device.ptrs.light_tree_root, 1 + offset * LIGHT_TREE_NODE_SECTION_REL_SIZE)
 
-  DeviceTask task;
-  task.state    = __float_as_uint(data0.x) & 0xFFFF;
-  task.padding  = __float_as_uint(data0.x) >> 16;
-  task.index.x  = __float_as_uint(data0.y) & 0xFFFF;
-  task.index.y  = __float_as_uint(data0.y) >> 16;
-  task.origin.x = data0.z;
-  task.origin.y = data0.w;
+////////////////////////////////////////////////////////////////////
+// Task State IO
+////////////////////////////////////////////////////////////////////
 
-  task.origin.z = data1.x;
-  task.ray.x    = data1.y;
-  task.ray.y    = data1.z;
-  task.ray.z    = data1.w;
+__device__ uint32_t
+  task_address_impl(const uint32_t thread_id_in_warp, const uint32_t warp_id, const uint32_t task_id, const TaskStateBufferIndex index) {
+  constexpr uint32_t num_chunks = sizeof(DeviceTaskState) / sizeof(float4);
 
-  return task;
+  uint32_t base_address = 0;
+  base_address += thread_id_in_warp;
+  base_address += warp_id * num_chunks * WARP_SIZE;
+  base_address += task_id * NUM_WARPS * num_chunks * WARP_SIZE;
+
+  base_address += index * device.config.num_tasks_per_thread * NUM_WARPS * num_chunks * WARP_SIZE;
+
+  return base_address;
 }
 
-__device__ void task_store(const DeviceTask task, const uint32_t offset) {
-  float4 data0;
-  float4 data1;
+__device__ uint32_t task_arbitrary_warp_address(const uint32_t warp_offset, const TaskStateBufferIndex index) {
+  const uint32_t thread_id_in_warp = warp_offset & WARP_SIZE_MASK;
+  const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
+  const uint32_t task_id           = warp_offset >> WARP_SIZE_LOG;
 
-  data0.x = __uint_as_float(((uint32_t) task.state & 0xffff) | ((uint32_t) 0 << 16));
-  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
-  data0.z = task.origin.x;
-  data0.w = task.origin.y;
-
-  __stcs(device.ptrs.tasks0 + offset, data0);
-
-  data1.x = task.origin.z;
-  data1.y = task.ray.x;
-  data1.z = task.ray.y;
-  data1.w = task.ray.z;
-
-  __stcs(device.ptrs.tasks1 + offset, data1);
+  return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
 }
 
-__device__ TriangleHandle triangle_handle_load(const uint32_t offset) {
-  const uint2* data_ptr = (const uint2*) (device.ptrs.triangle_handles + offset);
+__device__ uint32_t task_get_base_address(const uint32_t task_id, const TaskStateBufferIndex index) {
+  const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+  const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
 
-  const uint2 data = __ldcs(data_ptr + 0);
-
-  TriangleHandle handle;
-  handle.instance_id = data.x;
-  handle.tri_id      = data.y;
-
-  return handle;
+  return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
 }
 
-__device__ void triangle_handle_store(const TriangleHandle handle, const uint32_t offset) {
-  uint2* data_ptr = (uint2*) (device.ptrs.triangle_handles + offset);
+template <typename DATA_TYPE, typename LOAD_TYPE>
+__device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t member_offset) {
+  const uint32_t chunk_id          = member_offset >> 4;
+  const uint32_t sub_member_offset = member_offset & 0xF;
 
-  uint2 data;
-  data.x = handle.instance_id;
-  data.y = handle.tri_id;
+  const float4* ptr = ((const float4*) device.ptrs.task_states);
 
-  __stcs(data_ptr, data);
+  ptr += base_address;
+  ptr += chunk_id * WARP_SIZE;
+
+  ptr = (const float4*) (((const uint8_t*) ptr) + sub_member_offset);
+
+  union {
+    DATA_TYPE dst;
+    struct {
+      LOAD_TYPE data[sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)];
+    };
+  } converter;
+
+  for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)); i++) {
+    converter.data[i] = __ldcs((const LOAD_TYPE*) (ptr + i * WARP_SIZE));
+  }
+
+  return converter.dst;
 }
 
-__device__ float trace_depth_load(const uint32_t offset) {
-  return __ldcs((float*) (device.ptrs.trace_depths + offset));
+template <typename DATA_TYPE, typename STORE_TYPE>
+__device__ void store_task_state(const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
+  const uint32_t chunk_id          = member_offset >> 4;
+  const uint32_t sub_member_offset = member_offset & 0xF;
+
+  float4* ptr = ((float4*) device.ptrs.task_states);
+
+  ptr += base_address;
+  ptr += chunk_id * WARP_SIZE;
+
+  ptr = (float4*) (((uint8_t*) ptr) + sub_member_offset);
+
+  union {
+    DATA_TYPE src;
+    struct {
+      STORE_TYPE data[sizeof(DATA_TYPE) / sizeof(STORE_TYPE)];
+    };
+  } converter;
+
+  converter.src = src;
+
+  for (uint32_t i = 0; i < (sizeof(DATA_TYPE) / sizeof(STORE_TYPE)); i++) {
+    __stcs((STORE_TYPE*) (ptr + i * WARP_SIZE), converter.data[i]);
+  }
 }
 
-__device__ void trace_depth_store(const float depth, const uint32_t offset) {
-  __stcs((float*) (device.ptrs.trace_depths + offset), depth);
+__device__ DeviceTask task_load(const uint32_t base_address) {
+  return load_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task));
+}
+
+__device__ DeviceTaskTrace task_trace_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result));
+}
+
+__device__ DeviceTaskThroughput task_throughput_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput));
+}
+
+// DeviceTask
+
+__device__ void task_store(const uint32_t base_address, const DeviceTask data) {
+  store_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task), data);
+}
+
+// DeviceTaskTrace
+
+__device__ void task_trace_store(const uint32_t base_address, const DeviceTaskTrace data) {
+  store_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result), data);
+}
+
+__device__ void task_trace_handle_store(const uint32_t base_address, const TriangleHandle data) {
+  store_task_state<TriangleHandle, float2>(base_address, offsetof(DeviceTaskState, trace_result.handle), data);
+}
+
+__device__ void task_trace_depth_store(const uint32_t base_address, const float data) {
+  store_task_state<float, float>(base_address, offsetof(DeviceTaskState, trace_result.depth), data);
+}
+
+__device__ void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
+  store_task_state<DeviceIORStack, float>(base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
+}
+
+// DeviceTaskThroughput
+
+__device__ void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
+  store_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput), data);
+}
+
+__device__ void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
+  store_task_state<PackedRecord, float2>(base_address, offsetof(DeviceTaskState, throughput.record), data);
+}
+
+__device__ void task_throughput_mis_payload_store(const uint32_t base_address, const PackedMISPayload data) {
+  store_task_state<PackedMISPayload, float2>(base_address, offsetof(DeviceTaskState, throughput.payload), data);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -332,41 +438,6 @@ __device__ DeviceTransform load_transform(const uint32_t offset) {
   return trans;
 }
 
-__device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
-  const float4* ptr = (float4*) (device.ptrs.light_tree_nodes + offset);
-  const float4 v0   = __ldg(ptr + 0);
-  const float4 v1   = __ldg(ptr + 1);
-  const float4 v2   = __ldg(ptr + 2);
-  const float4 v3   = __ldg(ptr + 3);
-
-  DeviceLightTreeNode node;
-
-  node.base_point.x   = v0.x;
-  node.base_point.y   = v0.y;
-  node.base_point.z   = v0.z;
-  node.exp_x          = *((int8_t*) &v0.w + 0);
-  node.exp_y          = *((int8_t*) &v0.w + 1);
-  node.exp_z          = *((int8_t*) &v0.w + 2);
-  node.exp_confidence = *((uint8_t*) &v0.w + 3);
-
-  node.child_ptr      = __float_as_uint(v1.x);
-  node.light_ptr      = __float_as_uint(v1.y);
-  node.rel_point_x[0] = __float_as_uint(v1.z);
-  node.rel_point_x[1] = __float_as_uint(v1.w);
-
-  node.rel_point_y[0] = __float_as_uint(v2.x);
-  node.rel_point_y[1] = __float_as_uint(v2.y);
-  node.rel_point_z[0] = __float_as_uint(v2.z);
-  node.rel_point_z[1] = __float_as_uint(v2.w);
-
-  node.rel_energy[0]       = __float_as_uint(v3.x);
-  node.rel_energy[1]       = __float_as_uint(v3.y);
-  node.confidence_light[0] = __float_as_uint(v3.z);
-  node.confidence_light[1] = __float_as_uint(v3.w);
-
-  return node;
-}
-
 __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
   const float4* ptr = (float4*) (device.ptrs.textures + offset);
   const float4 v0   = __ldg(ptr + 0);
@@ -390,29 +461,6 @@ __device__ Star star_load(const uint32_t offset) {
   converter.data = __ldg((float4*) (device.ptrs.stars + offset));
 
   return converter.star;
-}
-
-//===========================================================================================
-// Defaults
-//===========================================================================================
-
-__device__ GBufferData gbuffer_data_default() {
-  GBufferData data;
-
-  data.instance_id = HIT_TYPE_INVALID;
-  data.tri_id      = 0;
-  data.albedo      = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
-  data.emission    = get_color(0.0f, 0.0f, 0.0f);
-  data.normal      = get_vector(0.0f, 0.0f, 1.0f);
-  data.position    = get_vector(0.0f, 0.0f, 0.0f);
-  data.V           = get_vector(0.0f, 0.0f, 1.0f);
-  data.roughness   = 0.5f;
-  data.state       = 0;
-  data.flags       = 0;
-  data.ior_in      = 1.0f;
-  data.ior_out     = 1.0f;
-
-  return data;
 }
 
 #endif /* CU_MEMORY_H */

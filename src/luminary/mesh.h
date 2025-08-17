@@ -28,7 +28,7 @@ struct MeshInstance {
   uint32_t mesh_id;
   vec3 translation;
   vec3 scale;
-  Quaternion rotation;
+  vec3 rotation;
   bool active; /* On deletion, instances will be marked as deleted and will be overwritten when new instances get added. */
 } typedef MeshInstance;
 

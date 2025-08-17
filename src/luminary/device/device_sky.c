@@ -243,7 +243,7 @@ LuminaryResult sky_hdri_create(SkyHDRI** hdri) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky) {
+LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(sky);
 
@@ -252,18 +252,28 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky) {
   bool hdri_dirty        = false;
   __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
 
+  // Check if the camera moved
+  passive_dirty |= camera->pos.x != hdri->origin.x;
+  passive_dirty |= camera->pos.y != hdri->origin.y;
+  passive_dirty |= camera->pos.z != hdri->origin.z;
+
   if (passive_dirty || integration_dirty) {
     memcpy(&hdri->sky, sky, sizeof(Sky));
     hdri->sky_is_dirty = true;
 
-    const uint32_t width  = sky->hdri_dim;
-    const uint32_t height = sky->hdri_dim;
+    hdri->origin = camera->pos;
 
-    if (hdri->color_tex == ((Texture*) 0) || hdri->color_tex->width != width || hdri->color_tex->height != height) {
+    // A dimension of 0 can cause issues in the allocation, so we don't allow it (and why would we)
+    const uint32_t width  = max(sky->hdri_dim, 1);
+    const uint32_t height = max(sky->hdri_dim, 1);
+
+    if (hdri->color_tex == ((Texture*) 0) || hdri->width != width || hdri->height != height) {
       hdri->output_is_dirty = true;
+      hdri->width           = width;
+      hdri->height          = height;
     }
 
-    __FAILURE_HANDLE(sample_count_set(&hdri->sample_count, sky->hdri_samples));
+    __FAILURE_HANDLE(sample_count_set(&hdri->sample_count, max(sky->hdri_samples, 1)));
   }
 
   return LUMINARY_SUCCESS;
@@ -284,10 +294,11 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
 
   args.dst_color    = DEVICE_PTR(device_hdri->color_tex->memory);
   args.dst_shadow   = DEVICE_PTR(device_hdri->shadow_tex->memory);
-  args.dim          = hdri->sky.hdri_dim;
-  args.ld           = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
-  args.origin       = hdri->sky.hdri_origin;
-  args.sample_count = hdri->sky.hdri_samples;
+  args.dim          = hdri->width;
+  args.ld_color     = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
+  args.ld_shadow    = device_hdri->shadow_tex->pitch / device_hdri->shadow_tex->pixel_size;
+  args.origin       = hdri->origin;
+  args.sample_count = hdri->sample_count.end_sample_count;
 
   for (uint32_t sample_id = 0; sample_id < hdri->sky.hdri_samples; sample_id++) {
     __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_id, 0xFFFF, 0xFFFF));
@@ -295,11 +306,11 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   }
 
   __FAILURE_HANDLE(device_download2D(
-    hdri->color_tex->data, device_hdri->color_tex->memory, device_hdri->color_tex->pitch, hdri->sky.hdri_dim * sizeof(RGBAF),
-    hdri->sky.hdri_dim, device->stream_main));
+    hdri->color_tex->data, device_hdri->color_tex->memory, device_hdri->color_tex->pitch, hdri->width * sizeof(RGBAF), hdri->height,
+    device->stream_main));
   __FAILURE_HANDLE(device_download2D(
-    hdri->shadow_tex->data, device_hdri->shadow_tex->memory, device_hdri->shadow_tex->pitch, hdri->sky.hdri_dim * sizeof(float),
-    hdri->sky.hdri_dim, device->stream_main));
+    hdri->shadow_tex->data, device_hdri->shadow_tex->memory, device_hdri->shadow_tex->pitch, hdri->width * sizeof(float), hdri->height,
+    device->stream_main));
 
   device_hdri->force_device_update = true;
 
@@ -329,11 +340,11 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
 
     if (hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
       if (hdri->output_is_dirty) {
-        __FAILURE_HANDLE(texture_create(&hdri->color_tex, hdri->sky.hdri_dim, hdri->sky.hdri_dim, 1, (void*) 0, TexDataFP32, 4));
-        __FAILURE_HANDLE(texture_create(&hdri->shadow_tex, hdri->sky.hdri_dim, hdri->sky.hdri_dim, 1, (void*) 0, TexDataFP32, 1));
+        __FAILURE_HANDLE(texture_create(&hdri->color_tex, hdri->width, hdri->height, 1, (void*) 0, TexDataFP32, 4));
+        __FAILURE_HANDLE(texture_create(&hdri->shadow_tex, hdri->width, hdri->height, 1, (void*) 0, TexDataFP32, 1));
 
         __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
-        __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->pitch * sizeof(float) * hdri->shadow_tex->height));
+        __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->width * sizeof(float) * hdri->shadow_tex->height));
       }
 
       __FAILURE_HANDLE(device_sync_constant_memory(device));

@@ -1,6 +1,8 @@
 #ifndef CU_LUMINARY_OPTIX_CLOSESTHIT_H
 #define CU_LUMINARY_OPTIX_CLOSESTHIT_H
 
+#if defined(OPTIX_KERNEL)
+
 #include "optix_common.cuh"
 #include "optix_utils.cuh"
 
@@ -35,16 +37,6 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(particle_trace)() {
 }
 
 ////////////////////////////////////////////////////////////////////
-// OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE
-////////////////////////////////////////////////////////////////////
-
-extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(light_bsdf_trace)() {
-  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE);
-
-  optixSetPayloadTriangleID(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_ID, optixGetPrimitiveIndex());
-}
-
-////////////////////////////////////////////////////////////////////
 // OPTIX_SBT_OFFSET_SHADOW_TRACE
 ////////////////////////////////////////////////////////////////////
 
@@ -63,5 +55,7 @@ extern "C" __global__ void OPTIX_CLOSESTHIT_FUNC_NAME(shadow_sun_trace)() {
 
   optixSetPayloadColor(OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT, splat_color(0.0f));
 }
+
+#endif /* OPTIX_KERNEL */
 
 #endif /* CU_LUMINARY_OPTIX_CLOSESTHIT_H */

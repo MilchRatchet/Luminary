@@ -4,12 +4,14 @@ IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 ENDIF()
 
-project("Luminary" LANGUAGES C)
+project("Luminary" LANGUAGES C VERSION 1.1)
 
 set(CMAKE_C_STANDARD 11)
 
 option(DEBUG "Debug Mode" OFF)
 option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
+option(LUMINARY_KERNEL_ARCHS "Architecture to build" "")
+option(LUMINARY_FAST_KERNEL_COMPILE "Use fast Kernel compilation" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
 option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
 
@@ -55,16 +57,16 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline -Wno-deprecated-non-prototype -Wextra")
         set(CMAKE_C_FLAGS_RELEASE "/O2")
-        set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
+        set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG /DLUM_DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-deprecated-non-prototype")
         set(CMAKE_C_FLAGS_RELEASE "-O3")
-        set(CMAKE_C_FLAGS_DEBUG "-Og -g")
+        set(CMAKE_C_FLAGS_DEBUG "-Og -g -DLUM_DEBUG")
     endif()
 elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-deprecated-non-prototype")
     set(CMAKE_C_FLAGS_RELEASE "-O3")
-    set(CMAKE_C_FLAGS_DEBUG "-Og -g")
+    set(CMAKE_C_FLAGS_DEBUG "-Og -g -DLUM_DEBUG")
 else()
     message(SEND_ERROR "No flags available for C Compiler ${CMAKE_C_COMPILER_ID}.")
 endif()
@@ -89,15 +91,13 @@ endif()
 
 message("============================= Overall =============================")
 message("Debug Mode                     ||  ${DEBUG}")
-
 message("C Compiler:                    ||  ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
-
 message("C Flags:                       ||  ${CMAKE_C_FLAGS}")
 
 if (DEBUG)
-    message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
+  message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
 else()
-    message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
+  message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
 endif()
 
 #=============================================================
@@ -107,45 +107,28 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 #=============================================================
+# Configure build information for executable
+#=============================================================
+
+ADD_CUSTOM_COMMAND(
+  OUTPUT ${CMAKE_SOURCE_DIR}/git_state.h
+         ${CMAKE_SOURCE_DIR}/git_state_cmake_dummy.h # Never actually produced which causes this to always run on every build
+  COMMAND ${CMAKE_COMMAND} -DGIT_STATE_TARGET_DIR="${CMAKE_SOURCE_DIR}" -P ${CMAKE_SOURCE_DIR}/cmake/QueryGitState.cmake
+)
+
+add_custom_target(
+  GIT_STATE_HEADER
+  DEPENDS
+    ${CMAKE_SOURCE_DIR}/git_state.h
+    ${CMAKE_SOURCE_DIR}/git_state_cmake_dummy.h
+  COMMENT
+    "Target for Git State Header."
+)
+
+#=============================================================
 # Compile modules
 #=============================================================
 
 add_subdirectory(src)
-
-#=============================================================
-# Configure build information for executable
-#=============================================================
-
-set(GIT_COMMIT_DATE "Unknown")
-set(GIT_BRANCH_NAME "Unknown")
-set(GIT_COMMIT_HASH "Unknown")
-
-find_package(Git QUIET)
-if(GIT_FOUND)
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} log -1 --format=%cd
-        RESULT_VARIABLE RESULT
-        OUTPUT_VARIABLE GIT_COMMIT_DATE)
-
-    string (REGEX REPLACE "\n" ""  GIT_COMMIT_DATE ${GIT_COMMIT_DATE})
-
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
-        RESULT_VARIABLE RESULT
-        OUTPUT_VARIABLE GIT_BRANCH_NAME)
-
-    string (REGEX REPLACE "\n" ""  GIT_BRANCH_NAME ${GIT_BRANCH_NAME})
-
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
-        RESULT_VARIABLE RESULT
-        OUTPUT_VARIABLE GIT_COMMIT_HASH)
-
-    string (REGEX REPLACE "\n" ""  GIT_COMMIT_HASH ${GIT_COMMIT_HASH})
-else()
-    message(SEND_ERROR "Failed to find git.")
-endif()
-
-configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_SOURCE_DIR}/src/mandarin_duck/config.h")
 
 message("===================================================================")

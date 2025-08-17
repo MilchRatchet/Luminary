@@ -20,7 +20,7 @@ static void _subwindow_tooltip_action(Window* window, Display* display, Luminary
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.size         = (ElementSize) {.width = ELEMENT_SIZE_INVALID, .rel_width = 1.0f, .height = 24},
+    (ElementTextArgs) {.size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
                        .color        = 0xFFFFFFFF,
                        .text         = data->string,
                        .center_x     = true,

@@ -15,13 +15,21 @@ enum DeviceRendererQueueActionType {
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE,
   DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE
 } typedef DeviceRendererQueueActionType;
 
 struct DeviceRendererQueueActionMemUpdate {
-  uint32_t depth;
+  union {
+    // DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH
+    struct {
+      uint32_t depth;
+    };
+  };
+
 } typedef DeviceRendererQueueActionMemUpdate;
 
 struct DeviceRendererQueueAction {
@@ -36,15 +44,17 @@ struct DeviceRendererQueueAction {
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
 
 #define DEVICE_RENDERER_MAX_TIMED_KERNELS 256
+#define DEVICE_RENDERER_MAX_TIMED_TILES 128
 
 struct DeviceRendererKernelTimer {
   const char* name;
-  CUevent time_start;
-  CUevent time_end;
+  CUevent time_start[DEVICE_RENDERER_MAX_TIMED_TILES];
+  CUevent time_end[DEVICE_RENDERER_MAX_TIMED_TILES];
+  uint32_t num_queued_tile_executions;
 } typedef DeviceRendererKernelTimer;
 
 struct DeviceRendererPerKernelTimings {
-  ARRAY DeviceRendererKernelTimer* kernels;
+  DeviceRendererKernelTimer kernels[DEVICE_RENDERER_MAX_TIMED_KERNELS];
   uint32_t num_kernel_launches;
 } typedef DeviceRendererPerKernelTimings;
 
@@ -54,8 +64,11 @@ struct DeviceRendererPerKernelTimings {
 #define DEVICE_RENDERER_TIMING_EVENTS_MASK (DEVICE_RENDERER_TIMING_EVENTS_COUNT - 1)
 
 struct DeviceRenderer {
-  uint32_t action_ptr;
+  uint32_t tile_id;
+  bool is_rendering_first_sample;
+  ARRAY DeviceRendererQueueAction* prepass_queue;
   ARRAY DeviceRendererQueueAction* queue;
+  ARRAY DeviceRendererQueueAction* postpass_queue;
   CUhostFn registered_callback_continue_func;
   CUhostFn registered_callback_finished_func;
   DeviceCommonCallbackData common_callback_data;
@@ -72,6 +85,13 @@ struct DeviceRenderer {
   DeviceRendererPerKernelTimings kernel_times[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 } typedef DeviceRenderer;
+
+enum DeviceRendererStatusFlags {
+  DEVICE_RENDERER_STATUS_FLAGS_NONE         = 0,
+  DEVICE_RENDERER_STATUS_FLAGS_READY        = (1 << 0),
+  DEVICE_RENDERER_STATUS_FLAGS_IN_PROGRESS  = (1 << 1),
+  DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE = (1 << 2)
+} typedef DeviceRendererStatusFlags;
 
 struct DeviceRendererQueueArgs {
   uint32_t max_depth;
@@ -91,10 +111,12 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer
 DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(
   DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time);
 LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id);
+LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* status_flags);
+LuminaryResult device_renderer_get_tile_count(DeviceRenderer* renderer, Device* device, uint32_t undersampling_stage, uint32_t* tile_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 
 #endif /* LUMINARY_DEVICE_RENDERER_H */

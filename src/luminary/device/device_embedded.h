@@ -1,0 +1,17 @@
+#ifndef LUMINARY_DEVICE_EMBEDDED_H
+#define LUMINARY_DEVICE_EMBEDDED_H
+
+#include "device_utils.h"
+
+enum DeviceEmbeddedFile {
+  DEVICE_EMBEDDED_FILE_MOON_ALBEDO,
+  DEVICE_EMBEDDED_FILE_MOON_NORMAL,
+  DEVICE_EMBEDDED_FILE_BLUENOISE1D,
+  DEVICE_EMBEDDED_FILE_BLUENOISE2D,
+  DEVICE_EMBEDDED_FILE_BRIDGE_LUT,
+  DEVICE_EMBEDDED_FILE_COUNT
+} typedef DeviceEmbeddedFile;
+
+LuminaryResult device_embedded_load(DeviceEmbeddedFile file, void** data, int64_t* size);
+
+#endif /* LUMINARY_DEVICE_EMBEDDED_H */

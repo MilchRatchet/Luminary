@@ -20,6 +20,7 @@ enum OptixKernelType {
 } typedef OptixKernelType;
 
 struct OptixKernel {
+  bool available;
   OptixModule module;
   OptixProgramGroup groups[OPTIX_KERNEL_NUM_GROUPS];
   OptixPipeline pipeline;

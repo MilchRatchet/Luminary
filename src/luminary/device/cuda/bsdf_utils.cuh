@@ -1,22 +1,19 @@
 #ifndef CU_BSDF_UTILS_H
 #define CU_BSDF_UTILS_H
 
+#include "material.cuh"
 #include "math.cuh"
 #include "utils.cuh"
 
 struct BSDFRayContext {
   vec3 H;
-  RGBF f0_conductor;
-  RGBF f0_glossy;
-  RGBF fresnel_conductor;
-  RGBF fresnel_glossy;
   float fresnel_dielectric;
   float NdotH;
   float NdotL;
   float NdotV;
-  float refraction_index;
   float HdotL;
   float HdotV;
+  float roughness4;
   bool is_refraction;
 };
 
@@ -30,11 +27,32 @@ struct BSDFDirectionalAlbedos {
 
 enum BSDFMaterial { BSDF_CONDUCTOR = 0, BSDF_GLOSSY = 1, BSDF_DIELECTRIC = 2 } typedef BSDFMaterial;
 
-struct BSDFSampleInfo {
+template <MaterialType TYPE>
+struct BSDFSampleInfo {};
+
+template <>
+struct BSDFSampleInfo<MATERIAL_GEOMETRY> {
+  vec3 ray;
   RGBF weight;
   bool is_transparent_pass;
   bool is_microfacet_based;
-} typedef BSDFSampleInfo;
+};
+
+template <>
+struct BSDFSampleInfo<MATERIAL_VOLUME> {
+  vec3 ray;
+  static constexpr RGBF weight              = {1.0f, 1.0f, 1.0f};
+  static constexpr bool is_transparent_pass = false;
+  static constexpr bool is_microfacet_based = false;
+};
+
+template <>
+struct BSDFSampleInfo<MATERIAL_PARTICLE> {
+  vec3 ray;
+  RGBF weight;
+  static constexpr bool is_transparent_pass = false;
+  static constexpr bool is_microfacet_based = false;
+};
 
 enum BSDFSamplingHint {
   BSDF_SAMPLING_GENERAL               = 0,
@@ -43,29 +61,31 @@ enum BSDFSamplingHint {
   BSDF_SAMPLING_MICROFACET_REFRACTION = 3
 };
 
-#if !defined(PHASE_KERNEL)
-__device__ bool bsdf_is_pass_through_ray(const bool is_transparent_pass, const float ior_in, const float ior_out) {
-  return is_transparent_pass && (ior_in == ior_out);
-}
-#else  /* !PHASE_KERNEL */
-__device__ bool bsdf_is_pass_through_ray(const bool is_transparent_pass, const float ior_in, const float ior_out) {
+template <MaterialType TYPE>
+__device__ bool bsdf_is_pass_through_ray(const MaterialContext<TYPE> ctx, const BSDFSampleInfo<TYPE> info) {
   return false;
 }
-#endif /* PHASE_KERNEL */
+
+template <>
+__device__ bool bsdf_is_pass_through_ray<MATERIAL_GEOMETRY>(
+  const MaterialContextGeometry ctx, const BSDFSampleInfo<MATERIAL_GEOMETRY> info) {
+  const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+  return info.is_transparent_pass && ((ior == 1.0f) || (info.is_microfacet_based == false));
+}
 
 ///////////////////////////////////////////////////
 // Fresnel
 ///////////////////////////////////////////////////
 
-__device__ float bsdf_fresnel(const vec3 normal, const vec3 V, const vec3 refraction, const float index_in, const float index_out) {
+__device__ float bsdf_fresnel(const vec3 normal, const vec3 V, const vec3 refraction, const float ior) {
   const float NdotV = dot_product(V, normal);
   const float NdotT = -dot_product(refraction, normal);
 
-  const float s_pol_term1 = index_in * NdotV;
-  const float s_pol_term2 = index_out * NdotT;
+  const float s_pol_term1 = ior * NdotV;
+  const float s_pol_term2 = 1.0f * NdotT;
 
-  const float p_pol_term1 = index_in * NdotT;
-  const float p_pol_term2 = index_out * NdotV;
+  const float p_pol_term1 = ior * NdotT;
+  const float p_pol_term2 = 1.0f * NdotV;
 
   float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
   float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
@@ -146,10 +166,9 @@ __device__ float bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX
 }
 
 __device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float roughness4) {
-  if (roughness4 < 1e-8f)
-    return 0.0f;
+  const float NdotH2 = fminf(NdotH * NdotH, 1.0f);
+  const float a      = 1.0f - NdotH2 + roughness4 * NdotH2;
 
-  const float a = ((roughness4 - 1.0f) * NdotH * NdotH + 1.0f);
   return roughness4 / (PI * a * a);
 }
 
@@ -160,16 +179,17 @@ __device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float r
  *
  * [EtoT23] K. Eto and Y. Tokuyoshi, "Bounded VNDF Sampling for Smith–GGX Reflections", ACM SIGGRAPH Asia, 2023.
  */
-__device__ vec3 bsdf_microfacet_sample_normal(const GBufferData data, const float2 random) {
-  const float roughness2 = data.roughness * data.roughness;
+__device__ vec3 bsdf_microfacet_sample_normal(const MaterialContextGeometry mat_ctx, const float2 random) {
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const vec3 v = normalize_vector(get_vector(roughness2 * data.V.x, roughness2 * data.V.y, data.V.z));
+  const vec3 v = normalize_vector(get_vector(roughness2 * mat_ctx.V.x, roughness2 * mat_ctx.V.y, mat_ctx.V.z));
 
   const float phi       = 2.0f * PI * random.x;
-  const float s         = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
+  const float s         = 1.0f + sqrtf(mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
   const float s2        = s * s;
-  const float k         = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
+  const float k         = (1.0f - roughness4) * s2 / (s2 + roughness4 * mat_ctx.V.z * mat_ctx.V.z);
   const float b         = k * v.z;
   const float z         = (1.0f - random.y) * (1.0f + b) - b;
   const float sin_theta = sqrtf(__saturatef(1.0f - z * z));
@@ -180,68 +200,68 @@ __device__ vec3 bsdf_microfacet_sample_normal(const GBufferData data, const floa
   return normalize_vector(get_vector(sampled.x * roughness2, sampled.y * roughness2, sampled.z));
 }
 
-__device__ float bsdf_microfacet_pdf(const GBufferData data, const float NdotH, const float NdotV) {
+__device__ float bsdf_microfacet_pdf(const MaterialContextGeometry mat_ctx, const float NdotH, const float NdotV) {
   // NdotV == data.V.z
-  const float roughness2 = data.roughness * data.roughness;
+  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
   const float D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
 
-  const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
-  const float t    = sqrtf(len2 + data.V.z * data.V.z);
+  const float len2 = roughness4 * (mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
+  const float t    = sqrtf(len2 + mat_ctx.V.z * mat_ctx.V.z);
 
-  const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
+  const float s  = 1.0f + sqrtf(mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
   const float s2 = s * s;
-  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
+  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * mat_ctx.V.z * mat_ctx.V.z);
   return D / (2.0f * (k * NdotV + t));
 }
 
 __device__ vec3 bsdf_microfacet_sample(
-  const GBufferData data, const ushort2 pixel, const uint32_t target = QUASI_RANDOM_TARGET_BSDF_MICROFACET,
-  const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
+  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
+  const uint32_t depth = device.state.depth) {
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
-  if (data.roughness > 0.0f) {
-    const float2 random = quasirandom_sequence_2D_base_float(target, pixel, sequence_id, depth);
-    H                   = bsdf_microfacet_sample_normal(data, random);
+  if (roughness > 0.0f) {
+    const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
+    H                   = bsdf_microfacet_sample_normal(mat_ctx, random);
   }
 
   return H;
 }
 
-__device__ float bsdf_microfacet_evaluate(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+__device__ float bsdf_microfacet_evaluate(
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float NdotH, const float NdotL, const float NdotV) {
+  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // D * G2 * NdotL / (4.0f * NdotL * NdotV)
   // G2 contains (4 * NdotL * NdotV) in the denominator
   return D * G2 * NdotL;
 }
 
-__device__ float bsdf_microfacet_evaluate_sampled_microfacet(const GBufferData data, const float NdotL, const float NdotV) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
-  const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+__device__ float bsdf_microfacet_evaluate_sampled_microfacet(
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float NdotL, const float NdotV) {
+  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // NdotV == data.V.z
 
-  const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
-  const float t    = sqrtf(len2 + data.V.z * data.V.z);
+  const float len2 = roughness4 * (mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
+  const float t    = sqrtf(len2 + mat_ctx.V.z * mat_ctx.V.z);
 
-  const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
+  const float s  = 1.0f + sqrtf(mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
   const float s2 = s * s;
-  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
+  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * mat_ctx.V.z * mat_ctx.V.z);
 
   // G2 contains (4 * NdotL * NdotV) in the denominator
   return 2.0f * (k * NdotV + t) * G2 * NdotL;
 }
 
-__device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+__device__ float bsdf_microfacet_evaluate_sampled_diffuse(
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float NdotH, const float NdotL, const float NdotV) {
+  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // G2 contains (4 * NdotL * NdotV) in the denominator
   return D * G2 * PI;
@@ -252,10 +272,9 @@ __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data
  *
  * [DupB23] J. Dupuy and A. Benyoub, "Sampling Visible GGX Normals with Spherical Caps", 2023. arXiv:2306.05044
  */
-__device__ vec3 bsdf_microfacet_refraction_sample_normal(const GBufferData data, const float2 random) {
-  const float roughness2 = data.roughness * data.roughness;
-
-  const vec3 v = normalize_vector(get_vector(roughness2 * data.V.x, roughness2 * data.V.y, data.V.z));
+__device__ vec3
+  bsdf_microfacet_refraction_sample_normal(const MaterialContextGeometry mat_ctx, const float roughness2, const float2 random) {
+  const vec3 v = normalize_vector(get_vector(roughness2 * mat_ctx.V.x, roughness2 * mat_ctx.V.y, mat_ctx.V.z));
 
   const float phi       = 2.0f * PI * random.x;
   const float z         = (1.0f - random.y) * (1.0f + v.z) - v.z;
@@ -268,12 +287,10 @@ __device__ vec3 bsdf_microfacet_refraction_sample_normal(const GBufferData data,
 }
 
 __device__ float bsdf_microfacet_refraction_pdf(
-  const GBufferData data, const float NdotH, const float NdotV, const float NdotL, const float HdotV, const float HdotL,
-  const float refraction_index) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G1         = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float NdotH, const float NdotV, const float NdotL, const float HdotV,
+  const float HdotL, const float refraction_index) {
+  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const float G1 = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
 
   float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
@@ -283,24 +300,24 @@ __device__ float bsdf_microfacet_refraction_pdf(
 }
 
 __device__ vec3 bsdf_microfacet_refraction_sample(
-  const GBufferData data, const ushort2 pixel, const uint32_t target = QUASI_RANDOM_TARGET_BSDF_REFRACTION,
-  const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
+  const MaterialContextGeometry mat_ctx, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
+  const uint32_t depth = device.state.depth) {
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
-  if (data.roughness > 0.0f) {
-    const float2 random = quasirandom_sequence_2D_base_float(target, pixel, sequence_id, depth);
-    H                   = bsdf_microfacet_refraction_sample_normal(data, random);
+  if (roughness > 0.0f) {
+    const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
+    H                   = bsdf_microfacet_refraction_sample_normal(mat_ctx, roughness * roughness, random);
   }
 
   return H;
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate(
-  const GBufferData data, const float HdotL, const float HdotV, const float NdotH, const float NdotL, const float NdotV,
-  const float refraction_index) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float HdotL, const float HdotV, const float NdotH, const float NdotL,
+  const float NdotV, const float refraction_index) {
+  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
@@ -311,10 +328,8 @@ __device__ float bsdf_microfacet_refraction_evaluate(
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
-  const GBufferData data, const float HdotL, const float HdotV, const float NdotH, const float NdotL, const float NdotV,
-  const float refraction_index) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float HdotL, const float HdotV, const float NdotH, const float NdotL,
+  const float NdotV, const float refraction_index) {
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // See Heitz14.
@@ -329,11 +344,11 @@ __device__ vec3 bsdf_diffuse_sample(const float2 random) {
   return sample_ray_sphere(random.x, random.y);
 }
 
-__device__ float bsdf_diffuse_pdf(const GBufferData data, const float NdotL) {
+__device__ float bsdf_diffuse_pdf(const MaterialContextGeometry mat_ctx, const float NdotL) {
   return NdotL * (1.0f / PI);
 }
 
-__device__ float bsdf_diffuse_evaluate(const GBufferData data, const float NdotL) {
+__device__ float bsdf_diffuse_evaluate(const MaterialContextGeometry mat_ctx, const float NdotL) {
   return NdotL * (1.0f / PI);
 }
 
@@ -341,17 +356,16 @@ __device__ float bsdf_diffuse_evaluate_sampled_diffuse() {
   return 1.0f;
 }
 
-__device__ float bsdf_diffuse_evaluate_sampled_microfacet(const GBufferData data, const float NdotL, const float NdotH, const float NdotV) {
-  const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+__device__ float bsdf_diffuse_evaluate_sampled_microfacet(
+  const MaterialContextGeometry mat_ctx, const float roughness4, const float NdotL, const float NdotH, const float NdotV) {
+  const float D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
 
-  const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
-  const float t    = sqrtf(len2 + data.V.z * data.V.z);
+  const float len2 = roughness4 * (mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
+  const float t    = sqrtf(len2 + mat_ctx.V.z * mat_ctx.V.z);
 
-  const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
+  const float s  = 1.0f + sqrtf(mat_ctx.V.x * mat_ctx.V.x + mat_ctx.V.y * mat_ctx.V.y);
   const float s2 = s * s;
-  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
+  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * mat_ctx.V.z * mat_ctx.V.z);
 
   return NdotL * (2.0f * (k * NdotV + t)) / (PI * D);
 }
@@ -365,38 +379,48 @@ __device__ float bsdf_conductor_directional_albedo(const float NdotV, const floa
 }
 
 __device__ RGBF bsdf_conductor(
-  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
+  const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
-  if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (MATERIAL_IS_SUBSTRATE_OPAQUE(mat_ctx.flags) == false)
+    return splat_color(0.0f);
 
-  if ((data.flags & G_BUFFER_FLAG_METALLIC) == 0)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if ((mat_ctx.flags & MATERIAL_FLAG_METALLIC) == 0)
+    return splat_color(0.0f);
+
+  float ior = 1.0f;
+  if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
-      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
+      ss_term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_MICROFACET:
-      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
+      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(mat_ctx, ctx.roughness4, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_DIFFUSE:
-      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+      ss_term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV)
+                / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
-  const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
+  const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
-  const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_conductor, ss_term);
-  const RGBF ms_term_with_fresnel =
-    mul_color(ctx.f0_conductor, scale_color(ctx.fresnel_conductor, ((1.0f / directional_albedo) - 1.0f) * ss_term));
+  const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
+
+  const RGBF f0_conductor      = albedo;
+  const RGBF fresnel_conductor = bsdf_fresnel_schlick(f0_conductor, bsdf_shadowed_F90(f0_conductor), ctx.HdotV);
+
+  const RGBF ss_term_with_fresnel = scale_color(fresnel_conductor, ss_term);
+  const RGBF ms_term_with_fresnel = mul_color(f0_conductor, scale_color(fresnel_conductor, ((1.0f / directional_albedo) - 1.0f) * ss_term));
 
   return add_color(ss_term_with_fresnel, ms_term_with_fresnel);
 }
@@ -405,56 +429,67 @@ __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float r
   return tex2D<float>(device.bsdf_lut_glossy.handle, NdotV, roughness);
 }
 
-__device__ RGBF
-  bsdf_glossy(const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+__device__ RGBF bsdf_glossy(
+  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
+  const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
-  if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_OPAQUE)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (MATERIAL_IS_SUBSTRATE_OPAQUE(mat_ctx.flags) == false)
+    return splat_color(0.0f);
 
-  if ((data.flags & G_BUFFER_FLAG_METALLIC) != 0)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if ((mat_ctx.flags & MATERIAL_FLAG_METALLIC) != 0)
+    return splat_color(0.0f);
+
+  float ior = 1.0f;
+  if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
-      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
+      ss_term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_MICROFACET:
-      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
+      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(mat_ctx, ctx.roughness4, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_DIFFUSE:
-      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+      ss_term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV)
+                / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
   float diff_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
-      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL) * one_over_sampling_pdf;
+      diff_term = bsdf_diffuse_evaluate(mat_ctx, ctx.NdotL) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_DIFFUSE:
       diff_term = 1.0f;
       break;
     case BSDF_SAMPLING_MICROFACET:
-      diff_term = bsdf_diffuse_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotH, ctx.NdotV);
+      diff_term = bsdf_diffuse_evaluate_sampled_microfacet(mat_ctx, ctx.roughness4, ctx.NdotL, ctx.NdotH, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL)
-                  / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+      diff_term = bsdf_diffuse_evaluate(mat_ctx, ctx.NdotL)
+                  / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
-  const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
-  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, data.roughness);
+  const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
-  const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_glossy, ss_term / conductor_directional_albedo);
-  const RGBF diff_term_with_color = scale_color(opaque_color(data.albedo), diff_term * (1.0f - glossy_directional_albedo));
+  const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
+  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, roughness);
+
+  const RGBF f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
+  const RGBF fresnel_glossy = bsdf_fresnel_schlick(f0_glossy, bsdf_shadowed_F90(f0_glossy), ctx.HdotV);
+
+  const RGBF ss_term_with_fresnel = scale_color(fresnel_glossy, ss_term / conductor_directional_albedo);
+  const RGBF diff_term_with_color = scale_color(albedo, diff_term * (1.0f - glossy_directional_albedo));
 
   return add_color(ss_term_with_fresnel, diff_term_with_color);
 }
@@ -470,23 +505,26 @@ __device__ float bsdf_dielectric_directional_albedo(const float NdotV, const flo
 }
 
 __device__ RGBF bsdf_dielectric(
-  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
+  const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return splat_color(0.0f);
 
-  if ((data.flags & G_BUFFER_FLAG_BASE_SUBSTRATE_MASK) != G_BUFFER_FLAG_BASE_SUBSTRATE_TRANSLUCENT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(mat_ctx.flags) == false)
+    return splat_color(0.0f);
+
+  const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   float term;
   if (ctx.is_refraction) {
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
-        term = bsdf_microfacet_refraction_evaluate(data, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index)
+        term = bsdf_microfacet_refraction_evaluate(mat_ctx, ctx.roughness4, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ior)
                * one_over_sampling_pdf;
         break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_refraction_evaluate_sampled_microfacet(
-          data, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index);
+          mat_ctx, ctx.roughness4, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ior);
         break;
       case BSDF_SAMPLING_MICROFACET:
       case BSDF_SAMPLING_DIFFUSE:
@@ -499,31 +537,34 @@ __device__ RGBF bsdf_dielectric(
   else {
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
-        term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
+        term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
         break;
       case BSDF_SAMPLING_MICROFACET:
-        term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
+        term = bsdf_microfacet_evaluate_sampled_microfacet(mat_ctx, ctx.roughness4, ctx.NdotL, ctx.NdotV);
         break;
       case BSDF_SAMPLING_DIFFUSE:
-        term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(data, ctx.NdotL);
+        term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(mat_ctx, ctx.NdotL);
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
-        term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-               / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
+        term = bsdf_microfacet_evaluate(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotL, ctx.NdotV)
+               / bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
         break;
     };
 
     term *= ctx.fresnel_dielectric;
   }
 
-  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, data.roughness, ctx.refraction_index);
+  const RGBF albedo     = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
+  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, roughness, ior);
   term /= dielectric_directional_albedo;
 
-  if (ctx.refraction_index == 1.0f && ctx.is_refraction) {
+  if (ior == 1.0f && ctx.is_refraction) {
     // TODO: Energy conservation does not work correctly for dielectric, investigate.
     term = (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION) ? 1.0f : 0.0f;
   }
 
-  return scale_color(opaque_color(data.albedo), term);
+  return scale_color(albedo, term);
 }
 
 ///////////////////////////////////////////////////
@@ -531,15 +572,18 @@ __device__ RGBF bsdf_dielectric(
 ///////////////////////////////////////////////////
 
 __device__ RGBF bsdf_multiscattering_evaluate(
-  const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
+  const float one_over_sampling_pdf) {
+  const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx);
+
   if (ctx.is_refraction)
-    return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a);
+    return scale_color(bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf), opacity);
 
-  RGBF conductor  = bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf);
-  RGBF glossy     = bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf);
-  RGBF dielectric = bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF conductor  = bsdf_conductor(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF glossy     = bsdf_glossy(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF dielectric = bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
 
-  return scale_color(add_color(add_color(conductor, glossy), dielectric), data.albedo.a);
+  return scale_color(add_color(add_color(conductor, glossy), dielectric), opacity);
 }
 
 #endif /* CU_BSDF_UTILS_H */

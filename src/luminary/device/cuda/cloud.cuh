@@ -120,12 +120,12 @@ __device__ CloudRenderResult
     }
   }
 
-  step_count += 8.0f * quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
+  step_count += 8.0f * random_1D(RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
 
   start = fmaxf(0.0f, start);
 
   const float step_size     = dist / step_count;
-  const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
+  const float random_offset = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
   float reach               = start + (0.1f + random_offset * 0.9f) * step_size;
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
@@ -137,7 +137,7 @@ __device__ CloudRenderResult
   float hit_dist       = start;
   bool hit             = false;
 
-  const float2 ambient_r        = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CLOUD_DIR, pixel);
+  const float2 ambient_r        = random_2D(RANDOM_TARGET_CLOUD_DIR, pixel);
   const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
@@ -290,12 +290,10 @@ __device__ float clouds_render(
     if (result.hit_dist == FLT_MAX)
       break;
 
-#ifndef SHADING_KERNEL
     if (device.cloud.atmosphere_scattering) {
       color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, pixel));
       origin = add_vector(origin, scale_vector(ray, result.hit_dist - prev_start));
     }
-#endif /* SHADING_KERNEL */
 
     color         = add_color(color, mul_color(result.scattered_light, transmittance));
     transmittance = scale_color(transmittance, result.transmittance);
@@ -317,14 +315,19 @@ LUMINARY_KERNEL void cloud_process_tasks() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset         = get_task_address(i);
-    DeviceTask task          = task_load(offset);
-    float depth              = trace_depth_load(offset);
+    HANDLE_DEVICE_ABORT();
+
+    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
+    float depth              = trace.depth;
     const float sky_max_dist = world_to_sky_scale(depth);
     vec3 sky_origin          = world_to_sky_transform(task.origin);
     const uint32_t pixel     = get_pixel_id(task.index);
 
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
+    RGBF record = record_unpack(throughput.record);
     RGBF color  = get_color(0.0f, 0.0f, 0.0f);
 
     float cloud_transmittance;
@@ -335,17 +338,17 @@ LUMINARY_KERNEL void cloud_process_tasks() {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
         task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
-        task_store(task, offset);
+        task_store(task_base_address, task);
 
         if (depth != FLT_MAX) {
           // Move past the clouds
           depth -= cloud_world_offset;
-          trace_depth_store(depth, offset);
+          task_trace_depth_store(task_base_address, depth);
         }
       }
     }
 
-    store_RGBF(device.ptrs.records, pixel, record);
+    task_throughput_record_store(task_base_address, record_pack(record));
     write_beauty_buffer(color, pixel, task.state);
   }
 }

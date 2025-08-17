@@ -1,32 +1,18 @@
 #ifndef LUMINARY_DEVICE_MANAGER_H
 #define LUMINARY_DEVICE_MANAGER_H
 
-// For multi GPU support we will use cudaSetDevice and cudaGetDevice.
-// These are not multithreading compatible. Hence all device work
-// needs to be handled within one queue instead of using per device queues.
-// Use cudaLaunchHostFunc to queue more work on demand. Since this func can't do CUDA calls
-// it must be used to queue the next bounce.
-// So the queue thread launches the kernels, then waits in the queue in case of additional work coming in.
-// Once the kernels have reached a certain point, the kernels are queued again. This gives a consistent time
-// window for other work to be queued.
-
-// For shutdown of the queues I need to have a specific order:
-// The API thread calls shutdown, this creates a device shutdown task on the host queue
-// This means all currently queued host work will be done, then the device shutdown will be initialized
-// Then all the devices get to finish their queue work. Then the host finishes whatever work
-// the devices had queued for the host. Then the host finally shuts down.
-// There is one tricky part:
-// If a device task queues a host task that in return queues a device task then
-// this will not work. So when finishing the last host tasks after shutting down the
-// devices, I need to mark the devices as offline so that these host tasks know to not
-// queue a device task.
-
 #include "device.h"
 #include "device_bsdf.h"
+#include "device_library.h"
 #include "device_light.h"
+#include "device_result_interface.h"
 #include "device_sampletime.h"
 #include "device_sky.h"
 #include "thread.h"
+
+struct DeviceManagerCreateInfo {
+  uint32_t device_mask;
+} typedef DeviceManagerCreateInfo;
 
 struct DeviceManager {
   Host* host;
@@ -35,7 +21,7 @@ struct DeviceManager {
   SampleCountSlice sample_count;
   ARRAY Device** devices;
   uint32_t main_device_index;
-  CUlibrary cuda_library;
+  DeviceLibrary* library;
   Queue* work_queue;
   RingBuffer* ringbuffer;
   WallTime* queue_wall_time;
@@ -46,11 +32,13 @@ struct DeviceManager {
   SkyStars* sky_stars;
   BSDFLUT* bsdf_lut;
   SampleTime* sample_time;
+  DeviceResultInterface* result_interface;
 } typedef DeviceManager;
 
-LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
+LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host, DeviceManagerCreateInfo info);
+LuminaryResult device_manager_enable_device(DeviceManager* device_manager, uint32_t device_id, bool enable);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
-LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height);
+LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, LuminaryOutputProperties properties);
 LuminaryResult device_manager_add_output_request(DeviceManager* device_manager, OutputRequestProperties properties);
 LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Mesh** meshes, uint32_t num_meshes);
 LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const Texture** textures, uint32_t num_textures);

@@ -21,7 +21,11 @@
 #include <luminary/api_utils.h>
 
 #define log_message(fmt, ...) luminary_print_log("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define info_message(fmt, ...) luminary_print_info("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define info_message(fmt, ...)                                             \
+  {                                                                        \
+    luminary_print_info(false, fmt, ##__VA_ARGS__);                        \
+    luminary_print_log("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__); \
+  }
 #define warn_message(fmt, ...) luminary_print_warn("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define error_message(fmt, ...) luminary_print_error("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define crash_message(fmt, ...) luminary_print_crash("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
@@ -42,14 +46,14 @@ LUMINARY_API void luminary_print_log(const char* format, ...);
  * @param format Message which may contain format specifiers.
  * @param ... Additional arguments to replace the format speciefiers.
  */
-LUMINARY_API void luminary_print_info(const char* format, ...);
+LUMINARY_API void luminary_print_info(bool log, const char* format, ...);
 
 /*
  * Writes a message without a newline. This message will be overwritten by any following message.
  * @param format Message which may contain format specifiers.
  * @param ... Additional arguments to replace the format speciefiers.
  */
-LUMINARY_API void luminary_print_info_inline(const char* format, ...);
+LUMINARY_API void luminary_print_info_inline(bool log, const char* format, ...);
 
 /*
  * Writes a message in yellow text.

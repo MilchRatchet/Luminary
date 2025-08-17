@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <threads.h>
 
 // Include stdatomic later, otherwise I run into issues.
@@ -178,6 +179,8 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
 
   struct HostMemoryHeader* header = (struct HostMemoryHeader*) malloc((uint64_t) size + sizeof(struct HostMemoryHeader));
 
+  memset(header, 0, sizeof(struct HostMemoryHeader));
+
   header->magic = HOST_MEMORY_HEADER_MAGIC;
   header->size  = size;
 
@@ -253,12 +256,12 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
   const uint64_t prev_total = atomic_fetch_sub(&_host_memory_total_allocation, header->size);
   LUM_UNUSED(prev_total);
 
-  free(header);
-
 #ifdef LUMINARY_MEMORY_DEBUG
   _debug_memory_allocation_remove(*ptr, buf_name, func, line, size);
   luminary_print_log("Free    %012llu [Total: %012llu] [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
 #endif /* LUMINARY_MEMORY_DEBUG */
+
+  free(header);
 
   *ptr = (void*) 0;
 

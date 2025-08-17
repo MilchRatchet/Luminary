@@ -33,9 +33,6 @@ _Assets exported using [Replanetizer](https://github.com/RatchetModding/Replanet
 
 # About
 
->📝 Luminary underwent a major host side rework recently and features might be missing or faulty. The latest stable commit is [`3068682
-`](https://github.com/MilchRatchet/Luminary/commit/306868268a3e74995416baa6ff3f33876190d210).
-
 The goal is to build an offline renderer that achieves high quality final renders in the lowest possible render time.
 
 `Luminary` does not aim to be a production-ready renderer, instead, the feature set is kept small and only a small range of hardware is supported. There is in general no backwards compatibility with older scenes, if the renderer changes then so does the render of the scene. The focus is on a non-artist friendly user interface.
@@ -66,20 +63,22 @@ where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Arg
 
 -v, --version
         print build information and exit
+
+--device [Device ID]
+        enable a device for rendering
 ```
 
 # Building
 
 Requirements:
-- CUDA Toolkit 12.6
-- Optix 8.0 SDK
+- CUDA Toolkit 12.9
 - SDL3 and SDL3_ttf
 - Modern CMake
 - Make or Ninja
 - AVX2 compatible CPU
 - Supported Nvidia GPU (Pascal or later)
 
->📝 `zlib`, `qoi` and `Ceb` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
+>📝 `zlib`, `qoi`, `Ceb` and `OptiX` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
 ## CMake Options
 | Option                     | Description
@@ -199,3 +198,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - J. Buisine, S. Delepoulle, C. Renaud, _Firefly Removal in Monte Carlo Rendering with Adaptive Median of meaNs_, Eurographics Symposium on Rendering, 2021.
 - B. Burley, _Practical Hash-based Owen Scrambling_, Journal of Computer Graphics Techniques (JCGT), pp. 1-20, 2020.
 - A. G. M. Ahmed, _An Implementation Algorithm of 2D Sobol Sequence Fast, Elegant, and Compact_, Eurographics Symposium on Rendering, 2024.
+- E. Ciklabakkal, A. Gruson, I. Georgiev, D. Nowrouzezahrai, T. Hachisuka, _Single-pass stratified importance resampling_, Computer Graphics Forum (Proceedings of EGSR), 2022.
