@@ -12,30 +12,6 @@ find_package(SDL3_ttf REQUIRED CONFIG)
 add_executable(LuminaryMD)
 
 #=============================================================
-# Generate icon
-#=============================================================
-
-set(icon_object_file "${CMAKE_BINARY_DIR}/Icon.o")
-
-function(generate_icon_object_win32)
-  add_custom_command(
-    OUTPUT
-      ${icon_object_file}
-    COMMAND
-      windres "${CMAKE_SOURCE_DIR}/data/icons/Icon.rc" -o "${icon_object_file}"
-    DEPENDS
-      "${CMAKE_SOURCE_DIR}/data/icons/Icon.rc"
-      "${CMAKE_SOURCE_DIR}/data/icons/Icon.ico"
-    COMMENT
-      "Generating ${icon_object_file}."
-  )
-endfunction()
-
-if(WIN32)
-  generate_icon_object_win32()
-endif()
-
-#=============================================================
 # Sources
 #=============================================================
 
@@ -43,8 +19,12 @@ file(GLOB mandarin_duck_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_
 
 target_sources(LuminaryMD PRIVATE ${mandarin_duck_source_files})
 
+#=============================================================
+# Add application icon
+#=============================================================
+
 if(WIN32)
-  target_sources(LuminaryMD PRIVATE ${icon_object_file})
+  target_sources(LuminaryMD PRIVATE "${CMAKE_SOURCE_DIR}/data/icons/Icon.rc")
 endif()
 
 #=============================================================
