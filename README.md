@@ -121,15 +121,16 @@ You can build using the following commands in the main project directory:
 ```
 mkdir build
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER=clang-cl
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER=clang-cl -DLUMINARY_KERNEL_ARCHS=sm_{arch}
 cd build && ninja
 ```
 or alternatively:
 ```
 mkdir build
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER=clang-cl -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/{Version}" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER=clang-cl -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/{Version}" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64" -DLUMINARY_KERNEL_ARCHS=sm_{arch}
 cd build && ninja
 ```
+where `arch` is the device architecture to build. For example, use `sm_120` to build for consumer Blackwell GPUs.
 
 Notes:
 - It is important to use `clang-cl.exe` as the C compiler.
@@ -145,11 +146,11 @@ You need a `nvcc` compatible host compiler. Which compilers are supported can be
 
 ```
 mkdir build
-cmake -B ./build -S .
+cmake -B ./build -S . -DLUMINARY_KERNEL_ARCHS=sm_{arch}
 cd build
 make
 ```
-If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
+where `arch` is the device architecture to build. For example, use `sm_120` to build for consumer Blackwell GPUs. If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
 
 # Licence
 

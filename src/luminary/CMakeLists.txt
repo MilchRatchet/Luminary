@@ -61,6 +61,10 @@ endif()
 # Validate architectures
 #=============================================================
 
+if (NOT LUMINARY_KERNEL_ARCHS)
+  message(FATAL_ERROR "No kernel architectures were specified. Use -DLUMINARY_KERNEL_ARCHS=sm_XY to build for device architecture X.Y.")
+endif()
+
 string(REPLACE "," ";" user_specified_archs ${LUMINARY_KERNEL_ARCHS})
 
 set(kernel_archs)
