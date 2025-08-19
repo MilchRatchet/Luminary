@@ -56,7 +56,6 @@ void text_renderer_create(TextRenderer** text_renderer) {
     }
 
     TTF_SetFontHinting((*text_renderer)->fonts[font_id], TTF_HINTING_LIGHT_SUBPIXEL);
-    TTF_SetFontSDF((*text_renderer)->fonts[font_id], true);
   }
 }
 
