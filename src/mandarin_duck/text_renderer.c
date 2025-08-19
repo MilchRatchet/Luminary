@@ -6,6 +6,10 @@
 // TODO: Let Mandarin Duck have its own embedded files.
 void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
 
+// We used to use TTF_SetFontSDF(..., true) which caused the text to extrude by 8 pixels.
+// See https://github.com/libsdl-org/SDL_ttf/issues/521
+#define TEXT_PADDING (8)
+
 static const char* font_file_locations[TEXT_RENDERER_FONT_COUNT] = {
   [TEXT_RENDERER_FONT_REGULAR]  = "LuminaryFont.ttf",
   [TEXT_RENDERER_FONT_BOLD]     = "LuminaryFontBold.ttf",
@@ -13,6 +17,12 @@ static const char* font_file_locations[TEXT_RENDERER_FONT_COUNT] = {
 
 static const float font_sizes[TEXT_RENDERER_FONT_COUNT] =
   {[TEXT_RENDERER_FONT_REGULAR] = 15.0f, [TEXT_RENDERER_FONT_BOLD] = 15.0f, [TEXT_RENDERER_FONT_MATERIAL] = 25.0f};
+
+static const int32_t font_offset_x[TEXT_RENDERER_FONT_COUNT] =
+  {[TEXT_RENDERER_FONT_REGULAR] = 1, [TEXT_RENDERER_FONT_BOLD] = 1, [TEXT_RENDERER_FONT_MATERIAL] = 0};
+
+static const int32_t font_offset_y[TEXT_RENDERER_FONT_COUNT] =
+  {[TEXT_RENDERER_FONT_REGULAR] = 1, [TEXT_RENDERER_FONT_BOLD] = 1, [TEXT_RENDERER_FONT_MATERIAL] = -2};
 
 static TTF_Font* _text_renderer_load_font(const char* font_location, const float size) {
   char* font_data;
@@ -148,19 +158,16 @@ void text_renderer_render(
 
   if (center_x) {
     x = x - (width >> 1);
-    if (font_id == TEXT_RENDERER_FONT_MATERIAL) {
-      x -= 1;
-    }
+    x += font_offset_x[font_id];
   }
 
   if (center_y) {
     y = y - (height >> 1);
-    if (font_id == TEXT_RENDERER_FONT_MATERIAL) {
-      y -= 3;
-    }
+    y += font_offset_y[font_id];
   }
 
   if (text_width) {
+    width += 2 * TEXT_PADDING;
     *text_width = (uint32_t) width;
   }
 
@@ -194,6 +201,9 @@ void text_renderer_compute_size(
   int32_t width;
   int32_t height;
   TTF_GetTextSize(text_instance, &width, &height);
+
+  width += 2 * TEXT_PADDING;
+  height += 2 * TEXT_PADDING;
 
   if (text_width) {
     *text_width = (uint32_t) width;
