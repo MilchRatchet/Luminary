@@ -1938,7 +1938,10 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
   __FAILURE_HANDLE(device_free_staging(&(*device)->abort_flags));
-  __FAILURE_HANDLE(device_free_staging(&(*device)->gbuffer_meta_dst));
+
+  if ((*device)->gbuffer_meta_dst != (GBufferMetaData*) 0) {
+    __FAILURE_HANDLE(device_free_staging(&(*device)->gbuffer_meta_dst));
+  }
 
   __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));
 
