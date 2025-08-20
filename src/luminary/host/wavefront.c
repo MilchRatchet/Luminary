@@ -286,7 +286,7 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
   FILE* file = fopen(mtl_file_path_string, "r");
 
   if (!file) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Could not read material file!");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to open file *.mtl file (%s)", mtl_file_path_string);
   }
 
   // Invalidate file path string.
