@@ -29,8 +29,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     GeometryContextCreationInfo ctx_creation_info;
     ctx_creation_info.task               = task;
-    ctx_creation_info.handle             = trace.handle;
-    ctx_creation_info.ior_stack          = trace.ior_stack;
+    ctx_creation_info.trace              = trace;
     ctx_creation_info.packed_mis_payload = throughput.payload;
     ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 
@@ -90,7 +89,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       ior_stack_interact(ior_stack, new_ior, ior_set_method);
     }
 
-    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
+    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, ctx.numerical_shift_length);
 
     uint16_t new_state = task.state;
 
@@ -155,8 +154,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
       case LUMINARY_SHADING_MODE_ALBEDO: {
         GeometryContextCreationInfo ctx_creation_info;
         ctx_creation_info.task               = task;
-        ctx_creation_info.handle             = trace.handle;
-        ctx_creation_info.ior_stack          = trace.ior_stack;
+        ctx_creation_info.trace              = trace;
         ctx_creation_info.packed_mis_payload = throughput.payload;
         ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 
@@ -172,8 +170,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
       case LUMINARY_SHADING_MODE_NORMAL: {
         GeometryContextCreationInfo ctx_creation_info;
         ctx_creation_info.task               = task;
-        ctx_creation_info.handle             = trace.handle;
-        ctx_creation_info.ior_stack          = trace.ior_stack;
+        ctx_creation_info.trace              = trace;
         ctx_creation_info.packed_mis_payload = throughput.payload;
         ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 
@@ -201,8 +198,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
       case LUMINARY_SHADING_MODE_LIGHTS: {
         GeometryContextCreationInfo ctx_creation_info;
         ctx_creation_info.task               = task;
-        ctx_creation_info.handle             = trace.handle;
-        ctx_creation_info.ior_stack          = trace.ior_stack;
+        ctx_creation_info.trace              = trace;
         ctx_creation_info.packed_mis_payload = throughput.payload;
         ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 

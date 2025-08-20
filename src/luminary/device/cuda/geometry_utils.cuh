@@ -11,11 +11,10 @@
 #include "utils.cuh"
 
 __device__ vec3 geometry_compute_normal(
-  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords,
+  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 face_normal, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords,
   UV tex_coords, bool& is_inside) {
-  vec3 face_normal = normalize_vector(cross_product(e1, e2));
-  vec3 normal      = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
-  is_inside        = dot_product(face_normal, ray) > 0.0f;
+  vec3 normal = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
+  is_inside   = dot_product(face_normal, ray) > 0.0f;
 
   // TODO: Why do I not have a neg_vector function?
   // Convention is for the face normal to look towards the origin
@@ -39,6 +38,22 @@ __device__ vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
+__device__ float geometry_get_numerical_shift_length(
+  const vec3 vertex, const vec3 edge1, const vec3 edge2, const float dist, const float NdotV) {
+  const vec3 v0      = vertex;
+  const float max_v0 = __fmax_fmax(fabsf(v0.x), fabsf(v0.y), fabsf(v0.z));
+
+  const vec3 v1      = add_vector(vertex, edge1);
+  const float max_v1 = __fmax_fmax(fabsf(v1.x), fabsf(v1.y), fabsf(v1.z));
+
+  const vec3 v2      = add_vector(vertex, edge2);
+  const float max_v2 = __fmax_fmax(fabsf(v2.x), fabsf(v2.y), fabsf(v2.z));
+
+  const float shift_length = __fmax_fmax(max_v0, max_v1, max_v2);
+
+  return eps * shift_length * (1.0f + dist) / fmaxf(NdotV, 1.0f / 32.0f);
+}
+
 enum GeometryContextCreationHint {
   GEOMETRY_CONTEXT_CREATION_HINT_NONE = 0,
   GEOMETRY_CONTEXT_CREATION_HINT_DL   = (1 << 0)
@@ -46,23 +61,22 @@ enum GeometryContextCreationHint {
 
 struct GeometryContextCreationInfo {
   DeviceTask task;
-  TriangleHandle handle;
-  DeviceIORStack ior_stack;
+  DeviceTaskTrace trace;
   PackedMISPayload packed_mis_payload;
   uint32_t hints;
 } typedef GeometryContextCreationInfo;
 
 __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationInfo info) {
-  const uint32_t mesh_id      = mesh_id_load(info.handle.instance_id);
-  const DeviceTransform trans = load_transform(info.handle.instance_id);
+  const uint32_t mesh_id      = mesh_id_load(info.trace.handle.instance_id);
+  const DeviceTransform trans = load_transform(info.trace.handle.instance_id);
 
   const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
   const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
 
-  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, info.handle.tri_id, triangle_count));
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, info.handle.tri_id, triangle_count));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, info.handle.tri_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, info.handle.tri_id, triangle_count));
+  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, info.trace.handle.tri_id, triangle_count));
+  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, info.trace.handle.tri_id, triangle_count));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, info.trace.handle.tri_id, triangle_count));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, info.trace.handle.tri_id, triangle_count));
 
   const vec3 position = transform_apply_inv(trans, info.task.origin);
   const vec3 ray      = transform_apply_rotation_inv(trans, info.task.ray);
@@ -71,7 +85,11 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
   const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
 
-  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, position);
+  const vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
+  const float face_NdotV = -dot_product(face_normal, info.task.ray);
+
+  const float2 coords                = get_coordinates_in_triangle(vertex, edge1, edge2, position);
+  const float numerical_shift_length = geometry_get_numerical_shift_length(vertex, edge1, edge2, info.trace.depth, face_NdotV);
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
@@ -91,7 +109,7 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
 
   bool is_inside;
   const vec3 normal = geometry_compute_normal(
-    vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, uv_sub(vertex_texture, vertex1_texture),
+    vertex_normal, edge1_normal, edge2_normal, ray, face_normal, uv_sub(vertex_texture, vertex1_texture),
     uv_sub(vertex_texture, vertex2_texture), mat.normal_tex, coords, tex_coords, is_inside);
 
   RGBAF albedo = mat.albedo;
@@ -174,7 +192,7 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
 
   const IORStackMethod ior_stack_method =
     (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(info.ior_stack, mat.refraction_index, ior_stack_method);
+  const float ray_ior = ior_stack_interact(info.trace.ior_stack, mat.refraction_index, ior_stack_method);
 
   const float ior_in  = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
   const float ior_out = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
@@ -193,14 +211,15 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   }
 
   MaterialContextGeometry ctx;
-  ctx.instance_id = info.handle.instance_id;
-  ctx.tri_id      = info.handle.tri_id;
-  ctx.normal      = transform_apply_rotation(trans, normal);
-  ctx.position    = info.task.origin;
-  ctx.V           = scale_vector(info.task.ray, -1.0f);
-  ctx.state       = info.task.state;
-  ctx.flags       = flags;
-  ctx.volume_type = VolumeType(info.task.volume_id);
+  ctx.instance_id            = info.trace.handle.instance_id;
+  ctx.tri_id                 = info.trace.handle.tri_id;
+  ctx.normal                 = transform_apply_rotation(trans, normal);
+  ctx.position               = info.task.origin;
+  ctx.V                      = scale_vector(info.task.ray, -1.0f);
+  ctx.state                  = info.task.state;
+  ctx.flags                  = flags;
+  ctx.volume_type            = VolumeType(info.task.volume_id);
+  ctx.numerical_shift_length = numerical_shift_length;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, opaque_color(albedo));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, albedo.a);

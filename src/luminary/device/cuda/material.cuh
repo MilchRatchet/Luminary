@@ -61,6 +61,7 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   uint16_t state;
   uint8_t flags;
   VolumeType volume_type;
+  float numerical_shift_length;
 
   uint32_t data[MATERIAL_GEOM_NUM_UINTS];
 };
@@ -78,6 +79,7 @@ struct MaterialContext<MATERIAL_VOLUME> {
   uint16_t state;
   VolumeType volume_type;
   float max_dist;
+  static constexpr float numerical_shift_length = 0.0f;
 };
 
 template <>
@@ -94,6 +96,7 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   uint16_t state;
   uint8_t flags;
   VolumeType volume_type;
+  static constexpr float numerical_shift_length = 0.0f;
 };
 
 typedef MaterialContext<MATERIAL_GEOMETRY> MaterialContextGeometry;

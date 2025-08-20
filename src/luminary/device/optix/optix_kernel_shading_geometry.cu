@@ -37,10 +37,9 @@ extern "C" __global__ void __raygen__optix() {
   task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
   GeometryContextCreationInfo ctx_creation_info;
-  ctx_creation_info.task      = task;
-  ctx_creation_info.handle    = trace.handle;
-  ctx_creation_info.ior_stack = trace.ior_stack;
-  ctx_creation_info.hints     = GEOMETRY_CONTEXT_CREATION_HINT_DL;
+  ctx_creation_info.task  = task;
+  ctx_creation_info.trace = trace;
+  ctx_creation_info.hints = GEOMETRY_CONTEXT_CREATION_HINT_DL;
 
   const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
 

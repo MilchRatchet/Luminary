@@ -171,7 +171,7 @@ __device__ RGBF
   ////////////////////////////////////////////////////////////////////
 
   task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task.origin       = shift_origin_vector(ctx.position, ctx.V, dir, is_refraction);
+  task.origin       = shift_origin_vector(ctx.position, ctx.V, dir, is_refraction, ctx.numerical_shift_length);
   task.ray          = dir;
   task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
   task.limit        = FLT_MAX;
@@ -312,10 +312,7 @@ __device__ RGBF direct_lighting_sun_caustic(
     return splat_color(0.0f);
   }
 
-  vec3 position = ctx.position;
-  if (TYPE == MATERIAL_GEOMETRY) {
-    position = shift_origin_vector(position, ctx.V, dir, is_refraction);
-  }
+  const vec3 position = shift_origin_vector(ctx.position, ctx.V, dir, is_refraction, ctx.numerical_shift_length);
 
   ////////////////////////////////////////////////////////////////////
   // Create shadow task
@@ -359,10 +356,7 @@ __device__ RGBF direct_lighting_geometry_sample(MaterialContext<TYPE> ctx, const
   task.limit        = sample.dist;
   task.volume_type  = ctx.volume_type;
 
-  // No need to shift origin for particles.
-  if (TYPE == MATERIAL_GEOMETRY) {
-    task.origin = shift_origin_vector(task.origin, ctx.V, sample.ray, sample.is_refraction);
-  }
+  task.origin = shift_origin_vector(task.origin, ctx.V, sample.ray, sample.is_refraction, ctx.numerical_shift_length);
 
   return (valid_sample) ? sample.light_color : splat_color(0.0f);
 }
@@ -411,7 +405,8 @@ __device__ RGBF direct_lighting_ambient_sample(
 
   const BSDFSampleInfo<TYPE> bounce_info = bsdf_sample<MaterialContext<TYPE>::RANDOM_DL_AMBIENT>(ctx, index);
 
-  const vec3 task_origin = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass);
+  const vec3 task_origin =
+    shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, ctx.numerical_shift_length);
 
   // No ocean caustics reflection sampling for ambient DL
   if ((ctx.volume_type != VOLUME_TYPE_OCEAN) && device.ocean.active && (bounce_info.ray.y < 0.0f)) {
