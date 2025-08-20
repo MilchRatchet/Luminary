@@ -175,6 +175,9 @@ inline void _light_tree_fit_bounds_of_bins(
       if (__macro_pos < 0)                                                                                                                \
         __macro_pos = 0;                                                                                                                  \
                                                                                                                                           \
+      if (__macro_pos >= OBJECT_SPLIT_BIN_COUNT)                                                                                          \
+        __macro_pos = OBJECT_SPLIT_BIN_COUNT - 1;                                                                                         \
+                                                                                                                                          \
       __macro_in_bins[__macro_pos].entry++;                                                                                               \
       __macro_in_bins[__macro_pos].exit++;                                                                                                \
       __macro_in_bins[__macro_pos].power += __macro_in_fragments[__macro_i].power;                                                        \
