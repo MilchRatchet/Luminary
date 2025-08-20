@@ -88,8 +88,12 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   const vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
   const float face_NdotV = -dot_product(face_normal, info.task.ray);
 
-  const float2 coords                = get_coordinates_in_triangle(vertex, edge1, edge2, position);
-  const float numerical_shift_length = geometry_get_numerical_shift_length(vertex, edge1, edge2, info.trace.depth, face_NdotV);
+  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, position);
+
+  // TODO: These transformations are wasteful but necessary here, the coords should be computed in objects space for better stability.
+  const float numerical_shift_length = geometry_get_numerical_shift_length(
+    transform_apply(trans, vertex), transform_apply_relative(trans, edge1), transform_apply_relative(trans, edge2), info.trace.depth,
+    face_NdotV);
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
