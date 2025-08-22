@@ -82,9 +82,11 @@ __device__ void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResu
   payload.depth  = result.depth;
   payload.handle = result.handle;
 
+  OptixRayFlags ray_flag = ((task.state & STATE_FLAG_USE_IGNORE_HANDLE) != 0) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_NONE;
+
   optixKernelFunctionGeometryTrace(
-    device.optix_bvh, task.origin, task.ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE,
-    OPTIX_TRACE_STATUS_EXECUTE, payload);
+    device.optix_bvh, task.origin, task.ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, OPTIX_TRACE_STATUS_EXECUTE,
+    payload);
 
   result.depth  = payload.depth;
   result.handle = payload.handle;
@@ -156,9 +158,21 @@ extern "C" __global__ void __raygen__optix() {
   result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
   result.depth  = FLT_MAX;
 
+  // Load ignore handle if necessary
+  if ((task.state & STATE_FLAG_USE_IGNORE_HANDLE) != 0) {
+    const DeviceTaskTrace trace = task_trace_load(task_base_address);
+
+    result.handle = trace.handle;
+  }
+
   optix_raytrace_geometry(task, result);
   optix_raytrace_particles(task, result);
   optix_raytrace_ocean(task, result);
+
+  // If we didn't hit anything, the result handle could be the ignore handle,
+  // regardless, not hitting anything is always a sky hit so just force that here.
+  if (result.depth == FLT_MAX)
+    result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
 
   task_trace_handle_store(task_base_address, result.handle);
   task_trace_depth_store(task_base_address, result.depth);

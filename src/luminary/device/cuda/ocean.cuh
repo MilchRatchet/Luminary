@@ -26,7 +26,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     DeviceIORStack ior_stack    = trace.ior_stack;
-    MaterialContextGeometry ctx = ocean_get_context(task, trace.depth, ior_stack);
+    MaterialContextGeometry ctx = ocean_get_context(task, ior_stack);
 
     const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.index);
 
@@ -45,12 +45,14 @@ LUMINARY_KERNEL void ocean_process_tasks() {
       volume_id = (refraction_is_inside) ? above_water_volume : VOLUME_TYPE_OCEAN;
     }
 
-    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, ctx.numerical_shift_length);
+    const float shift_length = 2.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + trace.depth);
+    ctx.position             = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, shift_length);
 
     uint16_t new_state = task.state;
 
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     new_state &= ~STATE_FLAG_MIS_EMISSION;
+    new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
     DeviceTask bounce_task;
     bounce_task.state     = new_state;

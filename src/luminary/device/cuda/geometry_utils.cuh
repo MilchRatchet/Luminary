@@ -38,22 +38,6 @@ __device__ vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-__device__ float geometry_get_numerical_shift_length(
-  const vec3 vertex, const vec3 edge1, const vec3 edge2, const float dist, const float NdotV) {
-  const vec3 v0      = vertex;
-  const float max_v0 = __fmax_fmax(fabsf(v0.x), fabsf(v0.y), fabsf(v0.z));
-
-  const vec3 v1      = add_vector(vertex, edge1);
-  const float max_v1 = __fmax_fmax(fabsf(v1.x), fabsf(v1.y), fabsf(v1.z));
-
-  const vec3 v2      = add_vector(vertex, edge2);
-  const float max_v2 = __fmax_fmax(fabsf(v2.x), fabsf(v2.y), fabsf(v2.z));
-
-  const float shift_length = __fmax_fmax(max_v0, max_v1, max_v2);
-
-  return eps * shift_length * (1.0f + dist) / fmaxf(NdotV, 1.0f / 32.0f);
-}
-
 enum GeometryContextCreationHint {
   GEOMETRY_CONTEXT_CREATION_HINT_NONE = 0,
   GEOMETRY_CONTEXT_CREATION_HINT_DL   = (1 << 0)
@@ -89,11 +73,6 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   const float face_NdotV = -dot_product(face_normal, info.task.ray);
 
   const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, position);
-
-  // TODO: These transformations are wasteful but necessary here, the coords should be computed in objects space for better stability.
-  const float numerical_shift_length = geometry_get_numerical_shift_length(
-    transform_apply(trans, vertex), transform_apply_relative(trans, edge1), transform_apply_relative(trans, edge2), info.trace.depth,
-    face_NdotV);
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
@@ -215,15 +194,14 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   }
 
   MaterialContextGeometry ctx;
-  ctx.instance_id            = info.trace.handle.instance_id;
-  ctx.tri_id                 = info.trace.handle.tri_id;
-  ctx.normal                 = transform_apply_rotation(trans, normal);
-  ctx.position               = info.task.origin;
-  ctx.V                      = scale_vector(info.task.ray, -1.0f);
-  ctx.state                  = info.task.state;
-  ctx.flags                  = flags;
-  ctx.volume_type            = VolumeType(info.task.volume_id);
-  ctx.numerical_shift_length = numerical_shift_length;
+  ctx.instance_id = info.trace.handle.instance_id;
+  ctx.tri_id      = info.trace.handle.tri_id;
+  ctx.normal      = transform_apply_rotation(trans, normal);
+  ctx.position    = info.task.origin;
+  ctx.V           = scale_vector(info.task.ray, -1.0f);
+  ctx.state       = info.task.state;
+  ctx.flags       = flags;
+  ctx.volume_type = VolumeType(info.task.volume_id);
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, opaque_color(albedo));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, albedo.a);

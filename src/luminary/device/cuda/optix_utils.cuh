@@ -66,7 +66,7 @@ static __forceinline__ __device__ void optixKernelFunctionShadowTrace(
   optixTrace(
     OPTIX_TRACE_PAYLOAD_ID(SHADOW_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
     actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
-    payload.v3, payload.v4);
+    payload.v3, payload.v4, payload.v5, payload.v6);
 }
 
 static __forceinline__ __device__ void optixKernelFunctionShadowSunTrace(
@@ -76,7 +76,8 @@ static __forceinline__ __device__ void optixKernelFunctionShadowSunTrace(
   const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
   optixTrace(
     OPTIX_TRACE_PAYLOAD_ID(SHADOW_SUN_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2);
+    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
+    payload.v3, payload.v4);
 }
 
 ////////////////////////////////////////////////////////////////////

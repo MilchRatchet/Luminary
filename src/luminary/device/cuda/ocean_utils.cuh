@@ -463,7 +463,7 @@ __device__ float ocean_reflection_coefficient(const vec3 normal, const vec3 ray,
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-__device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, const float depth, DeviceIORStack& ior_stack) {
+__device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceIORStack& ior_stack) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
@@ -486,14 +486,13 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, cons
 
   MaterialContextGeometry ctx;
 
-  ctx.instance_id            = HIT_TYPE_OCEAN;
-  ctx.tri_id                 = 0;
-  ctx.normal                 = normal;
-  ctx.position               = task.origin;
-  ctx.V                      = scale_vector(task.ray, -1.0f);
-  ctx.state                  = task.state;
-  ctx.flags                  = flags;
-  ctx.numerical_shift_length = 2.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + depth);
+  ctx.instance_id = HIT_TYPE_OCEAN;
+  ctx.tri_id      = 0;
+  ctx.normal      = normal;
+  ctx.position    = task.origin;
+  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.state       = task.state;
+  ctx.flags       = flags;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);

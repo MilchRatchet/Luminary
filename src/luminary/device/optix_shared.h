@@ -50,6 +50,43 @@ enum OptixKernelFunctionParticleTracePayloadValue {
 struct OptixKernelFunctionShadowTracePayload {
   union {
     TriangleHandle handle;
+
+    struct {
+      unsigned int v0;
+      unsigned int v1;
+    };
+  };
+  union {
+    TriangleHandle handle_origin;
+    struct {
+      unsigned int v2;
+      unsigned int v3;
+    };
+  };
+  union {
+    RGBF throughput;
+    struct {
+      unsigned int v4;
+      unsigned int v5;
+      unsigned int v6;
+    };
+  };
+} typedef OptixKernelFunctionShadowTracePayload;
+
+enum OptixKernelFunctionShadowTracePayloadValue {
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE3,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE4,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
+  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT
+} typedef OptixKernelFunctionShadowTracePayloadValue;
+
+struct OptixKernelFunctionShadowSunTracePayload {
+  union {
+    TriangleHandle handle_origin;
     struct {
       unsigned int v0;
       unsigned int v1;
@@ -63,29 +100,11 @@ struct OptixKernelFunctionShadowTracePayload {
       unsigned int v4;
     };
   };
-} typedef OptixKernelFunctionShadowTracePayload;
-
-enum OptixKernelFunctionShadowTracePayloadValue {
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT
-} typedef OptixKernelFunctionShadowTracePayloadValue;
-
-struct OptixKernelFunctionShadowSunTracePayload {
-  union {
-    RGBF throughput;
-    struct {
-      unsigned int v0;
-      unsigned int v1;
-      unsigned int v2;
-    };
-  };
 } typedef OptixKernelFunctionShadowSunTracePayload;
 
 enum OptixKernelFunctionShadowSunTracePayloadValue {
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
+  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT3,

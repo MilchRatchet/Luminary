@@ -195,6 +195,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     new_state &= ~STATE_FLAG_ALLOW_EMISSION;
     new_state &= ~STATE_FLAG_MIS_EMISSION;
+    new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
     if (device.sky.mode != LUMINARY_SKY_MODE_DEFAULT)
       new_state &= ~STATE_FLAG_ALLOW_AMBIENT;

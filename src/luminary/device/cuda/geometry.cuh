@@ -89,9 +89,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       ior_stack_interact(ior_stack, new_ior, ior_set_method);
     }
 
-    ctx.position = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, ctx.numerical_shift_length);
-
-    uint16_t new_state = task.state;
+    uint16_t new_state = task.state | STATE_FLAG_USE_IGNORE_HANDLE;
 
     if (device.sky.mode != LUMINARY_SKY_MODE_DEFAULT && is_pass_through == false)
       new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
@@ -123,10 +121,15 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       bounce_throughput.record  = record_pack(record);
       bounce_throughput.payload = mis_payload;
 
+      DeviceTaskTrace bounce_trace;
+      bounce_trace.ior_stack = ior_stack;
+      bounce_trace.handle    = triangle_handle_get(ctx.instance_id, ctx.tri_id);
+      bounce_trace.depth     = FLT_MAX;
+
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       task_store(dst_task_base_address, bounce_task);
-      task_trace_ior_stack_store(dst_task_base_address, ior_stack);
+      task_trace_store(dst_task_base_address, bounce_trace);
       task_throughput_store(dst_task_base_address, bounce_throughput);
     }
   }

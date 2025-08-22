@@ -43,9 +43,9 @@ __device__ bool direct_lighting_geometry_is_valid(const DeviceTask task) {
 // Shadowing
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF direct_lighting_sun_shadowing(const DirectLightingShadowTask task) {
+__device__ RGBF direct_lighting_sun_shadowing(const TriangleHandle handle, const DirectLightingShadowTask task) {
 #ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_sun_shadowing(task.origin, task.ray, task.limit, task.trace_status);
+  RGBF visibility = optix_sun_shadowing(handle, task.origin, task.ray, task.limit, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
@@ -61,9 +61,9 @@ __device__ RGBF direct_lighting_sun_shadowing(const DirectLightingShadowTask tas
 #endif /* DIRECT_LIGHTING_NO_SHADOW */
 }
 
-__device__ RGBF direct_lighting_shadowing(const DirectLightingShadowTask task) {
+__device__ RGBF direct_lighting_shadowing(const TriangleHandle handle, const DirectLightingShadowTask task) {
 #ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_geometry_shadowing(task.origin, task.ray, task.limit, task.target_light, task.trace_status);
+  RGBF visibility = optix_geometry_shadowing(handle, task.origin, task.ray, task.limit, task.target_light, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
@@ -140,18 +140,15 @@ __device__ RGBF
   float target_pdf;
   vec3 dir;
   RGBF light_color;
-  bool is_refraction;
   if (random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::RESAMPLING, index) * sum_weights < weight_bsdf) {
-    dir           = dir_bsdf;
-    target_pdf    = target_pdf_bsdf;
-    light_color   = light_bsdf;
-    is_refraction = is_refraction_bsdf;
+    dir         = dir_bsdf;
+    target_pdf  = target_pdf_bsdf;
+    light_color = light_bsdf;
   }
   else {
-    dir           = dir_solid_angle;
-    target_pdf    = target_pdf_solid_angle;
-    light_color   = light_solid_angle;
-    is_refraction = is_refraction_solid_angle;
+    dir         = dir_solid_angle;
+    target_pdf  = target_pdf_solid_angle;
+    light_color = light_solid_angle;
   }
 
   light_color = scale_color(light_color, sum_weights / target_pdf);
@@ -171,7 +168,7 @@ __device__ RGBF
   ////////////////////////////////////////////////////////////////////
 
   task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task.origin       = shift_origin_vector(ctx.position, ctx.V, dir, is_refraction, ctx.numerical_shift_length);
+  task.origin       = ctx.position;
   task.ray          = dir;
   task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
   task.limit        = FLT_MAX;
@@ -312,14 +309,12 @@ __device__ RGBF direct_lighting_sun_caustic(
     return splat_color(0.0f);
   }
 
-  const vec3 position = shift_origin_vector(ctx.position, ctx.V, dir, is_refraction, ctx.numerical_shift_length);
-
   ////////////////////////////////////////////////////////////////////
   // Create shadow task
   ////////////////////////////////////////////////////////////////////
 
   task0.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task0.origin       = position;
+  task0.origin       = ctx.position;
   task0.ray          = dir;
   task0.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
   task0.limit        = dist;
@@ -355,8 +350,6 @@ __device__ RGBF direct_lighting_geometry_sample(MaterialContext<TYPE> ctx, const
   task.target_light = sample.handle;
   task.limit        = sample.dist;
   task.volume_type  = ctx.volume_type;
-
-  task.origin = shift_origin_vector(task.origin, ctx.V, sample.ray, sample.is_refraction, ctx.numerical_shift_length);
 
   return (valid_sample) ? sample.light_color : splat_color(0.0f);
 }
@@ -405,15 +398,12 @@ __device__ RGBF direct_lighting_ambient_sample(
 
   const BSDFSampleInfo<TYPE> bounce_info = bsdf_sample<MaterialContext<TYPE>::RANDOM_DL_AMBIENT>(ctx, index);
 
-  const vec3 task_origin =
-    shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, ctx.numerical_shift_length);
-
   // No ocean caustics reflection sampling for ambient DL
   if ((ctx.volume_type != VOLUME_TYPE_OCEAN) && device.ocean.active && (bounce_info.ray.y < 0.0f)) {
     return splat_color(0.0f);
   }
 
-  RGBF light_color = sky_color_no_compute(task_origin, bounce_info.ray, 0);
+  RGBF light_color = sky_color_no_compute(ctx.position, bounce_info.ray, 0);
   light_color      = mul_color(light_color, bounce_info.weight);
 
   if (color_importance(light_color) == 0.0f) {
@@ -425,7 +415,7 @@ __device__ RGBF direct_lighting_ambient_sample(
   ////////////////////////////////////////////////////////////////////
 
   task1.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task1.origin       = task_origin;
+  task1.origin       = ctx.position;
   task1.ray          = bounce_info.ray;
   task1.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
   task1.limit        = FLT_MAX;
@@ -437,9 +427,9 @@ __device__ RGBF direct_lighting_ambient_sample(
 
   // Add a second ray for ocean refraction
   if ((ctx.volume_type == VOLUME_TYPE_OCEAN) && (bounce_info.ray.y > 0.0f)) {
-    const float ocean_intersection_dist = ocean_intersection_solver(task_origin, bounce_info.ray, 0.0f, FLT_MAX);
+    const float ocean_intersection_dist = ocean_intersection_solver(ctx.position, bounce_info.ray, 0.0f, FLT_MAX);
 
-    const vec3 ocean_intersection = add_vector(task_origin, scale_vector(bounce_info.ray, ocean_intersection_dist));
+    const vec3 ocean_intersection = add_vector(ctx.position, scale_vector(bounce_info.ray, ocean_intersection_dist));
 
     // Ocean normal points up, we come from below, so flip it
     const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_intersection), -1.0f);
@@ -516,8 +506,8 @@ __device__ RGBF direct_lighting_sun(const MaterialContext<TYPE> ctx, const ushor
     light_caustic = direct_lighting_sun_caustic(ctx, index, sky_pos, is_underwater, task_caustic0, task_caustic1);
   }
 
-  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(task_caustic0));
-  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(task_caustic1));
+  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(ctx.get_handle(), task_caustic0));
+  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(ctx.get_handle(), task_caustic1));
 
   DirectLightingShadowTask task_direct;
   task_direct.trace_status = OPTIX_TRACE_STATUS_ABORT;
@@ -527,7 +517,7 @@ __device__ RGBF direct_lighting_sun(const MaterialContext<TYPE> ctx, const ushor
     light_direct = direct_lighting_sun_direct(ctx, index, sky_pos, task_direct);
   }
 
-  light_direct = mul_color(light_direct, direct_lighting_sun_shadowing(task_direct));
+  light_direct = mul_color(light_direct, direct_lighting_sun_shadowing(ctx.get_handle(), task_direct));
 
   return add_color(light_caustic, light_direct);
 }
@@ -537,7 +527,7 @@ __device__ RGBF direct_lighting_geometry(const MaterialContext<TYPE> ctx, const 
   DirectLightingShadowTask task;
   RGBF light = direct_lighting_geometry_sample<TYPE>(ctx, index, task);
 
-  light = mul_color(light, direct_lighting_shadowing(task));
+  light = mul_color(light, direct_lighting_shadowing(ctx.get_handle(), task));
 
   return light;
 }
@@ -558,8 +548,8 @@ __device__ RGBF direct_lighting_ambient(const MaterialContext<TYPE> ctx, const u
   task2.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
   RGBF light         = direct_lighting_ambient_sample(ctx, index, task1, task2);
 
-  light = mul_color(light, direct_lighting_sun_shadowing(task1));
-  light = mul_color(light, direct_lighting_sun_shadowing(task2));
+  light = mul_color(light, direct_lighting_sun_shadowing(ctx.get_handle(), task1));
+  light = mul_color(light, direct_lighting_sun_shadowing(ctx.get_handle(), task2));
 
   return light;
 }

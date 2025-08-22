@@ -15,7 +15,13 @@
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(geometry_trace)() {
   optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_GEOMETRY_TRACE);
 
-  const TriangleHandle handle = optixGetTriangleHandle();
+  const TriangleHandle handle        = optixGetTriangleHandle();
+  const TriangleHandle ignore_handle = optixGetPayloadTriangleHandle(OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE);
+
+  // Ignore self intersection if requested
+  if (triangle_handle_equal(handle, ignore_handle)) {
+    optixIgnoreIntersection();
+  }
 
   const OptixAlphaResult alpha_result = optix_alpha_test(handle);
 
@@ -43,11 +49,16 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
   optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_TRACE);
 
-  const TriangleHandle handle = optixGetTriangleHandle();
-
+  const TriangleHandle handle       = optixGetTriangleHandle();
   const TriangleHandle target_light = optixGetPayloadTriangleHandle(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE);
 
   if (triangle_handle_equal(handle, target_light)) {
+    optixIgnoreIntersection();
+  }
+
+  const TriangleHandle ignore_handle = optixGetPayloadTriangleHandle(OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE3);
+
+  if (triangle_handle_equal(handle, ignore_handle)) {
     optixIgnoreIntersection();
   }
 
@@ -89,7 +100,12 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_sun_trace)() {
   optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_SUN_TRACE);
 
-  const TriangleHandle handle = optixGetTriangleHandle();
+  const TriangleHandle handle        = optixGetTriangleHandle();
+  const TriangleHandle ignore_handle = optixGetPayloadTriangleHandle(OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE);
+
+  if (triangle_handle_equal(handle, ignore_handle)) {
+    optixIgnoreIntersection();
+  }
 
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 

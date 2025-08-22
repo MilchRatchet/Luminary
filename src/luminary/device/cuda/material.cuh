@@ -61,9 +61,12 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   uint16_t state;
   uint8_t flags;
   VolumeType volume_type;
-  float numerical_shift_length;
 
   uint32_t data[MATERIAL_GEOM_NUM_UINTS];
+
+  __device__ TriangleHandle get_handle() const {
+    return triangle_handle_get(instance_id, tri_id);
+  }
 };
 
 template <>
@@ -79,7 +82,10 @@ struct MaterialContext<MATERIAL_VOLUME> {
   uint16_t state;
   VolumeType volume_type;
   float max_dist;
-  static constexpr float numerical_shift_length = 0.0f;
+
+  __device__ TriangleHandle get_handle() const {
+    return triangle_handle_get(VOLUME_TYPE_TO_HIT(descriptor.type), 0);
+  }
 };
 
 template <>
@@ -96,7 +102,10 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   uint16_t state;
   uint8_t flags;
   VolumeType volume_type;
-  static constexpr float numerical_shift_length = 0.0f;
+
+  __device__ TriangleHandle get_handle() const {
+    return triangle_handle_get(particle_id, 0);
+  }
 };
 
 typedef MaterialContext<MATERIAL_GEOMETRY> MaterialContextGeometry;

@@ -98,14 +98,20 @@ enum ShadingTaskIndex {
 //
 // STATE_FLAG_ALLOW_AMBIENT: This flag is set for rays that are allowed to include sky contribution
 //
+// STATE_FLAG_USE_IGNORE_HANDLE: This flag is set for rays that need to ignore a triangle in the next trace.
+//                               This flag is used to avoid loading the DeviceTaskAux data which currently only holds this handle
+//                               and is not written/sorted/loaded consistently for performance reasons. This will be removed when
+//                               nested dielectrics are implemented.
+//
 
 enum StateFlag {
-  STATE_FLAG_DELTA_PATH       = 0b00000001u,
-  STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
-  STATE_FLAG_VOLUME_SCATTERED = 0b00000100u,
-  STATE_FLAG_ALLOW_EMISSION   = 0b00001000u,
-  STATE_FLAG_MIS_EMISSION     = 0b00010000u,
-  STATE_FLAG_ALLOW_AMBIENT    = 0b00100000u
+  STATE_FLAG_DELTA_PATH        = 0b00000001u,
+  STATE_FLAG_CAMERA_DIRECTION  = 0b00000010u,
+  STATE_FLAG_VOLUME_SCATTERED  = 0b00000100u,
+  STATE_FLAG_ALLOW_EMISSION    = 0b00001000u,
+  STATE_FLAG_MIS_EMISSION      = 0b00010000u,
+  STATE_FLAG_ALLOW_AMBIENT     = 0b00100000u,
+  STATE_FLAG_USE_IGNORE_HANDLE = 0b01000000u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {

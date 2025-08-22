@@ -420,7 +420,8 @@ __device__ RGBF
   float dist;
   dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * sample.scale;
 
-  shadow_term = mul_color(shadow_term, optix_geometry_shadowing(current_vertex, current_direction, dist, sample.handle, trace_status));
+  shadow_term = mul_color(
+    shadow_term, optix_geometry_shadowing(ctx.get_handle(), current_vertex, current_direction, dist, sample.handle, trace_status));
 
   sum_dist += dist;
 
@@ -435,7 +436,8 @@ __device__ RGBF
 
     dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel)) * sample.scale;
 
-    shadow_term = mul_color(shadow_term, optix_geometry_shadowing(current_vertex, current_direction, dist, sample.handle, trace_status));
+    shadow_term = mul_color(
+      shadow_term, optix_geometry_shadowing(ctx.get_handle(), current_vertex, current_direction, dist, sample.handle, trace_status));
 
     sum_dist += dist;
   }
