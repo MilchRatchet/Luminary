@@ -451,32 +451,7 @@ Meshes must be in the Wavefront OBJ (`*.obj`) file format. Geometric vertices, t
 
 >📝 A common cause of light leaking / broken lighting is unrealistic vertex normals. Issues appear if the vertex normals represent a surface that is too different from the actual geometry. Performing steps like edge splitting often alleviate this issue at the cost of a higher triangle count.
 
-# Textures
-
-Textures must be in the Portable Network Graphics (`*.png`) file format. They need to have 8 bit channel depth. Supported color formats are `Truecolor` (RGB) and `Truecolor with alpha` (RGBA). They may use filters but may not be interlaced. Textures are used in three different ways:
-
- - Albedo Textures
-   - Red: Red Color
-   - Green: Green Color
-   - Blue: Blue Color
-   - Alpha: Transparency
- - Luminance Textures
-   - Red: Emission Red Color
-   - Green: Emission Green Color
-   - Blue: Emission Blue Color
-   - Alpha: Emission Intensity [0,1]
- - Material Textures
-   - Red: Roughness
-   - Green: Metallic
-   - Blue: Unused
-   - Alpha: Unused
- - Normal Textures (OpenGL format)
-   - Red: Tangent X
-   - Green: Tangent Y
-   - Blue: Tangent Z
-   - Alpha: Displacement
-
->📝 Textures must contain gamma information if they are not encoded linearly. Note that GIMP does not correctly export the correct gamma value. Hence, it is important to uncheck "Save gamma" during png export ([See Thread](https://gitlab.gnome.org/GNOME/gimp/-/issues/5363)). If textures are not displayed correctly, make sure that the gamma value used in the png file correctly approximates the color profile otherwise defined in the file.
+# Materials
 
 Material properties are to be referenced in the `*.mtl` as follows:
 
