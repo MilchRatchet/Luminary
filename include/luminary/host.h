@@ -41,34 +41,31 @@ LUMINARY_API LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, Lumi
 
 LUMINARY_API LuminaryResult luminary_host_get_current_sample_time(LuminaryHost* host, double* time);
 
-/*
- * Returns the string identifying the host's current queue task.
- * @param host Host instance.
- * @param string The destination the address of the string will be written to. If the host is idle, NULL will be written.
- */
-LUMINARY_API LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const char** string);
+LUMINARY_API LuminaryResult luminary_host_get_num_queue_workers(const LuminaryHost* host, uint32_t* num_queue_workers);
 
 /*
- * Returns the string identifying the device manager's current queue task.
+ * Returns the name of the selected queue worker.
  * @param host Host instance.
- * @param string The destination the address of the string will be written to. If the device manager is idle, NULL will be written.
+ * @param queue_worker_id ID of queue worker
+ * @param string The destination the address of the string will be written to. If the queue worker is not online, NULL will be written.
  */
-LUMINARY_API LuminaryResult luminary_host_get_device_queue_string(const LuminaryHost* host, const char** string);
+LUMINARY_API LuminaryResult luminary_host_get_queue_worker_name(const LuminaryHost* host, uint32_t queue_worker_id, const char** string);
 
 /*
- * Returns the wall time that the host's current queue task has thus far taken up.
+ * Returns the string identifying the selected queue worker's current queue task.
  * @param host Host instance.
- * @param time The destination the time will be written to. The time is given in seconds. If the host is idle, 0.0 will be returned.
+ * @param queue_worker_id ID of queue worker
+ * @param string The destination the address of the string will be written to. If the queue worker is idle, NULL will be written.
  */
-LUMINARY_API LuminaryResult luminary_host_get_queue_time(const LuminaryHost* host, double* time);
+LUMINARY_API LuminaryResult luminary_host_get_queue_worker_string(const LuminaryHost* host, uint32_t queue_worker_id, const char** string);
 
 /*
- * Returns the wall time that the device manager's current queue task has thus far taken up.
+ * Returns the wall time that the selected queue worker's current queue task has thus far taken up.
  * @param host Host instance.
- * @param time The destination the time will be written to. The time is given in seconds. If the device manager is idle, 0.0 will be
- * returned.
+ * @param queue_worker_id ID of queue worker
+ * @param time The destination the time will be written to. The time is given in seconds. If the queue worker is idle, 0.0 will be returned.
  */
-LUMINARY_API LuminaryResult luminary_host_get_device_queue_time(const LuminaryHost* host, double* time);
+LUMINARY_API LuminaryResult luminary_host_get_queue_worker_time(const LuminaryHost* host, uint32_t queue_worker_id, double* time);
 
 LUMINARY_API LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties);
 

@@ -42,20 +42,6 @@
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFF } typedef VolumeType;
 
-typedef LuminaryResult (*QueueEntryFunction)(void* worker, void* args);
-typedef LuminaryResult (*QueueEntryDeferringFunction)(void* worker, void* args, bool* defer_execution);
-
-struct QueueEntry {
-  const char* name;
-  QueueEntryFunction function;
-  QueueEntryFunction clear_func;
-  QueueEntryDeferringFunction deferring_func;
-  void* args;
-  bool remove_duplicates;
-  bool queuer_cannot_execute;  // Used to avoid self execution on CUDA callback threads.
-  bool skip_execution;         // Used to skip the actual work function but still execute the clear func.
-} typedef QueueEntry;
-
 struct Quaternion {
   float x;
   float y;

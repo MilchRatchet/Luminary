@@ -15,52 +15,10 @@
 
 #define HOST_RINGBUFFER_SIZE (0x100000ull)
 #define HOST_QUEUE_SIZE (0x400ull)
+#define HOST_NUM_SECONDARY_QUEUE_WORKERS (16)
 
-////////////////////////////////////////////////////////////////////
-// Queue worker functions
-////////////////////////////////////////////////////////////////////
-
-LuminaryResult _host_queue_worker(Host* host) {
-  __CHECK_NULL_ARGUMENT(host);
-
-  bool success = true;
-
-  while (success) {
-    QueueEntry entry;
-    __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry, &success));
-
-    // Verify that the device_manager didn't crash.
-    if (host->device_manager) {
-      __FAILURE_HANDLE(thread_get_last_result(host->device_manager->work_thread));
-    }
-
-    if (!success)
-      break;
-
-    __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, entry.name));
-    __FAILURE_HANDLE(wall_time_start(host->queue_wall_time));
-
-    __FAILURE_HANDLE(entry.function(host, entry.args));
-
-    if (entry.clear_func) {
-      __FAILURE_HANDLE(entry.clear_func(host, entry.args));
-    }
-
-    __FAILURE_HANDLE(wall_time_stop(host->queue_wall_time));
-    __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, (const char*) 0));
-
-#ifdef LUMINARY_WORK_QUEUE_STATS_PRINT
-    double time;
-    __FAILURE_HANDLE(wall_time_get_time(host->queue_wall_time, &time));
-
-    if (time > LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD) {
-      warn_message("host queue: %s (%fs)", entry.name, time);
-    }
-#endif
-  }
-
-  return LUMINARY_SUCCESS;
-}
+// Host Main + Device manager Main + Host Secondary
+#define LUMINARY_TOTAL_NUM_QUEUE_WORKERS (1 + 1 + HOST_NUM_SECONDARY_QUEUE_WORKERS)
 
 static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right) {
   return (left->function == right->function);
@@ -82,7 +40,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   WavefrontContent* wavefront_content;
 
   __FAILURE_HANDLE(wavefront_create(&wavefront_content, args->wavefront_args));
-  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
+  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path, host->secondary_work_queue));
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
 
@@ -346,10 +304,9 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   __FAILURE_HANDLE(scene_create(&(*host)->scene_caller));
   __FAILURE_HANDLE(scene_create(&(*host)->scene_host));
 
-  __FAILURE_HANDLE(thread_create(&(*host)->work_thread));
   __FAILURE_HANDLE(queue_create(&(*host)->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
+  __FAILURE_HANDLE(queue_create(&(*host)->secondary_work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&(*host)->ringbuffer, HOST_RINGBUFFER_SIZE));
-  __FAILURE_HANDLE(wall_time_create(&(*host)->queue_wall_time));
 
   DeviceManagerCreateInfo device_manager_create_info;
   device_manager_create_info.device_mask = info.device_mask;
@@ -358,7 +315,22 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
 
   (*host)->enable_output = false;
 
-  __FAILURE_HANDLE(thread_start((*host)->work_thread, (ThreadMainFunc) _host_queue_worker, *host));
+  __FAILURE_HANDLE(queue_worker_create(&(*host)->queue_worker_main));
+  __FAILURE_HANDLE(queue_worker_start((*host)->queue_worker_main, "Host", (*host)->work_queue, *host));
+
+  __FAILURE_HANDLE(array_create(&(*host)->queue_worker_secondary, sizeof(QueueWorker*), HOST_NUM_SECONDARY_QUEUE_WORKERS));
+
+  for (uint32_t queue_worker_id = 0; queue_worker_id < HOST_NUM_SECONDARY_QUEUE_WORKERS; queue_worker_id++) {
+    QueueWorker* queue_worker;
+    __FAILURE_HANDLE(queue_worker_create(&queue_worker));
+
+    char queue_worker_name[256];
+    sprintf(queue_worker_name, "Worker %u", queue_worker_id);
+
+    __FAILURE_HANDLE(queue_worker_start(queue_worker, queue_worker_name, (*host)->secondary_work_queue, *host));
+
+    __FAILURE_HANDLE(array_push(&(*host)->queue_worker_secondary, &queue_worker));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -377,9 +349,14 @@ LuminaryResult luminary_host_destroy(Host** host) {
   // Shutdown host thread queue
   ////////////////////////////////////////////////////////////////////
 
+  __FAILURE_HANDLE(queue_set_is_blocking((*host)->secondary_work_queue, false));
+
+  for (uint32_t queue_worker_id = 0; queue_worker_id < HOST_NUM_SECONDARY_QUEUE_WORKERS; queue_worker_id++) {
+    __FAILURE_HANDLE(queue_worker_shutdown((*host)->queue_worker_secondary[queue_worker_id]));
+  }
+
   __FAILURE_HANDLE(queue_set_is_blocking((*host)->work_queue, false));
-  __FAILURE_HANDLE(thread_join((*host)->work_thread));
-  __FAILURE_HANDLE(thread_get_last_result((*host)->work_thread));
+  __FAILURE_HANDLE(queue_worker_shutdown((*host)->queue_worker_main));
 
   ////////////////////////////////////////////////////////////////////
   // Destroy member
@@ -387,11 +364,17 @@ LuminaryResult luminary_host_destroy(Host** host) {
 
   __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
 
-  __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
+  __FAILURE_HANDLE(queue_destroy(&(*host)->secondary_work_queue));
 
-  __FAILURE_HANDLE(thread_destroy(&(*host)->work_thread));
+  __FAILURE_HANDLE(queue_worker_destroy(&(*host)->queue_worker_main));
+
+  for (uint32_t queue_worker_id = 0; queue_worker_id < HOST_NUM_SECONDARY_QUEUE_WORKERS; queue_worker_id++) {
+    __FAILURE_HANDLE(queue_worker_destroy(&(*host)->queue_worker_secondary[queue_worker_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*host)->queue_worker_secondary));
 
   uint32_t mesh_count;
   __FAILURE_HANDLE(array_get_num_elements((*host)->meshes, &mesh_count));
@@ -620,38 +603,92 @@ LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {
+LuminaryResult luminary_host_get_num_queue_workers(const LuminaryHost* host, uint32_t* num_queue_workers) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(num_queue_workers);
+
+  *num_queue_workers = LUMINARY_TOTAL_NUM_QUEUE_WORKERS;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_queue_worker_name(const LuminaryHost* host, uint32_t queue_worker_id, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
-  __FAILURE_HANDLE(wall_time_get_string(host->queue_wall_time, string));
+  if (queue_worker_id >= LUMINARY_TOTAL_NUM_QUEUE_WORKERS) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Queue worker ID %u is invalid.", queue_worker_id);
+  }
+
+  QueueWorker* queue_worker;
+
+  switch (queue_worker_id) {
+    case 0:
+      queue_worker = host->queue_worker_main;
+      break;
+    case 1:
+      queue_worker = host->device_manager->queue_worker_main;
+      break;
+    default:
+      queue_worker = host->queue_worker_secondary[queue_worker_id - 2];
+      break;
+  }
+
+  __FAILURE_HANDLE(wall_time_get_worker_name(queue_worker->wall_time, string));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_device_queue_string(const Host* host, const char** string) {
+LuminaryResult luminary_host_get_queue_worker_string(const LuminaryHost* host, uint32_t queue_worker_id, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
-  __FAILURE_HANDLE(wall_time_get_string(host->device_manager->queue_wall_time, string));
+  if (queue_worker_id >= LUMINARY_TOTAL_NUM_QUEUE_WORKERS) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Queue worker ID %u is invalid.", queue_worker_id);
+  }
+
+  QueueWorker* queue_worker;
+
+  switch (queue_worker_id) {
+    case 0:
+      queue_worker = host->queue_worker_main;
+      break;
+    case 1:
+      queue_worker = host->device_manager->queue_worker_main;
+      break;
+    default:
+      queue_worker = host->queue_worker_secondary[queue_worker_id - 2];
+      break;
+  }
+
+  __FAILURE_HANDLE(wall_time_get_string(queue_worker->wall_time, string));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_queue_time(const Host* host, double* time) {
+LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t queue_worker_id, double* time) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(time);
 
-  __FAILURE_HANDLE(wall_time_get_time(host->queue_wall_time, time));
+  if (queue_worker_id >= LUMINARY_TOTAL_NUM_QUEUE_WORKERS) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Queue worker ID %u is invalid.", queue_worker_id);
+  }
 
-  return LUMINARY_SUCCESS;
-}
+  QueueWorker* queue_worker;
 
-LuminaryResult luminary_host_get_device_queue_time(const Host* host, double* time) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(time);
+  switch (queue_worker_id) {
+    case 0:
+      queue_worker = host->queue_worker_main;
+      break;
+    case 1:
+      queue_worker = host->device_manager->queue_worker_main;
+      break;
+    default:
+      queue_worker = host->queue_worker_secondary[queue_worker_id - 2];
+      break;
+  }
 
-  __FAILURE_HANDLE(wall_time_get_time(host->device_manager->queue_wall_time, time));
+  __FAILURE_HANDLE(wall_time_get_time(queue_worker->wall_time, time));
 
   return LUMINARY_SUCCESS;
 }

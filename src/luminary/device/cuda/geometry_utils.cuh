@@ -22,8 +22,11 @@ __device__ vec3 geometry_compute_normal(
     face_normal = scale_vector(face_normal, -1.0f);
 
   if (normal_tex != TEXTURE_NONE) {
+    const DeviceTextureObject tex = load_texture_object(normal_tex);
+
     // TODO: Flip V based on a material flag that specifies if the texture is OpenGL or DirectX format.
-    const float4 normal_f = texture_load(load_texture_object(normal_tex), get_uv(tex_coords.u, 1.0f - tex_coords.v), true, false);
+    const float4 normal_f = (texture_is_valid(tex)) ? texture_load(tex, get_uv(tex_coords.u, 1.0f - tex_coords.v), true, false)
+                                                    : make_float4(0.0f, 0.0f, 1.0f, 0.0f);
 
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
@@ -97,7 +100,9 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
 
   RGBAF albedo = mat.albedo;
   if (mat.albedo_tex != TEXTURE_NONE) {
-    const float4 albedo_f = texture_load(load_texture_object(mat.albedo_tex), tex_coords);
+    const DeviceTextureObject tex = load_texture_object(mat.albedo_tex);
+
+    const float4 albedo_f = (texture_is_valid(tex)) ? texture_load(tex, tex_coords) : make_float4(0.9f, 0.9f, 0.9f, 1.0f);
     albedo.r              = albedo_f.x;
     albedo.g              = albedo_f.y;
     albedo.b              = albedo_f.z;
@@ -112,7 +117,9 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
     emission = mat.emission;
 
     if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
-      const float4 luminance_f = texture_load(load_texture_object(mat.luminance_tex), tex_coords);
+      const DeviceTextureObject tex = load_texture_object(mat.luminance_tex);
+
+      const float4 luminance_f = (texture_is_valid(tex)) ? texture_load(tex, tex_coords) : make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 
       emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
       emission = scale_color(emission, luminance_f.w * albedo.a * mat.emission_scale);
@@ -135,7 +142,9 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
 
   float roughness = mat.roughness;
   if (mat.roughness_tex != TEXTURE_NONE) {
-    const float4 material_f = texture_load(load_texture_object(mat.roughness_tex), tex_coords);
+    const DeviceTextureObject tex = load_texture_object(mat.roughness_tex);
+
+    const float4 material_f = (texture_is_valid(tex)) ? texture_load(tex, tex_coords) : make_float4(0.5f, 0.0f, 0.0f, 0.0f);
 
     roughness = material_f.x;
   }

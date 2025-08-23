@@ -40,6 +40,8 @@
 #define UNDERSAMPLING_STAGE_SHIFT 2
 #define UNDERSAMPLING_ITERATION_MASK 0x03
 
+#define TEXTURE_OBJECT_INVALID (0xFFFFFFFFFFFFFFFFull)
+
 #ifdef __cplusplus
 #define LUM_RESTRICT __restrict__
 #else

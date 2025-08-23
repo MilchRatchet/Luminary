@@ -90,7 +90,7 @@ struct WavefrontContent {
 } typedef WavefrontContent;
 
 LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args);
-LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file);
+LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file, Queue* queue);
 LuminaryResult wavefront_convert_content(
   WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials,
   uint32_t material_offset);

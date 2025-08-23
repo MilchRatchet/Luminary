@@ -6,6 +6,7 @@
 #include "mesh.h"
 #include "mutex.h"
 #include "output_descriptor.h"
+#include "queue_worker.h"
 #include "scene.h"
 #include "texture.h"
 #include "thread.h"
@@ -13,10 +14,11 @@
 
 struct LuminaryHost {
   DeviceManager* device_manager;
+  QueueWorker* queue_worker_main;
   Queue* work_queue;
+  ARRAY QueueWorker** queue_worker_secondary;
+  Queue* secondary_work_queue;
   RingBuffer* ringbuffer;
-  WallTime* queue_wall_time;
-  Thread* work_thread;
   ARRAY Mesh** meshes;
   ARRAY Texture** textures;
   bool enable_output;

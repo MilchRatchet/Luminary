@@ -3,6 +3,8 @@
 
 #include "utils.h"
 
+enum TextureStatus { TEXTURE_STATUS_NONE, TEXTURE_STATUS_INVALID, TEXTURE_STATUS_ASYNC_LOADING } typedef TextureStatus;
+
 enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1, TexDataUINT16 = 2 } typedef TextureDataType;
 enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
 enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
@@ -11,6 +13,7 @@ enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef Text
 enum TextureReadMode { TexReadModeNormalized = 0, TexReadModeElement = 1 } typedef TextureReadMode;
 
 struct Texture {
+  TextureStatus status;
   uint32_t width;
   uint32_t height;
   uint32_t depth;
@@ -27,10 +30,16 @@ struct Texture {
   void* data;
   float gamma;
   uint32_t num_components;
+  void* async_work_data;
 } typedef Texture;
 
-LuminaryResult texture_create(
-  Texture** tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components);
+LuminaryResult texture_create(Texture** texture);
+LuminaryResult texture_fill(
+  Texture* tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components);
+LuminaryResult texture_invalidate(Texture* texture);
+LuminaryResult texture_is_valid(const Texture* texture, bool* is_valid);
+LuminaryResult texture_load_async(Texture* texture, Queue* queue, const char* path);
+LuminaryResult texture_await(const Texture* texture);
 LuminaryResult texture_destroy(Texture** tex);
 
 #endif /* LUMINARY_TEXTURE_H */

@@ -1796,9 +1796,8 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(material);
 
-  bool has_emission      = false;
-  bool material_is_dirty = false;
-  *meshes_need_update    = false;
+  bool has_emission   = false;
+  *meshes_need_update = false;
 
   float intensity = 0.0f;
 
@@ -1806,7 +1805,7 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
     const bool has_textured_emission = material->luminance_tex != TEXTURE_NONE;
     if (cache->has_textured_emission != has_textured_emission) {
       cache->has_textured_emission = has_textured_emission;
-      material_is_dirty            = true;
+      cache->is_dirty              = true;
       cache->needs_reintegration   = true;
     }
 
@@ -1821,7 +1820,7 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
 
   if (cache->constant_emission_intensity != intensity) {
     cache->constant_emission_intensity = intensity;
-    material_is_dirty                  = true;
+    cache->is_dirty                    = true;
   }
 
   if (intensity > 0.0f) {
@@ -1830,12 +1829,8 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
 
   if (cache->has_emission != has_emission) {
     cache->has_emission = has_emission;
-    material_is_dirty   = true;
+    cache->is_dirty     = true;
     *meshes_need_update = true;
-  }
-
-  if (has_emission && material_is_dirty) {
-    cache->is_dirty = true;
   }
 
   return LUMINARY_SUCCESS;

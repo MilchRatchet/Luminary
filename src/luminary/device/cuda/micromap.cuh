@@ -56,6 +56,11 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
     return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
   }
 
+  if (texture_is_valid(tri.tex) == false) {
+    // Materials with an invalid texture are finicky, they rely on hardcoded behaviour, don't fast path such edge cases.
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+  }
+
   float2 bary0;
   float2 bary1;
   float2 bary2;
@@ -114,7 +119,7 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
       max_u = min_u + 1.0f;
 
     for (float u = min_u; u <= max_u; u += inv_width) {
-      const float alpha = tex2D<float4>(tri.tex.handle, u, 1.0f - v).w;
+      const float alpha = texture_load(tri.tex, get_uv(u, v)).w;
 
       if (alpha > 0.0f)
         found_opaque = true;

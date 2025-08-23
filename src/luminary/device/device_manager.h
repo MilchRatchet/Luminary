@@ -8,7 +8,7 @@
 #include "device_result_interface.h"
 #include "device_sampletime.h"
 #include "device_sky.h"
-#include "thread.h"
+#include "queue_worker.h"
 
 struct DeviceManagerCreateInfo {
   uint32_t device_mask;
@@ -23,9 +23,8 @@ struct DeviceManager {
   uint32_t main_device_index;
   DeviceLibrary* library;
   Queue* work_queue;
+  QueueWorker* queue_worker_main;
   RingBuffer* ringbuffer;
-  WallTime* queue_wall_time;
-  Thread* work_thread;
   LightTree* light_tree;
   SkyLUT* sky_lut;
   SkyHDRI* sky_hdri;

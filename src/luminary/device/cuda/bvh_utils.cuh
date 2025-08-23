@@ -2,6 +2,7 @@
 #define CU_BVH_UTILS_H
 
 #include "memory.cuh"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 
 #if 0
@@ -19,7 +20,7 @@ __device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle
     return BVH_ALPHA_RESULT_OPAQUE;
 
   const UV tex_coords = load_triangle_tex_coords(t_id, coords);
-  const float alpha   = tex2D<float4>(device.ptrs.albedo_atlas[t.albedo_tex].handle, tex_coords.u, 1.0f - tex_coords.v).w;
+  const float alpha   = texture_load(device.ptrs.albedo_atlas[t.albedo_tex], tex_coords).w;
 
   if (alpha == 0.0f) {
     return BVH_ALPHA_RESULT_TRANSPARENT;

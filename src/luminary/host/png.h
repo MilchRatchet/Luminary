@@ -40,7 +40,7 @@ LuminaryResult png_store_image(Image image, const char* file_path);
 LuminaryResult png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const PNGColortype color_type, const PNGBitdepth bit_depth);
-LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t file_length, const char* hint_name);
-LuminaryResult png_load_from_file(Texture** texture, const char* filename);
+LuminaryResult png_load(Texture* texture, const uint8_t* file, const size_t file_length, const char* hint_name);
+LuminaryResult png_load_from_file(Texture* texture, const char* filename);
 
 #endif /* PNG_H */
