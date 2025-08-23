@@ -14,8 +14,8 @@ static void _element_checkbox_render_func(Element* checkbox, Display* display) {
     background_mode);
 
   if (data->data) {
-    const uint32_t padding_x = (checkbox->width >> 1) - 2;
-    const uint32_t padding_y = (checkbox->width >> 1) - 1;
+    const uint32_t padding_x = (checkbox->width >> 1) - 1;
+    const uint32_t padding_y = (checkbox->width >> 1) + 2;
 
     text_renderer_render(
       display->text_renderer, display, "\ue5ca", TEXT_RENDERER_FONT_MATERIAL, MD_COLOR_WHITE, checkbox->x + padding_x,
