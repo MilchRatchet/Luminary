@@ -87,7 +87,7 @@ void window_renderer_status_create(Window** window) {
   (*window)->visibility_mask = WINDOW_VISIBILITY_STATUS;
   (*window)->x               = 0;
   (*window)->y               = 0;
-  (*window)->width           = 420;
+  (*window)->width           = 512;
   (*window)->height          = 48;
   (*window)->padding         = 0;
   (*window)->is_horizontal   = false;

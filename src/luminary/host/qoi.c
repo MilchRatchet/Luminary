@@ -83,15 +83,14 @@ LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** da
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture** texture) {
+LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture* texture) {
   __CHECK_NULL_ARGUMENT(data);
   __CHECK_NULL_ARGUMENT(texture);
 
   qoi_desc desc;
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
-  __FAILURE_HANDLE(texture_create(texture));
-  __FAILURE_HANDLE(texture_fill(*texture, desc.width, desc.height, 1, decoded_data, TexDataUINT8, 4));
+  __FAILURE_HANDLE(texture_fill(texture, desc.width, desc.height, 1, decoded_data, TexDataUINT8, 4));
 
   return LUMINARY_SUCCESS;
 }

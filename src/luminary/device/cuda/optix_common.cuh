@@ -25,9 +25,14 @@ __device__ OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
   const uint16_t tex         = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
 
   if (tex != TEXTURE_NONE) {
+    const DeviceTextureObject texture = load_texture_object(tex);
+
+    if (texture_is_valid(texture) == false)
+      return OPTIX_ALPHA_RESULT_OPAQUE;
+
     const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
-    const float alpha = tex2D<float4>(load_texture_object(tex).handle, uv.u, 1.0f - uv.v).w;
+    const float alpha = texture_load(texture, uv).w;
 
     if (alpha == 0.0f) {
       return OPTIX_ALPHA_RESULT_TRANSPARENT;
@@ -45,9 +50,14 @@ __device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, con
   RGBAF albedo = material.albedo;
 
   if (material.albedo_tex != TEXTURE_NONE) {
+    const DeviceTextureObject texture = load_texture_object(material.albedo_tex);
+
+    if (texture_is_valid(texture) == false)
+      return get_RGBAF(0.9f, 0.9f, 0.9f, 1.0f);
+
     const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
-    const float4 tex_value = tex2D<float4>(load_texture_object(material.albedo_tex).handle, uv.u, 1.0f - uv.v);
+    const float4 tex_value = texture_load(texture, uv);
 
     albedo = get_RGBAF(tex_value.x, tex_value.y, tex_value.z, tex_value.w);
   }

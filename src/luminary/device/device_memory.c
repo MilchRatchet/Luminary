@@ -66,7 +66,13 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
 
   size_t pitch;
-  CUDA_FAILURE_HANDLE(cuMemAllocPitch(&header->ptr, &pitch, width_in_bytes, height, 16));
+  if (width_in_bytes > 0 && height) {
+    CUDA_FAILURE_HANDLE(cuMemAllocPitch(&header->ptr, &pitch, width_in_bytes, height, 16));
+  }
+  else {
+    header->ptr = (CUdeviceptr) 0;
+    pitch       = 0;
+  }
 
   const size_t size = pitch * height;
 
@@ -245,7 +251,7 @@ LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Destination is not device memory.");
   }
 
-  if (header->pitch == 0) {
+  if ((header->ptr != (CUdeviceptr) 0) && (header->pitch == 0)) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device memory was not allocated with a pitch.");
   }
 

@@ -156,7 +156,8 @@ static uint16_t find_texture(const WavefrontContent* content, uint32_t hash) {
   return TEXTURE_NONE;
 }
 
-static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_file_path, const char* line, const size_t line_len) {
+static LuminaryResult _wavefront_parse_map(
+  WavefrontContent* content, Path* mtl_file_path, Queue* queue, const char* line, const size_t line_len) {
   if (line_len < 8) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Line is too short to be a valid map_ line.");
   }
@@ -260,7 +261,9 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
     __FAILURE_HANDLE(path_apply(mtl_file_path, path, &tex_file_path));
 
     Texture* tex;
-    __FAILURE_HANDLE(png_load_from_file(&tex, tex_file_path));
+    __FAILURE_HANDLE(texture_create(&tex));
+
+    __FAILURE_HANDLE(texture_load_async(tex, queue, tex_file_path));
 
     __FAILURE_HANDLE(array_push(&content->textures, &tex));
     __FAILURE_HANDLE(array_push(&content->texture_instances, &texture_instance));
@@ -275,7 +278,7 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_file_path) {
+static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_file_path, Queue* queue) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(mtl_file_path);
 
@@ -397,7 +400,7 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
       }
     }
     else if (line[0] == 'm' && line[1] == 'a') {
-      __FAILURE_HANDLE(_wavefront_parse_map(content, mtl_file_path, line, line_len));
+      __FAILURE_HANDLE(_wavefront_parse_map(content, mtl_file_path, queue, line, line_len));
     }
   }
 
@@ -556,7 +559,7 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
   return tris;
 }
 
-LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_file_path) {
+LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_file_path, Queue* queue) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(wavefront_file_path);
 
@@ -710,7 +713,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
           Path* mtl_file_path;
           __FAILURE_HANDLE(path_extend(&mtl_file_path, wavefront_file_path, path));
 
-          __FAILURE_HANDLE(read_materials_file(content, mtl_file_path));
+          __FAILURE_HANDLE(read_materials_file(content, mtl_file_path, queue));
 
           __FAILURE_HANDLE(luminary_path_destroy(&mtl_file_path));
         }

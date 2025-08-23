@@ -3,6 +3,10 @@
 
 #include "utils.cuh"
 
+__device__ bool texture_is_valid(const DeviceTextureObject tex) {
+  return tex.handle != TEXTURE_OBJECT_INVALID;
+}
+
 __device__ float4 texture_load(const DeviceTextureObject tex, const UV uv, const bool flip_v = true, const bool apply_gamma = true) {
   const float u = uv.u;
   const float v = flip_v ? 1.0f - uv.v : uv.v;

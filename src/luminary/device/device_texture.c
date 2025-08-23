@@ -90,6 +90,8 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
   __CHECK_NULL_ARGUMENT(_device_texture);
   __CHECK_NULL_ARGUMENT(texture);
 
+  __FAILURE_HANDLE(texture_await(texture));
+
   size_t pixel_size;
   __FAILURE_HANDLE(_device_texture_get_pixel_size(texture, &pixel_size));
 
@@ -196,15 +198,24 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension type is invalid.");
   }
 
-  DeviceTexture* device_texture;
-  __FAILURE_HANDLE(host_malloc(&device_texture, sizeof(DeviceTexture)));
-
-  CUDA_FAILURE_HANDLE(cuTexObjectCreate(&device_texture->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
-
   if (width > 0xFFFF || height > 0xFFFF) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension exceeds limits: %ux%u.", width, height);
   }
 
+  DeviceTexture* device_texture;
+  __FAILURE_HANDLE(host_malloc(&device_texture, sizeof(DeviceTexture)));
+
+  bool tex_is_valid;
+  __FAILURE_HANDLE(texture_is_valid(texture, &tex_is_valid));
+
+  if (tex_is_valid) {
+    CUDA_FAILURE_HANDLE(cuTexObjectCreate(&device_texture->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
+  }
+  else {
+    device_texture->tex = TEXTURE_OBJECT_INVALID;
+  }
+
+  device_texture->status     = tex_is_valid ? TEXTURE_STATUS_NONE : TEXTURE_STATUS_INVALID;
   device_texture->memory     = data_device;
   device_texture->width      = width;
   device_texture->height     = height;

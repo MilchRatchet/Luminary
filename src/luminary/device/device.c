@@ -422,14 +422,16 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_MOON_NORMAL, &moon_normal_data, &moon_normal_data_length));
 
   Texture* moon_albedo_tex;
-  __FAILURE_HANDLE(png_load(&moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
+  __FAILURE_HANDLE(texture_create(&moon_albedo_tex));
+  __FAILURE_HANDLE(png_load(moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
 
   __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&moon_albedo_tex));
 
   Texture* moon_normal_tex;
-  __FAILURE_HANDLE(png_load(&moon_normal_tex, moon_normal_data, moon_normal_data_length, "moon_normal.png"));
+  __FAILURE_HANDLE(texture_create(&moon_normal_tex));
+  __FAILURE_HANDLE(png_load(moon_normal_tex, moon_normal_data, moon_normal_data_length, "moon_normal.png"));
 
   __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex, device->stream_main));
 

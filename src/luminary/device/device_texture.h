@@ -6,6 +6,7 @@
 #include "texture.h"
 
 struct DeviceTexture {
+  TextureStatus status;
   void* memory;
   CUtexObject tex;
   uint16_t width;

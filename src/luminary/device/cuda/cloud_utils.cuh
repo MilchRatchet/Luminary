@@ -82,7 +82,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
       weather_pos.z    = weather_pos.z + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_sin;
       weather_pos      = scale_vector(weather_pos, 0.012f * device.cloud.noise_weather_scale);
 
-      float4 tex = tex2D<float4>(device.cloud_noise_weather_tex.handle, weather_pos.x, weather_pos.z);
+      float4 tex = texture_load(device.cloud_noise_weather_tex, get_uv(weather_pos.x, weather_pos.z), false, false);
 
       CloudWeather weather;
       weather.coverage = __saturatef(remap(tex.x * device.cloud.low.coverage, 0.0f, 1.0f, device.cloud.low.coverage_min, 1.0f));
@@ -96,7 +96,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
       weather_pos.z    = weather_pos.z + device.cloud.mid.wind_speed * height * device.cloud.mid.wind_angle_sin;
       weather_pos      = scale_vector(weather_pos, 0.01f * device.cloud.noise_weather_scale);
 
-      float4 tex = tex2D<float4>(device.cloud_noise_weather_tex.handle, weather_pos.x, weather_pos.z);
+      float4 tex = texture_load(device.cloud_noise_weather_tex, get_uv(weather_pos.x, weather_pos.z), false, false);
 
       CloudWeather weather;
       weather.coverage = __saturatef(remap(tex.z * device.cloud.mid.coverage, 0.0f, 1.0f, device.cloud.mid.coverage_min, 1.0f));
@@ -110,7 +110,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
       weather_pos.z    = weather_pos.z + device.cloud.top.wind_speed * height * device.cloud.top.wind_angle_sin;
       weather_pos      = scale_vector(weather_pos, 0.004f * device.cloud.noise_weather_scale);
 
-      float4 tex = tex2D<float4>(device.cloud_noise_weather_tex.handle, weather_pos.x, weather_pos.z);
+      float4 tex = texture_load(device.cloud_noise_weather_tex, get_uv(weather_pos.x, weather_pos.z), false, false);
 
       CloudWeather w;
       w.coverage  = __saturatef(remap(tex.x * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));

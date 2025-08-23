@@ -256,9 +256,16 @@ __device__ RGBF light_get_color(TriangleLight& triangle) {
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
   if (mat.luminance_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(load_texture_object(mat.luminance_tex), triangle.tex_coords);
+    const DeviceTextureObject tex = load_texture_object(mat.luminance_tex);
 
-    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
+    if (texture_is_valid(tex)) {
+      const float4 emission = texture_load(tex, triangle.tex_coords);
+
+      color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
+    }
+    else {
+      color = splat_color(0.0f);
+    }
   }
   else {
     color = mat.emission;
@@ -267,7 +274,9 @@ __device__ RGBF light_get_color(TriangleLight& triangle) {
   if (color_importance(color) > 0.0f) {
     float alpha;
     if (mat.albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(load_texture_object(mat.albedo_tex), triangle.tex_coords).w;
+      const DeviceTextureObject tex = load_texture_object(mat.albedo_tex);
+
+      alpha = (texture_is_valid(tex)) ? texture_load(tex, triangle.tex_coords).w : 1.0f;
     }
     else {
       alpha = mat.albedo.a;

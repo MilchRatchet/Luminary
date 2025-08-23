@@ -168,6 +168,9 @@ __device__ float lights_integrate_emission(
   const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2, const uint32_t microtriangle_id) {
   const DeviceTextureObject tex = load_texture_object(material.luminance_tex);
 
+  if (texture_is_valid(tex) == false)
+    return 0.0f;
+
   float2 bary0, bary1, bary2;
   light_microtriangle_id_to_bary(microtriangle_id, bary0, bary1, bary2);
 

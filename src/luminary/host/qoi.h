@@ -17,7 +17,7 @@ LuminaryResult store_ARGB8_qoi(const char* filename, const ARGB8* image, const i
 LuminaryResult store_as_qoi(
   const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type);
 LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** data);
-LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture** texture);
+LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture* texture);
 
 #if __cplusplus
 }

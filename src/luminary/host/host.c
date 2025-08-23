@@ -40,7 +40,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   WavefrontContent* wavefront_content;
 
   __FAILURE_HANDLE(wavefront_create(&wavefront_content, args->wavefront_args));
-  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
+  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path, host->secondary_work_queue));
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
 

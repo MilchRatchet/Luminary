@@ -3,6 +3,7 @@
 
 #include "math.cuh"
 #include "sky_defines.h"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 
 __device__ float sky_height(const vec3 point) {
@@ -52,7 +53,7 @@ __device__ RGBF sky_hdri_sample(const vec3 ray) {
   const float u = (theta + PI) / (2.0f * PI);
   const float v = 1.0f - ((phi + 0.5f * PI) / PI);
 
-  const float4 hdri = tex2D<float4>(device.sky_hdri_color_tex.handle, u, v);
+  const float4 hdri = texture_load(device.sky_hdri_color_tex, get_uv(u, v), false, false);
 
   return get_color(hdri.x, hdri.y, hdri.z);
 }
@@ -322,8 +323,8 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool 
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 
   const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-  const float4 transmittance_low  = tex2D<float4>(device.sky_lut_transmission_low_tex.handle, transmittance_uv.u, transmittance_uv.v);
-  const float4 transmittance_high = tex2D<float4>(device.sky_lut_transmission_high_tex.handle, transmittance_uv.u, transmittance_uv.v);
+  const float4 transmittance_low  = texture_load(device.sky_lut_transmission_low_tex, transmittance_uv, false, false);
+  const float4 transmittance_high = texture_load(device.sky_lut_transmission_high_tex, transmittance_uv, false, false);
   const Spectrum extinction_sun   = spectrum_mul(spectrum_get_ident(), spectrum_merge(transmittance_low, transmittance_high));
 
   const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.sky.sun_strength);
