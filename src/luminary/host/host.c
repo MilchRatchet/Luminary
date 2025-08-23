@@ -17,6 +17,9 @@
 #define HOST_QUEUE_SIZE (0x400ull)
 #define HOST_NUM_SECONDARY_QUEUE_WORKERS (16)
 
+// Host Main + Device manager Main + Host Secondary
+#define LUMINARY_TOTAL_NUM_QUEUE_WORKERS (1 + 1 + HOST_NUM_SECONDARY_QUEUE_WORKERS)
+
 static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right) {
   return (left->function == right->function);
 }
@@ -600,38 +603,92 @@ LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {
+LuminaryResult luminary_host_get_num_queue_workers(const LuminaryHost* host, uint32_t* num_queue_workers) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(num_queue_workers);
+
+  *num_queue_workers = LUMINARY_TOTAL_NUM_QUEUE_WORKERS;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_queue_worker_name(const LuminaryHost* host, uint32_t queue_worker_id, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
-  __FAILURE_HANDLE(wall_time_get_string(host->queue_worker_main->wall_time, string));
+  if (queue_worker_id >= LUMINARY_TOTAL_NUM_QUEUE_WORKERS) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Queue worker ID %u is invalid.", queue_worker_id);
+  }
+
+  QueueWorker* queue_worker;
+
+  switch (queue_worker_id) {
+    case 0:
+      queue_worker = host->queue_worker_main;
+      break;
+    case 1:
+      queue_worker = host->device_manager->queue_worker_main;
+      break;
+    default:
+      queue_worker = host->queue_worker_secondary[queue_worker_id - 2];
+      break;
+  }
+
+  __FAILURE_HANDLE(wall_time_get_worker_name(queue_worker->wall_time, string));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_device_queue_string(const Host* host, const char** string) {
+LuminaryResult luminary_host_get_queue_worker_string(const LuminaryHost* host, uint32_t queue_worker_id, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
-  __FAILURE_HANDLE(wall_time_get_string(host->device_manager->queue_worker_main->wall_time, string));
+  if (queue_worker_id >= LUMINARY_TOTAL_NUM_QUEUE_WORKERS) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Queue worker ID %u is invalid.", queue_worker_id);
+  }
+
+  QueueWorker* queue_worker;
+
+  switch (queue_worker_id) {
+    case 0:
+      queue_worker = host->queue_worker_main;
+      break;
+    case 1:
+      queue_worker = host->device_manager->queue_worker_main;
+      break;
+    default:
+      queue_worker = host->queue_worker_secondary[queue_worker_id - 2];
+      break;
+  }
+
+  __FAILURE_HANDLE(wall_time_get_string(queue_worker->wall_time, string));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_queue_time(const Host* host, double* time) {
+LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t queue_worker_id, double* time) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(time);
 
-  __FAILURE_HANDLE(wall_time_get_time(host->queue_worker_main->wall_time, time));
+  if (queue_worker_id >= LUMINARY_TOTAL_NUM_QUEUE_WORKERS) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Queue worker ID %u is invalid.", queue_worker_id);
+  }
 
-  return LUMINARY_SUCCESS;
-}
+  QueueWorker* queue_worker;
 
-LuminaryResult luminary_host_get_device_queue_time(const Host* host, double* time) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(time);
+  switch (queue_worker_id) {
+    case 0:
+      queue_worker = host->queue_worker_main;
+      break;
+    case 1:
+      queue_worker = host->device_manager->queue_worker_main;
+      break;
+    default:
+      queue_worker = host->queue_worker_secondary[queue_worker_id - 2];
+      break;
+  }
 
-  __FAILURE_HANDLE(wall_time_get_time(host->device_manager->queue_worker_main->wall_time, time));
+  __FAILURE_HANDLE(wall_time_get_time(queue_worker->wall_time, time));
 
   return LUMINARY_SUCCESS;
 }

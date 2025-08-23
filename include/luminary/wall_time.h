@@ -25,6 +25,8 @@ struct LuminaryWallTime;
 typedef struct LuminaryWallTime LuminaryWallTime;
 
 LUMINARY_API LuminaryResult wall_time_create(LuminaryWallTime** wall_time);
+LUMINARY_API LuminaryResult wall_time_set_worker_name(LuminaryWallTime* wall_time, const char* name);
+LUMINARY_API LuminaryResult wall_time_get_worker_name(LuminaryWallTime* wall_time, const char** name);
 LUMINARY_API LuminaryResult wall_time_set_string(LuminaryWallTime* wall_time, const char* string);
 LUMINARY_API LuminaryResult wall_time_get_string(LuminaryWallTime* wall_time, const char** string);
 LUMINARY_API LuminaryResult wall_time_start(LuminaryWallTime* wall_time);

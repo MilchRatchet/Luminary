@@ -15,6 +15,7 @@
 #endif
 
 struct LuminaryWallTime {
+  const char* name;
   const char* string;
   uint64_t time_point;
   double time;
@@ -45,28 +46,34 @@ static double _wall_time_get_time_diff(const uint64_t t0, const uint64_t t1) {
 #endif
 }
 
-LuminaryResult wall_time_create(WallTime** _wall_time) {
-  if (!_wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
-  }
+LuminaryResult wall_time_create(WallTime** wall_time) {
+  __CHECK_NULL_ARGUMENT(wall_time);
 
-  WallTime* wall_time;
+  __FAILURE_HANDLE(host_malloc(wall_time, sizeof(WallTime)));
+  memset(*wall_time, 0, sizeof(WallTime));
 
-  __FAILURE_HANDLE(host_malloc(&wall_time, sizeof(WallTime)));
+  return LUMINARY_SUCCESS;
+}
 
-  wall_time->string     = (const char*) 0;
-  wall_time->time_point = 0;
-  wall_time->time       = 0.0;
+LUMINARY_API LuminaryResult wall_time_set_worker_name(LuminaryWallTime* wall_time, const char* name) {
+  __CHECK_NULL_ARGUMENT(wall_time);
 
-  *_wall_time = wall_time;
+  wall_time->name = name;
+
+  return LUMINARY_SUCCESS;
+}
+
+LUMINARY_API LuminaryResult wall_time_get_worker_name(LuminaryWallTime* wall_time, const char** name) {
+  __CHECK_NULL_ARGUMENT(wall_time);
+  __CHECK_NULL_ARGUMENT(name);
+
+  *name = wall_time->name;
 
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult wall_time_set_string(WallTime* wall_time, const char* string) {
-  if (!wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(wall_time);
 
   wall_time->string = string;
 
@@ -74,13 +81,8 @@ LuminaryResult wall_time_set_string(WallTime* wall_time, const char* string) {
 }
 
 LuminaryResult wall_time_get_string(WallTime* wall_time, const char** string) {
-  if (!wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
-  }
-
-  if (!string) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "String ptr is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(wall_time);
+  __CHECK_NULL_ARGUMENT(string);
 
   *string = wall_time->string;
 
@@ -88,9 +90,7 @@ LuminaryResult wall_time_get_string(WallTime* wall_time, const char** string) {
 }
 
 LuminaryResult wall_time_start(WallTime* wall_time) {
-  if (!wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(wall_time);
 
   wall_time->time_point = _wall_time_get_time();
 
@@ -98,9 +98,8 @@ LuminaryResult wall_time_start(WallTime* wall_time) {
 }
 
 LuminaryResult wall_time_get_time(WallTime* wall_time, double* time) {
-  if (!wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(wall_time);
+  __CHECK_NULL_ARGUMENT(time);
 
   if (wall_time->time_point != 0) {
     wall_time->time = _wall_time_get_time_diff(wall_time->time_point, _wall_time_get_time());
@@ -112,9 +111,7 @@ LuminaryResult wall_time_get_time(WallTime* wall_time, double* time) {
 }
 
 LuminaryResult wall_time_stop(WallTime* wall_time) {
-  if (!wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(wall_time);
 
   wall_time->time = (wall_time->time_point != 0) ? _wall_time_get_time_diff(wall_time->time_point, _wall_time_get_time()) : 0.0f;
 
@@ -124,13 +121,8 @@ LuminaryResult wall_time_stop(WallTime* wall_time) {
 }
 
 LuminaryResult wall_time_destroy(WallTime** wall_time) {
-  if (!wall_time) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time ptr is NULL.");
-  }
-
-  if (!(*wall_time)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wall time is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(wall_time);
+  __CHECK_NULL_ARGUMENT(*wall_time);
 
   __FAILURE_HANDLE(host_free(wall_time));
 

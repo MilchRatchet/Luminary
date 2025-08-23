@@ -23,6 +23,8 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
 
   bool success = true;
 
+  __FAILURE_HANDLE(wall_time_set_worker_name(args->wall_time, args->name));
+
   while (success) {
     QueueEntry entry;
     __FAILURE_HANDLE(queue_pop_blocking(args->queue, &entry, &success));
@@ -60,6 +62,8 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
     }
 #endif
   }
+
+  __FAILURE_HANDLE(wall_time_set_worker_name(args->wall_time, (const char*) 0));
 
   return LUMINARY_SUCCESS;
 }
