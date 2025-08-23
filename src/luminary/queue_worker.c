@@ -30,6 +30,15 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
     if (!success)
       break;
 
+    if (entry.deferring_func) {
+      bool defer_execution;
+      __FAILURE_HANDLE(entry.deferring_func(args->worker_context, entry.args, &defer_execution));
+      if (defer_execution) {
+        __FAILURE_HANDLE(queue_push(args->queue, &entry));
+        continue;
+      }
+    }
+
     __FAILURE_HANDLE(wall_time_set_string(args->wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(args->wall_time));
 
@@ -55,6 +64,33 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _queue_worker_start_common(QueueWorker* worker, const char* name, Queue* queue, void* worker_context) {
+  __CHECK_NULL_ARGUMENT(worker);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(queue);
+  __CHECK_NULL_ARGUMENT(worker_context);
+
+  if (worker->status != QUEUE_WORKER_STATUS_OFFLINE) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue worker must be offline to start it.");
+  }
+
+  const size_t name_length = strlen(name);
+
+  QueueWorkerMainArgs* main_args = (QueueWorkerMainArgs*) worker->main_args;
+
+  __FAILURE_HANDLE(host_malloc(&main_args->name, name_length + 1));
+  memcpy(main_args->name, name, name_length);
+  main_args->name[name_length] = '\0';
+
+  main_args->queue          = queue;
+  main_args->wall_time      = worker->wall_time;
+  main_args->worker_context = worker_context;
+
+  worker->status = QUEUE_WORKER_STATUS_ONLINE;
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // API
 ////////////////////////////////////////////////////////////////////
@@ -76,27 +112,40 @@ LuminaryResult queue_worker_create(QueueWorker** worker) {
 
 LuminaryResult queue_worker_start(QueueWorker* worker, const char* name, Queue* queue, void* worker_context) {
   __CHECK_NULL_ARGUMENT(worker);
+  __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(queue);
+  __CHECK_NULL_ARGUMENT(worker_context);
 
-  if (worker->status != QUEUE_WORKER_STATUS_OFFLINE) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue worker must be offline to start it.");
-  }
+  __FAILURE_HANDLE(_queue_worker_start_common(worker, name, queue, worker_context));
 
-  const size_t name_length = strlen(name);
+  __FAILURE_HANDLE(thread_start(worker->thread, (ThreadMainFunc) _queue_worker_main, (QueueWorkerMainArgs*) worker->main_args));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult queue_worker_start_synchronous(QueueWorker* worker, const char* name, Queue* queue, void* worker_context) {
+  __CHECK_NULL_ARGUMENT(worker);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(queue);
+  __CHECK_NULL_ARGUMENT(worker_context);
+
+  __FAILURE_HANDLE(_queue_worker_start_common(worker, name, queue, worker_context));
+
+  __FAILURE_HANDLE(_queue_worker_main((QueueWorkerMainArgs*) worker->main_args));
+
+  worker->status = QUEUE_WORKER_STATUS_OFFLINE;
 
   QueueWorkerMainArgs* main_args = (QueueWorkerMainArgs*) worker->main_args;
+  __FAILURE_HANDLE(host_free(&main_args->name));
 
-  __FAILURE_HANDLE(host_malloc(&main_args->name, name_length + 1));
-  memcpy(main_args->name, name, name_length);
-  main_args->name[name_length] = '\0';
+  return LUMINARY_SUCCESS;
+}
 
-  main_args->queue          = queue;
-  main_args->wall_time      = worker->wall_time;
-  main_args->worker_context = worker_context;
+LuminaryResult queue_worker_is_running(QueueWorker* worker, bool* is_running) {
+  __CHECK_NULL_ARGUMENT(worker);
+  __CHECK_NULL_ARGUMENT(is_running);
 
-  worker->status = QUEUE_WORKER_STATUS_ONLINE;
-
-  __FAILURE_HANDLE(thread_start(worker->thread, (ThreadMainFunc) _queue_worker_main, main_args));
+  *is_running = worker->status == QUEUE_WORKER_STATUS_ONLINE;
 
   return LUMINARY_SUCCESS;
 }

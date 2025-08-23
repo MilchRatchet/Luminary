@@ -9,54 +9,6 @@
 #define DEVICE_MANAGER_RINGBUFFER_SIZE (0x100000ull)
 #define DEVICE_MANAGER_QUEUE_SIZE (0x400ull)
 
-////////////////////////////////////////////////////////////////////
-// Queue worker functions
-////////////////////////////////////////////////////////////////////
-
-static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager) {
-  bool success = true;
-
-  while (success) {
-    QueueEntry entry;
-    __FAILURE_HANDLE(queue_pop_blocking(device_manager->work_queue, &entry, &success));
-
-    if (!success)
-      return LUMINARY_SUCCESS;
-
-    if (entry.deferring_func) {
-      bool defer_execution;
-      __FAILURE_HANDLE(entry.deferring_func(device_manager, entry.args, &defer_execution));
-      if (defer_execution) {
-        __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
-        continue;
-      }
-    }
-
-    __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, entry.name));
-    __FAILURE_HANDLE(wall_time_start(device_manager->queue_wall_time));
-
-    __FAILURE_HANDLE(entry.function(device_manager, entry.args));
-
-    if (entry.clear_func) {
-      __FAILURE_HANDLE(entry.clear_func(device_manager, entry.args));
-    }
-
-    __FAILURE_HANDLE(wall_time_stop(device_manager->queue_wall_time));
-    __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, (const char*) 0));
-
-#ifdef LUMINARY_WORK_QUEUE_STATS_PRINT
-    double time;
-    __FAILURE_HANDLE(wall_time_get_time(device_manager->queue_wall_time, &time));
-
-    if (time > LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD) {
-      warn_message("device_manager queue: %s (%fs)", entry.name, time);
-    }
-#endif
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
 static bool _device_manager_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right) {
   return (left->function == right->function);
 }
@@ -833,10 +785,9 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   // Create work queue
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(thread_create(&device_manager->work_thread));
   __FAILURE_HANDLE(queue_create(&device_manager->work_queue, sizeof(QueueEntry), DEVICE_MANAGER_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&device_manager->ringbuffer, DEVICE_MANAGER_RINGBUFFER_SIZE));
-  __FAILURE_HANDLE(wall_time_create(&device_manager->queue_wall_time));
+  __FAILURE_HANDLE(queue_worker_create(&device_manager->queue_worker_main));
 
   __FAILURE_HANDLE(device_manager_start_queue(device_manager));
 
@@ -873,14 +824,14 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
 LuminaryResult device_manager_start_queue(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
-  bool device_thread_is_running;
-  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+  bool main_queue_worker_is_running;
+  __FAILURE_HANDLE(queue_worker_is_running(device_manager->queue_worker_main, &main_queue_worker_is_running));
 
-  if (device_thread_is_running)
+  if (main_queue_worker_is_running)
     return LUMINARY_SUCCESS;
 
   __FAILURE_HANDLE(queue_set_is_blocking(device_manager->work_queue, true));
-  __FAILURE_HANDLE(thread_start(device_manager->work_thread, (ThreadMainFunc) _device_manager_queue_worker, device_manager));
+  __FAILURE_HANDLE(queue_worker_start(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager));
 
   return LUMINARY_SUCCESS;
 }
@@ -895,7 +846,7 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   bool device_thread_is_running = device_manager->is_shutdown == false;
 
   if (device_manager->is_shutdown == false) {
-    __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+    __FAILURE_HANDLE(queue_worker_is_running(device_manager->queue_worker_main, &device_thread_is_running));
 
     cannot_execute |= (device_thread_is_running == false) && (entry->queuer_cannot_execute == true);
   }
@@ -927,7 +878,8 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
 
   // If the device thread is not running, execute on current thread.
   if (device_thread_is_running == false) {
-    __FAILURE_HANDLE(_device_manager_queue_worker(device_manager));
+    __FAILURE_HANDLE(
+      queue_worker_start_synchronous(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager));
   }
 
   return LUMINARY_SUCCESS;
@@ -937,17 +889,16 @@ LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
   bool device_thread_is_running;
-  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+  __FAILURE_HANDLE(queue_worker_is_running(device_manager->queue_worker_main, &device_thread_is_running));
 
   if (!device_thread_is_running)
     return LUMINARY_SUCCESS;
 
   __FAILURE_HANDLE(queue_set_is_blocking(device_manager->work_queue, false));
-  __FAILURE_HANDLE(thread_join(device_manager->work_thread));
-  __FAILURE_HANDLE(thread_get_last_result(device_manager->work_thread));
+  __FAILURE_HANDLE(queue_worker_shutdown(device_manager->queue_worker_main));
 
   // There could still be some unfinished work that was queued during shutdown, so execute that now.
-  __FAILURE_HANDLE(_device_manager_queue_worker(device_manager));
+  __FAILURE_HANDLE(queue_worker_start_synchronous(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager));
 
   return LUMINARY_SUCCESS;
 }
@@ -1107,11 +1058,10 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(device_manager_shutdown_queue(*device_manager));
 
-  __FAILURE_HANDLE(wall_time_destroy(&(*device_manager)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
 
-  __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
+  __FAILURE_HANDLE(queue_worker_destroy(&(*device_manager)->queue_worker_main));
 
   const uint32_t main_device_index = (*device_manager)->main_device_index;
   __FAILURE_HANDLE(device_unload_light_tree((*device_manager)->devices[main_device_index], (*device_manager)->light_tree));

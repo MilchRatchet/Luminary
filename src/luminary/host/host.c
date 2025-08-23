@@ -584,7 +584,7 @@ LuminaryResult luminary_host_get_device_queue_string(const Host* host, const cha
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
-  __FAILURE_HANDLE(wall_time_get_string(host->device_manager->queue_wall_time, string));
+  __FAILURE_HANDLE(wall_time_get_string(host->device_manager->queue_worker_main->wall_time, string));
 
   return LUMINARY_SUCCESS;
 }
@@ -602,7 +602,7 @@ LuminaryResult luminary_host_get_device_queue_time(const Host* host, double* tim
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(time);
 
-  __FAILURE_HANDLE(wall_time_get_time(host->device_manager->queue_wall_time, time));
+  __FAILURE_HANDLE(wall_time_get_time(host->device_manager->queue_worker_main->wall_time, time));
 
   return LUMINARY_SUCCESS;
 }
