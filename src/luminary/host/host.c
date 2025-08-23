@@ -15,6 +15,7 @@
 
 #define HOST_RINGBUFFER_SIZE (0x100000ull)
 #define HOST_QUEUE_SIZE (0x400ull)
+#define HOST_NUM_SECONDARY_QUEUE_WORKERS (16)
 
 static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right) {
   return (left->function == right->function);
@@ -301,6 +302,7 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   __FAILURE_HANDLE(scene_create(&(*host)->scene_host));
 
   __FAILURE_HANDLE(queue_create(&(*host)->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
+  __FAILURE_HANDLE(queue_create(&(*host)->secondary_work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&(*host)->ringbuffer, HOST_RINGBUFFER_SIZE));
 
   DeviceManagerCreateInfo device_manager_create_info;
@@ -312,6 +314,20 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
 
   __FAILURE_HANDLE(queue_worker_create(&(*host)->queue_worker_main));
   __FAILURE_HANDLE(queue_worker_start((*host)->queue_worker_main, "Host", (*host)->work_queue, *host));
+
+  __FAILURE_HANDLE(array_create(&(*host)->queue_worker_secondary, sizeof(QueueWorker*), HOST_NUM_SECONDARY_QUEUE_WORKERS));
+
+  for (uint32_t queue_worker_id = 0; queue_worker_id < HOST_NUM_SECONDARY_QUEUE_WORKERS; queue_worker_id++) {
+    QueueWorker* queue_worker;
+    __FAILURE_HANDLE(queue_worker_create(&queue_worker));
+
+    char queue_worker_name[256];
+    sprintf(queue_worker_name, "Worker %u", queue_worker_id);
+
+    __FAILURE_HANDLE(queue_worker_start(queue_worker, queue_worker_name, (*host)->secondary_work_queue, *host));
+
+    __FAILURE_HANDLE(array_push(&(*host)->queue_worker_secondary, &queue_worker));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -330,6 +346,12 @@ LuminaryResult luminary_host_destroy(Host** host) {
   // Shutdown host thread queue
   ////////////////////////////////////////////////////////////////////
 
+  __FAILURE_HANDLE(queue_set_is_blocking((*host)->secondary_work_queue, false));
+
+  for (uint32_t queue_worker_id = 0; queue_worker_id < HOST_NUM_SECONDARY_QUEUE_WORKERS; queue_worker_id++) {
+    __FAILURE_HANDLE(queue_worker_shutdown((*host)->queue_worker_secondary[queue_worker_id]));
+  }
+
   __FAILURE_HANDLE(queue_set_is_blocking((*host)->work_queue, false));
   __FAILURE_HANDLE(queue_worker_shutdown((*host)->queue_worker_main));
 
@@ -341,8 +363,15 @@ LuminaryResult luminary_host_destroy(Host** host) {
 
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
+  __FAILURE_HANDLE(queue_destroy(&(*host)->secondary_work_queue));
 
   __FAILURE_HANDLE(queue_worker_destroy(&(*host)->queue_worker_main));
+
+  for (uint32_t queue_worker_id = 0; queue_worker_id < HOST_NUM_SECONDARY_QUEUE_WORKERS; queue_worker_id++) {
+    __FAILURE_HANDLE(queue_worker_destroy(&(*host)->queue_worker_secondary[queue_worker_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*host)->queue_worker_secondary));
 
   uint32_t mesh_count;
   __FAILURE_HANDLE(array_get_num_elements((*host)->meshes, &mesh_count));

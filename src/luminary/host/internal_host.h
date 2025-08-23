@@ -16,6 +16,8 @@ struct LuminaryHost {
   DeviceManager* device_manager;
   QueueWorker* queue_worker_main;
   Queue* work_queue;
+  ARRAY QueueWorker** queue_worker_secondary;
+  Queue* secondary_work_queue;
   RingBuffer* ringbuffer;
   ARRAY Mesh** meshes;
   ARRAY Texture** textures;
