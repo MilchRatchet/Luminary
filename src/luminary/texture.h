@@ -4,13 +4,17 @@
 #include "utils.h"
 
 enum TextureStatus { TEXTURE_STATUS_NONE, TEXTURE_STATUS_INVALID, TEXTURE_STATUS_ASYNC_LOADING } typedef TextureStatus;
-
-enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1, TexDataUINT16 = 2 } typedef TextureDataType;
-enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
-enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
-enum TextureFilterMode { TexFilterPoint = 0, TexFilterLinear = 1 } typedef TextureFilterMode;
-enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef TextureMipmapMode;
-enum TextureReadMode { TexReadModeNormalized = 0, TexReadModeElement = 1 } typedef TextureReadMode;
+enum TextureDataType { TEXTURE_DATA_TYPE_FP32, TEXTURE_DATA_TYPE_U8, TEXTURE_DATA_TYPE_U16 } typedef TextureDataType;
+enum TextureWrappingMode {
+  TEXTURE_WRAPPING_MODE_WRAP,
+  TEXTURE_WRAPPING_MODE_CLAMP,
+  TEXTURE_WRAPPING_MODE_MIRROR,
+  TEXTURE_WRAPPING_MODE_BORDER
+} typedef TextureWrappingMode;
+enum TextureDimensionType { TEXTURE_DIMENSION_TYPE_2D, TEXTURE_DIMENSION_TYPE_3D } typedef TextureDimensionType;
+enum TextureFilterMode { TEXTURE_FILTER_MODE_POINT, TEXTURE_FILTER_MODE_LINEAR } typedef TextureFilterMode;
+enum TextureMipmapMode { TEXTURE_MIPMAP_MODE_NONE, TEXTURE_MIPMAP_MODE_GENERATE } typedef TextureMipmapMode;
+enum TextureReadMode { TEXTURE_READ_MODE_NORMALIZED, TEXTURE_READ_MODE_ELEMENT } typedef TextureReadMode;
 
 struct Texture {
   TextureStatus status;

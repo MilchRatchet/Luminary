@@ -491,7 +491,7 @@ LuminaryResult png_load(Texture* texture, const uint8_t* file, const size_t file
 
   const uint32_t byte_per_pixel = byte_per_channel * num_channels;
 
-  const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
+  const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TEXTURE_DATA_TYPE_U8 : TEXTURE_DATA_TYPE_U16;
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, (void*) 0, tex_data_type, 4));
 
   uint8_t* filtered_data;

@@ -1,9 +1,11 @@
 #include "texture.h"
 
 #include <stdatomic.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "host/png.h"
+#include "image.h"
 #include "internal_error.h"
 #include "queue_worker.h"
 #include "spinlock.h"
@@ -26,7 +28,7 @@ static LuminaryResult _texture_load_async_queue_work(void* context, TextureAsync
   // Context-less
   (void) context;
 
-  LuminaryResult result = png_load_from_file(work->texture, work->path);
+  LuminaryResult result = image_load(work->texture, work->path);
 
   work->success = result == LUMINARY_SUCCESS;
 
@@ -58,11 +60,11 @@ static LuminaryResult _texture_load_async_clear_work(void* context, TextureAsync
 
 static uint32_t _texture_compute_pitch(const uint32_t width, TextureDataType type, uint32_t num_components) {
   switch (type) {
-    case TexDataFP32:
+    case TEXTURE_DATA_TYPE_FP32:
       return 4 * num_components * width;
-    case TexDataUINT8:
+    case TEXTURE_DATA_TYPE_U8:
       return 1 * num_components * width;
-    case TexDataUINT16:
+    case TEXTURE_DATA_TYPE_U16:
       return 2 * num_components * width;
     default:
       return 0;
@@ -88,14 +90,14 @@ LuminaryResult texture_fill(
   tex->depth            = depth;
   tex->pitch            = _texture_compute_pitch(width, type, num_components);
   tex->data             = data;
-  tex->dim              = (depth > 1) ? Tex3D : Tex2D;
+  tex->dim              = (depth > 1) ? TEXTURE_DIMENSION_TYPE_3D : TEXTURE_DIMENSION_TYPE_2D;
   tex->type             = type;
-  tex->wrap_mode_S      = TexModeWrap;
-  tex->wrap_mode_T      = TexModeWrap;
-  tex->wrap_mode_R      = TexModeWrap;
-  tex->filter           = TexFilterLinear;
-  tex->read_mode        = TexReadModeNormalized;
-  tex->mipmap           = TexMipmapNone;
+  tex->wrap_mode_S      = TEXTURE_WRAPPING_MODE_WRAP;
+  tex->wrap_mode_T      = TEXTURE_WRAPPING_MODE_WRAP;
+  tex->wrap_mode_R      = TEXTURE_WRAPPING_MODE_WRAP;
+  tex->filter           = TEXTURE_FILTER_MODE_LINEAR;
+  tex->read_mode        = TEXTURE_READ_MODE_NORMALIZED;
+  tex->mipmap           = TEXTURE_MIPMAP_MODE_NONE;
   tex->mipmap_max_level = 0;
   tex->gamma            = 1.0f;
   tex->num_components   = num_components;

@@ -35,8 +35,8 @@ struct MemoryDebugAllocation {
 } typedef MemoryDebugAllocation;
 
 static MemoryDebugAllocation* _debug_memory_allocations;
-uint64_t _debug_memory_allocations_count;
-uint64_t _debug_memory_allocations_allocated;
+static uint64_t _debug_memory_allocations_count;
+static uint64_t _debug_memory_allocations_allocated;
 
 static MemoryDebugAllocation* _debug_memory_allocation_find(const void* ptr) {
   for (uint64_t allocation = 0; allocation < _debug_memory_allocations_count; allocation++) {
