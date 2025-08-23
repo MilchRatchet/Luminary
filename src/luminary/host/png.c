@@ -297,27 +297,6 @@ static int _png_verify_header(const uint8_t* file, const size_t file_length) {
   return result;
 }
 
-static inline Texture* _png_default_texture() {
-  RGBA8* data;
-  host_malloc(&data, sizeof(RGBA8) * 4);
-
-  RGBA8 default_pixel = {.r = 0, .g = 0, .b = 255, .a = 255};
-  data[0]             = default_pixel;
-  data[1]             = default_pixel;
-  data[2]             = default_pixel;
-  data[3]             = default_pixel;
-  Texture* fallback;
-
-  texture_create(&fallback, 2, 2, 1, data, TexDataUINT8, 4);
-
-  return fallback;
-}
-
-static inline Texture* _png_default_failure() {
-  error_message("File content is corrupted!");
-  return _png_default_texture();
-}
-
 //////////////////////////////////////////////////////////////////////
 // Reconstruction filters
 //
@@ -434,17 +413,17 @@ static void _png_reconstruction_4(uint8_t* line, const uint32_t line_length, con
 }
 
 LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t file_length, const char* hint_name) {
-  if (!texture) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(texture);
+
+  __FAILURE_HANDLE(texture_create(texture));
 
   if (_png_verify_header(file, file_length)) {
-    *texture = _png_default_texture();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File header does not correspond to png!");
   }
 
   if (file_length < PNG_HEADER_SIZE + 25) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "PNG file is too small to contain a IHDR block.");
   }
 
@@ -452,12 +431,12 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
   const uint8_t* IHDR = file + file_offset;
 
   if (_png_read_uint32_big_endian(IHDR) != 13u) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Error in IHDR block.");
   }
 
   if (_png_read_uint32_big_endian(IHDR + 4) != CHUNK_IHDR) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "IHDR block is not in expected position.");
   }
 
@@ -468,24 +447,24 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
   const uint8_t interlace_type = IHDR[20];
 
   if ((uint32_t) crc32(0, IHDR + 4, 17) != _png_read_uint32_big_endian(IHDR + 21)) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s is corrupted!", hint_name);
   }
 
   if (
     color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR && color_type != PNG_COLORTYPE_GRAYSCALE
     && color_type != PNG_COLORTYPE_GRAYSCALE_ALPHA) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s is either using a color palette or a non standard format!", hint_name);
   }
 
   if (bit_depth != PNG_BITDEPTH_8 && bit_depth != PNG_BITDEPTH_16) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s does not have 8 or 16 bit depth!", hint_name);
   }
 
   if (interlace_type == PNG_INTERLACE_ADAM7) {
-    *texture = _png_default_failure();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s is interlaced, which is not supported.", hint_name);
   }
 
@@ -508,15 +487,14 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
       num_channels = 4;
       break;
     default:
-      *texture = _png_default_failure();
+      __FAILURE_HANDLE(texture_invalidate(*texture));
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid color type encountered!");
   }
 
   const uint32_t byte_per_pixel = byte_per_channel * num_channels;
 
-  Texture* result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
-  __FAILURE_HANDLE(texture_create(&result, width, height, 1, (void*) 0, tex_data_type, 4));
+  __FAILURE_HANDLE(texture_fill(*texture, width, height, 1, (void*) 0, tex_data_type, 4));
 
   uint8_t* filtered_data;
   __FAILURE_HANDLE(host_malloc(&filtered_data, width * height * byte_per_pixel + height));
@@ -542,7 +520,7 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
       chunk = file + file_offset;
 
       if ((uint32_t) crc32(0, chunk_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
-        *texture = _png_default_failure();
+        __FAILURE_HANDLE(texture_invalidate(*texture));
         __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "CRC Error.");
       }
 
@@ -562,7 +540,7 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
         }
         else {
           const uint32_t gAMA_val = _png_read_uint32_big_endian(chunk_data + 4);
-          result->gamma           = 100000.0f / ((float) gAMA_val);
+          (*texture)->gamma       = 100000.0f / ((float) gAMA_val);
         }
       }
     }
@@ -726,13 +704,11 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
 
   __FAILURE_HANDLE(host_free(&data));
 
-  result->data = output_data;
+  (*texture)->data = output_data;
 
   __FAILURE_HANDLE(host_free(&filtered_data));
 
   log_message("PNG (%s) Size: %dx%d Depth: %d Colortype: %d", hint_name, width, height, bit_depth, color_type);
-
-  *texture = result;
 
   return LUMINARY_SUCCESS;
 }
@@ -747,7 +723,7 @@ LuminaryResult png_load_from_file(Texture** texture, const char* filename) {
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
-    *texture = _png_default_texture();
+    __FAILURE_HANDLE(texture_invalidate(*texture));
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File %s could not be opened!", filename);
   }
 

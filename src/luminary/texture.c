@@ -18,13 +18,20 @@ static uint32_t _texture_compute_pitch(const uint32_t width, TextureDataType typ
   }
 }
 
-LuminaryResult texture_create(
-  Texture** _tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components) {
-  __CHECK_NULL_ARGUMENT(_tex);
+LuminaryResult texture_create(Texture** texture) {
+  __CHECK_NULL_ARGUMENT(texture);
 
-  Texture* tex;
-  __FAILURE_HANDLE(host_malloc(&tex, sizeof(Texture)));
+  __FAILURE_HANDLE(host_malloc(texture, sizeof(Texture)));
+  memset(*texture, 0, sizeof(Texture));
 
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult texture_fill(
+  Texture* tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components) {
+  __CHECK_NULL_ARGUMENT(tex);
+
+  tex->status           = TEXTURE_STATUS_NONE;
   tex->width            = width;
   tex->height           = height;
   tex->depth            = depth;
@@ -42,7 +49,15 @@ LuminaryResult texture_create(
   tex->gamma            = 1.0f;
   tex->num_components   = num_components;
 
-  *_tex = tex;
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult texture_invalidate(Texture* texture) {
+  __CHECK_NULL_ARGUMENT(texture);
+
+  memset(texture, 0, sizeof(Texture));
+
+  texture->status = TEXTURE_STATUS_INVALID;
 
   return LUMINARY_SUCCESS;
 }

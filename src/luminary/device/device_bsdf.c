@@ -22,11 +22,16 @@ LuminaryResult bsdf_lut_create(BSDFLUT** lut) {
   void* dielectric_inv_data;
   __FAILURE_HANDLE(host_malloc(&dielectric_inv_data, BSDF_LUT_SIZE * BSDF_LUT_SIZE * BSDF_LUT_SIZE * sizeof(uint16_t)));
 
-  __FAILURE_HANDLE(texture_create(&(*lut)->conductor, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, conductor_data, TexDataUINT16, 1));
-  __FAILURE_HANDLE(texture_create(&(*lut)->specular, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, specular_data, TexDataUINT16, 1));
-  __FAILURE_HANDLE(texture_create(&(*lut)->dielectric, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_data, TexDataUINT16, 1));
+  __FAILURE_HANDLE(texture_create(&(*lut)->conductor));
+  __FAILURE_HANDLE(texture_create(&(*lut)->specular));
+  __FAILURE_HANDLE(texture_create(&(*lut)->dielectric));
+  __FAILURE_HANDLE(texture_create(&(*lut)->dielectric_inv));
+
+  __FAILURE_HANDLE(texture_fill((*lut)->conductor, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, conductor_data, TexDataUINT16, 1));
+  __FAILURE_HANDLE(texture_fill((*lut)->specular, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, specular_data, TexDataUINT16, 1));
+  __FAILURE_HANDLE(texture_fill((*lut)->dielectric, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_data, TexDataUINT16, 1));
   __FAILURE_HANDLE(
-    texture_create(&(*lut)->dielectric_inv, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_inv_data, TexDataUINT16, 1));
+    texture_fill((*lut)->dielectric_inv, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_inv_data, TexDataUINT16, 1));
 
   (*lut)->conductor->wrap_mode_R = TexModeClamp;
   (*lut)->conductor->wrap_mode_S = TexModeClamp;
