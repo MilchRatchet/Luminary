@@ -724,6 +724,10 @@ static void _window_entity_properties_material_action(Window* window, Display* d
       _window_entity_properties_add_slider(data, "IOR", &material.refraction_index, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
   }
 
+  if (material.normal_tex != 0xFFFF) {
+    update_data |= _window_entity_properties_add_checkbox(data, "Compressed Normal Map", &material.normal_map_is_compressed);
+  }
+
   update_data |= _window_entity_properties_add_checkbox(data, "Colored Transparency", &material.colored_transparency);
   update_data |= _window_entity_properties_add_checkbox(data, "Roughness as Smoothness", &material.roughness_as_smoothness);
 
