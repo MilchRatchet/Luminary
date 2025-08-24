@@ -57,12 +57,17 @@ static void* _image_realloc_stbi(void* data, size_t size) {
 #pragma GCC diagnostic pop
 #endif /* !_MSC_VER || __clang__ */
 
-static LuminaryResult _image_load_hdr(Texture* texture, const uint8_t* file_mem, size_t file_length) {
+static LuminaryResult _image_load_hdr(Texture* texture, const uint8_t* file_mem, size_t file_length, const char* file_name) {
   __CHECK_NULL_ARGUMENT(texture);
   __CHECK_NULL_ARGUMENT(file_mem);
 
   int width, height, num_components;
   float* data = stbi_loadf_from_memory(file_mem, (int) file_length, &width, &height, &num_components, 4);
+
+  if (data == (float*) 0) {
+    __FAILURE_HANDLE(texture_invalidate(texture));
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load image %s.", file_name);
+  }
 
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, data, TEXTURE_DATA_TYPE_FP32, 4));
 
@@ -72,12 +77,17 @@ static LuminaryResult _image_load_hdr(Texture* texture, const uint8_t* file_mem,
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _image_load_16(Texture* texture, const uint8_t* file_mem, size_t file_length) {
+static LuminaryResult _image_load_16(Texture* texture, const uint8_t* file_mem, size_t file_length, const char* file_name) {
   __CHECK_NULL_ARGUMENT(texture);
   __CHECK_NULL_ARGUMENT(file_mem);
 
   int width, height, num_components;
   uint16_t* data = stbi_load_16_from_memory(file_mem, (int) file_length, &width, &height, &num_components, 4);
+
+  if (data == (uint16_t*) 0) {
+    __FAILURE_HANDLE(texture_invalidate(texture));
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load image %s.", file_name);
+  }
 
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, data, TEXTURE_DATA_TYPE_U16, 4));
 
@@ -87,12 +97,17 @@ static LuminaryResult _image_load_16(Texture* texture, const uint8_t* file_mem, 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _image_load_8(Texture* texture, const uint8_t* file_mem, size_t file_length) {
+static LuminaryResult _image_load_8(Texture* texture, const uint8_t* file_mem, size_t file_length, const char* file_name) {
   __CHECK_NULL_ARGUMENT(texture);
   __CHECK_NULL_ARGUMENT(file_mem);
 
   int width, height, num_components;
   uint8_t* data = stbi_load_from_memory(file_mem, (int) file_length, &width, &height, &num_components, 4);
+
+  if (data == (uint8_t*) 0) {
+    __FAILURE_HANDLE(texture_invalidate(texture));
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load image %s.", file_name);
+  }
 
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, data, TEXTURE_DATA_TYPE_U8, 4));
 
@@ -137,17 +152,19 @@ LuminaryResult image_load(Texture* texture, const char* path) {
 
   __FAILURE_HANDLE(host_realloc(&file_mem, file_length));
 
+  LuminaryResult result;
+
   if (stbi_is_hdr_from_memory(file_mem, (int) file_length)) {
-    __FAILURE_HANDLE(_image_load_hdr(texture, file_mem, file_length));
+    result = _image_load_hdr(texture, file_mem, file_length, path);
   }
   else if (stbi_is_16_bit_from_memory(file_mem, (int) file_length)) {
-    __FAILURE_HANDLE(_image_load_16(texture, file_mem, file_length));
+    result = _image_load_16(texture, file_mem, file_length, path);
   }
   else {
-    __FAILURE_HANDLE(_image_load_8(texture, file_mem, file_length));
+    result = _image_load_8(texture, file_mem, file_length, path);
   }
 
   __FAILURE_HANDLE(host_free(&file_mem));
 
-  return LUMINARY_SUCCESS;
+  return result;
 }
