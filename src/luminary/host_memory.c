@@ -86,27 +86,6 @@ static LuminaryResult _debug_memory_allocation_add(
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _debug_memory_allocation_resize(
-  const void* old_ptr, const void* new_ptr, const char* buf_name, const char* func, uint32_t line, const size_t size) {
-  mtx_lock(&_memory_debug_mutex);
-
-  const char* allocation_name = _debug_memory_allocation_get_name(buf_name, func, line);
-
-  MemoryDebugAllocation* allocation = _debug_memory_allocation_find(old_ptr);
-
-  if (!allocation) {
-    mtx_unlock(&_memory_debug_mutex);
-    __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "LUMINARY_MEMORY_DEBUG Allocation %s does not exist.", allocation_name);
-  }
-
-  allocation->size = size;
-  allocation->ptr  = new_ptr;
-
-  mtx_unlock(&_memory_debug_mutex);
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _debug_memory_allocation_remove(
   const void* ptr, const char* buf_name, const char* func, uint32_t line, const size_t size) {
   mtx_lock(&_memory_debug_mutex);
@@ -215,6 +194,10 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
 
   atomic_fetch_sub(&_host_memory_total_allocation, header->size);
 
+#ifdef LUMINARY_MEMORY_DEBUG
+  _debug_memory_allocation_remove(*ptr, buf_name, func, line, header->size);
+#endif /* LUMINARY_MEMORY_DEBUG */
+
   header = realloc(header, (uint64_t) size + sizeof(struct HostMemoryHeader));
 
   header->size = size;
@@ -223,7 +206,7 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
   LUM_UNUSED(prev_total);
 
 #ifdef LUMINARY_MEMORY_DEBUG
-  _debug_memory_allocation_resize(*ptr, (const void*) (header + 1), buf_name, func, line, size);
+  _debug_memory_allocation_add((const void*) (header + 1), buf_name, func, line, size);
   luminary_print_log("Realloc %012llu [Total: %012llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
 #endif /* LUMINARY_MEMORY_DEBUG */
 

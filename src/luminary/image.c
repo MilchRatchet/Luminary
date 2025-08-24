@@ -30,6 +30,7 @@ static void* _image_realloc_stbi(void* data, size_t size) {
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
+#define STBI_NO_FAILURE_STRINGS
 #define STBI_ASSERT(x)
 #ifdef __WIN32__
 #define STBI_WINDOWS_UTF8
