@@ -8,17 +8,8 @@
 #include "texture.h"
 #include "utils.h"
 
-struct WavefrontVertex {
-  float x;
-  float y;
-  float z;
-} typedef WavefrontVertex;
-
-struct WavefrontNormal {
-  float x;
-  float y;
-  float z;
-} typedef WavefrontNormal;
+typedef vec3 WavefrontVertex;
+typedef vec3 WavefrontNormal;
 
 struct WavefrontUV {
   float u;

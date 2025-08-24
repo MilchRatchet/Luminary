@@ -929,6 +929,12 @@ LuminaryResult wavefront_convert_content(
     mesh->data.index_buffer[ptr * 4 + 1] = t.v2 - 1;
     mesh->data.index_buffer[ptr * 4 + 2] = t.v3 - 1;
 
+    // Some OBJs have no normals. We compute the face normal here and use that instead.
+    // TODO: Implement smooth normals generation.
+    const vec3 face_normal = (vec3) {.x = triangle.edge1.y * triangle.edge2.z - triangle.edge1.z * triangle.edge2.y,
+                                     .y = triangle.edge1.z * triangle.edge2.x - triangle.edge1.x * triangle.edge2.z,
+                                     .z = triangle.edge1.x * triangle.edge2.y - triangle.edge1.y * triangle.edge2.x};
+
     WavefrontUV uv;
 
     const uint32_t vt1_ptr = (t.vt1 > 0) ? t.vt1 - 1 : t.vt1 + uv_count;
@@ -975,9 +981,7 @@ LuminaryResult wavefront_convert_content(
     const uint32_t vn1_ptr = (t.vn1 > 0) ? t.vn1 - 1 : t.vn1 + normal_count;
 
     if (vn1_ptr >= normal_count) {
-      n.x = 0.0f;
-      n.y = 0.0f;
-      n.z = 0.0f;
+      n = face_normal;
     }
     else {
       n = content->normals[vn1_ptr];
@@ -985,9 +989,7 @@ LuminaryResult wavefront_convert_content(
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
       if (isnan(n_length) || isinf(n_length)) {
-        n.x = 0.0f;
-        n.y = 0.0f;
-        n.z = 0.0f;
+        n = face_normal;
       }
       else {
         n.x *= n_length;
@@ -1003,9 +1005,7 @@ LuminaryResult wavefront_convert_content(
     const uint32_t vn2_ptr = (t.vn2 > 0) ? t.vn2 - 1 : t.vn2 + normal_count;
 
     if (vn2_ptr >= normal_count) {
-      n.x = 0.0f;
-      n.y = 0.0f;
-      n.z = 0.0f;
+      n = face_normal;
     }
     else {
       n = content->normals[vn2_ptr];
@@ -1013,9 +1013,7 @@ LuminaryResult wavefront_convert_content(
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
       if (isnan(n_length) || isinf(n_length)) {
-        n.x = 0.0f;
-        n.y = 0.0f;
-        n.z = 0.0f;
+        n = face_normal;
       }
       else {
         n.x *= n_length;
@@ -1031,9 +1029,7 @@ LuminaryResult wavefront_convert_content(
     const uint32_t vn3_ptr = (t.vn3 > 0) ? t.vn3 - 1 : t.vn3 + normal_count;
 
     if (vn3_ptr >= normal_count) {
-      n.x = 0.0f;
-      n.y = 0.0f;
-      n.z = 0.0f;
+      n = face_normal;
     }
     else {
       n = content->normals[vn3_ptr];
@@ -1041,9 +1037,7 @@ LuminaryResult wavefront_convert_content(
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
       if (isnan(n_length) || isinf(n_length)) {
-        n.x = 0.0f;
-        n.y = 0.0f;
-        n.z = 0.0f;
+        n = face_normal;
       }
       else {
         n.x *= n_length;
