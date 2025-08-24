@@ -43,11 +43,10 @@ struct DeviceCamera {
   float film_grain;
   float thin_lens_ior;
   float thin_lens_thickness;
-  float thin_lens_radius1;
-  float thin_lens_radius2;
+  float thin_lens_radius;
   float camera_scale;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x54u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x50u);
 
 struct DeviceOcean {
   uint32_t active : 1;

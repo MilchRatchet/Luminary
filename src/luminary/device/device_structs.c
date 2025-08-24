@@ -60,8 +60,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->russian_roulette_threshold = camera->russian_roulette_threshold;
   device_camera->film_grain                 = camera->film_grain;
   device_camera->thin_lens_ior              = camera->thin_lens_ior;
-  device_camera->thin_lens_radius1          = camera->thin_lens_radius1;
-  device_camera->thin_lens_radius2          = camera->thin_lens_radius2;
+  device_camera->thin_lens_radius           = camera->thin_lens_radius;
   device_camera->thin_lens_thickness        = camera->thin_lens_thickness;
   device_camera->camera_scale               = camera->camera_scale;
 

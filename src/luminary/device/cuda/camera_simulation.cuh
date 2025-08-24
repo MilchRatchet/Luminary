@@ -21,14 +21,13 @@ struct CameraSimulationState {
 
 __device__ void camera_simulation_step(CameraSimulationState& state, const uint32_t semi_circle_id, const ushort2 pixel) {
   // TODO: These will be written by the host into a dedicated buffer
-  const float base_offset                                       = device.camera.focal_length + camera_thin_lens_focal_length();
   CameraLensSemiCircle semi_circles[THIN_LENS_NUM_SEMI_CIRCLES] = {
-    {base_offset - 0.5f * device.camera.thin_lens_thickness + device.camera.thin_lens_radius2, device.camera.thin_lens_radius2},
-    {base_offset + 0.5f * device.camera.thin_lens_thickness - device.camera.thin_lens_radius1, device.camera.thin_lens_radius1}};
+    {-device.camera.thin_lens_radius, device.camera.thin_lens_radius},
+    {-device.camera.thin_lens_thickness + device.camera.thin_lens_radius, device.camera.thin_lens_radius}};
 
   const CameraLensSemiCircle semi_circle = semi_circles[semi_circle_id];
 
-  const vec3 semi_circle_center = get_vector(0.0f, 0.0f, -semi_circle.distance);
+  const vec3 semi_circle_center = get_vector(0.0f, 0.0f, semi_circle.distance);
 
   const float dist = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, semi_circle.radius);
 
@@ -41,7 +40,12 @@ __device__ void camera_simulation_step(CameraSimulationState& state, const uint3
 
   state.origin = add_vector(state.origin, scale_vector(state.ray, dist));
 
-  const vec3 normal = normalize_vector(sub_vector(state.origin, semi_circle_center));
+  vec3 normal = normalize_vector(sub_vector(state.origin, semi_circle_center));
+
+  // Flip normal if we are inside
+  if (semi_circle_id == 1) {
+    normal = scale_vector(normal, -1.0f);
+  }
 
   // TODO
   const float lens_ior = semi_circle_id == 0 ? device.camera.thin_lens_ior : 1.0f;

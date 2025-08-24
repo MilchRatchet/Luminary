@@ -14,7 +14,7 @@ __device__ CameraSimulationResult camera_sample(const ushort2 pixel) {
 
   // Transform result to world space
   result.origin = quaternion_apply(device.camera.rotation, result.origin);
-  result.origin = scale_vector(result.origin, device.camera.camera_scale);
+  result.origin = scale_vector(result.origin, device.camera.camera_scale * CAMERA_COMMON_SCALE);
   result.origin = add_vector(result.origin, device.camera.pos);
 
   result.ray = quaternion_apply(device.camera.rotation, result.ray);

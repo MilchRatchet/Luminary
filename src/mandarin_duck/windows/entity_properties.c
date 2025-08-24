@@ -252,17 +252,15 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   if (lens_model == (uint32_t) LUMINARY_LENS_MODEL_THIN) {
     update_data |=
-      _window_entity_properties_add_slider(data, "IOR", &camera.thin_lens_ior, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 3.0f, 1.0f);
+      _window_entity_properties_add_slider(data, "IOR", &camera.thin_lens_ior, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 3.0f, 1.0f);
     update_data |= _window_entity_properties_add_slider(
-      data, "Radius 1", &camera.thin_lens_radius1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 1000.0f, 1.0f);
+      data, "Radius 2", &camera.thin_lens_radius, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_slider(
-      data, "Radius 2", &camera.thin_lens_radius2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, 1000.0f, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Thickness", &camera.thin_lens_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, 3.0f, 1.0f);
+      data, "Thickness", &camera.thin_lens_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
   }
 
   update_data |=
-    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
 
   // TODO: End of placeholder UI
 

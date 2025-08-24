@@ -8,8 +8,9 @@
 
 // We force the weight to be 1, else the brightness of the image would depend on aperture size.
 // That would be realistic but not practical.
-__device__ vec3 camera_lens_sample_initial_direction(const vec3 sensor_point, const ushort2 pixel) {
-  vec3 target_point = get_vector(0.0f, 0.0f, -device.camera.focal_length);
+__device__ vec3 camera_lens_sample_initial_direction(const vec3 sensor_point, const ushort2 pixel, float& weight) {
+  // Positioned at back vertex, which is the origin.
+  vec3 target_point = get_vector(0.0f, 0.0f, 0.0f);
 
   if (device.camera.aperture_size != 0.0f) {
 #ifndef CAMERA_DEBUG_RENDER
@@ -51,13 +52,27 @@ __device__ vec3 camera_lens_sample_initial_direction(const vec3 sensor_point, co
     target_point = add_vector(target_point, get_vector(sample.x, sample.y, 0.0f));
   }
 
-  return normalize_vector(sub_vector(target_point, sensor_point));
+  const vec3 diff = sub_vector(target_point, sensor_point);
+
+  const float dist        = get_length(diff);
+  const float image_plane = camera_thin_lens_image_plane();
+
+  const vec3 ray = normalize_vector(diff);
+
+  weight = fabsf(ray.z) * (image_plane * image_plane) / (dist * dist);
+
+  return ray;
 }
 
 __device__ CameraSimulationResult camera_lens_sample(const vec3 sensor_point, const ushort2 pixel) {
-  const vec3 initial_direction = camera_lens_sample_initial_direction(sensor_point, pixel);
+  float initial_weight;
+  const vec3 initial_direction = camera_lens_sample_initial_direction(sensor_point, pixel, initial_weight);
 
-  return camera_simulation_trace(sensor_point, initial_direction, pixel);
+  CameraSimulationResult result = camera_simulation_trace(sensor_point, initial_direction, pixel);
+
+  result.weight = scale_color(result.weight, initial_weight);
+
+  return result;
 }
 
 #endif /* CU_LUMINARY_CAMERA_LENS_H */

@@ -150,8 +150,7 @@ LUMINARY_API struct LuminaryCamera {
   LuminaryLensModel lens_model;
   float thin_lens_ior;
   float thin_lens_thickness;
-  float thin_lens_radius1;
-  float thin_lens_radius2;
+  float thin_lens_radius;
 
   float camera_scale;
 
