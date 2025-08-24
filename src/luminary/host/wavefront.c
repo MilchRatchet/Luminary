@@ -11,6 +11,7 @@
 
 #include "internal_error.h"
 #include "internal_path.h"
+#include "material.h"
 #include "png.h"
 #include "utils.h"
 
@@ -788,26 +789,29 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     const bool has_emission = (wavefront_mat.emission.r > 0.0f) || (wavefront_mat.emission.g > 0.0f) || (wavefront_mat.emission.b > 0.0f);
 
     Material mat;
-    mat.id                      = material_id_offset + mat_id;
-    mat.base_substrate          = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
-    mat.albedo.r                = wavefront_mat.diffuse_reflectivity.r;
-    mat.albedo.g                = wavefront_mat.diffuse_reflectivity.g;
-    mat.albedo.b                = wavefront_mat.diffuse_reflectivity.b;
-    mat.albedo.a                = wavefront_mat.dissolve;
-    mat.emission                = wavefront_mat.emission;
-    mat.emission_scale          = content->args.emission_scale;
-    mat.refraction_index        = wavefront_mat.refraction_index;
-    mat.roughness               = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
-    mat.roughness_clamp         = 0.25f;
-    mat.roughness_as_smoothness = content->args.legacy_smoothness;
-    mat.emission_active         = has_luminance_tex || has_emission;
-    mat.thin_walled             = false;
-    mat.metallic                = wavefront_mat.specular_reflectivity.r > 0.5f;
-    mat.albedo_tex              = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
-    mat.luminance_tex           = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
-    mat.roughness_tex           = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
-    mat.metallic_tex            = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
-    mat.normal_tex              = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
+    __FAILURE_HANDLE(material_get_default(&mat));
+
+    mat.id                       = material_id_offset + mat_id;
+    mat.base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
+    mat.albedo.r                 = wavefront_mat.diffuse_reflectivity.r;
+    mat.albedo.g                 = wavefront_mat.diffuse_reflectivity.g;
+    mat.albedo.b                 = wavefront_mat.diffuse_reflectivity.b;
+    mat.albedo.a                 = wavefront_mat.dissolve;
+    mat.emission                 = wavefront_mat.emission;
+    mat.emission_scale           = content->args.emission_scale;
+    mat.refraction_index         = wavefront_mat.refraction_index;
+    mat.roughness                = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
+    mat.roughness_clamp          = 0.25f;
+    mat.roughness_as_smoothness  = content->args.legacy_smoothness;
+    mat.emission_active          = has_luminance_tex || has_emission;
+    mat.thin_walled              = false;
+    mat.normal_map_is_compressed = true;
+    mat.metallic                 = wavefront_mat.specular_reflectivity.r > 0.5f;
+    mat.albedo_tex               = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
+    mat.luminance_tex            = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
+    mat.roughness_tex            = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
+    mat.metallic_tex             = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
+    mat.normal_tex               = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
 
     __FAILURE_HANDLE(array_push(materials, &mat));
   }
@@ -929,6 +933,12 @@ LuminaryResult wavefront_convert_content(
     mesh->data.index_buffer[ptr * 4 + 1] = t.v2 - 1;
     mesh->data.index_buffer[ptr * 4 + 2] = t.v3 - 1;
 
+    // Some OBJs have no normals. We compute the face normal here and use that instead.
+    // TODO: Implement smooth normals generation.
+    const vec3 face_normal = (vec3) {.x = triangle.edge1.y * triangle.edge2.z - triangle.edge1.z * triangle.edge2.y,
+                                     .y = triangle.edge1.z * triangle.edge2.x - triangle.edge1.x * triangle.edge2.z,
+                                     .z = triangle.edge1.x * triangle.edge2.y - triangle.edge1.y * triangle.edge2.x};
+
     WavefrontUV uv;
 
     const uint32_t vt1_ptr = (t.vt1 > 0) ? t.vt1 - 1 : t.vt1 + uv_count;
@@ -975,9 +985,7 @@ LuminaryResult wavefront_convert_content(
     const uint32_t vn1_ptr = (t.vn1 > 0) ? t.vn1 - 1 : t.vn1 + normal_count;
 
     if (vn1_ptr >= normal_count) {
-      n.x = 0.0f;
-      n.y = 0.0f;
-      n.z = 0.0f;
+      n = face_normal;
     }
     else {
       n = content->normals[vn1_ptr];
@@ -985,9 +993,7 @@ LuminaryResult wavefront_convert_content(
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
       if (isnan(n_length) || isinf(n_length)) {
-        n.x = 0.0f;
-        n.y = 0.0f;
-        n.z = 0.0f;
+        n = face_normal;
       }
       else {
         n.x *= n_length;
@@ -1003,9 +1009,7 @@ LuminaryResult wavefront_convert_content(
     const uint32_t vn2_ptr = (t.vn2 > 0) ? t.vn2 - 1 : t.vn2 + normal_count;
 
     if (vn2_ptr >= normal_count) {
-      n.x = 0.0f;
-      n.y = 0.0f;
-      n.z = 0.0f;
+      n = face_normal;
     }
     else {
       n = content->normals[vn2_ptr];
@@ -1013,9 +1017,7 @@ LuminaryResult wavefront_convert_content(
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
       if (isnan(n_length) || isinf(n_length)) {
-        n.x = 0.0f;
-        n.y = 0.0f;
-        n.z = 0.0f;
+        n = face_normal;
       }
       else {
         n.x *= n_length;
@@ -1031,9 +1033,7 @@ LuminaryResult wavefront_convert_content(
     const uint32_t vn3_ptr = (t.vn3 > 0) ? t.vn3 - 1 : t.vn3 + normal_count;
 
     if (vn3_ptr >= normal_count) {
-      n.x = 0.0f;
-      n.y = 0.0f;
-      n.z = 0.0f;
+      n = face_normal;
     }
     else {
       n = content->normals[vn3_ptr];
@@ -1041,9 +1041,7 @@ LuminaryResult wavefront_convert_content(
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
       if (isnan(n_length) || isinf(n_length)) {
-        n.x = 0.0f;
-        n.y = 0.0f;
-        n.z = 0.0f;
+        n = face_normal;
       }
       else {
         n.x *= n_length;

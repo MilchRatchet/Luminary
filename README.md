@@ -41,7 +41,7 @@ The goal is to build an offline renderer that achieves high quality final render
 
 >📝 Luminary currently transitions to a new scene description format, this new format is not yet available. Luminary can still parse the old format but it can no longer export scenes in the old format.
 
-The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md). It is possible to specify a `*.obj` file instead of a `*.lum` file. This will load the mesh and use the default settings. Then one can make changes to the settings and automatically generate a `*.lum` file.
+The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocsV4.md). It is possible to specify a `*.obj` file instead of a `*.lum` file. This will load the mesh and use the default settings. Then one can make changes to the settings and automatically generate a `*.lum` file.
 
 Luminary comes with its own frontend called `Mandarin Duck`. You can run Mandarin Duck through:
 
@@ -78,7 +78,7 @@ Requirements:
 - AVX2 compatible CPU
 - Supported Nvidia GPU (Pascal or later)
 
->📝 `zlib`, `qoi`, `Ceb` and `OptiX` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
+>📝 `zlib`, `qoi`, `Ceb`, `stb` and `OptiX` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
 ## CMake Options
 | Option                     | Description

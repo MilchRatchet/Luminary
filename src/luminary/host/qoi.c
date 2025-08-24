@@ -68,11 +68,11 @@ LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** da
   __CHECK_NULL_ARGUMENT(encoded_size);
   __CHECK_NULL_ARGUMENT(data);
 
-  if (tex->type != TexDataUINT8) {
+  if (tex->type != TEXTURE_DATA_TYPE_U8) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not of channel type uint8_t.");
   }
 
-  if (tex->dim != Tex2D) {
+  if (tex->dim != TEXTURE_DIMENSION_TYPE_2D) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not 2D.");
   }
 
@@ -90,7 +90,7 @@ LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture* textu
   qoi_desc desc;
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
-  __FAILURE_HANDLE(texture_fill(texture, desc.width, desc.height, 1, decoded_data, TexDataUINT8, 4));
+  __FAILURE_HANDLE(texture_fill(texture, desc.width, desc.height, 1, decoded_data, TEXTURE_DATA_TYPE_U8, 4));
 
   return LUMINARY_SUCCESS;
 }

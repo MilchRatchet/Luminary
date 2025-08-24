@@ -4,16 +4,16 @@
 
 static LuminaryResult _device_texture_get_address_mode(const TextureWrappingMode mode, CUaddress_mode* address_mode) {
   switch (mode) {
-    case TexModeWrap:
+    case TEXTURE_WRAPPING_MODE_WRAP:
       *address_mode = CU_TR_ADDRESS_MODE_WRAP;
       return LUMINARY_SUCCESS;
-    case TexModeClamp:
+    case TEXTURE_WRAPPING_MODE_CLAMP:
       *address_mode = CU_TR_ADDRESS_MODE_CLAMP;
       return LUMINARY_SUCCESS;
-    case TexModeMirror:
+    case TEXTURE_WRAPPING_MODE_MIRROR:
       *address_mode = CU_TR_ADDRESS_MODE_MIRROR;
       return LUMINARY_SUCCESS;
-    case TexModeBorder:
+    case TEXTURE_WRAPPING_MODE_BORDER:
       *address_mode = CU_TR_ADDRESS_MODE_BORDER;
       return LUMINARY_SUCCESS;
     default:
@@ -23,14 +23,14 @@ static LuminaryResult _device_texture_get_address_mode(const TextureWrappingMode
 
 static LuminaryResult _device_texture_get_read_mode(const Texture* tex, uint32_t* flags) {
   switch (tex->type) {
-    case TexDataFP32:
+    case TEXTURE_DATA_TYPE_FP32:
       return LUMINARY_SUCCESS;
-    case TexDataUINT8:
-    case TexDataUINT16:
+    case TEXTURE_DATA_TYPE_U8:
+    case TEXTURE_DATA_TYPE_U16:
       switch (tex->read_mode) {
-        case TexReadModeNormalized:
+        case TEXTURE_READ_MODE_NORMALIZED:
           return LUMINARY_SUCCESS;
-        case TexReadModeElement:
+        case TEXTURE_READ_MODE_ELEMENT:
           *flags = *flags | CU_TRSF_READ_AS_INTEGER;
           return LUMINARY_SUCCESS;
         default:
@@ -43,13 +43,13 @@ static LuminaryResult _device_texture_get_read_mode(const Texture* tex, uint32_t
 
 static LuminaryResult _device_texture_get_format(const Texture* tex, CUarray_format* format) {
   switch (tex->type) {
-    case TexDataFP32:
+    case TEXTURE_DATA_TYPE_FP32:
       *format = CU_AD_FORMAT_FLOAT;
       return LUMINARY_SUCCESS;
-    case TexDataUINT8:
+    case TEXTURE_DATA_TYPE_U8:
       *format = CU_AD_FORMAT_UNSIGNED_INT8;
       return LUMINARY_SUCCESS;
-    case TexDataUINT16:
+    case TEXTURE_DATA_TYPE_U16:
       *format = CU_AD_FORMAT_UNSIGNED_INT16;
       return LUMINARY_SUCCESS;
     default:
@@ -59,10 +59,10 @@ static LuminaryResult _device_texture_get_format(const Texture* tex, CUarray_for
 
 static LuminaryResult _device_texture_get_filter_mode(const Texture* tex, CUfilter_mode* mode) {
   switch (tex->filter) {
-    case TexFilterPoint:
+    case TEXTURE_FILTER_MODE_POINT:
       *mode = CU_TR_FILTER_MODE_POINT;
       return LUMINARY_SUCCESS;
-    case TexFilterLinear:
+    case TEXTURE_FILTER_MODE_LINEAR:
       *mode = CU_TR_FILTER_MODE_LINEAR;
       return LUMINARY_SUCCESS;
     default:
@@ -72,13 +72,13 @@ static LuminaryResult _device_texture_get_filter_mode(const Texture* tex, CUfilt
 
 static LuminaryResult _device_texture_get_pixel_size(const Texture* tex, size_t* size) {
   switch (tex->type) {
-    case TexDataFP32:
+    case TEXTURE_DATA_TYPE_FP32:
       *size = tex->num_components * sizeof(float);
       return LUMINARY_SUCCESS;
-    case TexDataUINT8:
+    case TEXTURE_DATA_TYPE_U8:
       *size = tex->num_components * sizeof(uint8_t);
       return LUMINARY_SUCCESS;
-    case TexDataUINT16:
+    case TEXTURE_DATA_TYPE_U16:
       *size = tex->num_components * sizeof(uint16_t);
       return LUMINARY_SUCCESS;
     default:
@@ -124,11 +124,11 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
   size_t pitch_gpu;
 
   switch (texture->dim) {
-    case Tex2D: {
+    case TEXTURE_DIMENSION_TYPE_2D: {
       switch (texture->mipmap) {
         default:
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
-        case TexMipmapNone: {
+        case TEXTURE_MIPMAP_MODE_NONE: {
           __FAILURE_HANDLE(device_malloc2D(&data_device, width * pixel_size, height));
 
           __FAILURE_HANDLE(device_memory_get_pitch(data_device, &pitch_gpu));
@@ -146,16 +146,16 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
 
           __FAILURE_HANDLE(_device_texture_get_format(texture, &res_desc.res.pitch2D.format));
         } break;
-        case TexMipmapGenerate: {
+        case TEXTURE_MIPMAP_MODE_GENERATE: {
           __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported.");
         } break;
       }
     } break;
-    case Tex3D: {
+    case TEXTURE_DIMENSION_TYPE_3D: {
       switch (texture->mipmap) {
         default:
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
-        case TexMipmapNone: {
+        case TEXTURE_MIPMAP_MODE_NONE: {
           // TODO: Add support in device_memory
 
           CUDA_ARRAY3D_DESCRIPTOR descriptor;
@@ -189,7 +189,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
           res_desc.resType          = CU_RESOURCE_TYPE_ARRAY;
           res_desc.res.array.hArray = (CUarray) data_device;
         } break;
-        case TexMipmapGenerate: {
+        case TEXTURE_MIPMAP_MODE_GENERATE: {
           __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported.");
         } break;
       }
@@ -221,7 +221,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
   device_texture->height     = height;
   device_texture->depth      = depth;
   device_texture->gamma      = texture->gamma;
-  device_texture->is_3D      = (texture->dim == Tex3D);
+  device_texture->is_3D      = (texture->dim == TEXTURE_DIMENSION_TYPE_3D);
   device_texture->pitch      = pitch_gpu;
   device_texture->pixel_size = pixel_size;
 

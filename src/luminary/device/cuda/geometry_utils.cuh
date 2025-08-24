@@ -12,26 +12,29 @@
 
 __device__ vec3 geometry_compute_normal(
   vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 face_normal, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords,
-  UV tex_coords, bool& is_inside) {
-  vec3 normal = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
-  is_inside   = dot_product(face_normal, ray) > 0.0f;
+  UV tex_coords, bool normal_map_is_compressed, bool& is_inside) {
+  is_inside = dot_product(face_normal, ray) > 0.0f;
 
   // TODO: Why do I not have a neg_vector function?
   // Convention is for the face normal to look towards the origin
   if (is_inside)
     face_normal = scale_vector(face_normal, -1.0f);
 
+  vec3 normal = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
+
   if (normal_tex != TEXTURE_NONE) {
     const DeviceTextureObject tex = load_texture_object(normal_tex);
 
     // TODO: Flip V based on a material flag that specifies if the texture is OpenGL or DirectX format.
-    const float4 normal_f = (texture_is_valid(tex)) ? texture_load(tex, get_uv(tex_coords.u, 1.0f - tex_coords.v), true, false)
-                                                    : make_float4(0.0f, 0.0f, 1.0f, 0.0f);
+    const float4 normal_f = (texture_is_valid(tex)) ? texture_load(tex, tex_coords, true, false) : make_float4(0.0f, 0.0f, 1.0f, 0.0f);
 
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
-    map_normal = scale_vector(map_normal, 2.0f);
-    map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
+    // Normal maps can be encoded in [-1,1]^3 or [0,1]^3.
+    if (normal_map_is_compressed) {
+      map_normal = scale_vector(map_normal, 2.0f);
+      map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
+    }
 
     const Quaternion q = quaternion_rotation_to_z_canonical(normal);
 
@@ -93,10 +96,12 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   const vec3 edge1_normal = sub_vector(vertex1_normal, vertex_normal);
   const vec3 edge2_normal = sub_vector(vertex2_normal, vertex_normal);
 
+  const bool normal_map_is_compressed = (mat.flags & DEVICE_MATERIAL_FLAG_NORMAL_MAP_COMPRESSED) != 0;
+
   bool is_inside;
   const vec3 normal = geometry_compute_normal(
     vertex_normal, edge1_normal, edge2_normal, ray, face_normal, uv_sub(vertex_texture, vertex1_texture),
-    uv_sub(vertex_texture, vertex2_texture), mat.normal_tex, coords, tex_coords, is_inside);
+    uv_sub(vertex_texture, vertex2_texture), mat.normal_tex, coords, tex_coords, normal_map_is_compressed, is_inside);
 
   RGBAF albedo = mat.albedo;
   if (mat.albedo_tex != TEXTURE_NONE) {

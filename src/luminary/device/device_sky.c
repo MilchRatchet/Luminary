@@ -34,29 +34,30 @@ LuminaryResult sky_lut_create(SkyLUT** lut) {
   __FAILURE_HANDLE(texture_create(&(*lut)->multiscattering_low));
   __FAILURE_HANDLE(texture_create(&(*lut)->multiscattering_high));
 
-  __FAILURE_HANDLE(texture_fill((*lut)->transmittance_low, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, transmittance_low_data, TexDataFP32, 4));
   __FAILURE_HANDLE(
-    texture_fill((*lut)->transmittance_high, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, transmittance_high_data, TexDataFP32, 4));
+    texture_fill((*lut)->transmittance_low, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, transmittance_low_data, TEXTURE_DATA_TYPE_FP32, 4));
   __FAILURE_HANDLE(
-    texture_fill((*lut)->multiscattering_low, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, multiscattering_low_data, TexDataFP32, 4));
+    texture_fill((*lut)->transmittance_high, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, transmittance_high_data, TEXTURE_DATA_TYPE_FP32, 4));
   __FAILURE_HANDLE(
-    texture_fill((*lut)->multiscattering_high, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, multiscattering_high_data, TexDataFP32, 4));
+    texture_fill((*lut)->multiscattering_low, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, multiscattering_low_data, TEXTURE_DATA_TYPE_FP32, 4));
+  __FAILURE_HANDLE(
+    texture_fill((*lut)->multiscattering_high, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, multiscattering_high_data, TEXTURE_DATA_TYPE_FP32, 4));
 
-  (*lut)->transmittance_low->wrap_mode_R = TexModeClamp;
-  (*lut)->transmittance_low->wrap_mode_S = TexModeClamp;
-  (*lut)->transmittance_low->wrap_mode_T = TexModeClamp;
+  (*lut)->transmittance_low->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->transmittance_high->wrap_mode_R = TexModeClamp;
-  (*lut)->transmittance_high->wrap_mode_S = TexModeClamp;
-  (*lut)->transmittance_high->wrap_mode_T = TexModeClamp;
+  (*lut)->transmittance_high->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->multiscattering_low->wrap_mode_R = TexModeClamp;
-  (*lut)->multiscattering_low->wrap_mode_S = TexModeClamp;
-  (*lut)->multiscattering_low->wrap_mode_T = TexModeClamp;
+  (*lut)->multiscattering_low->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->multiscattering_high->wrap_mode_R = TexModeClamp;
-  (*lut)->multiscattering_high->wrap_mode_S = TexModeClamp;
-  (*lut)->multiscattering_high->wrap_mode_T = TexModeClamp;
+  (*lut)->multiscattering_high->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
   return LUMINARY_SUCCESS;
 }
@@ -347,8 +348,8 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
         __FAILURE_HANDLE(texture_create(&hdri->color_tex));
         __FAILURE_HANDLE(texture_create(&hdri->shadow_tex));
 
-        __FAILURE_HANDLE(texture_fill(hdri->color_tex, hdri->width, hdri->height, 1, (void*) 0, TexDataFP32, 4));
-        __FAILURE_HANDLE(texture_fill(hdri->shadow_tex, hdri->width, hdri->height, 1, (void*) 0, TexDataFP32, 1));
+        __FAILURE_HANDLE(texture_fill(hdri->color_tex, hdri->width, hdri->height, 1, (void*) 0, TEXTURE_DATA_TYPE_FP32, 4));
+        __FAILURE_HANDLE(texture_fill(hdri->shadow_tex, hdri->width, hdri->height, 1, (void*) 0, TEXTURE_DATA_TYPE_FP32, 1));
 
         __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
         __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->width * sizeof(float) * hdri->shadow_tex->height));

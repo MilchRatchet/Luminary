@@ -27,27 +27,28 @@ LuminaryResult bsdf_lut_create(BSDFLUT** lut) {
   __FAILURE_HANDLE(texture_create(&(*lut)->dielectric));
   __FAILURE_HANDLE(texture_create(&(*lut)->dielectric_inv));
 
-  __FAILURE_HANDLE(texture_fill((*lut)->conductor, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, conductor_data, TexDataUINT16, 1));
-  __FAILURE_HANDLE(texture_fill((*lut)->specular, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, specular_data, TexDataUINT16, 1));
-  __FAILURE_HANDLE(texture_fill((*lut)->dielectric, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_data, TexDataUINT16, 1));
+  __FAILURE_HANDLE(texture_fill((*lut)->conductor, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, conductor_data, TEXTURE_DATA_TYPE_U16, 1));
+  __FAILURE_HANDLE(texture_fill((*lut)->specular, BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, specular_data, TEXTURE_DATA_TYPE_U16, 1));
   __FAILURE_HANDLE(
-    texture_fill((*lut)->dielectric_inv, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_inv_data, TexDataUINT16, 1));
+    texture_fill((*lut)->dielectric, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_data, TEXTURE_DATA_TYPE_U16, 1));
+  __FAILURE_HANDLE(
+    texture_fill((*lut)->dielectric_inv, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_inv_data, TEXTURE_DATA_TYPE_U16, 1));
 
-  (*lut)->conductor->wrap_mode_R = TexModeClamp;
-  (*lut)->conductor->wrap_mode_S = TexModeClamp;
-  (*lut)->conductor->wrap_mode_T = TexModeClamp;
+  (*lut)->conductor->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->conductor->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->conductor->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->specular->wrap_mode_R = TexModeClamp;
-  (*lut)->specular->wrap_mode_S = TexModeClamp;
-  (*lut)->specular->wrap_mode_T = TexModeClamp;
+  (*lut)->specular->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->specular->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->specular->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->dielectric->wrap_mode_R = TexModeClamp;
-  (*lut)->dielectric->wrap_mode_S = TexModeClamp;
-  (*lut)->dielectric->wrap_mode_T = TexModeClamp;
+  (*lut)->dielectric->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->dielectric_inv->wrap_mode_R = TexModeClamp;
-  (*lut)->dielectric_inv->wrap_mode_S = TexModeClamp;
-  (*lut)->dielectric_inv->wrap_mode_T = TexModeClamp;
+  (*lut)->dielectric_inv->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric_inv->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric_inv->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
 
   return LUMINARY_SUCCESS;
 }

@@ -10,3 +10,6 @@
 [submodule "optix-dev"]
 	path = src/luminary/optix-dev
 	url = https://github.com/NVIDIA/optix-dev.git
+[submodule "src/luminary/stb"]
+	path = src/luminary/stb
+	url = https://github.com/nothings/stb.git

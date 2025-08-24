@@ -35,15 +35,15 @@ LuminaryResult device_cloud_noise_create(DeviceCloudNoise** cloud_noise, Device*
 
   Texture* shape_tex;
   __FAILURE_HANDLE(texture_create(&shape_tex));
-  __FAILURE_HANDLE(texture_fill(shape_tex, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, 4));
+  __FAILURE_HANDLE(texture_fill(shape_tex, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TEXTURE_DATA_TYPE_U8, 4));
 
   Texture* detail_tex;
   __FAILURE_HANDLE(texture_create(&detail_tex));
-  __FAILURE_HANDLE(texture_fill(detail_tex, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, 4));
+  __FAILURE_HANDLE(texture_fill(detail_tex, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TEXTURE_DATA_TYPE_U8, 4));
 
   Texture* weather_tex;
   __FAILURE_HANDLE(texture_create(&weather_tex));
-  __FAILURE_HANDLE(texture_fill(weather_tex, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, (void*) 0, TexDataUINT8, 4));
+  __FAILURE_HANDLE(texture_fill(weather_tex, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, (void*) 0, TEXTURE_DATA_TYPE_U8, 4));
 
   __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->shape_tex, shape_tex, device->stream_main));
   __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->detail_tex, detail_tex, device->stream_main));

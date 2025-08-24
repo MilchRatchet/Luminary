@@ -168,8 +168,9 @@ enum DeviceMaterialFlags {
   DEVICE_MATERIAL_FLAG_THIN_WALLED             = 0x04,
   DEVICE_MATERIAL_FLAG_METALLIC                = 0x08,
   DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY    = 0x10,
-  DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS = 0x20
-  // 2 bits unused
+  DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS = 0x20,
+  DEVICE_MATERIAL_FLAG_NORMAL_MAP_COMPRESSED   = 0x40
+  // 1 bits unused
 } typedef DeviceMaterialFlags;
 
 struct DeviceMaterialCompressed {
