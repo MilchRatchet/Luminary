@@ -47,8 +47,8 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->film_grain                 = 0.0f;
   camera->lens_model                 = LUMINARY_LENS_MODEL_THIN;
   camera->thin_lens_ior              = 1.5f;
-  camera->thin_lens_radius           = 49.15f;
-  camera->thin_lens_thickness        = 5.0f;
+  camera->thin_lens_radius           = 100.0f;
+  camera->thin_lens_thickness        = 1.0f;
   camera->camera_scale               = 1.0f;
 
   return LUMINARY_SUCCESS;

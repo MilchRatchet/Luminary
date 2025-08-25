@@ -64,11 +64,11 @@ __device__ float camera_thin_lens_back_focal_length() {
 }
 
 __device__ float camera_thin_lens_front_principal_plane() {
-  return device.camera.thin_lens_thickness - camera_thin_lens_focal_length() + camera_thin_lens_front_focal_length();
+  return camera_thin_lens_focal_length() - camera_thin_lens_front_focal_length() - device.camera.thin_lens_thickness;
 }
 
 __device__ float camera_thin_lens_back_principal_plane() {
-  return camera_thin_lens_focal_length() - camera_thin_lens_front_focal_length();
+  return camera_thin_lens_front_focal_length() - camera_thin_lens_focal_length();
 }
 
 __device__ float camera_thin_lens_object_distance() {
@@ -76,7 +76,7 @@ __device__ float camera_thin_lens_object_distance() {
   float o = device.camera.focal_length * CAMERA_COMMON_INV_SCALE * (1.0f / device.camera.camera_scale);
 
   // Distance between object and front principal plane
-  return o - camera_thin_lens_front_principal_plane();
+  return camera_thin_lens_front_principal_plane() - o;
 }
 
 __device__ float camera_thin_lens_image_plane() {
