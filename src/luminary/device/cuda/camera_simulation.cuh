@@ -14,12 +14,13 @@ struct CameraSimulationState {
   vec3 origin;
   vec3 ray;
   float ior;
-  RGBF weight;
+  float weight;
 } typedef CameraSimulationState;
 
 #define THIN_LENS_NUM_SEMI_CIRCLES 2
 
-__device__ void camera_simulation_step(CameraSimulationState& state, const uint32_t semi_circle_id, const ushort2 pixel) {
+__device__ int32_t
+  camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t semi_circle_id, const ushort2 pixel) {
   // TODO: These will be written by the host into a dedicated buffer
   CameraLensSemiCircle semi_circles[THIN_LENS_NUM_SEMI_CIRCLES] = {
     {-device.camera.thin_lens_radius, device.camera.thin_lens_radius},
@@ -33,34 +34,49 @@ __device__ void camera_simulation_step(CameraSimulationState& state, const uint3
 
   // No hit
   if (dist == FLT_MAX) {
-    state.weight = splat_color(0.0f);
+    state.weight = 0.0f;
 
-    return;
+    return 0;
   }
+
+  // TODO: Optimize
+  const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < semi_circle.radius;
 
   state.origin = add_vector(state.origin, scale_vector(state.ray, dist));
 
   vec3 normal = normalize_vector(sub_vector(state.origin, semi_circle_center));
 
   // Flip normal if we are inside
-  if (semi_circle_id == 1) {
+  if (is_inside) {
     normal = scale_vector(normal, -1.0f);
   }
 
   // TODO
-  const float lens_ior = semi_circle_id == 0 ? device.camera.thin_lens_ior : 1.0f;
+  const float lens_ior = (is_inside == false) ? device.camera.thin_lens_ior : 1.0f;
+
+  const vec3 V = scale_vector(state.ray, -1.0f);
+
+  const float ior = state.ior / lens_ior;
 
   bool total_reflection;
-  state.ray = refract_vector(scale_vector(state.ray, -1.0f), normal, state.ior / lens_ior, total_reflection);
+  const vec3 refraction = refract_vector(V, normal, ior, total_reflection);
+  const vec3 reflection = reflect_vector(V, normal);
 
-  // TODO: Handle reflections
+  bool sampled_refraction;
   if (total_reflection) {
-    state.weight = splat_color(0.0f);
+    sampled_refraction = false;
+  }
+  else {
+    const float fresnel = bsdf_fresnel(normal, V, refraction, ior);
+    const float random  = random_1D(RANDOM_TARGET_LENS_METHOD + iteration, pixel);
 
-    return;
+    sampled_refraction = random >= fresnel;
   }
 
-  state.ior = lens_ior;
+  state.ray = sampled_refraction ? refraction : reflection;
+  state.ior = sampled_refraction ? lens_ior : state.ior;
+
+  return sampled_refraction ? 1 : -1;
 }
 
 __device__ CameraSimulationResult camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const ushort2 pixel) {
@@ -68,15 +84,24 @@ __device__ CameraSimulationResult camera_simulation_trace(const vec3 sensor_poin
   state.origin = sensor_point;
   state.ray    = initial_direction;
   state.ior    = 1.0f;
-  state.weight = splat_color(1.0f);
+  state.weight = 1.0f;
 
-  camera_simulation_step(state, 0, pixel);
-  camera_simulation_step(state, 1, pixel);
+  int32_t current_semicircle = 0;
+
+  for (uint32_t iteration = 0; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
+    current_semicircle += camera_simulation_step(state, iteration, current_semicircle, pixel);
+
+    if (current_semicircle >= 2 || current_semicircle < 0 || state.weight == 0.0f)
+      break;
+  }
+
+  if (current_semicircle < 0)
+    state.weight = 0.0f;
 
   CameraSimulationResult result;
   result.origin = state.origin;
   result.ray    = state.ray;
-  result.weight = state.weight;
+  result.weight = splat_color(state.weight);
 
   return result;
 }
