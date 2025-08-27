@@ -62,16 +62,35 @@ __device__ int32_t
   const vec3 refraction = refract_vector(V, normal, ior, total_reflection);
   const vec3 reflection = reflect_vector(V, normal);
 
+  const bool allow_reflection = semi_circle_id != 0 || iteration != 0;
+  const bool allow_refraction = semi_circle_id != 0 || iteration == 0;
+
+  float weight;
   bool sampled_refraction;
   if (total_reflection) {
+    weight             = allow_reflection ? 1.0f : 0.0f;
     sampled_refraction = false;
   }
   else {
     const float fresnel = bsdf_fresnel(normal, V, refraction, ior);
-    const float random  = random_1D(RANDOM_TARGET_LENS_METHOD + iteration, pixel);
 
-    sampled_refraction = random >= fresnel;
+    if (allow_refraction && allow_reflection) {
+      const float random = random_1D(RANDOM_TARGET_LENS_METHOD + iteration, pixel);
+
+      weight             = 1.0f;
+      sampled_refraction = random >= fresnel;
+    }
+    else if (allow_refraction) {
+      weight             = 1.0f - fresnel;
+      sampled_refraction = true;
+    }
+    else {
+      weight             = fresnel;
+      sampled_refraction = false;
+    }
   }
+
+  state.weight *= weight;
 
   state.ray = sampled_refraction ? refraction : reflection;
   state.ior = sampled_refraction ? lens_ior : state.ior;
@@ -87,15 +106,16 @@ __device__ CameraSimulationResult camera_simulation_trace(const vec3 sensor_poin
   state.weight = 1.0f;
 
   int32_t current_semicircle = 0;
+  uint32_t iteration         = 0;
 
-  for (uint32_t iteration = 0; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
+  for (; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
     current_semicircle += camera_simulation_step(state, iteration, current_semicircle, pixel);
 
     if (current_semicircle >= 2 || current_semicircle < 0 || state.weight == 0.0f)
       break;
   }
 
-  if (current_semicircle < 0)
+  if (current_semicircle < 0 || iteration == RANDOM_LENS_MAX_INTERSECTIONS)
     state.weight = 0.0f;
 
   CameraSimulationResult result;
