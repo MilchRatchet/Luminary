@@ -15,6 +15,7 @@ struct CameraSimulationState {
   vec3 ray;
   float ior;
   float weight;
+  bool is_forward;
 } typedef CameraSimulationState;
 
 #define THIN_LENS_NUM_SEMI_CIRCLES 2
@@ -92,18 +93,20 @@ __device__ int32_t
 
   state.weight *= weight;
 
-  state.ray = sampled_refraction ? refraction : reflection;
-  state.ior = sampled_refraction ? lens_ior : state.ior;
+  state.ray        = sampled_refraction ? refraction : reflection;
+  state.ior        = sampled_refraction ? lens_ior : state.ior;
+  state.is_forward = sampled_refraction ? state.is_forward : !state.is_forward;
 
-  return sampled_refraction ? 1 : -1;
+  return state.is_forward ? 1 : -1;
 }
 
 __device__ CameraSimulationResult camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const ushort2 pixel) {
   CameraSimulationState state;
-  state.origin = sensor_point;
-  state.ray    = initial_direction;
-  state.ior    = 1.0f;
-  state.weight = 1.0f;
+  state.origin     = sensor_point;
+  state.ray        = initial_direction;
+  state.ior        = 1.0f;
+  state.weight     = 1.0f;
+  state.is_forward = true;
 
   int32_t current_semicircle = 0;
   uint32_t iteration         = 0;
@@ -115,7 +118,7 @@ __device__ CameraSimulationResult camera_simulation_trace(const vec3 sensor_poin
       break;
   }
 
-  if (current_semicircle < 0 || iteration == RANDOM_LENS_MAX_INTERSECTIONS)
+  if (current_semicircle < 0 || (iteration == RANDOM_LENS_MAX_INTERSECTIONS && current_semicircle < 2))
     state.weight = 0.0f;
 
   CameraSimulationResult result;
