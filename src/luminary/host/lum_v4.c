@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "internal_error.h"
@@ -173,20 +174,24 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* AUTOEXP_ */
     case 6868086486446921025u:
-      sscanf(value, "%u\n", &bool_uint);
-      camera->auto_exposure = bool_uint;
+      // Legacy
+      // sscanf(value, "%u\n", &bool_uint);
+      // camera->auto_exposure = bool_uint;
       break;
     /* EXPOSURE */
     case 4995148753008613445u:
       sscanf(value, "%f\n", &camera->exposure);
+      camera->exposure = logf(camera->exposure);  // Legacy conversion from linear to exponential scale
       break;
     /* MINEXPOS */
     case 6003105168358263117u:
-      sscanf(value, "%f\n", &camera->min_exposure);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->min_exposure);
       break;
     /* MAXEXPOS */
     case 6003105168358916429u:
-      sscanf(value, "%f\n", &camera->max_exposure);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->max_exposure);
       break;
     /* BLOOM___ */
     case 6872316342038383682u:

@@ -17,10 +17,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->aperture_size              = 0.0f;
   camera->aperture_shape             = LUMINARY_APERTURE_ROUND;
   camera->aperture_blade_count       = 7;
-  camera->exposure                   = 1.0f;
-  camera->min_exposure               = 10.0f;
-  camera->max_exposure               = 400.0f;
-  camera->auto_exposure              = 0;
+  camera->exposure                   = 0.0f;
   camera->bloom_blend                = 0.01f;
   camera->lens_flare                 = 0;
   camera->lens_flare_threshold       = 1.0f;

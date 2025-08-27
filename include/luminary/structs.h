@@ -160,9 +160,6 @@ LUMINARY_API struct LuminaryCamera {
   LuminaryApertureShape aperture_shape;
   uint32_t aperture_blade_count;
   float exposure;
-  float max_exposure;
-  float min_exposure;
-  bool auto_exposure;
   LuminaryToneMap tonemap;
   float agx_custom_slope;
   float agx_custom_power;
