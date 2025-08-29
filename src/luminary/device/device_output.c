@@ -181,10 +181,11 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   __FAILURE_HANDLE(vault_handle_get(callback_data->descriptor.data_handle, &dst_buffer));
 
   KernelArgsConvertRGBFToARGB8 args;
-  args.dst    = DEVICE_PTR(output->device_buffer);
-  args.width  = width;
-  args.height = height;
-  args.filter = output->filter;
+  args.dst           = DEVICE_PTR(output->device_buffer);
+  args.width         = width;
+  args.height        = height;
+  args.filter        = output->filter;
+  args.undersampling = device->undersampling_state;
 
   __FAILURE_HANDLE(
     kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8], (void*) &args, device->stream_output));
@@ -285,6 +286,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_current_result);
   generate_final_image_args.color_correction = output->color_correction;
   generate_final_image_args.agx_params       = output->agx_params;
+  generate_final_image_args.undersampling    = device->undersampling_state;
 
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], (void*) &generate_final_image_args, device->stream_main));
