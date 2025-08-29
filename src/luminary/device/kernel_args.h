@@ -83,6 +83,7 @@ struct KernelArgsGenerateFinalImage {
   RGBF* src;
   RGBF color_correction;
   AGXCustomParams agx_params;
+  uint8_t undersampling;
 } typedef KernelArgsGenerateFinalImage;
 
 struct KernelArgsConvertRGBFToARGB8 {
@@ -90,6 +91,7 @@ struct KernelArgsConvertRGBFToARGB8 {
   uint32_t width;
   uint32_t height;
   LuminaryFilter filter;
+  uint8_t undersampling;
 } typedef KernelArgsConvertRGBFToARGB8;
 
 struct KernelArgsCameraPostImageDownsample {

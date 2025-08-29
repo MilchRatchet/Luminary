@@ -281,8 +281,8 @@ __device__ RGBF final_image_get_undersampling_sample(
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t undersampling_stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
-  const uint32_t undersampling_iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
+  const uint32_t undersampling_stage     = (args.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  const uint32_t undersampling_iteration = args.undersampling & UNDERSAMPLING_ITERATION_MASK;
 
   const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
 
@@ -353,7 +353,7 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
   const float scale_x   = 1.0f / (args.width - 1);
   const float scale_y   = 1.0f / (args.height - 1);
 
-  const uint32_t undersampling_stage = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  const uint32_t undersampling_stage = (args.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
   const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
 
