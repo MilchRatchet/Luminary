@@ -96,7 +96,6 @@ struct Device {
   CUstream stream_abort;
   CUstream stream_callbacks;
   CUevent event_queue_render;
-  CUevent event_queue_output;
   CUevent event_queue_gbuffer_meta;
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;

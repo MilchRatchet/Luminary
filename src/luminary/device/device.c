@@ -724,7 +724,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   ////////////////////////////////////////////////////////////////////
 
   CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_render, CU_EVENT_DISABLE_TIMING));
-  CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_output, CU_EVENT_DISABLE_TIMING));
   CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_gbuffer_meta, CU_EVENT_DISABLE_TIMING));
 
   ////////////////////////////////////////////////////////////////////
@@ -1953,7 +1952,6 @@ LuminaryResult device_destroy(Device** device) {
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_callbacks));
 
   CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_render));
-  CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_output));
   CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_gbuffer_meta));
 
   OPTIX_FAILURE_HANDLE(optixDeviceContextDestroy((*device)->optix_ctx));

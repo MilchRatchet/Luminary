@@ -31,6 +31,7 @@ struct DeviceOutput {
   DEVICE ARGB8* device_buffer;
   CUhostFn registered_callback_func;
   DeviceOutputCallbackData callback_data[DEVICE_OUTPUT_CALLBACK_COUNT];
+  CUevent event_output_callback[DEVICE_OUTPUT_CALLBACK_COUNT];
   uint32_t callback_index;
   ARRAY DeviceOutputRequest* output_requests;
   RGBF color_correction;
