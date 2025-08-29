@@ -577,7 +577,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   FILE* file = fopen(file_path_string, "r");
 
   if (!file) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File could not be opened!");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File %s could not be opened!", file_path_string);
   }
 
   // Invalidate this string as we will not need it again.
