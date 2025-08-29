@@ -6,6 +6,9 @@
 #define PATH_BUFFER_SIZE (1u << 14)
 
 static bool _path_is_absolute(const char* string) {
+  if (string == (const char*) 0)
+    return false;
+
   // Windows C:, D:, ...
   const char* windows_disk_designator = strchr(string, ':');
 
@@ -150,6 +153,57 @@ LuminaryResult luminary_path_set_from_string(Path* path, const char* string) {
   return LUMINARY_SUCCESS;
 }
 
+static uint32_t _path_apply_working_dir(Path* path) {
+  uint32_t offset = 0;
+
+  if (path->working_dir_len == 0)
+    return offset;
+
+  if (_path_is_absolute(path->working_dir)) {
+    memcpy(path->output + offset, path->working_dir, path->working_dir_len);
+    offset += path->working_dir_len;
+  }
+  else {
+    // Sanitize relative paths to start with './' or '.\'
+    path->output[offset++] = '.';
+
+#if defined(WIN32)
+    path->output[offset++] = '\\';
+#else  /* WIN32 */
+    path->output[offset++] = '/';
+#endif /* !WIN32 */
+
+    uint32_t read_offset = 0;
+
+    // Skip past the automatically inserted characters
+    if (path->working_dir_len > read_offset && path->working_dir[read_offset] == '.')
+      read_offset++;
+
+#if defined(WIN32)
+    if ((path->working_dir_len > read_offset) && ((path->working_dir[read_offset] == '\\') || (path->working_dir[read_offset] == '/')))
+      read_offset++;
+#else  /* WIN32 */
+    if ((path->working_dir_len > read_offset) && (path->working_dir[read_offset] == '/'))
+      read_offset++;
+#endif /* !WIN32 */
+
+    __DEBUG_ASSERT(path->working_dir_len >= read_offset);
+
+    uint32_t copy_length = path->working_dir_len - read_offset;
+
+    memcpy(path->output + offset, path->working_dir + read_offset, copy_length);
+    offset += copy_length;
+  }
+
+#if defined(WIN32)
+  path->output[offset++] = '\\';
+#else  /* WIN32 */
+  path->output[offset++] = '/';
+#endif /* !WIN32 */
+
+  return offset;
+}
+
 static LuminaryResult _path_apply_no_override(Path* path) {
   __CHECK_NULL_ARGUMENT(path);
 
@@ -163,18 +217,7 @@ static LuminaryResult _path_apply_no_override(Path* path) {
       path->file_path_len);
   }
 
-  memcpy(path->output, path->working_dir, path->working_dir_len);
-
-  uint32_t file_path_offset = 0;
-  if (path->working_dir_len) {
-#if defined(WIN32)
-    path->output[path->working_dir_len] = '\\';
-#else  /* WIN32 */
-    path->output[path->working_dir_len] = '/';
-#endif /* !WIN32 */
-
-    file_path_offset = path->working_dir_len + 1;
-  }
+  uint32_t file_path_offset = _path_apply_working_dir(path);
 
   memcpy(path->output + file_path_offset, path->file_path, path->file_path_len + 1);
 
@@ -215,15 +258,9 @@ static LuminaryResult _path_apply_override(Path* path, const char* override) {
       path->working_dir_len, override_len);
   }
 
-  memcpy(path->output, path->working_dir, path->working_dir_len);
+  uint32_t file_path_offset = _path_apply_working_dir(path);
 
-#if defined(WIN32)
-  path->output[path->working_dir_len] = '\\';
-#else  /* WIN32 */
-  path->output[path->working_dir_len] = '/';
-#endif /* !WIN32 */
-
-  memcpy(path->output + path->working_dir_len + 1, override, override_len + 1);
+  memcpy(path->output + file_path_offset, override, override_len + 1);
 
   return LUMINARY_SUCCESS;
 }
