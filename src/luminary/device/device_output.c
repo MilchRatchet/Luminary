@@ -19,6 +19,10 @@ LuminaryResult device_output_create(DeviceOutput** output) {
     __FAILURE_HANDLE(vault_object_create(&(*output)->buffer_objects[buffer_id]));
   }
 
+  for (uint32_t callback_id = 0; callback_id < DEVICE_OUTPUT_CALLBACK_COUNT; callback_id++) {
+    CUDA_FAILURE_HANDLE(cuEventCreate(&(*output)->event_output_callback[callback_id], CU_EVENT_DISABLE_TIMING));
+  }
+
   // Default properties
   LuminaryOutputProperties properties;
   memset(&properties, 0, sizeof(LuminaryOutputProperties));
@@ -168,7 +172,8 @@ LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn ca
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_output_generate_output(DeviceOutput* output, Device* device, DeviceOutputCallbackData* callback_data) {
+static LuminaryResult _device_output_generate_output(
+  DeviceOutput* output, Device* device, DeviceOutputCallbackData* callback_data, CUevent callback_event) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
@@ -192,8 +197,8 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
 
   __FAILURE_HANDLE(device_download(dst_buffer, output->device_buffer, 0, width * height * sizeof(ARGB8), device->stream_output));
 
-  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_output, device->stream_output));
-  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_output, CU_EVENT_WAIT_DEFAULT));
+  CUDA_FAILURE_HANDLE(cuEventRecord(callback_event, device->stream_output));
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, callback_event, CU_EVENT_WAIT_DEFAULT));
   CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, output->registered_callback_func, (void*) callback_data));
 
   output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
@@ -272,12 +277,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
 
-  // TODO: There is a bug where the undersampling breaks if we update the constant memory here, so we can only do it afterwards.
-  // This is only important if sample times are high which is not the case during undersampling so this is not very important.
-  if (output->recurring_output_is_dirty && device->undersampling_state == 0) {
-    // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
-    __FAILURE_HANDLE(device_sync_constant_memory(device));
-  }
+  // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
+  __FAILURE_HANDLE(device_sync_constant_memory(device));
 
   const uint32_t current_sample_count = device->aggregate_sample_count;
 
@@ -310,7 +311,9 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output->buffer_objects[output->buffer_index]));
 
-    __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
+    CUevent event_output_callback = output->event_output_callback[output->callback_index];
+
+    __FAILURE_HANDLE(_device_output_generate_output(output, device, data, event_output_callback));
 
     output->buffer_index   = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
     output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
@@ -338,7 +341,9 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output_request->buffer_object));
 
-    __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
+    CUevent event_output_callback = output->event_output_callback[output->callback_index];
+
+    __FAILURE_HANDLE(_device_output_generate_output(output, device, data, event_output_callback));
 
     output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
 
@@ -378,6 +383,10 @@ LuminaryResult device_output_destroy(DeviceOutput** output) {
     }
 
     __FAILURE_HANDLE(vault_object_destroy(&(*output)->output_requests[output_request_id].buffer_object));
+  }
+
+  for (uint32_t callback_id = 0; callback_id < DEVICE_OUTPUT_CALLBACK_COUNT; callback_id++) {
+    CUDA_FAILURE_HANDLE(cuEventDestroy((*output)->event_output_callback[callback_id]));
   }
 
   CUDA_FAILURE_HANDLE(cuEventDestroy((*output)->event_output_ready));
