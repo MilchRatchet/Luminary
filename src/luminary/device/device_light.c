@@ -487,14 +487,28 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 }
 
 static LuminaryResult _lights_get_vmf_and_mean_and_variance(
-  const LightTreeWork* work, const LightTreeBinaryNode node, const float power, vec3* mean, float* variance) {
+  const LightTreeWork* work, const LightTreeBinaryNode node, const float parent_power, float* power, vec3* mean, float* variance) {
   // TODO: This could instead be done in a bottom up fashion like in the paper which would be much faster, however, this here might be more
   // accurate
+
+  // There is a good chance that the power is numerically unstable, recompute it.
+  if (*power < parent_power * 1e-5f) {
+    float new_power = 0.0f;
+
+    for (uint32_t i = 0; i < node.triangle_count; i++) {
+      const LightTreeFragment frag = work->fragments[node.triangles_address + i];
+      new_power += frag.power;
+    }
+
+    *power = new_power;
+  }
+
+  __DEBUG_ASSERT(*power > 0.0f);
 
 #ifdef LIGHT_TREE_UNIFORM_WEIGHTING
   const float inverse_total_power = 1.0f / node.triangle_count;
 #else
-  const float inverse_total_power = 1.0f / power;
+  const float inverse_total_power = 1.0f / *power;
 #endif
 
 #ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
@@ -589,17 +603,22 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
 
     switch (binary_node.type) {
       case LIGHT_TREE_NODE_TYPE_INTERNAL:
+        const float parent_power = binary_node.left_power + binary_node.right_power;
+
+        __DEBUG_ASSERT(parent_power > 0.0f);
+
         node.child_ptr = binary_node.child_address;
 
 #ifdef LIGHT_COMPUTE_VMF_DISTRIBUTIONS
         __FAILURE_HANDLE(_lights_get_vmf_and_mean_and_variance(
-          work, children[0], node.left_power, &node.left_vmf_dir, &node.left_vmf_sharpness, &node.left_mean, &node.left_variance));
+          work, children[0], &node.left_power, &node.left_vmf_dir, &node.left_vmf_sharpness, &node.left_mean, &node.left_variance));
         __FAILURE_HANDLE(_lights_get_vmf_and_mean_and_variance(
-          work, children[1], node.right_power, &node.right_vmf_dir, &node.right_vmf_sharpness, &node.right_mean, &node.right_variance));
+          work, children[1], &node.right_power, &node.right_vmf_dir, &node.right_vmf_sharpness, &node.right_mean, &node.right_variance));
 #else  /* LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
-        __FAILURE_HANDLE(_lights_get_vmf_and_mean_and_variance(work, children[0], node.left_power, &node.left_mean, &node.left_variance));
         __FAILURE_HANDLE(
-          _lights_get_vmf_and_mean_and_variance(work, children[1], node.right_power, &node.right_mean, &node.right_variance));
+          _lights_get_vmf_and_mean_and_variance(work, children[0], parent_power, &node.left_power, &node.left_mean, &node.left_variance));
+        __FAILURE_HANDLE(_lights_get_vmf_and_mean_and_variance(
+          work, children[1], parent_power, &node.right_power, &node.right_mean, &node.right_variance));
 #endif /* !LIGHT_COMPUTE_VMF_DISTRIBUTIONS */
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
