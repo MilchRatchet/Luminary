@@ -149,6 +149,8 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
   DisplayFileDrop* file_drop_array;
   LUM_FAILURE_HANDLE(array_create(&file_drop_array, sizeof(DisplayFileDrop), 4));
 
+  LUM_FAILURE_HANDLE(luminary_host_start_new_render(duck->host));
+
   while (!exit_requested) {
     bool display_dirty = false;
 
@@ -193,6 +195,8 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
 
   uint32_t num_benchmark_outputs;
   LUM_FAILURE_HANDLE(array_get_num_elements(duck->benchmark_output_promises, &num_benchmark_outputs));
+
+  LUM_FAILURE_HANDLE(luminary_host_start_new_render(duck->host));
 
   uint32_t obtained_outputs = 0;
 
