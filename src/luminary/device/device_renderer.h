@@ -80,6 +80,7 @@ struct DeviceRenderer {
   CUevent time_end[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float total_render_time[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
   float last_time;
+  bool shutdown;
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
   DeviceRendererPerKernelTimings kernel_times[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
@@ -117,6 +118,7 @@ LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_
 LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id);
 LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* status_flags);
 LuminaryResult device_renderer_get_tile_count(DeviceRenderer* renderer, Device* device, uint32_t undersampling_stage, uint32_t* tile_count);
+LuminaryResult device_renderer_shutdown(DeviceRenderer* renderer);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 
 #endif /* LUMINARY_DEVICE_RENDERER_H */

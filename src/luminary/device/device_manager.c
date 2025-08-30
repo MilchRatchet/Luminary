@@ -885,8 +885,17 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
+LuminaryResult device_manager_shutdown(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
+
+  for (uint32_t device_id = 0; device_id < num_devices; device_id++) {
+    const Device* device = device_manager->devices[device_id];
+
+    __FAILURE_HANDLE(device_renderer_shutdown(device->renderer));
+  }
 
   bool device_thread_is_running;
   __FAILURE_HANDLE(queue_worker_is_running(device_manager->queue_worker_main, &device_thread_is_running));
@@ -1056,7 +1065,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
     __FAILURE_HANDLE(device_set_abort((*device_manager)->devices[device_id]));
   }
 
-  __FAILURE_HANDLE(device_manager_shutdown_queue(*device_manager));
+  __FAILURE_HANDLE(device_manager_shutdown(*device_manager));
 
   __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
