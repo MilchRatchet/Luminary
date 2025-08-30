@@ -404,6 +404,16 @@ LuminaryResult luminary_host_destroy(Host** host) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_start_new_render(LuminaryHost* host) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  __FAILURE_HANDLE(scene_set_dirty_flags(host->scene_caller, SCENE_DIRTY_FLAG_INTEGRATION));
+
+  __FAILURE_HANDLE(_host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_device_count(LuminaryHost* host, uint32_t* device_count) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(device_count);
