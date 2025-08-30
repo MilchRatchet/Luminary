@@ -202,14 +202,19 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
     return LUMINARY_SUCCESS;
   }
 
+  props->arch            = DEVICE_ARCH_UNKNOWN;
+  props->rt_core_version = 0;
+
   switch (major) {
+    case 5: {
+      if (minor == 0 || minor == 2 || minor == 3) {
+        props->arch            = DEVICE_ARCH_MAXWELL;
+        props->rt_core_version = 0;
+      }
+    } break;
     case 6: {
       if (minor == 0 || minor == 1 || minor == 2) {
         props->arch            = DEVICE_ARCH_PASCAL;
-        props->rt_core_version = 0;
-      }
-      else {
-        props->arch            = DEVICE_ARCH_UNKNOWN;
         props->rt_core_version = 0;
       }
     } break;
@@ -230,10 +235,6 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
           }
         }
       }
-      else {
-        props->arch            = DEVICE_ARCH_UNKNOWN;
-        props->rt_core_version = 0;
-      }
     } break;
     case 8: {
       if (minor == 0) {
@@ -249,18 +250,10 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
         props->arch            = DEVICE_ARCH_ADA;
         props->rt_core_version = 3;
       }
-      else {
-        props->arch            = DEVICE_ARCH_UNKNOWN;
-        props->rt_core_version = 0;
-      }
     } break;
     case 9: {
       if (minor == 0) {
         props->arch            = DEVICE_ARCH_HOPPER;
-        props->rt_core_version = 0;
-      }
-      else {
-        props->arch            = DEVICE_ARCH_UNKNOWN;
         props->rt_core_version = 0;
       }
     } break;
@@ -269,24 +262,14 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
         props->arch            = DEVICE_ARCH_BLACKWELL_HPC;
         props->rt_core_version = 0;
       }
-      else {
-        props->arch            = DEVICE_ARCH_UNKNOWN;
-        props->rt_core_version = 0;
-      }
     } break;
     case 12: {
       if (minor == 0) {
         props->arch            = DEVICE_ARCH_BLACKWELL_CONSUMER;
         props->rt_core_version = 4;
       }
-      else {
-        props->arch            = DEVICE_ARCH_UNKNOWN;
-        props->rt_core_version = 0;
-      }
     } break;
     default:
-      props->arch            = DEVICE_ARCH_UNKNOWN;
-      props->rt_core_version = 0;
       break;
   }
 

@@ -23,6 +23,7 @@
 // Architectures that were already legacy when Luminary was created are omitted.
 enum DeviceArch {
   DEVICE_ARCH_UNKNOWN,
+  DEVICE_ARCH_MAXWELL,
   DEVICE_ARCH_PASCAL,
   DEVICE_ARCH_VOLTA,
   DEVICE_ARCH_TURING,
