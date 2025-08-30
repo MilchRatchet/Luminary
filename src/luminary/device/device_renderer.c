@@ -462,6 +462,9 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
 
+  if (renderer->shutdown)
+    return LUMINARY_SUCCESS;
+
   if (sample_count->current_sample_count == sample_count->end_sample_count)
     return LUMINARY_SUCCESS;
 
@@ -658,6 +661,14 @@ LuminaryResult device_renderer_get_tile_count(
   __FAILURE_HANDLE(device_get_allocated_task_count(device, &allocated_tasks));
 
   *tile_count = (internal_pixels_this_sample + allocated_tasks - 1) / allocated_tasks;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_shutdown(DeviceRenderer* renderer) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  renderer->shutdown = true;
 
   return LUMINARY_SUCCESS;
 }

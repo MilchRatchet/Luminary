@@ -343,7 +343,7 @@ LuminaryResult luminary_host_destroy(Host** host) {
   // Shutdown device thread queue
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(device_manager_shutdown_queue((*host)->device_manager));
+  __FAILURE_HANDLE(device_manager_shutdown((*host)->device_manager));
 
   ////////////////////////////////////////////////////////////////////
   // Shutdown host thread queue
