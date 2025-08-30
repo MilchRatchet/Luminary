@@ -76,7 +76,7 @@ Requirements:
 - Modern CMake
 - Make or Ninja
 - AVX2 compatible CPU
-- Supported Nvidia GPU (Pascal or later)
+- Supported Nvidia GPU (Maxwell or later)
 
 >📝 `zlib`, `qoi`, `Ceb`, `stb` and `OptiX` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
