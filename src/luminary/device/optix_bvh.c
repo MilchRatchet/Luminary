@@ -308,6 +308,9 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
 
   __FAILURE_HANDLE(_optix_bvh_free(bvh));
 
+  if (device->optix_instance_cache->num_instances == 0)
+    return LUMINARY_SUCCESS;
+
   ////////////////////////////////////////////////////////////////////
   // Setting up build input
   ////////////////////////////////////////////////////////////////////
