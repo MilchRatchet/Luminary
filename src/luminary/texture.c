@@ -101,6 +101,15 @@ LuminaryResult texture_fill(
   tex->mipmap_max_level = 0;
   tex->gamma            = 1.0f;
   tex->num_components   = num_components;
+  tex->is_memory_owner  = true;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult texture_set_memory_owner(Texture* tex, bool is_memory_owner) {
+  __CHECK_NULL_ARGUMENT(tex);
+
+  tex->is_memory_owner = is_memory_owner;
 
   return LUMINARY_SUCCESS;
 }
@@ -201,7 +210,7 @@ LuminaryResult texture_destroy(Texture** tex) {
     __FAILURE_HANDLE(host_free(&(*tex)->async_work_data));
   }
 
-  if ((*tex)->data) {
+  if ((*tex)->data && (*tex)->is_memory_owner) {
     __FAILURE_HANDLE(host_free(&(*tex)->data));
   }
 

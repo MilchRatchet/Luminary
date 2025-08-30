@@ -35,11 +35,13 @@ struct Texture {
   float gamma;
   uint32_t num_components;
   void* async_work_data;
+  bool is_memory_owner;
 } typedef Texture;
 
 LuminaryResult texture_create(Texture** texture);
 LuminaryResult texture_fill(
   Texture* tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components);
+LuminaryResult texture_set_memory_owner(Texture* tex, bool is_memory_owner);
 LuminaryResult texture_invalidate(Texture* texture);
 LuminaryResult texture_is_valid(const Texture* texture, bool* is_valid);
 LuminaryResult texture_load_async(Texture* texture, Queue* queue, const char* path);
