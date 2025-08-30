@@ -201,9 +201,9 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
     tex_desc.normalizedCoords = 1;
     tex_desc.filterMode       = filter_mode;
 
-    tex_desc.addressMode[0] = texture_get_address_mode(tex->wrap_mode_S);
-    tex_desc.addressMode[1] = texture_get_address_mode(tex->wrap_mode_T);
-    tex_desc.addressMode[2] = texture_get_address_mode(tex->wrap_mode_R);
+    tex_desc.addressMode[0] = texture_get_address_mode(tex->wrap_mode_U);
+    tex_desc.addressMode[1] = texture_get_address_mode(tex->wrap_mode_V);
+    tex_desc.addressMode[2] = texture_get_address_mode(tex->wrap_mode_W);
 
     tex_desc.readMode = read_mode;
 

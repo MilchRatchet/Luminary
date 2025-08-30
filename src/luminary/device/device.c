@@ -450,18 +450,18 @@ static LuminaryResult _device_load_spectral_data(Device* device) {
   __FAILURE_HANDLE(texture_fill(spectral_xy_lut_tex, num_elements, 1, 1, spectral_xy_lut_data, TEXTURE_DATA_TYPE_FP32, 2));
   __FAILURE_HANDLE(texture_set_memory_owner(spectral_xy_lut_tex, false));
 
-  spectral_xy_lut_tex->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_xy_lut_tex->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_xy_lut_tex->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_xy_lut_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_xy_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_xy_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
   Texture* spectral_z_lut_tex;
   __FAILURE_HANDLE(texture_create(&spectral_z_lut_tex));
   __FAILURE_HANDLE(texture_fill(spectral_z_lut_tex, num_elements, 1, 1, spectral_z_lut_data, TEXTURE_DATA_TYPE_FP32, 1));
   __FAILURE_HANDLE(texture_set_memory_owner(spectral_z_lut_tex, false));
 
-  spectral_z_lut_tex->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_z_lut_tex->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_z_lut_tex->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_z_lut_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_z_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_z_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
   __FAILURE_HANDLE(device_texture_create(&device->spectral_xy_tex, spectral_xy_lut_tex, device->stream_main));
   __FAILURE_HANDLE(device_texture_create(&device->spectral_z_tex, spectral_z_lut_tex, device->stream_main));

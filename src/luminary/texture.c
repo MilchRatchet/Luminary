@@ -92,9 +92,9 @@ LuminaryResult texture_fill(
   tex->data             = data;
   tex->dim              = (depth > 1) ? TEXTURE_DIMENSION_TYPE_3D : TEXTURE_DIMENSION_TYPE_2D;
   tex->type             = type;
-  tex->wrap_mode_S      = TEXTURE_WRAPPING_MODE_WRAP;
-  tex->wrap_mode_T      = TEXTURE_WRAPPING_MODE_WRAP;
-  tex->wrap_mode_R      = TEXTURE_WRAPPING_MODE_WRAP;
+  tex->wrap_mode_U      = TEXTURE_WRAPPING_MODE_WRAP;
+  tex->wrap_mode_V      = TEXTURE_WRAPPING_MODE_WRAP;
+  tex->wrap_mode_W      = TEXTURE_WRAPPING_MODE_WRAP;
   tex->filter           = TEXTURE_FILTER_MODE_LINEAR;
   tex->read_mode        = TEXTURE_READ_MODE_NORMALIZED;
   tex->mipmap           = TEXTURE_MIPMAP_MODE_NONE;

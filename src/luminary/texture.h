@@ -23,9 +23,9 @@ struct Texture {
   uint32_t depth;
   uint32_t pitch;
   TextureDataType type;
-  TextureWrappingMode wrap_mode_S;
-  TextureWrappingMode wrap_mode_T;
-  TextureWrappingMode wrap_mode_R;
+  TextureWrappingMode wrap_mode_U;
+  TextureWrappingMode wrap_mode_V;
+  TextureWrappingMode wrap_mode_W;
   TextureDimensionType dim;
   TextureFilterMode filter;
   TextureMipmapMode mipmap;

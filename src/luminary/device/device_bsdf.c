@@ -34,21 +34,21 @@ LuminaryResult bsdf_lut_create(BSDFLUT** lut) {
   __FAILURE_HANDLE(
     texture_fill((*lut)->dielectric_inv, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, dielectric_inv_data, TEXTURE_DATA_TYPE_U16, 1));
 
-  (*lut)->conductor->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->conductor->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->conductor->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->conductor->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->conductor->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->conductor->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->specular->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->specular->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->specular->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->specular->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->specular->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->specular->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->dielectric->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->dielectric->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->dielectric->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->dielectric_inv->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->dielectric_inv->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->dielectric_inv->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric_inv->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric_inv->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->dielectric_inv->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
   return LUMINARY_SUCCESS;
 }

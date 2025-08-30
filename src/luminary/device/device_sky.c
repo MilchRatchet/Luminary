@@ -43,21 +43,21 @@ LuminaryResult sky_lut_create(SkyLUT** lut) {
   __FAILURE_HANDLE(
     texture_fill((*lut)->multiscattering_high, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, multiscattering_high_data, TEXTURE_DATA_TYPE_FP32, 4));
 
-  (*lut)->transmittance_low->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_low->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_low->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->transmittance_high->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_high->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_high->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->multiscattering_low->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_low->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_low->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->multiscattering_high->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_high->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_high->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
   return LUMINARY_SUCCESS;
 }
