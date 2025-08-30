@@ -229,9 +229,12 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
     inputFlags |= (type == OPTIX_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
 
-    build_input.triangleArray.flags           = &inputFlags;
-    build_input.triangleArray.numSbtRecords   = 1;
-    build_input.triangleArray.opacityMicromap = omm->optix_build_input;
+    build_input.triangleArray.flags         = &inputFlags;
+    build_input.triangleArray.numSbtRecords = 1;
+
+    // OMMs is only available on GPUs with RT cores
+    if (device->optix_properties.rtcore_version > 0)
+      build_input.triangleArray.opacityMicromap = omm->optix_build_input;
 
     ////////////////////////////////////////////////////////////////////
     // Building BVH
