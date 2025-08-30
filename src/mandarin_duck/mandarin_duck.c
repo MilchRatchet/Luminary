@@ -69,8 +69,8 @@ static void _mandarin_duck_queue_benchmark_outputs(MandarinDuck* duck, uint32_t 
     LUM_FAILURE_HANDLE(luminary_host_request_output(duck->host, properties, &handle));
     LUM_FAILURE_HANDLE(array_push(&duck->benchmark_output_promises, &handle));
 
-    if (output_id > 0) {
-      properties.sample_count = (1 << output_id) + (1 << (output_id - 1));
+    if (output_id >= 2) {
+      properties.sample_count = (1 << (output_id - 1)) + (1 << (output_id - 2));
       properties.width        = renderer_settings.width;
       properties.height       = renderer_settings.height;
 
