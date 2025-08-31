@@ -15,6 +15,7 @@ struct CameraSimulationState {
   vec3 ray;
   float ior;
   float weight;
+  float wavelength;
   bool is_forward;
 } typedef CameraSimulationState;
 
@@ -53,7 +54,7 @@ __device__ int32_t
   }
 
   // TODO
-  const float lens_ior = (is_inside == false) ? device.camera.thin_lens_ior : 1.0f;
+  const float lens_ior = (is_inside == false) ? camera_thin_lens_get_ior(state.wavelength) : 1.0f;
 
   const vec3 V = scale_vector(state.ray, -1.0f);
 
@@ -100,12 +101,14 @@ __device__ int32_t
   return state.is_forward ? 1 : -1;
 }
 
-__device__ CameraSimulationResult camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const ushort2 pixel) {
+__device__ CameraSimulationResult
+  camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const ushort2 pixel) {
   CameraSimulationState state;
   state.origin     = sensor_point;
   state.ray        = initial_direction;
   state.ior        = 1.0f;
   state.weight     = 1.0f;
+  state.wavelength = wavelength;
   state.is_forward = true;
 
   int32_t current_semicircle = 0;

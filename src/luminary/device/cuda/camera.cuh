@@ -15,7 +15,7 @@ __device__ CameraSimulationResult camera_sample(const ushort2 pixel) {
 
   vec3 sensor_point = camera_sensor_sample(pixel);
 
-  CameraSimulationResult result = camera_lens_sample(sensor_point, pixel);
+  CameraSimulationResult result = camera_lens_sample(sensor_point, wavelength, pixel);
 
   // Convert from spectral to RGB
   result.weight = mul_color(result.weight, spectral_wavelength_to_rgb(wavelength));
