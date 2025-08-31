@@ -19,7 +19,7 @@ __device__ vec3 camera_sensor_sample(const ushort2 pixel) {
   vec3 sensor_point;
   sensor_point.x = device.camera.fov - step * (sensor_pixel.x + jitter.x);
   sensor_point.y = -vfov + step * (sensor_pixel.y + jitter.y);
-  sensor_point.z = camera_thin_lens_image_plane();
+  sensor_point.z = camera_thin_lens_image_plane(camera_thin_lens_get_ior(CAMERA_DESIGN_WAVELENGTH));
 
   return sensor_point;
 }

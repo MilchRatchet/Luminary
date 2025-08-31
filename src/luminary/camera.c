@@ -46,6 +46,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->thin_lens_ior              = 1.5f;
   camera->thin_lens_radius           = 100.0f;
   camera->thin_lens_thickness        = 1.0f;
+  camera->thin_lens_abbe_number      = 90.0f;
   camera->camera_scale               = 1.0f;
 
   return LUMINARY_SUCCESS;
@@ -89,6 +90,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_STANDARD_DIRTY(thin_lens_ior);
   __CAMERA_STANDARD_DIRTY(thin_lens_radius);
   __CAMERA_STANDARD_DIRTY(thin_lens_thickness);
+  __CAMERA_STANDARD_DIRTY(thin_lens_abbe_number);
   __CAMERA_STANDARD_DIRTY(camera_scale);
 
   if (input->aperture_size > 0.0f) {

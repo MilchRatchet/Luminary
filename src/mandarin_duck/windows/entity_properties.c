@@ -253,10 +253,12 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   if (lens_model == (uint32_t) LUMINARY_LENS_MODEL_THIN) {
     update_data |=
       _window_entity_properties_add_slider(data, "IOR", &camera.thin_lens_ior, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 3.0f, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Radius 2", &camera.thin_lens_radius, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+    update_data |=
+      _window_entity_properties_add_slider(data, "Radius", &camera.thin_lens_radius, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_slider(
       data, "Thickness", &camera.thin_lens_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Abbe", &camera.thin_lens_abbe_number, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   }
 
   update_data |=

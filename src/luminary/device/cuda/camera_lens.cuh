@@ -55,7 +55,7 @@ __device__ vec3 camera_lens_sample_initial_direction(const vec3 sensor_point, co
   const vec3 diff = sub_vector(target_point, sensor_point);
 
   const float dist        = get_length(diff);
-  const float image_plane = camera_thin_lens_image_plane();
+  const float image_plane = camera_thin_lens_image_plane(camera_thin_lens_get_ior(CAMERA_DESIGN_WAVELENGTH));
 
   const vec3 ray = normalize_vector(diff);
 
