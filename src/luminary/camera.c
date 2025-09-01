@@ -48,6 +48,8 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->thin_lens_thickness        = 1.0f;
   camera->thin_lens_abbe_number      = 90.0f;
   camera->camera_scale               = 1.0f;
+  camera->allow_reflections          = false;
+  camera->use_spectral_rendering     = false;
 
   return LUMINARY_SUCCESS;
 }
@@ -92,6 +94,8 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_STANDARD_DIRTY(thin_lens_thickness);
   __CAMERA_STANDARD_DIRTY(thin_lens_abbe_number);
   __CAMERA_STANDARD_DIRTY(camera_scale);
+  __CAMERA_STANDARD_DIRTY(allow_reflections);
+  __CAMERA_STANDARD_DIRTY(use_spectral_rendering);
 
   if (input->aperture_size > 0.0f) {
     __CAMERA_STANDARD_DIRTY(focal_length);

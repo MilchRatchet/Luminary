@@ -21,6 +21,7 @@ struct CameraSimulationState {
 
 #define THIN_LENS_NUM_SEMI_CIRCLES 2
 
+template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 __device__ int32_t
   camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t semi_circle_id, const ushort2 pixel) {
   // TODO: These will be written by the host into a dedicated buffer
@@ -64,7 +65,7 @@ __device__ int32_t
   const vec3 refraction = refract_vector(V, normal, ior, total_reflection);
   const vec3 reflection = reflect_vector(V, normal);
 
-  const bool allow_reflection = semi_circle_id != 0 || iteration != 0;
+  const bool allow_reflection = ALLOW_REFLECTIONS && (semi_circle_id != 0 || iteration != 0);
   const bool allow_refraction = semi_circle_id != 0 || iteration == 0;
 
   float weight;
@@ -82,13 +83,13 @@ __device__ int32_t
       weight             = 1.0f;
       sampled_refraction = random >= fresnel;
     }
-    else if (allow_refraction) {
-      weight             = 1.0f - fresnel;
-      sampled_refraction = true;
-    }
-    else {
+    else if (allow_reflection) {
       weight             = fresnel;
       sampled_refraction = false;
+    }
+    else {
+      weight             = 1.0f - fresnel;
+      sampled_refraction = true;
     }
   }
 
@@ -101,6 +102,7 @@ __device__ int32_t
   return state.is_forward ? 1 : -1;
 }
 
+template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 __device__ CameraSimulationResult
   camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const ushort2 pixel) {
   CameraSimulationState state;
@@ -115,7 +117,7 @@ __device__ CameraSimulationResult
   uint32_t iteration         = 0;
 
   for (; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
-    current_semicircle += camera_simulation_step(state, iteration, current_semicircle, pixel);
+    current_semicircle += camera_simulation_step<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(state, iteration, current_semicircle, pixel);
 
     if (current_semicircle >= 2 || current_semicircle < 0 || state.weight == 0.0f)
       break;

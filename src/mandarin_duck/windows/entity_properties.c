@@ -261,6 +261,9 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "Abbe", &camera.thin_lens_abbe_number, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   }
 
+  update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.allow_reflections);
+  update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.use_spectral_rendering);
+
   update_data |=
     _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
 

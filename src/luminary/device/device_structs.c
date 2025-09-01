@@ -40,14 +40,16 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(device_camera);
 
-  device_camera->aperture_shape       = camera->aperture_shape;
-  device_camera->aperture_blade_count = camera->aperture_blade_count;
-  device_camera->tonemap              = camera->tonemap;
-  device_camera->dithering            = camera->dithering;
-  device_camera->purkinje             = camera->purkinje;
-  device_camera->use_color_correction = camera->use_color_correction;
-  device_camera->do_firefly_rejection = camera->do_firefly_rejection;
-  device_camera->indirect_only        = camera->indirect_only;
+  device_camera->aperture_shape         = camera->aperture_shape;
+  device_camera->aperture_blade_count   = camera->aperture_blade_count;
+  device_camera->tonemap                = camera->tonemap;
+  device_camera->dithering              = camera->dithering;
+  device_camera->purkinje               = camera->purkinje;
+  device_camera->use_color_correction   = camera->use_color_correction;
+  device_camera->do_firefly_rejection   = camera->do_firefly_rejection;
+  device_camera->indirect_only          = camera->indirect_only;
+  device_camera->allow_reflections      = camera->allow_reflections;
+  device_camera->use_spectral_rendering = camera->use_spectral_rendering;
 
   device_camera->pos                        = camera->pos;
   device_camera->rotation                   = rotation_euler_angles_to_quaternion(camera->rotation);

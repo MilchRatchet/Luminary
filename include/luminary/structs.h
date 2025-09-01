@@ -155,6 +155,9 @@ LUMINARY_API struct LuminaryCamera {
 
   float camera_scale;
 
+  bool allow_reflections;
+  bool use_spectral_rendering;
+
   float fov;
   float focal_length;
   float aperture_size;

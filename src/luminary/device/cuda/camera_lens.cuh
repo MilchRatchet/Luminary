@@ -64,11 +64,13 @@ __device__ vec3 camera_lens_sample_initial_direction(const vec3 sensor_point, co
   return ray;
 }
 
+template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 __device__ CameraSimulationResult camera_lens_sample(const vec3 sensor_point, const float wavelength, const ushort2 pixel) {
   float initial_weight;
   const vec3 initial_direction = camera_lens_sample_initial_direction(sensor_point, pixel, initial_weight);
 
-  CameraSimulationResult result = camera_simulation_trace(sensor_point, initial_direction, wavelength, pixel);
+  CameraSimulationResult result =
+    camera_simulation_trace<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(sensor_point, initial_direction, wavelength, pixel);
 
   result.weight = scale_color(result.weight, initial_weight);
 
