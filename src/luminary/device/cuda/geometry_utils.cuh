@@ -31,7 +31,7 @@ __device__ vec3 geometry_compute_normal(
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
     // Normal maps can be encoded in [-1,1]^3 or [0,1]^3.
-    if (normal_map_is_compressed) {
+    if (normal_map_is_compressed && texture_is_valid(tex)) {
       map_normal = scale_vector(map_normal, 2.0f);
       map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
     }
