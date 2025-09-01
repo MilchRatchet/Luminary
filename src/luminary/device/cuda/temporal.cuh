@@ -157,35 +157,35 @@ __device__ void temporal_load_buckets(
   const float* src, uint32_t x, uint32_t y, float values[9 * MAX_NUM_INDIRECT_BUCKETS], uint32_t& num_buckets) {
   if (y) {
     if (x) {
-      values[num_buckets++] = __ldcs(src + (x - 1) + (y - 1) * device.settings.width);
+      values[num_buckets++] = fabsf(__ldcs(src + (x - 1) + (y - 1) * device.settings.width));
     }
 
-    values[num_buckets++] = __ldcs(src + x + (y - 1) * device.settings.width);
+    values[num_buckets++] = fabsf(__ldcs(src + x + (y - 1) * device.settings.width));
 
     if (x + 1 != device.settings.width) {
-      values[num_buckets++] = __ldcs(src + (x + 1) + (y - 1) * device.settings.width);
+      values[num_buckets++] = fabsf(__ldcs(src + (x + 1) + (y - 1) * device.settings.width));
     }
   }
 
   if (x) {
-    values[num_buckets++] = __ldcs(src + (x - 1) + y * device.settings.width);
+    values[num_buckets++] = fabsf(__ldcs(src + (x - 1) + y * device.settings.width));
   }
 
-  values[num_buckets++] = __ldcs(src + x + y * device.settings.width);
+  values[num_buckets++] = fabsf(__ldcs(src + x + y * device.settings.width));
 
   if (x + 1 != device.settings.width) {
-    values[num_buckets++] = __ldcs(src + (x + 1) + y * device.settings.width);
+    values[num_buckets++] = fabsf(__ldcs(src + (x + 1) + y * device.settings.width));
   }
 
   if (y + 1 != device.settings.height) {
     if (x) {
-      values[num_buckets++] = __ldcs(src + (x - 1) + (y + 1) * device.settings.width);
+      values[num_buckets++] = fabsf(__ldcs(src + (x - 1) + (y + 1) * device.settings.width));
     }
 
-    values[num_buckets++] = __ldcs(src + x + (y + 1) * device.settings.width);
+    values[num_buckets++] = fabsf(__ldcs(src + x + (y + 1) * device.settings.width));
 
     if (x + 1 != device.settings.width) {
-      values[num_buckets++] = __ldcs(src + (x + 1) + (y + 1) * device.settings.width);
+      values[num_buckets++] = fabsf(__ldcs(src + (x + 1) + (y + 1) * device.settings.width));
     }
   }
 }
