@@ -59,14 +59,14 @@
 
 #ifdef CUDA_STALL_VALIDATION
 
-extern WallTime* __cuda_stall_validation_macro_walltime;
+extern ThreadStatus* __cuda_stall_validation_macro_walltime;
 
 #define CUDA_FAILURE_HANDLE(command)                                                                                               \
   {                                                                                                                                \
-    wall_time_start(__cuda_stall_validation_macro_walltime);                                                                       \
+    thread_status_start(__cuda_stall_validation_macro_walltime, "_DEBUG_CUDA_STALL_VALIDATION");                                   \
     const CUresult __cuda_err = (command);                                                                                         \
     double __macro_time;                                                                                                           \
-    wall_time_get_time(__cuda_stall_validation_macro_walltime, &__macro_time);                                                     \
+    thread_status_get_time(__cuda_stall_validation_macro_walltime, &__macro_time);                                                 \
     if (__macro_time > 0.01) {                                                                                                     \
       warn_message("CUDA API call (%s) stalled for %fs", #command, __macro_time);                                                  \
     }                                                                                                                              \

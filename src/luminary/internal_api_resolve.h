@@ -46,7 +46,7 @@ typedef LuminaryRingBuffer RingBuffer;
 
 typedef LuminaryHost Host;
 
-typedef LuminaryWallTime WallTime;
+typedef LuminaryThreadStatus ThreadStatus;
 
 typedef LuminaryPath Path;
 typedef LuminaryImage Image;

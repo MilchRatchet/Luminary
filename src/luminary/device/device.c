@@ -17,7 +17,7 @@
 #include "sky.h"
 
 #ifdef CUDA_STALL_VALIDATION
-WallTime* __cuda_stall_validation_macro_walltime;
+ThreadStatus* __cuda_stall_validation_macro_walltime;
 #endif
 
 #define DEVICE_ASSERT_AVAILABLE                    \
@@ -108,13 +108,13 @@ void _device_init(void) {
   _device_memory_init();
 
 #ifdef CUDA_STALL_VALIDATION
-  wall_time_create(&__cuda_stall_validation_macro_walltime);
+  thread_status_create(&__cuda_stall_validation_macro_walltime);
 #endif
 }
 
 void _device_shutdown(void) {
 #ifdef CUDA_STALL_VALIDATION
-  wall_time_destroy(&__cuda_stall_validation_macro_walltime);
+  thread_status_destroy(&__cuda_stall_validation_macro_walltime);
 #endif
 
   _device_memory_shutdown();

@@ -141,10 +141,11 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateInfo info) {
 static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
   bool exit_requested = false;
 
-  LuminaryWallTime* md_timer;
-  LUM_FAILURE_HANDLE(wall_time_create(&md_timer));
+  LuminaryThreadStatus* ui_thread;
+  LUM_FAILURE_HANDLE(thread_status_create(&ui_thread));
 
-  LUM_FAILURE_HANDLE(wall_time_start(md_timer));
+  LUM_FAILURE_HANDLE(thread_status_set_worker_name(ui_thread, "MandarinDuck"));
+  LUM_FAILURE_HANDLE(thread_status_start(ui_thread, "Process Frame"));
 
   DisplayFileDrop* file_drop_array;
   LUM_FAILURE_HANDLE(array_create(&file_drop_array, sizeof(DisplayFileDrop), 4));
@@ -155,13 +156,13 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
     bool display_dirty = false;
 
     // Measure the time between event queries
-    LUM_FAILURE_HANDLE(wall_time_stop(md_timer));
+    LUM_FAILURE_HANDLE(thread_status_stop(ui_thread));
     display_query_events(duck->display, &file_drop_array, &exit_requested, &display_dirty);
 
     double time_step;
-    LUM_FAILURE_HANDLE(wall_time_get_time(md_timer, &time_step));
+    LUM_FAILURE_HANDLE(thread_status_get_time(ui_thread, &time_step));
 
-    LUM_FAILURE_HANDLE(wall_time_start(md_timer));
+    LUM_FAILURE_HANDLE(thread_status_start(ui_thread, "Process Frame"));
 
     if (display_dirty) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
@@ -179,7 +180,7 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
 
   LUM_FAILURE_HANDLE(array_destroy(&file_drop_array));
 
-  LUM_FAILURE_HANDLE(wall_time_destroy(&md_timer));
+  LUM_FAILURE_HANDLE(thread_status_destroy(&ui_thread));
 }
 
 void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {

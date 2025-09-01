@@ -34,7 +34,7 @@
 #include <luminary/log.h>
 #include <luminary/queue.h>
 #include <luminary/ringbuffer.h>
-#include <luminary/wall_time.h>
+#include <luminary/thread_status.h>
 #endif /* LUMINARY_INCLUDE_EXTRA_UTILS */
 
 /*
