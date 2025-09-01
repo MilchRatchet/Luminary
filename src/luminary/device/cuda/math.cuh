@@ -34,17 +34,17 @@ __device__ RGBF record_unpack(const PackedRecord packed) {
   const uint32_t blue  = packed.y >> 10;
 
   RGBF record;
-  record.r = __uint_as_float(red << 10);
-  record.g = __uint_as_float(green << 10);
-  record.b = __uint_as_float(blue << 10);
+  record.r = __uint_as_float(red << 11);
+  record.g = __uint_as_float(green << 11);
+  record.b = __uint_as_float(blue << 11);
 
   return record;
 }
 
 __device__ PackedRecord record_pack(const RGBF record) {
-  const uint32_t red   = (__float_as_uint(record.r) >> 10) & 0x1FFFFF;
-  const uint32_t green = (__float_as_uint(record.g) >> 10) & 0x1FFFFF;
-  const uint32_t blue  = (__float_as_uint(record.b) >> 10) & 0x1FFFFF;
+  const uint32_t red   = __float_as_uint(record.r) >> 11;
+  const uint32_t green = __float_as_uint(record.g) >> 11;
+  const uint32_t blue  = __float_as_uint(record.b) >> 11;
 
   PackedRecord packed;
   packed.x = red | (green << 21);
