@@ -11,7 +11,7 @@ __device__ float spectral_sample_wavelength(const float random, float& pdf) {
   while (range > 0) {
     const uint32_t step   = range >> 1;
     const uint32_t index  = first + step;
-    const float cdf_value = __ldg(device.ptrs.spectral_cdf + index) * (1.0f / 0xFFFF);
+    const float cdf_value = __ldg(device.ptrs.spectral_cdf + index);
 
     if (cdf_value <= random) {
       first = index + 1;
@@ -25,8 +25,8 @@ __device__ float spectral_sample_wavelength(const float random, float& pdf) {
   const uint32_t index_lower  = first - 1;
   const uint32_t index_higher = first;
 
-  const float cdf_lower  = __ldg(device.ptrs.spectral_cdf + index_lower) * (1.0f / 0xFFFF);
-  const float cdf_higher = __ldg(device.ptrs.spectral_cdf + index_higher) * (1.0f / 0xFFFF);
+  const float cdf_lower  = __ldg(device.ptrs.spectral_cdf + index_lower);
+  const float cdf_higher = __ldg(device.ptrs.spectral_cdf + index_higher);
 
   pdf = cdf_higher - cdf_lower;
 

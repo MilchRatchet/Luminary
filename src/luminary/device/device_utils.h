@@ -40,8 +40,8 @@
 #define UNDERSAMPLING_STAGE_SHIFT 2
 #define UNDERSAMPLING_ITERATION_MASK 0x03
 
-#define SPECTRAL_MIN_WAVELENGTH 420
-#define SPECTRAL_MAX_WAVELENGTH 700
+#define SPECTRAL_MIN_WAVELENGTH 360
+#define SPECTRAL_MAX_WAVELENGTH 830
 
 #define TEXTURE_OBJECT_INVALID (0xFFFFFFFFFFFFFFFFull)
 
@@ -372,7 +372,7 @@ struct DevicePointers {
   DEVICE const Quad* LUM_RESTRICT particle_quads;
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
-  DEVICE const uint16_t* LUM_RESTRICT spectral_cdf;
+  DEVICE const float* LUM_RESTRICT spectral_cdf;
   DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
