@@ -16,6 +16,7 @@ struct DeviceTexture {
   bool is_3D;
   size_t pitch;
   size_t pixel_size;
+  uint8_t num_mip_levels;
 } typedef DeviceTexture;
 
 DEVICE_CTX_FUNC LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream);

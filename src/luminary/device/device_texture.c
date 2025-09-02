@@ -86,14 +86,83 @@ static LuminaryResult _device_texture_get_pixel_size(const Texture* tex, size_t*
   }
 }
 
-LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Texture* texture, CUstream stream) {
-  __CHECK_NULL_ARGUMENT(_device_texture);
+static LuminaryResult _device_texture_get_num_mip_levels(const Texture* tex, uint8_t* num_mip_levels) {
+  if (tex->mipmap != TEXTURE_MIPMAP_MODE_GENERATE) {
+    *num_mip_levels = 1;
+    return LUMINARY_SUCCESS;
+  }
+
+  uint16_t max_dim = max(tex->width, max(tex->height, tex->depth));
+
+  if (max_dim == 0) {
+    *num_mip_levels = 1;
+    return LUMINARY_SUCCESS;
+  }
+
+  uint32_t level = 0;
+
+  while (max_dim != 1) {
+    level++;
+    max_dim = max_dim >> 1;
+  }
+
+  *num_mip_levels = level;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_texture_generate_mipmaps(
+  DeviceTexture* device_texture, const CUDA_TEXTURE_DESC* texture_desc, CUstream stream) {
+  __CHECK_NULL_ARGUMENT(device_texture);
+  __CHECK_NULL_ARGUMENT(texture_desc);
+
+  for (uint32_t mip_level = 0; mip_level < device_texture->num_mip_levels; mip_level++) {
+    CUarray src_level;
+    CUDA_FAILURE_HANDLE(cuMipmappedArrayGetLevel(&src_level, *((CUmipmappedArray*) device_texture->memory), mip_level));
+
+    CUarray dst_level;
+    CUDA_FAILURE_HANDLE(cuMipmappedArrayGetLevel(&dst_level, *((CUmipmappedArray*) device_texture->memory), mip_level + 1));
+
+    // Create SRC texture
+    CUDA_RESOURCE_DESC texture_res_desc;
+    memset(&texture_res_desc, 0, sizeof(CUDA_RESOURCE_DESC));
+
+    texture_res_desc.resType          = CU_RESOURCE_TYPE_ARRAY;
+    texture_res_desc.res.array.hArray = src_level;
+
+    CUtexObject src_tex;
+    CUDA_FAILURE_HANDLE(cuTexObjectCreate(&src_tex, &texture_res_desc, texture_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
+
+    // Create DST surface
+    CUDA_RESOURCE_DESC surface_res_desc;
+    memset(&surface_res_desc, 0, sizeof(CUDA_RESOURCE_DESC));
+
+    surface_res_desc.resType          = CU_RESOURCE_TYPE_ARRAY;
+    surface_res_desc.res.array.hArray = dst_level;
+
+    CUsurfObject dst_surface;
+    CUDA_FAILURE_HANDLE(cuSurfObjectCreate(&dst_surface, &surface_res_desc));
+
+    // Execute kernels
+
+    CUDA_FAILURE_HANDLE(cuTexObjectDestroy(src_tex));
+    CUDA_FAILURE_HANDLE(cuSurfObjectDestroy(dst_surface));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream) {
+  __CHECK_NULL_ARGUMENT(device_texture);
   __CHECK_NULL_ARGUMENT(texture);
 
   __FAILURE_HANDLE(texture_await(texture));
 
   size_t pixel_size;
   __FAILURE_HANDLE(_device_texture_get_pixel_size(texture, &pixel_size));
+
+  uint8_t num_mip_levels;
+  __FAILURE_HANDLE(_device_texture_get_num_mip_levels(texture, &num_mip_levels));
 
   CUDA_TEXTURE_DESC tex_desc;
   memset(&tex_desc, 0, sizeof(CUDA_TEXTURE_DESC));
@@ -106,6 +175,8 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
   tex_desc.maxAnisotropy       = 16;
   tex_desc.flags               = CU_TRSF_NORMALIZED_COORDINATES;
   tex_desc.minMipmapLevelClamp = 0;
+  tex_desc.maxMipmapLevelClamp = num_mip_levels - 1;
+  tex_desc.mipmapFilterMode    = CU_TR_FILTER_MODE_POINT;
   __FAILURE_HANDLE(_device_texture_get_read_mode(texture, &tex_desc.flags));
 
   CUDA_RESOURCE_DESC res_desc;
@@ -147,18 +218,13 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
           __FAILURE_HANDLE(_device_texture_get_format(texture, &res_desc.res.pitch2D.format));
         } break;
         case TEXTURE_MIPMAP_MODE_GENERATE: {
-          __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported.");
-        } break;
-      }
-    } break;
-    case TEXTURE_DIMENSION_TYPE_3D: {
-      switch (texture->mipmap) {
-        default:
-          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
-        case TEXTURE_MIPMAP_MODE_NONE: {
-          // TODO: Add support in device_memory
+          if (texture->num_components != 4) {
+            __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Mipmapping is only supported for textures with 4 components.");
+          }
 
           CUDA_ARRAY3D_DESCRIPTOR descriptor;
+          memset(&descriptor, 0, sizeof(CUDA_ARRAY3D_DESCRIPTOR));
+
           descriptor.Width       = width;
           descriptor.Height      = height;
           descriptor.Depth       = depth;
@@ -167,6 +233,31 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
 
           __FAILURE_HANDLE(_device_texture_get_format(texture, &descriptor.Format));
 
+          // TODO: Add support in device_memory
+          CUDA_FAILURE_HANDLE(cuMipmappedArrayCreate((CUmipmappedArray*) &data_device, &descriptor, num_mip_levels));
+
+          res_desc.resType                    = CU_RESOURCE_TYPE_MIPMAPPED_ARRAY;
+          res_desc.res.mipmap.hMipmappedArray = (CUmipmappedArray) data_device;
+        } break;
+      }
+    } break;
+    case TEXTURE_DIMENSION_TYPE_3D: {
+      switch (texture->mipmap) {
+        default:
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
+        case TEXTURE_MIPMAP_MODE_NONE: {
+          CUDA_ARRAY3D_DESCRIPTOR descriptor;
+          memset(&descriptor, 0, sizeof(CUDA_ARRAY3D_DESCRIPTOR));
+
+          descriptor.Width       = width;
+          descriptor.Height      = height;
+          descriptor.Depth       = depth;
+          descriptor.Flags       = 0;
+          descriptor.NumChannels = texture->num_components;
+
+          __FAILURE_HANDLE(_device_texture_get_format(texture, &descriptor.Format));
+
+          // TODO: Add support in device_memory
           CUDA_FAILURE_HANDLE(cuArray3DCreate((CUarray*) &data_device, &descriptor));
 
           pitch_gpu = width * pixel_size;
@@ -190,7 +281,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
           res_desc.res.array.hArray = (CUarray) data_device;
         } break;
         case TEXTURE_MIPMAP_MODE_GENERATE: {
-          __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported.");
+          __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported for 3D textures.");
         } break;
       }
     } break;
@@ -202,30 +293,32 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension exceeds limits: %ux%u.", width, height);
   }
 
-  DeviceTexture* device_texture;
-  __FAILURE_HANDLE(host_malloc(&device_texture, sizeof(DeviceTexture)));
+  __FAILURE_HANDLE(host_malloc(device_texture, sizeof(DeviceTexture)));
 
   bool tex_is_valid;
   __FAILURE_HANDLE(texture_is_valid(texture, &tex_is_valid));
 
   if (tex_is_valid) {
-    CUDA_FAILURE_HANDLE(cuTexObjectCreate(&device_texture->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
+    CUDA_FAILURE_HANDLE(cuTexObjectCreate(&(*device_texture)->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
   }
   else {
-    device_texture->tex = TEXTURE_OBJECT_INVALID;
+    (*device_texture)->tex = TEXTURE_OBJECT_INVALID;
   }
 
-  device_texture->status     = tex_is_valid ? TEXTURE_STATUS_NONE : TEXTURE_STATUS_INVALID;
-  device_texture->memory     = data_device;
-  device_texture->width      = width;
-  device_texture->height     = height;
-  device_texture->depth      = depth;
-  device_texture->gamma      = texture->gamma;
-  device_texture->is_3D      = (texture->dim == TEXTURE_DIMENSION_TYPE_3D);
-  device_texture->pitch      = pitch_gpu;
-  device_texture->pixel_size = pixel_size;
+  (*device_texture)->status         = tex_is_valid ? TEXTURE_STATUS_NONE : TEXTURE_STATUS_INVALID;
+  (*device_texture)->memory         = data_device;
+  (*device_texture)->width          = width;
+  (*device_texture)->height         = height;
+  (*device_texture)->depth          = depth;
+  (*device_texture)->gamma          = texture->gamma;
+  (*device_texture)->is_3D          = (texture->dim == TEXTURE_DIMENSION_TYPE_3D);
+  (*device_texture)->pitch          = pitch_gpu;
+  (*device_texture)->pixel_size     = pixel_size;
+  (*device_texture)->num_mip_levels = num_mip_levels;
 
-  *_device_texture = device_texture;
+  if (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE) {
+    __FAILURE_HANDLE(_device_texture_generate_mipmaps(*device_texture, &tex_desc, stream));
+  }
 
   return LUMINARY_SUCCESS;
 }
