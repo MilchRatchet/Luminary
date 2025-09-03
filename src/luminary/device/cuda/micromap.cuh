@@ -138,7 +138,7 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
   if (found_opaque && !found_transparent)
     return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
 
-  return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+  return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
 }
 
 //
@@ -152,7 +152,7 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
 
     const uint8_t opacity = micromap_get_opacity(tri, 0, 0);
 
-    if (opacity != OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
+    if (opacity != OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT)
       args.level_record[tri_id] = 0;
 
     args.dst[tri_id] = opacity;
@@ -186,11 +186,11 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
       src_v         = (src_v >> (2 * (i & 0b11))) & 0b11;
 
       uint8_t dst_v = 0;
-      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE) {
+      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT) {
         for (uint32_t j = 0; j < 4; j++) {
           const uint8_t opacity = micromap_get_opacity(tri, args.src_level + 1, 4 * i + j);
 
-          if (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
+          if (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT)
             unknowns_left = true;
 
           dst_v = dst_v | (opacity << (2 * j));
