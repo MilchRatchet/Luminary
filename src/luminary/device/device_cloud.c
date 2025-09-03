@@ -17,7 +17,7 @@ static LuminaryResult _device_cloud_noise_generate_weather_map(DeviceCloudNoise*
   KernelArgsCloudComputeWeatherNoise weather_args;
   weather_args.dim  = CLOUD_WEATHER_RES;
   weather_args.seed = cloud_noise->seed;
-  weather_args.tex  = DEVICE_PTR(cloud_noise->weather_tex->memory);
+  weather_args.tex  = DEVICE_PTR(cloud_noise->weather_tex->cuda_memory);
   weather_args.ld   = cloud_noise->weather_tex->pitch / (sizeof(uint8_t) * 4);
 
   __FAILURE_HANDLE(

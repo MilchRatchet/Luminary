@@ -11,7 +11,7 @@ __device__ float4 texture_load(const DeviceTextureObject tex, const UV uv, const
   const float u = uv.u;
   const float v = flip_v ? 1.0f - uv.v : uv.v;
 
-  float4 result = tex2D<float4>(tex.handle, u, v);
+  float4 result = tex2DLod<float4>(tex.handle, u, v, 0.0f);
 
   if (apply_gamma) {
     result.x = powf(result.x, tex.gamma);

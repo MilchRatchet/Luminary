@@ -7,7 +7,11 @@
 
 struct DeviceTexture {
   TextureStatus status;
-  void* memory;
+  union {
+    DEVICE void* cuda_memory;
+    CUarray cuda_array;
+    CUmipmappedArray cuda_mipmapped_array;
+  };
   CUtexObject tex;
   uint16_t width;
   uint16_t height;
