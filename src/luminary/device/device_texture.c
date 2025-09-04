@@ -412,6 +412,7 @@ LuminaryResult device_texture_create(DeviceTexture** device_texture, const Textu
   (*device_texture)->is_3D          = (texture->dim == TEXTURE_DIMENSION_TYPE_3D);
   (*device_texture)->pixel_size     = pixel_size;
   (*device_texture)->num_mip_levels = num_mip_levels;
+  (*device_texture)->has_mipmaps    = (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE);
 
   if (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE && tex_is_valid) {
     __FAILURE_HANDLE(_device_texture_generate_mipmaps(*device_texture, &tex_desc, texture->type, device, stream));
@@ -475,7 +476,7 @@ LuminaryResult device_texture_destroy(DeviceTexture** device_texture) {
     CUDA_FAILURE_HANDLE(cuArrayDestroy((*device_texture)->cuda_array));
   }
   else {
-    if ((*device_texture)->num_mip_levels > 1) {
+    if ((*device_texture)->has_mipmaps) {
       CUDA_FAILURE_HANDLE(cuMipmappedArrayDestroy((*device_texture)->cuda_mipmapped_array));
     }
     else {

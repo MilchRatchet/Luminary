@@ -21,6 +21,7 @@ struct DeviceTexture {
   size_t pitch;
   size_t pixel_size;
   uint8_t num_mip_levels;
+  bool has_mipmaps;
 } typedef DeviceTexture;
 
 struct Device typedef Device;
