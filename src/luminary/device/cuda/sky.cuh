@@ -226,9 +226,13 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(
 
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
 
+      TextureLoadArgs tex_load_args = texture_get_default_args();
+      tex_load_args.flip_v          = false;
+      tex_load_args.apply_gamma     = false;
+
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = texture_load(transmission_low, transmittance_uv, false, false);
-      const float4 transmittance_high = texture_load(transmission_high, transmittance_uv, false, false);
+      const float4 transmittance_low  = texture_load(transmission_low, transmittance_uv, tex_load_args);
+      const float4 transmittance_high = texture_load(transmission_high, transmittance_uv, tex_load_args);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
       const float density_rayleigh = sky_rayleigh_density(height) * device.sky.rayleigh_density;
@@ -374,9 +378,13 @@ __device__ Spectrum sky_compute_atmosphere(
         shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : 1.0f;
       }
 
+      TextureLoadArgs tex_load_args = texture_get_default_args();
+      tex_load_args.flip_v          = false;
+      tex_load_args.apply_gamma     = false;
+
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = texture_load(device.sky_lut_transmission_low_tex, transmittance_uv, false, false);
-      const float4 transmittance_high = texture_load(device.sky_lut_transmission_high_tex, transmittance_uv, false, false);
+      const float4 transmittance_low  = texture_load(device.sky_lut_transmission_low_tex, transmittance_uv, tex_load_args);
+      const float4 transmittance_high = texture_load(device.sky_lut_transmission_high_tex, transmittance_uv, tex_load_args);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
       const float density_rayleigh = sky_rayleigh_density(height) * device.sky.rayleigh_density;
@@ -398,8 +406,8 @@ __device__ Spectrum sky_compute_atmosphere(
       const Spectrum ss_radiance = spectrum_scale(spectrum_mul(extinction_sun, phase_times_scattering), shadow * light_angle);
 
       const UV multiscattering_uv        = get_uv(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
-      const float4 multiscattering_low   = texture_load(device.sky_lut_multiscattering_low_tex, multiscattering_uv, false, false);
-      const float4 multiscattering_high  = texture_load(device.sky_lut_multiscattering_high_tex, multiscattering_uv, false, false);
+      const float4 multiscattering_low   = texture_load(device.sky_lut_multiscattering_low_tex, multiscattering_uv, tex_load_args);
+      const float4 multiscattering_high  = texture_load(device.sky_lut_multiscattering_high_tex, multiscattering_uv, tex_load_args);
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
       const Spectrum ms_radiance         = spectrum_mul(multiscattering_tex, scattering);
 

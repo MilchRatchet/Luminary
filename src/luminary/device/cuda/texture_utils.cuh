@@ -3,17 +3,38 @@
 
 #include "utils.cuh"
 
+struct TextureLoadArgs {
+  bool flip_v;
+  bool apply_gamma;
+  float mip_level;
+  float4 default_result;
+} typedef TextureLoadArgs;
+
+__device__ TextureLoadArgs texture_get_default_args() {
+  TextureLoadArgs args;
+
+  args.flip_v         = true;
+  args.apply_gamma    = true;
+  args.mip_level      = 0.0f;
+  args.default_result = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+  return args;
+}
+
 __device__ bool texture_is_valid(const DeviceTextureObject tex) {
   return tex.handle != TEXTURE_OBJECT_INVALID;
 }
 
-__device__ float4 texture_load(const DeviceTextureObject tex, const UV uv, const bool flip_v = true, const bool apply_gamma = true) {
+__device__ float4 texture_load(DeviceTextureObject tex, UV uv, const TextureLoadArgs args = texture_get_default_args()) {
+  if (texture_is_valid(tex) == false)
+    return args.default_result;
+
   const float u = uv.u;
-  const float v = flip_v ? 1.0f - uv.v : uv.v;
+  const float v = args.flip_v ? 1.0f - uv.v : uv.v;
 
-  float4 result = tex2DLod<float4>(tex.handle, u, v, 0.0f);
+  float4 result = tex2DLod<float4>(tex.handle, u, v, args.mip_level);
 
-  if (apply_gamma) {
+  if (args.apply_gamma) {
     result.x = powf(result.x, tex.gamma);
     result.y = powf(result.y, tex.gamma);
     result.z = powf(result.z, tex.gamma);
