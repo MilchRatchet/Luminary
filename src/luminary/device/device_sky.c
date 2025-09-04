@@ -203,10 +203,10 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_update(DeviceSkyLUT* lut, Device* 
   if (source_lut->id != lut->reference_id) {
     __FAILURE_HANDLE(_device_sky_lut_free(lut));
 
-    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_low, source_lut->transmittance_low, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_high, source_lut->transmittance_high, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_low, source_lut->multiscattering_low, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_high, source_lut->multiscattering_high, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_low, source_lut->transmittance_low, device, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_high, source_lut->transmittance_high, device, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_low, source_lut->multiscattering_low, device, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_high, source_lut->multiscattering_high, device, device->stream_main));
 
     lut->reference_id = source_lut->id;
 
@@ -424,8 +424,8 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Devic
     __FAILURE_HANDLE(_device_sky_hdri_free(hdri));
 
     if (source_hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
-      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device->stream_main));
-      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device->stream_main));
+      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device, device->stream_main));
+      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device, device->stream_main));
 
       *has_changed = true;
     }

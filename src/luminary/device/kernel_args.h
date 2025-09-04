@@ -168,4 +168,49 @@ struct KernelArgsOMMGatherArrayFormat4 {
   const OptixOpacityMicromapDesc* desc;
 } typedef KernelArgsOMMGatherArrayFormat4;
 
+struct KernelArgsMipmapGenerateLevel3DRGBA8 {
+  CUtexObject src;
+  CUsurfObject dst;
+  uint16_t width;
+  uint16_t height;
+  uint16_t depth;
+} typedef KernelArgsMipmapGenerateLevel3DRGBA8;
+
+struct KernelArgsMipmapGenerateLevel2DRGBA8 {
+  CUtexObject src;
+  CUsurfObject dst;
+  uint16_t width;
+  uint16_t height;
+} typedef KernelArgsMipmapGenerateLevel2DRGBA8;
+
+struct KernelArgsMipmapGenerateLevel3DRGBA16 {
+  CUtexObject src;
+  CUsurfObject dst;
+  uint16_t width;
+  uint16_t height;
+  uint16_t depth;
+} typedef KernelArgsMipmapGenerateLevel3DRGBA16;
+
+struct KernelArgsMipmapGenerateLevel2DRGBA16 {
+  CUtexObject src;
+  CUsurfObject dst;
+  uint16_t width;
+  uint16_t height;
+} typedef KernelArgsMipmapGenerateLevel2DRGBA16;
+
+struct KernelArgsMipmapGenerateLevel3DRGBAF {
+  CUtexObject src;
+  CUsurfObject dst;
+  uint16_t width;
+  uint16_t height;
+  uint16_t depth;
+} typedef KernelArgsMipmapGenerateLevel3DRGBAF;
+
+struct KernelArgsMipmapGenerateLevel2DRGBAF {
+  CUtexObject src;
+  CUsurfObject dst;
+  uint16_t width;
+  uint16_t height;
+} typedef KernelArgsMipmapGenerateLevel2DRGBAF;
+
 #endif /* LUMINARY_KERNEL_ARGS_H */

@@ -23,7 +23,10 @@ struct DeviceTexture {
   uint8_t num_mip_levels;
 } typedef DeviceTexture;
 
-DEVICE_CTX_FUNC LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream);
+struct Device typedef Device;
+
+DEVICE_CTX_FUNC LuminaryResult
+  device_texture_create(DeviceTexture** device_texture, const Texture* texture, Device* device, CUstream stream);
 DEVICE_CTX_FUNC LuminaryResult device_texture_copy_from_mem(DeviceTexture* device_texture, const DEVICE void* mem, CUstream stream);
 DEVICE_CTX_FUNC LuminaryResult device_texture_destroy(DeviceTexture** device_texture);
 

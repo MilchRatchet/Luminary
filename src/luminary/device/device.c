@@ -408,7 +408,7 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   __FAILURE_HANDLE(texture_create(&moon_albedo_tex));
   __FAILURE_HANDLE(png_load(moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
 
-  __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex, device, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&moon_albedo_tex));
 
@@ -416,7 +416,7 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   __FAILURE_HANDLE(texture_create(&moon_normal_tex));
   __FAILURE_HANDLE(png_load(moon_normal_tex, moon_normal_data, moon_normal_data_length, "moon_normal.png"));
 
-  __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex, device, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&moon_normal_tex));
 
@@ -1082,7 +1082,7 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
 
   for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
     DeviceTexture* device_texture;
-    __FAILURE_HANDLE(device_texture_create(&device_texture, textures[texture_id], device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&device_texture, textures[texture_id], device, device->stream_main));
 
     __FAILURE_HANDLE(array_push(&device->textures, &device_texture));
   }

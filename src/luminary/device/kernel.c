@@ -62,7 +62,21 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]  = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
   [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] =
     {.name = "omm_gather_array_format_4", .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)},
-  [CUDA_KERNEL_TYPE_BUFFER_ADD] = {.name = "buffer_add", .param_size = sizeof(KernelArgsBufferAdd)}};
+  [CUDA_KERNEL_TYPE_BUFFER_ADD] = {.name = "buffer_add", .param_size = sizeof(KernelArgsBufferAdd)},
+  [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_3D_RGBA8] =
+    {.name = "mipmap_generate_level_3D_RGBA8", .param_size = sizeof(KernelArgsMipmapGenerateLevel3DRGBA8)},
+  [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBA8] =
+    {.name = "mipmap_generate_level_2D_RGBA8", .param_size = sizeof(KernelArgsMipmapGenerateLevel2DRGBA8)},
+  [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_3D_RGBA16] =
+    {.name = "mipmap_generate_level_3D_RGBA16", .param_size = sizeof(KernelArgsMipmapGenerateLevel3DRGBA16)},
+  [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBA16] =
+    {.name = "mipmap_generate_level_2D_RGBA16", .param_size = sizeof(KernelArgsMipmapGenerateLevel2DRGBA16)},
+  [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_3D_RGBAF] =
+    {.name = "mipmap_generate_level_3D_RGBAF", .param_size = sizeof(KernelArgsMipmapGenerateLevel3DRGBAF)},
+  [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBAF] =
+    {.name = "mipmap_generate_level_2D_RGBAF", .param_size = sizeof(KernelArgsMipmapGenerateLevel2DRGBAF)},
+
+};
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 
 LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type) {

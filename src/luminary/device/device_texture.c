@@ -1,6 +1,9 @@
 #include "device_texture.h"
 
+#include "device.h"
 #include "internal_error.h"
+#include "kernel.h"
+#include "kernel_args.h"
 
 static LuminaryResult _device_texture_get_address_mode(const TextureWrappingMode mode, CUaddress_mode* address_mode) {
   switch (mode) {
@@ -112,7 +115,7 @@ static LuminaryResult _device_texture_get_num_mip_levels(const Texture* tex, uin
 }
 
 static LuminaryResult _device_texture_generate_mipmaps(
-  DeviceTexture* device_texture, const CUDA_TEXTURE_DESC* texture_desc, CUstream stream) {
+  DeviceTexture* device_texture, const CUDA_TEXTURE_DESC* texture_desc, TextureDataType data_type, Device* device, CUstream stream) {
   __CHECK_NULL_ARGUMENT(device_texture);
   __CHECK_NULL_ARGUMENT(texture_desc);
 
@@ -122,6 +125,10 @@ static LuminaryResult _device_texture_generate_mipmaps(
 
     CUarray dst_level;
     CUDA_FAILURE_HANDLE(cuMipmappedArrayGetLevel(&dst_level, device_texture->cuda_mipmapped_array, mip_level + 1));
+
+    const uint16_t width  = device_texture->width >> (mip_level + 1);
+    const uint16_t height = device_texture->height >> (mip_level + 1);
+    const uint16_t depth  = device_texture->depth >> (mip_level + 1);
 
     // Create SRC texture
     CUDA_RESOURCE_DESC texture_res_desc;
@@ -144,6 +151,81 @@ static LuminaryResult _device_texture_generate_mipmaps(
     CUDA_FAILURE_HANDLE(cuSurfObjectCreate(&dst_surface, &surface_res_desc));
 
     // Execute kernels
+    if (device_texture->is_3D) {
+      switch (data_type) {
+        case TEXTURE_DATA_TYPE_FP32: {
+          KernelArgsMipmapGenerateLevel3DRGBAF args;
+          args.dst    = dst_surface;
+          args.src    = src_tex;
+          args.width  = width;
+          args.height = height;
+          args.depth  = depth;
+
+          __FAILURE_HANDLE(
+            kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_3D_RGBAF], (void*) &args, stream));
+        } break;
+        case TEXTURE_DATA_TYPE_U8: {
+          KernelArgsMipmapGenerateLevel3DRGBA8 args;
+          args.dst    = dst_surface;
+          args.src    = src_tex;
+          args.width  = width;
+          args.height = height;
+          args.depth  = depth;
+
+          __FAILURE_HANDLE(
+            kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_3D_RGBA8], (void*) &args, stream));
+        } break;
+        case TEXTURE_DATA_TYPE_U16: {
+          KernelArgsMipmapGenerateLevel3DRGBA16 args;
+          args.dst    = dst_surface;
+          args.src    = src_tex;
+          args.width  = width;
+          args.height = height;
+          args.depth  = depth;
+
+          __FAILURE_HANDLE(
+            kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_3D_RGBA16], (void*) &args, stream));
+        } break;
+        default:
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid texture data type.");
+      }
+    }
+    else {
+      switch (data_type) {
+        case TEXTURE_DATA_TYPE_FP32: {
+          KernelArgsMipmapGenerateLevel2DRGBAF args;
+          args.dst    = dst_surface;
+          args.src    = src_tex;
+          args.width  = width;
+          args.height = height;
+
+          __FAILURE_HANDLE(
+            kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBAF], (void*) &args, stream));
+        } break;
+        case TEXTURE_DATA_TYPE_U8: {
+          KernelArgsMipmapGenerateLevel2DRGBA8 args;
+          args.dst    = dst_surface;
+          args.src    = src_tex;
+          args.width  = width;
+          args.height = height;
+
+          __FAILURE_HANDLE(
+            kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBA8], (void*) &args, stream));
+        } break;
+        case TEXTURE_DATA_TYPE_U16: {
+          KernelArgsMipmapGenerateLevel2DRGBA16 args;
+          args.dst    = dst_surface;
+          args.src    = src_tex;
+          args.width  = width;
+          args.height = height;
+
+          __FAILURE_HANDLE(
+            kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBA16], (void*) &args, stream));
+        } break;
+        default:
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid texture data type.");
+      }
+    }
 
     CUDA_FAILURE_HANDLE(cuTexObjectDestroy(src_tex));
     CUDA_FAILURE_HANDLE(cuSurfObjectDestroy(dst_surface));
@@ -152,7 +234,7 @@ static LuminaryResult _device_texture_generate_mipmaps(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream) {
+LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, Device* device, CUstream stream) {
   __CHECK_NULL_ARGUMENT(device_texture);
   __CHECK_NULL_ARGUMENT(texture);
 
@@ -331,8 +413,8 @@ LuminaryResult device_texture_create(DeviceTexture** device_texture, const Textu
   (*device_texture)->pixel_size     = pixel_size;
   (*device_texture)->num_mip_levels = num_mip_levels;
 
-  if (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE) {
-    __FAILURE_HANDLE(_device_texture_generate_mipmaps(*device_texture, &tex_desc, stream));
+  if (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE && tex_is_valid) {
+    __FAILURE_HANDLE(_device_texture_generate_mipmaps(*device_texture, &tex_desc, texture->type, device, stream));
   }
 
   return LUMINARY_SUCCESS;
