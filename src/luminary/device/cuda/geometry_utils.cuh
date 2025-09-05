@@ -41,6 +41,8 @@ __device__ vec3 geometry_compute_normal(
       map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
     }
 
+    map_normal = normalize_vector(map_normal);
+
     const Quaternion q = quaternion_rotation_to_z_canonical(normal);
 
     normal = quaternion_apply(quaternion_inverse(q), map_normal);
