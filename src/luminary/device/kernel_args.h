@@ -146,25 +146,34 @@ struct KernelArgsCameraPostLensFlareHalo {
 struct KernelArgsOMMLevel0Format4 {
   uint32_t mesh_id;
   uint32_t triangle_count;
+  uint8_t max_num_levels;
   uint8_t* dst;
   uint8_t* level_record;
+  uint32_t* offset_record;
+  uint32_t* dst_tri_work;
+  uint32_t* work_counter;
 } typedef KernelArgsOMMLevel0Format4;
 
 struct KernelArgsOMMRefineFormat4 {
   uint32_t mesh_id;
   uint32_t triangle_count;
+  uint8_t max_num_levels;
   uint8_t* dst;
   const uint8_t* src;
   uint8_t* level_record;
-  const uint32_t src_level;
+  uint32_t* offset_record;
+  const uint32_t dst_level;
+  const uint32_t* src_tri_work;
+  uint32_t* dst_tri_work;
+  uint32_t* work_counter;
 } typedef KernelArgsOMMRefineFormat4;
 
 struct KernelArgsOMMGatherArrayFormat4 {
   uint32_t triangle_count;
   uint8_t* dst;
-  const uint8_t* src;
-  const uint32_t level;
+  const uint8_t* src[OPTIX_OPACITY_MICROMAP_MAX_SUBDIVISION_LEVEL];
   const uint8_t* level_record;
+  const uint32_t* offset_record;
   const OptixOpacityMicromapDesc* desc;
 } typedef KernelArgsOMMGatherArrayFormat4;
 

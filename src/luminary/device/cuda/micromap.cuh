@@ -193,34 +193,45 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
 
     const uint8_t opacity = micromap_get_opacity(tri, 0, 0);
 
-    if (opacity != OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT)
-      args.level_record[tri_id] = 0;
+    const bool tri_requires_refinement = opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT && (args.max_num_levels > 1);
 
-    args.dst[tri_id] = opacity;
+    if (tri_requires_refinement) {
+      const uint32_t work_offset = atomicAdd((uint32_t*) args.work_counter, 1u);
+
+      args.dst_tri_work[work_offset] = tri_id;
+    }
+    else {
+      args.level_record[tri_id] = 0;
+    }
+
+    args.offset_record[tri_id] = tri_id;
+    args.dst[tri_id]           = opacity;
 
     tri_id += blockDim.x * gridDim.x;
   }
 }
 
+// TODO: Refinement should probably operate such that each warp handles one triangle
 LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) {
-  uint32_t tri_id = THREAD_ID;
+  uint32_t work_id = THREAD_ID;
 
-  while (tri_id < args.triangle_count) {
-    if (args.level_record[tri_id] != 0xFF) {
-      tri_id += blockDim.x * gridDim.x;
-      continue;
-    }
+  const uint32_t state_size    = OMM_STATE_SIZE(args.dst_level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+  const uint32_t src_tri_count = 1u << (2u * (args.dst_level - 1));
+
+  while (work_id < args.triangle_count) {
+    const uint32_t tri_id = args.src_tri_work[work_id];
 
     const OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
 
-    const uint32_t src_tri_count  = 1 << (2 * args.src_level);
-    const uint32_t src_state_size = (src_tri_count + 3) / 4;
-    const uint32_t dst_state_size = src_tri_count;
+    const uint32_t src_offset = args.offset_record[tri_id];
+    const uint32_t dst_offset = work_id * state_size;
 
-    const uint8_t* src_tri_ptr = args.src + tri_id * src_state_size;
-    uint8_t* dst_tri_ptr       = args.dst + tri_id * dst_state_size;
+    const uint8_t* src_tri_ptr = args.src + src_offset;
+    uint8_t* dst_tri_ptr       = args.dst + dst_offset;
 
-    bool unknowns_left = false;
+    args.offset_record[tri_id] = dst_offset;
+
+    bool tri_requires_refinement = false;
 
     for (uint32_t i = 0; i < src_tri_count; i++) {
       uint8_t src_v = src_tri_ptr[i / 4];
@@ -229,10 +240,9 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
       uint8_t dst_v = 0;
       if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT) {
         for (uint32_t j = 0; j < 4; j++) {
-          const uint8_t opacity = micromap_get_opacity(tri, args.src_level + 1, 4 * i + j);
+          const uint8_t opacity = micromap_get_opacity(tri, args.dst_level, 4 * i + j);
 
-          if (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT)
-            unknowns_left = true;
+          tri_requires_refinement |= (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT);
 
           dst_v = dst_v | (opacity << (2 * j));
         }
@@ -244,25 +254,32 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
       dst_tri_ptr[i] = dst_v;
     }
 
-    if (!unknowns_left)
-      args.level_record[tri_id] = args.src_level + 1;
+    tri_requires_refinement &= (args.max_num_levels > (args.dst_level + 1));
 
-    tri_id += blockDim.x * gridDim.x;
+    if (tri_requires_refinement) {
+      const uint32_t work_offset = atomicAdd((uint32_t*) args.work_counter, 1u);
+
+      args.dst_tri_work[work_offset] = tri_id;
+    }
+    else {
+      args.level_record[tri_id] = args.dst_level;
+    }
+
+    work_id += blockDim.x * gridDim.x;
   }
 }
 
 LUMINARY_KERNEL void omm_gather_array_format_4(const KernelArgsOMMGatherArrayFormat4 args) {
-  uint32_t tri_id           = THREAD_ID;
-  const uint32_t state_size = OMM_STATE_SIZE(args.level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+  uint32_t tri_id = THREAD_ID;
 
   while (tri_id < args.triangle_count) {
-    if (args.level_record[tri_id] != args.level) {
-      tri_id += blockDim.x * gridDim.x;
-      continue;
-    }
+    const uint8_t level       = args.level_record[tri_id];
+    const uint32_t src_offset = args.offset_record[tri_id];
+    const uint32_t state_size = OMM_STATE_SIZE(level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+    const uint32_t dst_offset = args.desc[tri_id].byteOffset;
 
     for (uint32_t j = 0; j < state_size; j++) {
-      args.dst[args.desc[tri_id].byteOffset + j] = args.src[tri_id * state_size + j];
+      args.dst[dst_offset + j] = args.src[level][src_offset + j];
     }
 
     tri_id += blockDim.x * gridDim.x;
