@@ -560,7 +560,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   uint32_t tasks_per_thread = RECOMMENDED_TASKS_PER_THREAD;
   uint32_t allocated_tasks;
 
-  while (tasks_per_thread < 2 * RECOMMENDED_TASKS_PER_THREAD) {
+  while (tasks_per_thread < MAXIMUM_TASKS_PER_THREAD) {
     allocated_tasks = thread_count * tasks_per_thread;
 
     const uint32_t tile_count       = (internal_pixel_count + allocated_tasks - 1) / allocated_tasks;

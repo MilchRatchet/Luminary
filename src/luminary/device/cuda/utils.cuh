@@ -133,6 +133,12 @@ extern "C" static __constant__ DeviceConstantMemory device;
 // Functions
 //===========================================================================================
 
+#ifdef __builtin_assume
+#define LUMINARY_ASSUME(__internal_macro_expression) __builtin_assume(__internal_macro_expression)
+#else /* __builtin_assume */
+#define LUMINARY_ASSUME(__internal_macro_expression) __assume(__internal_macro_expression)
+#endif /* !__builtin_assume */
+
 #define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
 
 __device__ bool is_selected_pixel(const ushort2 index) {

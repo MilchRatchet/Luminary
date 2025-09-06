@@ -611,6 +611,8 @@ LUMINARY_KERNEL void sky_process_tasks() {
   const int task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_SKY];
 
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
+
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
@@ -640,6 +642,8 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
 
   const int task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_SKY];
+
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
 
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();

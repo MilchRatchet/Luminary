@@ -142,6 +142,8 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
 
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
+
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
@@ -215,6 +217,8 @@ LUMINARY_KERNEL void tasks_sort() {
 
   const uint32_t task_count          = __ldcs(device.ptrs.trace_counts + THREAD_ID);
   const uint32_t max_warp_task_count = warp_reduce_max(task_count);
+
+  LUMINARY_ASSUME(max_warp_task_count <= MAXIMUM_TASKS_PER_THREAD);
 
   uint64_t offset_mask = 0;
 
