@@ -116,27 +116,34 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
   const float inv_width  = 1.0f / tri.tex.width;
   const float inv_height = 1.0f / tri.tex.height;
 
+  float step_v = inv_height;
+
   for (float v = min_v; v <= max_v;) {
+    v = fminf(v, max_v);
+
     const float e0    = fmaxf(fminf(a0 + v * m0, max_e_0), min_e_0);
     const float e1    = fmaxf(fminf(a1 + v * m1, max_e_1), min_e_1);
     const float e2    = fmaxf(fminf(a2 + v * m2, max_e_2), min_e_2);
     const float min_u = fminf(e0, fminf(e1, e2));
     float max_u       = fmaxf(e0, fmaxf(e1, e2));
 
+    // There is no reason to iterate over the whole texture more than once.
     if (max_u > min_u + 1.0f)
       max_u = min_u + 1.0f;
 
     const float span_u   = max_u - min_u;
     const float texels_u = span_u * tri.tex.width;
 
-    if (texels_u <= 0.0f)
-      return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+    if (texels_u <= 0.0f) {
+      v += step_v;
+      continue;
+    }
 
     const float mip_level_u = fmaxf(log2f(texels_u), 0.0f);
 
     // Taking the minimum would be accurate but has issues with thin triangles using tiling and high resolution textures.
     // Using the max introduces some error but is robust in terms of generation time.
-    const float mip_level = fmaxf(mip_level_u, mip_level_v);
+    const float mip_level = fmaxf(fmaxf(mip_level_u, mip_level_v) - 1.0f, 0.0f);
 
     TextureLoadArgs tex_load_args = texture_get_default_args();
     tex_load_args.mip_level       = mip_level;
@@ -144,6 +151,8 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
     const float step_u = exp2f(mip_level) * inv_width;
 
     for (float u = min_u; u <= max_u; u += step_u) {
+      u = fminf(u, max_u);
+
       const float alpha = texture_load(tri.tex, get_uv(u, v), tex_load_args).w;
 
       if (alpha > 0.0f)
@@ -156,7 +165,7 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
     if (found_opaque && found_transparent)
       break;
 
-    const float step_v = exp2f(mip_level) * inv_height;
+    step_v = exp2f(mip_level) * inv_height;
     v += step_v;
   }
 
@@ -165,6 +174,10 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
 
   if (found_opaque && !found_transparent)
     return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
+
+  // This is a case that should never happen
+  if (!found_opaque && !found_transparent)
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
 
   return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
 }
@@ -176,7 +189,7 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
   uint32_t tri_id = THREAD_ID;
 
   while (tri_id < args.triangle_count) {
-    OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
+    const OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
 
     const uint8_t opacity = micromap_get_opacity(tri, 0, 0);
 
@@ -198,7 +211,7 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
       continue;
     }
 
-    OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
+    const OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
 
     const uint32_t src_tri_count  = 1 << (2 * args.src_level);
     const uint32_t src_state_size = (src_tri_count + 3) / 4;

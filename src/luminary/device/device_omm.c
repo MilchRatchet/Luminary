@@ -39,7 +39,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   const uint32_t total_tri_count          = mesh->data.triangle_count;
 
   // Highest allowed level is 12 according to OptiX Docs
-  const uint8_t max_num_levels = 6;
+  const uint8_t max_num_levels = 10;
   uint8_t num_levels           = 0;
 
   ////////////////////////////////////////////////////////////////////
