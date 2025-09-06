@@ -14,7 +14,7 @@ uint32_t device_pack_normal(const vec3 normal) {
   y *= recip_norm;
   z *= recip_norm;
 
-  const double t = fmax(fmin(-z, 1.0f), 0.0f);
+  const double t = fmax(fmin(-z, 1.0), 0.0);
 
   x += (x >= 0.0) ? t : -t;
   y += (y >= 0.0) ? t : -t;

@@ -358,6 +358,34 @@ __device__ vec3 normal_unpack(const uint32_t data) {
   return normalize_vector(normal);
 }
 
+__device__ uint32_t normal_pack(const vec3 normal) {
+  float x = normal.x;
+  float y = normal.y;
+  float z = normal.z;
+
+  const float recip_norm = 1.0f / (fabsf(x) + fabsf(y) + fabsf(z));
+
+  x *= recip_norm;
+  y *= recip_norm;
+  z *= recip_norm;
+
+  const float t = fmaxf(fminf(-z, 1.0f), 0.0f);
+
+  x += (x >= 0.0f) ? t : -t;
+  y += (y >= 0.0f) ? t : -t;
+
+  x = fmaxf(fminf(x, 1.0f), -1.0f);
+  y = fmaxf(fminf(y, 1.0f), -1.0f);
+
+  x = (x + 1.0f) * 0.5f;
+  y = (y + 1.0f) * 0.5f;
+
+  const uint32_t x_u16 = (uint32_t) (x * 0xFFFF + 0.5f);
+  const uint32_t y_u16 = (uint32_t) (y * 0xFFFF + 0.5f);
+
+  return (y_u16 << 16) | x_u16;
+}
+
 /*
  * Uses a orthonormal basis which is built as described in
  * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_

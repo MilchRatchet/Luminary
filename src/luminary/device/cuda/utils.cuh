@@ -28,7 +28,7 @@
 #define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
 #ifndef eps
-#define eps 0.000001f
+#define eps FLT_EPSILON
 #endif /* eps */
 
 #define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)

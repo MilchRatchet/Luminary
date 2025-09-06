@@ -11,8 +11,8 @@
 #include "utils.cuh"
 
 __device__ vec3 geometry_compute_normal(
-  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 face_normal, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords,
-  UV tex_coords, bool normal_map_is_compressed, bool& is_inside) {
+  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords, UV tex_coords,
+  bool normal_map_is_compressed, vec3& face_normal, bool& is_inside) {
   is_inside = dot_product(face_normal, ray) > 0.0f;
 
   // TODO: Why do I not have a neg_vector function?
@@ -75,17 +75,20 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, info.trace.handle.tri_id, triangle_count));
   const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, info.trace.handle.tri_id, triangle_count));
 
-  const vec3 position = transform_apply_inv(trans, info.task.origin);
-  const vec3 ray      = transform_apply_rotation_inv(trans, info.task.ray);
+  vec3 position  = transform_apply_inv(trans, info.task.origin);
+  const vec3 ray = transform_apply_rotation_inv(trans, info.task.ray);
 
   const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
   const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
   const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
 
-  const vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
+  vec3 face_normal       = normalize_vector(cross_product(edge1, edge2));
   const float face_NdotV = -dot_product(face_normal, info.task.ray);
 
   const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, position);
+
+  position = add_vector(vertex, add_vector(scale_vector(edge1, coords.x), scale_vector(edge2, coords.y)));
+  position = transform_apply(trans, position);
 
   const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
   const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
@@ -107,8 +110,8 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
 
   bool is_inside;
   const vec3 normal = geometry_compute_normal(
-    vertex_normal, edge1_normal, edge2_normal, ray, face_normal, uv_sub(vertex_texture, vertex1_texture),
-    uv_sub(vertex_texture, vertex2_texture), mat.normal_tex, coords, tex_coords, normal_map_is_compressed, is_inside);
+    vertex_normal, edge1_normal, edge2_normal, ray, uv_sub(vertex_texture, vertex1_texture), uv_sub(vertex_texture, vertex2_texture),
+    mat.normal_tex, coords, tex_coords, normal_map_is_compressed, face_normal, is_inside);
 
   RGBAF albedo = mat.albedo;
   if (mat.albedo_tex != TEXTURE_NONE) {
@@ -224,12 +227,13 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   ctx.instance_id = info.trace.handle.instance_id;
   ctx.tri_id      = info.trace.handle.tri_id;
   ctx.normal      = transform_apply_rotation(trans, normal);
-  ctx.position    = info.task.origin;
+  ctx.position    = position;
   ctx.V           = scale_vector(info.task.ray, -1.0f);
   ctx.state       = info.task.state;
   ctx.flags       = flags;
   ctx.volume_type = VolumeType(info.task.volume_id);
 
+  material_set_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx, face_normal);
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, opaque_color(albedo));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, albedo.a);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, roughness);
