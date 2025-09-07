@@ -7,9 +7,6 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-// OMMs should not occupy too much memory
-#define MAX_MEMORY_USAGE 100000000ul
-
 #define OMM_STATE_SIZE(__level__, __format__) \
   (((1u << (__level__ * 2u)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1u : 2u) + 7u) / 8u)
 
@@ -195,15 +192,16 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
 
     const bool tri_requires_refinement = opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT && (args.max_num_levels > 1);
 
+    uint8_t level = 0;
     if (tri_requires_refinement) {
       const uint32_t work_offset = atomicAdd((uint32_t*) args.work_counter, 1u);
 
+      level |= OMM_REFINEMENT_NEEDED_FLAG;
+
       args.dst_tri_work[work_offset] = tri_id;
     }
-    else {
-      args.level_record[tri_id] = 0;
-    }
 
+    args.level_record[tri_id]  = level;
     args.offset_record[tri_id] = tri_id;
     args.dst[tri_id]           = opacity;
 
@@ -256,14 +254,16 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
 
     tri_requires_refinement &= (args.max_num_levels > (args.dst_level + 1));
 
+    uint8_t level = args.dst_level;
     if (tri_requires_refinement) {
       const uint32_t work_offset = atomicAdd((uint32_t*) args.work_counter, 1u);
 
+      level |= OMM_REFINEMENT_NEEDED_FLAG;
+
       args.dst_tri_work[work_offset] = tri_id;
     }
-    else {
-      args.level_record[tri_id] = args.dst_level;
-    }
+
+    args.level_record[tri_id] = level;
 
     work_id += blockDim.x * gridDim.x;
   }
@@ -273,7 +273,7 @@ LUMINARY_KERNEL void omm_gather_array_format_4(const KernelArgsOMMGatherArrayFor
   uint32_t tri_id = THREAD_ID;
 
   while (tri_id < args.triangle_count) {
-    const uint8_t level       = args.level_record[tri_id];
+    const uint8_t level       = args.level_record[tri_id] & (~OMM_REFINEMENT_NEEDED_FLAG);
     const uint32_t src_offset = args.offset_record[tri_id];
     const uint32_t state_size = OMM_STATE_SIZE(level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
     const uint32_t dst_offset = args.desc[tri_id].byteOffset;
