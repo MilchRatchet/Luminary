@@ -87,7 +87,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
     const size_t data_size = _omm_array_size(remaining_triangles, num_levels, format);
     __FAILURE_HANDLE(device_malloc(data + num_levels, data_size));
 
-    __FAILURE_HANDLE(cuMemsetD32Async(DEVICE_CUPTR(tri_work_counter), 0, 0, device->stream_main));
+    __FAILURE_HANDLE(cuMemsetD32Async(DEVICE_CUPTR(tri_work_counter), 0, 1, device->stream_main));
 
     if (num_levels > 0) {
       KernelArgsOMMRefineFormat4 args = {
@@ -152,6 +152,19 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   __FAILURE_HANDLE(device_free(&tri_work_buffers[0]));
   __FAILURE_HANDLE(device_free(&tri_work_buffers[1]));
   __FAILURE_HANDLE(device_free(&tri_work_counter));
+
+  // Some triangles needed more refinement but we reached memory limit.
+  if (remaining_triangles) {
+    triangles_per_level[num_levels - 1] += remaining_triangles;
+
+    for (uint32_t i = 0; i < total_tri_count; i++) {
+      if (triangle_level[i] == 0xFF) {
+        triangle_level[i] = num_levels - 1;
+      }
+    }
+
+    __FAILURE_HANDLE(device_upload(triangle_level_buffer, triangle_level, 0, total_tri_count, device->stream_main));
+  }
 
   size_t final_array_size = 0;
   size_t* array_offset_per_level;
