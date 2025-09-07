@@ -173,10 +173,10 @@ DEVICE_CTX_FUNC LuminaryResult device_bsdf_lut_update(DeviceBSDFLUT* lut, Device
     __FAILURE_HANDLE(device_texture_destroy(&lut->dielectric_inv));
   }
 
-  __FAILURE_HANDLE(device_texture_create(&lut->conductor, source_lut->conductor, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&lut->specular, source_lut->specular, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&lut->dielectric, source_lut->dielectric, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&lut->dielectric_inv, source_lut->dielectric_inv, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&lut->conductor, source_lut->conductor, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&lut->specular, source_lut->specular, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&lut->dielectric, source_lut->dielectric, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&lut->dielectric_inv, source_lut->dielectric_inv, device, device->stream_main));
 
   return LUMINARY_SUCCESS;
 }

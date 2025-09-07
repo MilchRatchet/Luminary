@@ -13,6 +13,7 @@ enum MaterialParamType {
   MATERIAL_PARAM_TYPE_ABBE,               // [9,91]
   MATERIAL_PARAM_TYPE_NORM_COLOR,         // [0,1]^3
   MATERIAL_PARAM_TYPE_COLOR,              // [0,1023]^3
+  MATERIAL_PARAM_TYPE_PACKED_NORMAL       // [-1,1]^3
 } typedef MaterialParamType;
 
 #define MATERIAL_GEOMETRY_PARAM_ALLOCATE(__name, __type, __bitcount)                                                                    \
@@ -30,13 +31,15 @@ enum MaterialParamType {
 // Fixed sizes
 #define MATERIAL_PARAM_TYPE_NORM_COLOR_SIZE 30
 #define MATERIAL_PARAM_TYPE_COLOR_SIZE 32
+#define MATERIAL_PARAM_TYPE_PACKED_NORMAL_SIZE 32
 
 enum MaterialGeometryParam : uint32_t {
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(EMISSION, MATERIAL_PARAM_TYPE_COLOR, MATERIAL_PARAM_TYPE_COLOR_SIZE)          //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ALBEDO, MATERIAL_PARAM_TYPE_NORM_COLOR, MATERIAL_PARAM_TYPE_NORM_COLOR_SIZE)  //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(OPACITY, MATERIAL_PARAM_TYPE_NORM_FLOAT, 8)                                   //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ROUGHNESS, MATERIAL_PARAM_TYPE_NORM_FLOAT, 10)                                //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR, MATERIAL_PARAM_TYPE_IOR, 8)                                              //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(FACE_NORMAL, MATERIAL_PARAM_TYPE_PACKED_NORMAL, MATERIAL_PARAM_TYPE_PACKED_NORMAL_SIZE)  //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(EMISSION, MATERIAL_PARAM_TYPE_COLOR, MATERIAL_PARAM_TYPE_COLOR_SIZE)                     //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ALBEDO, MATERIAL_PARAM_TYPE_NORM_COLOR, MATERIAL_PARAM_TYPE_NORM_COLOR_SIZE)             //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(OPACITY, MATERIAL_PARAM_TYPE_NORM_FLOAT, 8)                                              //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ROUGHNESS, MATERIAL_PARAM_TYPE_NORM_FLOAT, 10)                                           //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR, MATERIAL_PARAM_TYPE_IOR, 8)                                                         //
 
   MATERIAL_GEOMETRY_PARAM_BITS_COUNT
 } typedef MaterialGeometryParam;
@@ -157,8 +160,9 @@ template <MaterialGeometryParam PARAM>
 __device__ float material_get_float(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {
   static_assert(
     MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_NORM_COLOR
-      && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_COLOR,
-    "PARAM must not be color type.");
+      && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_COLOR
+      && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_PACKED_NORMAL,
+    "PARAM must be float type.");
 
   constexpr uint32_t SIZE          = MATERIAL_GEOMETRY_PARAM_GET_SIZE(PARAM);
   constexpr MaterialParamType TYPE = MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM);
@@ -233,11 +237,21 @@ __device__ RGBF material_get_color(const MaterialContext<MATERIAL_GEOMETRY>& ctx
 }
 
 template <MaterialGeometryParam PARAM>
+__device__ vec3 material_get_normal(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {
+  static_assert(MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_PACKED_NORMAL, "PARAM must be packed normal type.");
+
+  const uint32_t data = material_param_get_data<PARAM>(ctx);
+
+  return normal_unpack(data);
+}
+
+template <MaterialGeometryParam PARAM>
 __device__ void material_set_float(MaterialContext<MATERIAL_GEOMETRY>& ctx, const float value) {
   static_assert(
     MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_NORM_COLOR
-      && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_COLOR,
-    "PARAM must not be color type.");
+      && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_COLOR
+      && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_PACKED_NORMAL,
+    "PARAM must be float type.");
 
   constexpr uint32_t SIZE          = MATERIAL_GEOMETRY_PARAM_GET_SIZE(PARAM);
   constexpr MaterialParamType TYPE = MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM);
@@ -273,9 +287,9 @@ __device__ void material_set_color(MaterialContext<MATERIAL_GEOMETRY>& ctx, cons
 
   uint32_t data;
   if constexpr (MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_NORM_COLOR) {
-    const uint32_t data_red   = (uint32_t) (value.r * 0x3FF + 0.5f);
-    const uint32_t data_green = (uint32_t) (value.g * 0x3FF + 0.5f);
-    const uint32_t data_blue  = (uint32_t) (value.b * 0x3FF + 0.5f);
+    const uint32_t data_red   = (uint32_t) (__saturatef(value.r) * 0x3FF + 0.5f);
+    const uint32_t data_green = (uint32_t) (__saturatef(value.g) * 0x3FF + 0.5f);
+    const uint32_t data_blue  = (uint32_t) (__saturatef(value.b) * 0x3FF + 0.5f);
 
     data = data_red | (data_green << 10) | (data_blue << 20);
   }
@@ -318,6 +332,15 @@ __device__ void material_set_color(MaterialContext<MATERIAL_GEOMETRY>& ctx, cons
   material_param_set_data<PARAM>(ctx, data);
 }
 
+template <MaterialGeometryParam PARAM>
+__device__ void material_set_normal(MaterialContext<MATERIAL_GEOMETRY>& ctx, const vec3 value) {
+  static_assert(MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_PACKED_NORMAL, "PARAM must be packed normal type.");
+
+  const uint32_t data = normal_pack(value);
+
+  material_param_set_data<PARAM>(ctx, data);
+}
+
 __device__ MaterialContextGeometry material_get_default_context() {
   MaterialContextGeometry ctx;
 
@@ -329,6 +352,7 @@ __device__ MaterialContextGeometry material_get_default_context() {
   ctx.state       = 0;
   ctx.flags       = 0;
 
+  material_set_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx, get_vector(0.0f, 0.0f, 1.0f));
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, 0.5f);

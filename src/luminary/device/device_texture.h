@@ -7,7 +7,11 @@
 
 struct DeviceTexture {
   TextureStatus status;
-  void* memory;
+  union {
+    DEVICE void* cuda_memory;
+    CUarray cuda_array;
+    CUmipmappedArray cuda_mipmapped_array;
+  };
   CUtexObject tex;
   uint16_t width;
   uint16_t height;
@@ -16,9 +20,14 @@ struct DeviceTexture {
   bool is_3D;
   size_t pitch;
   size_t pixel_size;
+  uint8_t num_mip_levels;
+  bool has_mipmaps;
 } typedef DeviceTexture;
 
-DEVICE_CTX_FUNC LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream);
+struct Device typedef Device;
+
+DEVICE_CTX_FUNC LuminaryResult
+  device_texture_create(DeviceTexture** device_texture, const Texture* texture, Device* device, CUstream stream);
 DEVICE_CTX_FUNC LuminaryResult device_texture_copy_from_mem(DeviceTexture* device_texture, const DEVICE void* mem, CUstream stream);
 DEVICE_CTX_FUNC LuminaryResult device_texture_destroy(DeviceTexture** device_texture);
 

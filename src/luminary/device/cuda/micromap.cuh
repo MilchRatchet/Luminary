@@ -7,9 +7,6 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-// OMMs should not occupy too much memory
-#define MAX_MEMORY_USAGE 100000000ul
-
 #define OMM_STATE_SIZE(__level__, __format__) \
   (((1u << (__level__ * 2u)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1u : 2u) + 7u) / 8u)
 
@@ -73,6 +70,14 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
   const float max_v = fmaxf(uv0.v, fmaxf(uv1.v, uv2.v));
   const float min_v = fminf(uv0.v, fminf(uv1.v, uv2.v));
 
+  const float span_v   = max_v - min_v;
+  const float texels_v = span_v * tri.tex.height;
+
+  if (texels_v <= 0.0f)
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+
+  const float mip_level_v = fmaxf(log2f(texels_v), 0.0f);
+
   float m0 = (uv0.u - uv1.u) / (uv0.v - uv1.v);
   float m1 = (uv1.u - uv2.u) / (uv1.v - uv2.v);
   float m2 = (uv2.u - uv0.u) / (uv2.v - uv0.v);
@@ -108,18 +113,44 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
   const float inv_width  = 1.0f / tri.tex.width;
   const float inv_height = 1.0f / tri.tex.height;
 
-  for (float v = min_v; v <= max_v; v += inv_height) {
+  float step_v = inv_height;
+
+  for (float v = min_v; v <= max_v;) {
+    v = fminf(v, max_v);
+
     const float e0    = fmaxf(fminf(a0 + v * m0, max_e_0), min_e_0);
     const float e1    = fmaxf(fminf(a1 + v * m1, max_e_1), min_e_1);
     const float e2    = fmaxf(fminf(a2 + v * m2, max_e_2), min_e_2);
     const float min_u = fminf(e0, fminf(e1, e2));
     float max_u       = fmaxf(e0, fmaxf(e1, e2));
 
+    // There is no reason to iterate over the whole texture more than once.
     if (max_u > min_u + 1.0f)
       max_u = min_u + 1.0f;
 
-    for (float u = min_u; u <= max_u; u += inv_width) {
-      const float alpha = texture_load(tri.tex, get_uv(u, v)).w;
+    const float span_u   = max_u - min_u;
+    const float texels_u = span_u * tri.tex.width;
+
+    if (texels_u <= 0.0f) {
+      v += step_v;
+      continue;
+    }
+
+    const float mip_level_u = fmaxf(log2f(texels_u), 0.0f);
+
+    // Taking the minimum would be accurate but has issues with thin triangles using tiling and high resolution textures.
+    // Using the max introduces some error but is robust in terms of generation time.
+    const float mip_level = fmaxf(fmaxf(mip_level_u, mip_level_v) - 1.0f, 0.0f);
+
+    TextureLoadArgs tex_load_args = texture_get_default_args();
+    tex_load_args.mip_level       = mip_level;
+
+    const float step_u = exp2f(mip_level) * inv_width;
+
+    for (float u = min_u; u <= max_u; u += step_u) {
+      u = fminf(u, max_u);
+
+      const float alpha = texture_load(tri.tex, get_uv(u, v), tex_load_args).w;
 
       if (alpha > 0.0f)
         found_opaque = true;
@@ -130,6 +161,9 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
 
     if (found_opaque && found_transparent)
       break;
+
+    step_v = exp2f(mip_level) * inv_height;
+    v += step_v;
   }
 
   if (found_transparent && !found_opaque)
@@ -138,7 +172,11 @@ __device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint
   if (found_opaque && !found_transparent)
     return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
 
-  return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+  // This is a case that should never happen
+  if (!found_opaque && !found_transparent)
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+
+  return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
 }
 
 //
@@ -148,50 +186,61 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
   uint32_t tri_id = THREAD_ID;
 
   while (tri_id < args.triangle_count) {
-    OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
+    const OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
 
     const uint8_t opacity = micromap_get_opacity(tri, 0, 0);
 
-    if (opacity != OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
-      args.level_record[tri_id] = 0;
+    const bool tri_requires_refinement = opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT && (args.max_num_levels > 1);
 
-    args.dst[tri_id] = opacity;
+    uint8_t level = 0;
+    if (tri_requires_refinement) {
+      const uint32_t work_offset = atomicAdd((uint32_t*) args.work_counter, 1u);
+
+      level |= OMM_REFINEMENT_NEEDED_FLAG;
+
+      args.dst_tri_work[work_offset] = tri_id;
+    }
+
+    args.level_record[tri_id]  = level;
+    args.offset_record[tri_id] = tri_id;
+    args.dst[tri_id]           = opacity;
 
     tri_id += blockDim.x * gridDim.x;
   }
 }
 
+// TODO: Refinement should probably operate such that each warp handles one triangle
 LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) {
-  uint32_t tri_id = THREAD_ID;
+  uint32_t work_id = THREAD_ID;
 
-  while (tri_id < args.triangle_count) {
-    if (args.level_record[tri_id] != 0xFF) {
-      tri_id += blockDim.x * gridDim.x;
-      continue;
-    }
+  const uint32_t state_size    = OMM_STATE_SIZE(args.dst_level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+  const uint32_t src_tri_count = 1u << (2u * (args.dst_level - 1));
 
-    OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
+  while (work_id < args.triangle_count) {
+    const uint32_t tri_id = args.src_tri_work[work_id];
 
-    const uint32_t src_tri_count  = 1 << (2 * args.src_level);
-    const uint32_t src_state_size = (src_tri_count + 3) / 4;
-    const uint32_t dst_state_size = src_tri_count;
+    const OMMTextureTriangle tri = micromap_get_ommtexturetriangle(args.mesh_id, tri_id);
 
-    const uint8_t* src_tri_ptr = args.src + tri_id * src_state_size;
-    uint8_t* dst_tri_ptr       = args.dst + tri_id * dst_state_size;
+    const uint32_t src_offset = args.offset_record[tri_id];
+    const uint32_t dst_offset = work_id * state_size;
 
-    bool unknowns_left = false;
+    const uint8_t* src_tri_ptr = args.src + src_offset;
+    uint8_t* dst_tri_ptr       = args.dst + dst_offset;
+
+    args.offset_record[tri_id] = dst_offset;
+
+    bool tri_requires_refinement = false;
 
     for (uint32_t i = 0; i < src_tri_count; i++) {
       uint8_t src_v = src_tri_ptr[i / 4];
       src_v         = (src_v >> (2 * (i & 0b11))) & 0b11;
 
       uint8_t dst_v = 0;
-      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE) {
+      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT) {
         for (uint32_t j = 0; j < 4; j++) {
-          const uint8_t opacity = micromap_get_opacity(tri, args.src_level + 1, 4 * i + j);
+          const uint8_t opacity = micromap_get_opacity(tri, args.dst_level, 4 * i + j);
 
-          if (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
-            unknowns_left = true;
+          tri_requires_refinement |= (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT);
 
           dst_v = dst_v | (opacity << (2 * j));
         }
@@ -203,25 +252,34 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
       dst_tri_ptr[i] = dst_v;
     }
 
-    if (!unknowns_left)
-      args.level_record[tri_id] = args.src_level + 1;
+    tri_requires_refinement &= (args.max_num_levels > (args.dst_level + 1));
 
-    tri_id += blockDim.x * gridDim.x;
+    uint8_t level = args.dst_level;
+    if (tri_requires_refinement) {
+      const uint32_t work_offset = atomicAdd((uint32_t*) args.work_counter, 1u);
+
+      level |= OMM_REFINEMENT_NEEDED_FLAG;
+
+      args.dst_tri_work[work_offset] = tri_id;
+    }
+
+    args.level_record[tri_id] = level;
+
+    work_id += blockDim.x * gridDim.x;
   }
 }
 
 LUMINARY_KERNEL void omm_gather_array_format_4(const KernelArgsOMMGatherArrayFormat4 args) {
-  uint32_t tri_id           = THREAD_ID;
-  const uint32_t state_size = OMM_STATE_SIZE(args.level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+  uint32_t tri_id = THREAD_ID;
 
   while (tri_id < args.triangle_count) {
-    if (args.level_record[tri_id] != args.level) {
-      tri_id += blockDim.x * gridDim.x;
-      continue;
-    }
+    const uint8_t level       = args.level_record[tri_id] & (~OMM_REFINEMENT_NEEDED_FLAG);
+    const uint32_t src_offset = args.offset_record[tri_id];
+    const uint32_t state_size = OMM_STATE_SIZE(level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+    const uint32_t dst_offset = args.desc[tri_id].byteOffset;
 
     for (uint32_t j = 0; j < state_size; j++) {
-      args.dst[args.desc[tri_id].byteOffset + j] = args.src[tri_id * state_size + j];
+      args.dst[dst_offset + j] = args.src[level][src_offset + j];
     }
 
     tri_id += blockDim.x * gridDim.x;

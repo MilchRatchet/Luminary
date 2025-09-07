@@ -314,6 +314,8 @@ LUMINARY_KERNEL void cloud_process_tasks() {
 
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
+
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 

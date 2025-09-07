@@ -17,7 +17,7 @@ static LuminaryResult _device_cloud_noise_generate_weather_map(DeviceCloudNoise*
   KernelArgsCloudComputeWeatherNoise weather_args;
   weather_args.dim  = CLOUD_WEATHER_RES;
   weather_args.seed = cloud_noise->seed;
-  weather_args.tex  = DEVICE_PTR(cloud_noise->weather_tex->memory);
+  weather_args.tex  = DEVICE_PTR(cloud_noise->weather_tex->cuda_memory);
   weather_args.ld   = cloud_noise->weather_tex->pitch / (sizeof(uint8_t) * 4);
 
   __FAILURE_HANDLE(
@@ -45,9 +45,9 @@ LuminaryResult device_cloud_noise_create(DeviceCloudNoise** cloud_noise, Device*
   __FAILURE_HANDLE(texture_create(&weather_tex));
   __FAILURE_HANDLE(texture_fill(weather_tex, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, (void*) 0, TEXTURE_DATA_TYPE_U8, 4));
 
-  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->shape_tex, shape_tex, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->detail_tex, detail_tex, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->weather_tex, weather_tex, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->shape_tex, shape_tex, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->detail_tex, detail_tex, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->weather_tex, weather_tex, device, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&shape_tex));
   __FAILURE_HANDLE(texture_destroy(&detail_tex));

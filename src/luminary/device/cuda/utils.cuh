@@ -28,7 +28,7 @@
 #define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
 #ifndef eps
-#define eps 0.000001f
+#define eps FLT_EPSILON
 #endif /* eps */
 
 #define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)
@@ -132,6 +132,12 @@ extern "C" static __constant__ DeviceConstantMemory device;
 //===========================================================================================
 // Functions
 //===========================================================================================
+
+#ifdef __builtin_assume
+#define LUMINARY_ASSUME(__internal_macro_expression) __builtin_assume(__internal_macro_expression)
+#else /* __builtin_assume */
+#define LUMINARY_ASSUME(__internal_macro_expression) __assume(__internal_macro_expression)
+#endif /* !__builtin_assume */
 
 #define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
 
