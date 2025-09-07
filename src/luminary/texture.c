@@ -107,6 +107,14 @@ LuminaryResult texture_fill(
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult texture_set_memory_owner(Texture* tex, bool is_memory_owner) {
+  __CHECK_NULL_ARGUMENT(tex);
+
+  tex->is_memory_owner = is_memory_owner;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult texture_invalidate(Texture* texture) {
   __CHECK_NULL_ARGUMENT(texture);
 

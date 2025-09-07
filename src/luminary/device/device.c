@@ -463,8 +463,8 @@ static LuminaryResult _device_load_spectral_data(Device* device) {
   spectral_z_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
   spectral_z_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  __FAILURE_HANDLE(device_texture_create(&device->spectral_xy_tex, spectral_xy_lut_tex, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&device->spectral_z_tex, spectral_z_lut_tex, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&device->spectral_xy_tex, spectral_xy_lut_tex, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&device->spectral_z_tex, spectral_z_lut_tex, device, device->stream_main));
 
   __FAILURE_HANDLE(device_struct_texture_object_convert(device->spectral_xy_tex, &device->constant_memory->spectral_xy_lut_tex));
   __FAILURE_HANDLE(device_struct_texture_object_convert(device->spectral_z_tex, &device->constant_memory->spectral_z_lut_tex));
