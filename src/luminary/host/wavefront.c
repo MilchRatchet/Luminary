@@ -264,6 +264,9 @@ static LuminaryResult _wavefront_parse_map(
     Texture* tex;
     __FAILURE_HANDLE(texture_create(&tex));
 
+    // Scene textures require mipmapping
+    tex->mipmap = TEXTURE_MIPMAP_MODE_GENERATE;
+
     __FAILURE_HANDLE(texture_load_async(tex, queue, tex_file_path));
 
     __FAILURE_HANDLE(array_push(&content->textures, &tex));

@@ -30,7 +30,6 @@ struct Texture {
   TextureFilterMode filter;
   TextureMipmapMode mipmap;
   TextureReadMode read_mode;
-  uint32_t mipmap_max_level;
   void* data;
   float gamma;
   uint32_t num_components;

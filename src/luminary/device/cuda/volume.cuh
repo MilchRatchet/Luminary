@@ -33,6 +33,8 @@ LUMINARY_KERNEL void volume_process_events() {
 
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
+
   uint16_t geometry_task_count = 0;
   uint16_t ocean_task_count    = 0;
   uint16_t volume_task_count   = 0;
@@ -169,6 +171,8 @@ LUMINARY_KERNEL void volume_process_tasks() {
   const int task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_VOLUME];
   const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_VOLUME];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
+
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
 
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();

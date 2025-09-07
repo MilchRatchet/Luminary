@@ -85,12 +85,12 @@ static LuminaryResult _sky_lut_generate_lut(SkyLUT* lut, DeviceSkyLUT* device_lu
   __CHECK_NULL_ARGUMENT(device);
 
   KernelArgsSkyComputeTransmittanceLUT transmission_lut_args;
-  transmission_lut_args.dst_low  = DEVICE_PTR(device_lut->transmittance_low->memory);
-  transmission_lut_args.dst_high = DEVICE_PTR(device_lut->transmittance_high->memory);
+  transmission_lut_args.dst_low  = DEVICE_PTR(device_lut->transmittance_low->cuda_memory);
+  transmission_lut_args.dst_high = DEVICE_PTR(device_lut->transmittance_high->cuda_memory);
 
   KernelArgsSkyComputeMultiscatteringLUT multiscattering_lut_args;
-  multiscattering_lut_args.dst_low  = DEVICE_PTR(device_lut->multiscattering_low->memory);
-  multiscattering_lut_args.dst_high = DEVICE_PTR(device_lut->multiscattering_high->memory);
+  multiscattering_lut_args.dst_low  = DEVICE_PTR(device_lut->multiscattering_low->cuda_memory);
+  multiscattering_lut_args.dst_high = DEVICE_PTR(device_lut->multiscattering_high->cuda_memory);
 
   __FAILURE_HANDLE(device_struct_texture_object_convert(device_lut->transmittance_low, &multiscattering_lut_args.transmission_low_tex));
   __FAILURE_HANDLE(device_struct_texture_object_convert(device_lut->transmittance_high, &multiscattering_lut_args.transmission_high_tex));
@@ -103,16 +103,16 @@ static LuminaryResult _sky_lut_generate_lut(SkyLUT* lut, DeviceSkyLUT* device_lu
     &multiscattering_lut_args, device->stream_main));
 
   __FAILURE_HANDLE(device_download2D(
-    lut->transmittance_low->data, device_lut->transmittance_low->memory, device_lut->transmittance_low->pitch,
+    lut->transmittance_low->data, device_lut->transmittance_low->cuda_memory, device_lut->transmittance_low->pitch,
     SKY_TM_TEX_WIDTH * sizeof(RGBAF), SKY_TM_TEX_HEIGHT, device->stream_main));
   __FAILURE_HANDLE(device_download2D(
-    lut->transmittance_high->data, device_lut->transmittance_high->memory, device_lut->transmittance_high->pitch,
+    lut->transmittance_high->data, device_lut->transmittance_high->cuda_memory, device_lut->transmittance_high->pitch,
     SKY_TM_TEX_WIDTH * sizeof(RGBAF), SKY_TM_TEX_HEIGHT, device->stream_main));
   __FAILURE_HANDLE(device_download2D(
-    lut->multiscattering_low->data, device_lut->multiscattering_low->memory, device_lut->multiscattering_low->pitch,
+    lut->multiscattering_low->data, device_lut->multiscattering_low->cuda_memory, device_lut->multiscattering_low->pitch,
     SKY_MS_TEX_SIZE * sizeof(RGBAF), SKY_MS_TEX_SIZE, device->stream_main));
   __FAILURE_HANDLE(device_download2D(
-    lut->multiscattering_high->data, device_lut->multiscattering_high->memory, device_lut->multiscattering_high->pitch,
+    lut->multiscattering_high->data, device_lut->multiscattering_high->cuda_memory, device_lut->multiscattering_high->pitch,
     SKY_MS_TEX_SIZE * sizeof(RGBAF), SKY_MS_TEX_SIZE, device->stream_main));
 
   return LUMINARY_SUCCESS;
@@ -203,10 +203,10 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_update(DeviceSkyLUT* lut, Device* 
   if (source_lut->id != lut->reference_id) {
     __FAILURE_HANDLE(_device_sky_lut_free(lut));
 
-    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_low, source_lut->transmittance_low, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_high, source_lut->transmittance_high, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_low, source_lut->multiscattering_low, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_high, source_lut->multiscattering_high, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_low, source_lut->transmittance_low, device, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_high, source_lut->transmittance_high, device, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_low, source_lut->multiscattering_low, device, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_high, source_lut->multiscattering_high, device, device->stream_main));
 
     lut->reference_id = source_lut->id;
 
@@ -297,8 +297,8 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
 
   KernelArgsSkyComputeHDRI args;
 
-  args.dst_color    = DEVICE_PTR(device_hdri->color_tex->memory);
-  args.dst_shadow   = DEVICE_PTR(device_hdri->shadow_tex->memory);
+  args.dst_color    = DEVICE_PTR(device_hdri->color_tex->cuda_memory);
+  args.dst_shadow   = DEVICE_PTR(device_hdri->shadow_tex->cuda_memory);
   args.dim          = hdri->width;
   args.ld_color     = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
   args.ld_shadow    = device_hdri->shadow_tex->pitch / device_hdri->shadow_tex->pixel_size;
@@ -311,10 +311,10 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   }
 
   __FAILURE_HANDLE(device_download2D(
-    hdri->color_tex->data, device_hdri->color_tex->memory, device_hdri->color_tex->pitch, hdri->width * sizeof(RGBAF), hdri->height,
+    hdri->color_tex->data, device_hdri->color_tex->cuda_memory, device_hdri->color_tex->pitch, hdri->width * sizeof(RGBAF), hdri->height,
     device->stream_main));
   __FAILURE_HANDLE(device_download2D(
-    hdri->shadow_tex->data, device_hdri->shadow_tex->memory, device_hdri->shadow_tex->pitch, hdri->width * sizeof(float), hdri->height,
+    hdri->shadow_tex->data, device_hdri->shadow_tex->cuda_memory, device_hdri->shadow_tex->pitch, hdri->width * sizeof(float), hdri->height,
     device->stream_main));
 
   device_hdri->force_device_update = true;
@@ -424,8 +424,8 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Devic
     __FAILURE_HANDLE(_device_sky_hdri_free(hdri));
 
     if (source_hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
-      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device->stream_main));
-      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device->stream_main));
+      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device, device->stream_main));
+      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device, device->stream_main));
 
       *has_changed = true;
     }

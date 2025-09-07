@@ -5,7 +5,7 @@
 #include "kernel_args.h"
 
 // OMMs should not occupy too much memory
-#define MAX_MEMORY_USAGE 100000000ul
+#define MAX_MEMORY_USAGE (size_t) (512ull * 1024ull * 1024ull)
 
 #define OMM_STATE_SIZE(__level__, __format__) \
   (((1u << (__level__ * 2u)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1u : 2u) + 7u) / 8u)
@@ -25,7 +25,7 @@ static size_t _omm_array_size(const uint32_t count, const uint32_t level, const 
   }
 
   // OMMs are byte aligned, hence even the low subdivision levels are at least 1 byte in size
-  const uint32_t state_size = OMM_STATE_SIZE(level, format);
+  const size_t state_size = OMM_STATE_SIZE(level, format);
 
   return state_size * count;
 }
@@ -39,7 +39,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   const uint32_t total_tri_count          = mesh->data.triangle_count;
 
   // Highest allowed level is 12 according to OptiX Docs
-  const uint8_t max_num_levels = 6;
+  const uint8_t max_num_levels = 10;
   uint8_t num_levels           = 0;
 
   ////////////////////////////////////////////////////////////////////
@@ -53,67 +53,69 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   void** data;
   __FAILURE_HANDLE(host_malloc(&data, sizeof(DEVICE void*) * max_num_levels));
 
-  // For each triangle, we store the final level, 0xFF specifies that the triangle has not reached its final level yet
-  uint8_t* triangle_level;
-  __FAILURE_HANDLE(host_malloc(&triangle_level, total_tri_count));
-
-  for (uint32_t i = 0; i < total_tri_count; i++) {
-    triangle_level[i] = 0xFF;
-  }
-
   DEVICE void* triangle_level_buffer;
   __FAILURE_HANDLE(device_malloc(&triangle_level_buffer, total_tri_count));
 
-  __FAILURE_HANDLE(device_upload(triangle_level_buffer, triangle_level, 0, total_tri_count, device->stream_main));
+  DEVICE uint32_t* triangle_data_offset;
+  __FAILURE_HANDLE(device_malloc(&triangle_data_offset, total_tri_count * sizeof(uint32_t)));
+
+  DEVICE uint32_t* tri_work_buffers[2];
+  __FAILURE_HANDLE(device_malloc(&tri_work_buffers[0], total_tri_count * sizeof(uint32_t)));
+  __FAILURE_HANDLE(device_malloc(&tri_work_buffers[1], total_tri_count * sizeof(uint32_t)));
+
+  DEVICE uint32_t* tri_work_counter;
+  __FAILURE_HANDLE(device_malloc(&tri_work_counter, sizeof(uint32_t)));
+
+  // Make sure that all the data is actually present
+  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
   size_t memory_usage = 0;
 
-  uint32_t remaining_triangles = 0;
+  uint32_t remaining_triangles = total_tri_count;
   for (; num_levels < max_num_levels;) {
-    const size_t data_size = _omm_array_size(total_tri_count, num_levels, format);
+    const size_t data_size = _omm_array_size(remaining_triangles, num_levels, format);
     __FAILURE_HANDLE(device_malloc(data + num_levels, data_size));
 
-    if (num_levels) {
+    __FAILURE_HANDLE(cuMemsetD32Async(DEVICE_CUPTR(tri_work_counter), 0, 1, device->stream_main));
+
+    if (num_levels > 0) {
       KernelArgsOMMRefineFormat4 args = {
         .mesh_id        = mesh->id,
-        .triangle_count = total_tri_count,
+        .triangle_count = remaining_triangles,
+        .max_num_levels = max_num_levels,
         .dst            = (uint8_t*) DEVICE_PTR(data[num_levels]),
         .src            = (const uint8_t*) DEVICE_PTR(data[num_levels - 1]),
         .level_record   = (uint8_t*) DEVICE_PTR(triangle_level_buffer),
-        .src_level      = num_levels - 1,
-      };
+        .offset_record  = (uint32_t*) DEVICE_PTR(triangle_data_offset),
+        .dst_level      = num_levels,
+        .src_tri_work   = (const uint32_t*) DEVICE_PTR(tri_work_buffers[(num_levels - 1) & 0b1]),
+        .dst_tri_work   = (uint32_t*) DEVICE_PTR(tri_work_buffers[num_levels & 0b1]),
+        .work_counter   = (uint32_t*) DEVICE_PTR(tri_work_counter)};
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4], &args, device->stream_main));
     }
     else {
-      // Make sure that all the data is actually present
-      __FAILURE_HANDLE(device_sync_constant_memory(device));
-      __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
-
       KernelArgsOMMLevel0Format4 args = {
         .mesh_id        = mesh->id,
-        .triangle_count = total_tri_count,
+        .triangle_count = remaining_triangles,
+        .max_num_levels = max_num_levels,
         .dst            = (uint8_t*) DEVICE_PTR(data[0]),
         .level_record   = (uint8_t*) DEVICE_PTR(triangle_level_buffer),
-      };
+        .offset_record  = (uint32_t*) DEVICE_PTR(triangle_data_offset),
+        .dst_tri_work   = (uint32_t*) DEVICE_PTR(tri_work_buffers[0]),
+        .work_counter   = (uint32_t*) DEVICE_PTR(tri_work_counter)};
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4], &args, device->stream_main));
     }
 
-    __FAILURE_HANDLE(device_download(triangle_level, triangle_level_buffer, 0, total_tri_count, device->stream_main));
+    uint32_t num_triangles_queued_for_refinement;
+    __FAILURE_HANDLE(device_download(&num_triangles_queued_for_refinement, tri_work_counter, 0, sizeof(uint32_t), device->stream_main));
 
-    remaining_triangles         = 0;
-    uint32_t triangles_at_level = 0;
+    uint32_t triangles_at_level = remaining_triangles - num_triangles_queued_for_refinement;
+    remaining_triangles         = num_triangles_queued_for_refinement;
 
-    for (uint32_t i = 0; i < total_tri_count; i++) {
-      if (triangle_level[i] == 0xFF)
-        remaining_triangles++;
-
-      if (triangle_level[i] == num_levels)
-        triangles_at_level++;
-    }
-
-    log_message("[OptiX OMM] Remaining triangles after %u iterations: %u.", num_levels, remaining_triangles);
+    log_message("OMM Construction has %u triangles remaining after %u iterations.", remaining_triangles, num_levels);
 
     triangles_per_level[num_levels] = triangles_at_level;
 
@@ -121,28 +123,20 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
 
     num_levels++;
 
-    if (!remaining_triangles) {
+    if (remaining_triangles == 0)
       break;
-    }
 
     if (memory_usage + remaining_triangles * OMM_STATE_SIZE(num_levels, format) > MAX_MEMORY_USAGE) {
-      log_message("[OptiX OMM] Exceeded memory budget at subdivision level %u.", num_levels);
+      warn_message("OMM construction exceeded memory budget at subdivision level %u.", num_levels);
       break;
     }
   }
 
-  // Some triangles needed more refinement but max level was reached.
-  if (remaining_triangles) {
-    triangles_per_level[num_levels - 1] += remaining_triangles;
+  __FAILURE_HANDLE(device_free(&tri_work_buffers[0]));
+  __FAILURE_HANDLE(device_free(&tri_work_buffers[1]));
+  __FAILURE_HANDLE(device_free(&tri_work_counter));
 
-    for (uint32_t i = 0; i < total_tri_count; i++) {
-      if (triangle_level[i] == 0xFF) {
-        triangle_level[i] = num_levels - 1;
-      }
-    }
-
-    __FAILURE_HANDLE(device_upload(triangle_level_buffer, triangle_level, 0, total_tri_count, device->stream_main));
-  }
+  triangles_per_level[num_levels - 1] += remaining_triangles;
 
   size_t final_array_size = 0;
   size_t* array_offset_per_level;
@@ -153,8 +147,6 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
 
   for (uint32_t i = 0; i < num_levels; i++) {
     const size_t state_size = OMM_STATE_SIZE(i, format);
-
-    log_message("[OptiX OMM] Total triangles at subdivision level %u: %u.", i, triangles_per_level[i]);
 
     array_size_per_level[i]   = state_size * triangles_per_level[i];
     array_offset_per_level[i] = (i) ? array_offset_per_level[i - 1] + array_size_per_level[i - 1] : 0;
@@ -169,11 +161,16 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   // Description setup
   ////////////////////////////////////////////////////////////////////
 
+  uint8_t* triangle_level;
+  __FAILURE_HANDLE(host_malloc(&triangle_level, total_tri_count * sizeof(uint8_t)));
+
+  __FAILURE_HANDLE(device_download(triangle_level, triangle_level_buffer, 0, total_tri_count * sizeof(uint8_t), device->stream_main));
+
   OptixOpacityMicromapDesc* desc;
   __FAILURE_HANDLE(host_malloc(&desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
 
   for (uint32_t i = 0; i < total_tri_count; i++) {
-    const uint32_t level = (triangle_level[i] == 0xFF) ? max_num_levels - 1 : triangle_level[i];
+    const uint32_t level = triangle_level[i] & (~OMM_REFINEMENT_NEEDED_FLAG);
 
     desc[i].byteOffset       = (unsigned int) array_offset_per_level[level];
     desc[i].subdivisionLevel = (unsigned short) level;
@@ -184,6 +181,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
     array_offset_per_level[level] += state_size;
   }
 
+  __FAILURE_HANDLE(host_free(&triangle_level));
   __FAILURE_HANDLE(host_free(&array_offset_per_level));
   __FAILURE_HANDLE(host_free(&array_size_per_level));
 
@@ -191,24 +189,25 @@ LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device)
   __FAILURE_HANDLE(device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
   __FAILURE_HANDLE(device_upload(desc_buffer, desc, 0, sizeof(OptixOpacityMicromapDesc) * total_tri_count, device->stream_main));
 
-  for (uint32_t i = 0; i < num_levels; i++) {
-    KernelArgsOMMGatherArrayFormat4 args = {
-      .triangle_count = total_tri_count,
-      .dst            = (uint8_t*) DEVICE_PTR(omm_array),
-      .src            = (const uint8_t*) DEVICE_PTR(data[i]),
-      .level          = i,
-      .level_record   = (const uint8_t*) DEVICE_PTR(triangle_level_buffer),
-      .desc           = (const OptixOpacityMicromapDesc*) DEVICE_PTR(desc_buffer),
-    };
+  KernelArgsOMMGatherArrayFormat4 gather_args = {
+    .triangle_count = total_tri_count,
+    .dst            = (uint8_t*) DEVICE_PTR(omm_array),
+    .level_record   = (const uint8_t*) DEVICE_PTR(triangle_level_buffer),
+    .offset_record  = (const uint32_t*) DEVICE_PTR(triangle_data_offset),
+    .desc           = (const OptixOpacityMicromapDesc*) DEVICE_PTR(desc_buffer),
+  };
 
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4], &args, device->stream_main));
+  for (uint32_t level = 0; level < num_levels; level++) {
+    gather_args.src[level] = (const uint8_t*) DEVICE_PTR(data[level]);
   }
+
+  __FAILURE_HANDLE(
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4], &gather_args, device->stream_main));
 
   __FAILURE_HANDLE(host_free(&desc));
 
-  __FAILURE_HANDLE(host_free(&triangle_level));
   __FAILURE_HANDLE(device_free(&triangle_level_buffer));
+  __FAILURE_HANDLE(device_free(&triangle_data_offset));
 
   for (uint32_t i = 0; i < num_levels; i++) {
     __FAILURE_HANDLE(device_free(&data[i]));

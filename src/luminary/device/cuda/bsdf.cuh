@@ -51,8 +51,16 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const MaterialContextGeometry ma
 }
 
 __device__ RGBF bsdf_evaluate_core(
-  const MaterialContextGeometry ctx, const BSDFRayContext context, const BSDFSamplingHint sampling_hint,
-  const float one_over_sampling_pdf = 1.0f) {
+  const MaterialContextGeometry ctx, const BSDFRayContext context, const BSDFSamplingHint sampling_hint, const vec3 L,
+  const vec3 face_normal, const float one_over_sampling_pdf = 1.0f) {
+  const float FN_dot_L  = dot_product(face_normal, L);
+  const float face_flip = context.is_refraction ? -1.0f : 1.0f;
+
+  // Invalidate directions that are valid for the shading normal but not for the face normal
+  if (FN_dot_L * face_flip < eps) {
+    return splat_color(0.0f);
+  }
+
   return bsdf_multiscattering_evaluate(ctx, context, sampling_hint, one_over_sampling_pdf);
 }
 
@@ -69,7 +77,9 @@ __device__ RGBF bsdf_evaluate(
 
   is_refraction = context.is_refraction;
 
-  return bsdf_evaluate_core(ctx, context, sampling_hint, one_over_sampling_pdf);
+  const vec3 face_normal = material_get_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx);
+
+  return bsdf_evaluate_core(ctx, context, sampling_hint, L, face_normal, one_over_sampling_pdf);
 }
 
 template <>
@@ -150,6 +160,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
   const vec3 V_local             = quaternion_apply(rotation_to_z, mat_ctx.V);
+  const vec3 face_normal_local   = quaternion_apply(rotation_to_z, material_get_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(mat_ctx));
 
   // Material Context (+Z-Up)
   MaterialContextGeometry mat_ctx_local = mat_ctx;
@@ -182,7 +193,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
     const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel, RANDOM_SET::REFLECTION);
     const vec3 ray           = reflect_vector(mat_ctx_local.V, microfacet);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
-    const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET);
+    const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET, ray, face_normal_local);
     const float pdf          = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
     const float diffuse_pdf  = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
     const float refraction_pdf =
@@ -209,7 +220,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
     const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_SET::DIFFUSE, pixel));
     const vec3 microfacet      = normalize_vector(add_vector(mat_ctx_local.V, ray));
     const BSDFRayContext ctx   = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
-    const RGBF eval            = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_DIFFUSE);
+    const RGBF eval            = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_DIFFUSE, ray, face_normal_local);
     const float pdf            = bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL);
     const float microfacet_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
     const float refraction_pdf =
@@ -246,7 +257,7 @@ __device__ BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(cons
     const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel, RANDOM_SET::REFRACTION);
     const vec3 ray           = refract_vector(mat_ctx_local.V, microfacet, ior, total_reflection);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, !total_reflection);
-    const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION);
+    const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, ray, face_normal_local);
 
     float mis_weight = 1.0f;
 

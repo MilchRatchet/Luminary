@@ -494,6 +494,7 @@ __device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, Devi
   ctx.state       = task.state;
   ctx.flags       = flags;
 
+  material_set_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx, normal);
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, BSDF_ROUGHNESS_CLAMP);

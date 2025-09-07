@@ -345,11 +345,11 @@ __device__ vec3 bsdf_diffuse_sample(const float2 random) {
 }
 
 __device__ float bsdf_diffuse_pdf(const MaterialContextGeometry mat_ctx, const float NdotL) {
-  return NdotL * (1.0f / PI);
+  return __saturatef(NdotL) * (1.0f / PI);
 }
 
 __device__ float bsdf_diffuse_evaluate(const MaterialContextGeometry mat_ctx, const float NdotL) {
-  return NdotL * (1.0f / PI);
+  return __saturatef(NdotL) * (1.0f / PI);
 }
 
 __device__ float bsdf_diffuse_evaluate_sampled_diffuse() {

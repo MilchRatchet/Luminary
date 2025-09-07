@@ -77,6 +77,14 @@ LuminaryResult texture_create(Texture** texture) {
   __FAILURE_HANDLE(host_malloc(texture, sizeof(Texture)));
   memset(*texture, 0, sizeof(Texture));
 
+  (*texture)->wrap_mode_U = TEXTURE_WRAPPING_MODE_WRAP;
+  (*texture)->wrap_mode_V = TEXTURE_WRAPPING_MODE_WRAP;
+  (*texture)->wrap_mode_W = TEXTURE_WRAPPING_MODE_WRAP;
+  (*texture)->filter      = TEXTURE_FILTER_MODE_LINEAR;
+  (*texture)->read_mode   = TEXTURE_READ_MODE_NORMALIZED;
+  (*texture)->mipmap      = TEXTURE_MIPMAP_MODE_NONE;
+  (*texture)->gamma       = 1.0f;
+
   return LUMINARY_SUCCESS;
 }
 
@@ -84,32 +92,17 @@ LuminaryResult texture_fill(
   Texture* tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components) {
   __CHECK_NULL_ARGUMENT(tex);
 
-  tex->status           = TEXTURE_STATUS_NONE;
-  tex->width            = width;
-  tex->height           = height;
-  tex->depth            = depth;
-  tex->pitch            = _texture_compute_pitch(width, type, num_components);
-  tex->data             = data;
-  tex->dim              = (depth > 1) ? TEXTURE_DIMENSION_TYPE_3D : TEXTURE_DIMENSION_TYPE_2D;
-  tex->type             = type;
-  tex->wrap_mode_U      = TEXTURE_WRAPPING_MODE_WRAP;
-  tex->wrap_mode_V      = TEXTURE_WRAPPING_MODE_WRAP;
-  tex->wrap_mode_W      = TEXTURE_WRAPPING_MODE_WRAP;
-  tex->filter           = TEXTURE_FILTER_MODE_LINEAR;
-  tex->read_mode        = TEXTURE_READ_MODE_NORMALIZED;
-  tex->mipmap           = TEXTURE_MIPMAP_MODE_NONE;
-  tex->mipmap_max_level = 0;
-  tex->gamma            = 1.0f;
-  tex->num_components   = num_components;
-  tex->is_memory_owner  = true;
+  tex->status          = TEXTURE_STATUS_NONE;
+  tex->width           = width;
+  tex->height          = height;
+  tex->depth           = depth;
+  tex->pitch           = _texture_compute_pitch(width, type, num_components);
+  tex->data            = data;
+  tex->dim             = (depth > 1) ? TEXTURE_DIMENSION_TYPE_3D : TEXTURE_DIMENSION_TYPE_2D;
+  tex->type            = type;
+  tex->is_memory_owner = true;
 
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult texture_set_memory_owner(Texture* tex, bool is_memory_owner) {
-  __CHECK_NULL_ARGUMENT(tex);
-
-  tex->is_memory_owner = is_memory_owner;
+  tex->num_components = num_components;
 
   return LUMINARY_SUCCESS;
 }
