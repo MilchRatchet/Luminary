@@ -12,9 +12,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->rotation.x                 = 0.0f;
   camera->rotation.y                 = 0.0f;
   camera->rotation.z                 = 0.0f;
-  camera->fov                        = 35.0f;
-  camera->focal_length               = 1.0f;
-  camera->aperture_size              = 0.0f;
   camera->aperture_shape             = LUMINARY_APERTURE_ROUND;
   camera->aperture_blade_count       = 7;
   camera->exposure                   = 0.0f;
@@ -42,14 +39,28 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->do_firefly_rejection       = false;
   camera->indirect_only              = false;
   camera->film_grain                 = 0.0f;
-  camera->lens_model                 = LUMINARY_LENS_MODEL_THIN;
-  camera->thin_lens_ior              = 1.5f;
-  camera->thin_lens_radius           = 100.0f;
-  camera->thin_lens_thickness        = 1.0f;
-  camera->thin_lens_abbe_number      = 90.0f;
   camera->camera_scale               = 1.0f;
-  camera->allow_reflections          = false;
-  camera->use_spectral_rendering     = false;
+  camera->object_distance            = 1.0f;
+  camera->use_physical_camera        = false;
+
+  camera->thin_lens.fov           = 1.0f;
+  camera->thin_lens.aperture_size = 0.0f;
+
+  camera->physical.allow_reflections      = false;
+  camera->physical.use_spectral_rendering = false;
+
+  // Temp - Canon 50mm F1.2 from 1950s
+  camera->physical.focal_length          = 50.53f;
+  camera->physical.front_focal_point     = -22.69f;
+  camera->physical.back_focal_point      = 65.18f;
+  camera->physical.front_principal_point = 27.84f;
+  camera->physical.back_principal_point  = 14.65f;
+  camera->physical.aperture_point        = 28.02f;
+  camera->physical.aperture_diameter     = 21.411f;
+  camera->physical.exit_pupil_point      = 26.55f;  // These are probably wrong
+  camera->physical.exit_pupil_diameter   = 41.67f;  // These are probably wrong
+  camera->physical.image_plane_distance  = 65.18f;
+  camera->physical.sensor_width          = 35.0f;
 
   return LUMINARY_SUCCESS;
 }
@@ -85,26 +96,32 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_STANDARD_DIRTY(rotation.x);
   __CAMERA_STANDARD_DIRTY(rotation.y);
   __CAMERA_STANDARD_DIRTY(rotation.z);
-  __CAMERA_STANDARD_DIRTY(fov);
-  __CAMERA_STANDARD_DIRTY(aperture_size);
   __CAMERA_STANDARD_DIRTY(russian_roulette_threshold);
-  __CAMERA_STANDARD_DIRTY(lens_model);
-  __CAMERA_STANDARD_DIRTY(thin_lens_ior);
-  __CAMERA_STANDARD_DIRTY(thin_lens_radius);
-  __CAMERA_STANDARD_DIRTY(thin_lens_thickness);
-  __CAMERA_STANDARD_DIRTY(thin_lens_abbe_number);
   __CAMERA_STANDARD_DIRTY(camera_scale);
-  __CAMERA_STANDARD_DIRTY(allow_reflections);
-  __CAMERA_STANDARD_DIRTY(use_spectral_rendering);
+  __CAMERA_STANDARD_DIRTY(object_distance);
 
-  if (input->aperture_size > 0.0f) {
-    __CAMERA_STANDARD_DIRTY(focal_length);
-    __CAMERA_STANDARD_DIRTY(aperture_shape);
+  __CAMERA_STANDARD_DIRTY(aperture_shape);
 
-    if (input->aperture_shape != LUMINARY_APERTURE_ROUND) {
-      __CAMERA_STANDARD_DIRTY(aperture_blade_count);
-    }
+  if (input->aperture_shape != LUMINARY_APERTURE_ROUND) {
+    __CAMERA_STANDARD_DIRTY(aperture_blade_count);
   }
+
+  __CAMERA_STANDARD_DIRTY(thin_lens.fov);
+  __CAMERA_STANDARD_DIRTY(thin_lens.aperture_size);
+
+  __CAMERA_STANDARD_DIRTY(physical.allow_reflections);
+  __CAMERA_STANDARD_DIRTY(physical.use_spectral_rendering);
+  __CAMERA_STANDARD_DIRTY(physical.focal_length);
+  __CAMERA_STANDARD_DIRTY(physical.front_focal_point);
+  __CAMERA_STANDARD_DIRTY(physical.back_focal_point);
+  __CAMERA_STANDARD_DIRTY(physical.front_principal_point);
+  __CAMERA_STANDARD_DIRTY(physical.back_principal_point);
+  __CAMERA_STANDARD_DIRTY(physical.aperture_point);
+  __CAMERA_STANDARD_DIRTY(physical.aperture_diameter);
+  __CAMERA_STANDARD_DIRTY(physical.exit_pupil_point);
+  __CAMERA_STANDARD_DIRTY(physical.exit_pupil_diameter);
+  __CAMERA_STANDARD_DIRTY(physical.image_plane_distance);
+  __CAMERA_STANDARD_DIRTY(physical.sensor_width);
 
   __CAMERA_OUTPUT_DIRTY(exposure);
   __CAMERA_OUTPUT_DIRTY(bloom_blend);

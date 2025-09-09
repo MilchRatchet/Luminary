@@ -48,24 +48,40 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->use_color_correction   = camera->use_color_correction;
   device_camera->do_firefly_rejection   = camera->do_firefly_rejection;
   device_camera->indirect_only          = camera->indirect_only;
-  device_camera->allow_reflections      = camera->allow_reflections;
-  device_camera->use_spectral_rendering = camera->use_spectral_rendering;
+  device_camera->allow_reflections      = camera->physical.allow_reflections;
+  device_camera->use_spectral_rendering = camera->physical.use_spectral_rendering;
+  device_camera->use_physical_camera    = camera->use_physical_camera;
 
-  device_camera->pos                        = camera->pos;
-  device_camera->rotation                   = rotation_euler_angles_to_quaternion(camera->rotation);
-  device_camera->fov                        = camera->fov;
-  device_camera->focal_length               = camera->focal_length;
-  device_camera->aperture_size              = camera->aperture_size;
+  if (camera->use_physical_camera) {
+    device_camera->physical.num_interfaces        = 1;     // TODO
+    device_camera->physical.lens_length           = 0.0f;  // TODO
+    device_camera->physical.focal_length          = camera->physical.focal_length;
+    device_camera->physical.front_focal_point     = camera->physical.front_focal_point;
+    device_camera->physical.back_focal_point      = camera->physical.back_focal_point;
+    device_camera->physical.front_principal_point = camera->physical.front_principal_point;
+    device_camera->physical.back_principal_point  = camera->physical.back_principal_point;
+    device_camera->physical.aperture_point        = camera->physical.aperture_point;
+    device_camera->physical.aperture_radius       = camera->physical.aperture_diameter * 0.5f;
+    device_camera->physical.exit_pupil_point      = camera->physical.exit_pupil_point;
+    device_camera->physical.exit_pupil_radius     = camera->physical.exit_pupil_diameter * 0.5f;
+    device_camera->physical.image_plane_distance  = camera->physical.image_plane_distance;
+    device_camera->physical.sensor_width          = camera->physical.sensor_width;
+  }
+  else {
+    device_camera->thin_lens.fov           = camera->thin_lens.fov;
+    device_camera->thin_lens.aperture_size = camera->thin_lens.aperture_size;
+  }
+
+  device_camera->pos      = camera->pos;
+  device_camera->rotation = rotation_euler_angles_to_quaternion(camera->rotation);
+
   device_camera->exposure                   = expf(camera->exposure);
   device_camera->purkinje_kappa1            = camera->purkinje_kappa1;
   device_camera->purkinje_kappa2            = camera->purkinje_kappa2;
   device_camera->russian_roulette_threshold = camera->russian_roulette_threshold;
   device_camera->film_grain                 = camera->film_grain;
-  device_camera->thin_lens_ior              = camera->thin_lens_ior;
-  device_camera->thin_lens_radius           = camera->thin_lens_radius;
-  device_camera->thin_lens_thickness        = camera->thin_lens_thickness;
-  device_camera->thin_lens_abbe             = camera->thin_lens_abbe_number;
   device_camera->camera_scale               = camera->camera_scale;
+  device_camera->object_distance            = camera->object_distance;
 
   return LUMINARY_SUCCESS;
 }

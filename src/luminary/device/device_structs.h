@@ -77,7 +77,6 @@ struct DeviceCamera {
     } physical;
     struct {
       float fov;
-      float focal_length;
       float aperture_size;
     } thin_lens;
   };

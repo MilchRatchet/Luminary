@@ -111,8 +111,6 @@ LUMINARY_API struct LuminaryImage {
 // Camera
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_API enum LuminaryLensModel { LUMINARY_LENS_MODEL_THIN = 0, LUMINARY_LENS_MODEL_COUNT } typedef LuminaryLensModel;
-
 // 3 bits reserved
 LUMINARY_API enum LuminaryFilter {
   LUMINARY_FILTER_NONE       = 0,
@@ -146,21 +144,6 @@ LUMINARY_API enum LuminaryApertureShape {
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
-
-  LuminaryLensModel lens_model;
-  float thin_lens_ior;
-  float thin_lens_thickness;
-  float thin_lens_radius;
-  float thin_lens_abbe_number;
-
-  float camera_scale;
-
-  bool allow_reflections;
-  bool use_spectral_rendering;
-
-  float fov;
-  float focal_length;
-  float aperture_size;
   LuminaryApertureShape aperture_shape;
   uint32_t aperture_blade_count;
   float exposure;
@@ -186,6 +169,28 @@ LUMINARY_API struct LuminaryCamera {
   bool do_firefly_rejection;
   float film_grain;
   bool indirect_only;
+  float camera_scale;
+  float object_distance;
+  bool use_physical_camera;
+  struct {
+    float fov;
+    float aperture_size;
+  } thin_lens;
+  struct {
+    bool allow_reflections;
+    bool use_spectral_rendering;
+    float focal_length;
+    float front_focal_point;
+    float back_focal_point;
+    float front_principal_point;
+    float back_principal_point;
+    float aperture_point;
+    float aperture_diameter;
+    float exit_pupil_point;
+    float exit_pupil_diameter;
+    float image_plane_distance;
+    float sensor_width;
+  } physical;
 } typedef LuminaryCamera;
 
 ////////////////////////////////////////////////////////////////////

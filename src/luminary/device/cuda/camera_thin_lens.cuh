@@ -75,7 +75,7 @@ __device__ CameraSampleResult camera_thin_lens_sample(const ushort2 pixel) {
 
   vec3 sensor_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), sensor_point));
 
-  const float focal_length = fmaxf(device.camera.thin_lens.focal_length, 0.01f);
+  const float focal_length = fmaxf(device.camera.object_distance, 0.01f);
 
   // The minus is because we are always looking in -Z direction
   vec3 focal_point = scale_vector(sensor_to_focal_ray, -focal_length / sensor_to_focal_ray.z);

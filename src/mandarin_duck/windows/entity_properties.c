@@ -239,57 +239,42 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   uint32_t tonemap        = (uint32_t) camera.tonemap;
   uint32_t filter         = (uint32_t) camera.filter;
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
-  uint32_t lens_model     = (uint32_t) camera.lens_model;
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Camera", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   bool update_data = false;
 
-  // TODO: This is just placeholder debug UI
-  update_data |=
-    _window_entity_properties_add_dropdown(data, "Model", LUMINARY_LENS_MODEL_COUNT, (char**) luminary_strings_lens_model, &lens_model);
-
-  if (lens_model == (uint32_t) LUMINARY_LENS_MODEL_THIN) {
-    update_data |=
-      _window_entity_properties_add_slider(data, "IOR", &camera.thin_lens_ior, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 3.0f, 1.0f);
-    update_data |=
-      _window_entity_properties_add_slider(data, "Radius", &camera.thin_lens_radius, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Thickness", &camera.thin_lens_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Abbe", &camera.thin_lens_abbe_number, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  }
-
-  update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.allow_reflections);
-  update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.use_spectral_rendering);
-
-  update_data |=
-    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
-
-  // TODO: End of placeholder UI
-
   update_data |=
     _window_entity_properties_add_slider(data, "Position", &camera.pos, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Field of View", &camera.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Aperture Size", &camera.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
-  if (camera.aperture_size > 0.0f) {
-    update_data |= _window_entity_properties_add_dropdown(
-      data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
+  update_data |= _window_entity_properties_add_checkbox(data, "Physical", &camera.use_physical_camera);
 
-    if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
-      update_data |= _window_entity_properties_add_slider(
-        data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
-    }
-
-    update_data |= _window_entity_properties_add_slider(
-      data, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  if (camera.use_physical_camera) {
+    update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.physical.allow_reflections);
+    update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.physical.use_spectral_rendering);
   }
+  else {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Field of View", &camera.thin_lens.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aperture Size", &camera.thin_lens.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  }
+
+  update_data |= _window_entity_properties_add_dropdown(
+    data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
+
+  if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+  }
+
+  update_data |=
+    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
 
   update_data |= _window_entity_properties_add_checkbox(data, "Firefly Rejection", &camera.do_firefly_rejection);
   update_data |= _window_entity_properties_add_checkbox(data, "Only Indirect Lighting", &camera.indirect_only);
@@ -346,7 +331,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
     camera.tonemap        = (LuminaryToneMap) tonemap;
     camera.filter         = (LuminaryFilter) filter;
     camera.aperture_shape = (LuminaryApertureShape) aperture_shape;
-    camera.lens_model     = (LuminaryLensModel) lens_model;
 
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }

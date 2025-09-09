@@ -19,7 +19,6 @@
 #define LUMINARY_NAME_STRINGS_H
 
 extern const char* const luminary_strings_shading_mode[LUMINARY_SHADING_MODE_COUNT];
-extern const char* const luminary_strings_lens_model[LUMINARY_LENS_MODEL_COUNT];
 extern const char* const luminary_strings_filter[LUMINARY_FILTER_COUNT];
 extern const char* const luminary_strings_tonemap[LUMINARY_TONEMAP_COUNT];
 extern const char* const luminary_strings_aperture[LUMINARY_APERTURE_COUNT];

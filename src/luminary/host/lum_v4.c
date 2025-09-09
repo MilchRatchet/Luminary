@@ -154,15 +154,15 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FOV_____ */
     case 6872316419616689990u:
-      sscanf(value, "%f\n", &camera->fov);
+      sscanf(value, "%f\n", &camera->thin_lens.fov);
       break;
     /* FOCALLEN */
     case 5639997998747569990u:
-      sscanf(value, "%f\n", &camera->focal_length);
+      sscanf(value, "%f\n", &camera->object_distance);
       break;
     /* APERTURE */
     case 4995148757353189441u:
-      sscanf(value, "%f\n", &camera->aperture_size);
+      sscanf(value, "%f\n", &camera->thin_lens.aperture_size);
       break;
     /* APESHAPE */
     case 4994563765644382273u:
@@ -691,6 +691,9 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     .force_thin_walled         = false,
     .emission_scale            = 1.0f,
     .force_no_bloom            = false};
+
+  // Legacy scenes cannot use physical camera
+  content->camera.use_physical_camera = false;
 
   while (1) {
     fgets(line, LINE_SIZE, file);

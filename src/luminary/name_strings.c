@@ -8,8 +8,6 @@ const char* const luminary_strings_shading_mode[LUMINARY_SHADING_MODE_COUNT] = {
   [LUMINARY_SHADING_MODE_IDENTIFICATION] = "Identification",
   [LUMINARY_SHADING_MODE_LIGHTS]         = "Lights"};
 
-const char* const luminary_strings_lens_model[LUMINARY_LENS_MODEL_COUNT] = {[LUMINARY_LENS_MODEL_THIN] = "Thin Lens"};
-
 const char* const luminary_strings_filter[LUMINARY_FILTER_COUNT] = {
   [LUMINARY_FILTER_NONE]       = "None",
   [LUMINARY_FILTER_GRAY]       = "Gray",
