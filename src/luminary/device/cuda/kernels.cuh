@@ -92,7 +92,7 @@ LUMINARY_KERNEL void tasks_create() {
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
 
-    CameraSimulationResult camera_result = camera_sample(task.index);
+    CameraSampleResult camera_result = camera_sample(task.index);
 
     task.origin = camera_result.origin;
     task.ray    = camera_result.ray;

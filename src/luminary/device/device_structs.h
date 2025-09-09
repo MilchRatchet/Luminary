@@ -21,6 +21,20 @@ struct DeviceRendererSettings {
 } typedef DeviceRendererSettings;
 LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x10u);
 
+struct DeviceCameraMedium {
+  float design_ior;
+  float abbe;
+} typedef DeviceCameraMedium;
+LUM_STATIC_SIZE_ASSERT(DeviceCameraMedium, 0x08u);
+
+struct DeviceCameraInterface {
+  float diameter;
+  float radius;
+  float center;
+  float padding;
+} typedef DeviceCameraInterface;
+LUM_STATIC_SIZE_ASSERT(DeviceCameraInterface, 0x10u);
+
 struct DeviceCamera {
   uint32_t aperture_shape : 1;
   uint32_t aperture_blade_count : 3;
@@ -32,25 +46,43 @@ struct DeviceCamera {
   uint32_t indirect_only : 1;
   uint32_t allow_reflections : 1;
   uint32_t use_spectral_rendering : 1;
-  // 18 bits spare
+  uint32_t use_physical_camera : 1;
+  // 17 bits spare
 
   vec3 pos;
   Quaternion rotation;
-  float fov;
-  float focal_length;
-  float aperture_size;
   float exposure;
   float purkinje_kappa1;
   float purkinje_kappa2;
   float russian_roulette_threshold;
   float film_grain;
-  float thin_lens_ior;
-  float thin_lens_thickness;
-  float thin_lens_radius;
-  float thin_lens_abbe;
   float camera_scale;
+  float object_distance;
+
+  union {
+    struct {
+      uint32_t num_interfaces;
+      float lens_length;
+      float focal_length;
+      float front_focal_point;
+      float back_focal_point;
+      float front_principal_point;
+      float back_principal_point;
+      float aperture_point;
+      float aperture_radius;
+      float exit_pupil_point;
+      float exit_pupil_radius;
+      float image_plane_distance;
+      float sensor_width;
+    } physical;
+    struct {
+      float fov;
+      float focal_length;
+      float aperture_size;
+    } thin_lens;
+  };
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x54u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x70u);
 
 struct DeviceOcean {
   uint32_t active : 1;

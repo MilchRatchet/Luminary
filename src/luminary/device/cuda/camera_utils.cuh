@@ -16,11 +16,11 @@
 
 #define CAMERA_DESIGN_WAVELENGTH CAMERA_FRAUNHOFER_D_LINE
 
-struct CameraSimulationResult {
+struct CameraSampleResult {
   vec3 origin;
   vec3 ray;
   RGBF weight;
-} typedef CameraSimulationResult;
+} typedef CameraSampleResult;
 
 __device__ float2 camera_get_jitter() {
 #ifndef CAMERA_DEBUG_RENDER
@@ -31,6 +31,15 @@ __device__ float2 camera_get_jitter() {
 #else
   return make_float2(0.5f, 0.5f);
 #endif
+}
+
+__device__ float camera_get_image_plane() {
+  const float f = device.camera.physical.focal_length;
+  const float o = device.camera.physical.front_principal_point - device.camera.object_distance;
+
+  float i = (f * o) / (o - f);
+
+  return i + device.camera.physical.back_principal_point;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -48,69 +57,12 @@ __device__ float camera_ior_cauchy_approximation(const float nd, const float abb
   return a + b / (wavelength * wavelength);
 }
 
-__device__ float camera_thin_lens_get_ior(const float wavelength) {
-  return camera_ior_cauchy_approximation(device.camera.thin_lens_ior, device.camera.thin_lens_abbe, wavelength);
-}
+template <bool SPECTRAL_RENDERING>
+__device__ float camera_medium_get_ior(const DeviceCameraMedium medium, const float wavelength) {
+  if constexpr (SPECTRAL_RENDERING)
+    return camera_ior_cauchy_approximation(medium.design_ior, medium.abbe, wavelength);
 
-////////////////////////////////////////////////////////////////////
-// Focals, Principals
-////////////////////////////////////////////////////////////////////
-
-__device__ float camera_thin_lens_inv_focal_length(const float ior) {
-  const float radius1 = device.camera.thin_lens_radius;
-  const float radius2 = -device.camera.thin_lens_radius;
-
-  float focal_length = 0.0f;
-
-  focal_length += 1.0f / radius1;
-  focal_length -= 1.0f / radius2;
-  focal_length += ((ior - 1.0f) * device.camera.thin_lens_thickness) / (radius1 * radius2 * ior);
-
-  focal_length *= (ior - 1.0f);
-
-  return focal_length;
-}
-
-__device__ float camera_thin_lens_focal_length(const float ior) {
-  return 1.0f / camera_thin_lens_inv_focal_length(ior);
-}
-
-__device__ float camera_thin_lens_front_focal_length(const float ior) {
-  const float f     = camera_thin_lens_focal_length(ior);
-  const float num   = (ior - 1.0f) * device.camera.thin_lens_thickness;
-  const float denom = ior * device.camera.thin_lens_radius;
-
-  return f * (1.0f - num / denom);
-}
-
-__device__ float camera_thin_lens_back_focal_length(const float ior) {
-  const float f     = camera_thin_lens_focal_length(ior);
-  const float num   = (ior - 1.0f) * device.camera.thin_lens_thickness;
-  const float denom = -ior * device.camera.thin_lens_radius;
-
-  return f * (1.0f - num / denom);
-}
-
-__device__ float camera_thin_lens_front_principal_plane(const float ior) {
-  return camera_thin_lens_focal_length(ior) - camera_thin_lens_front_focal_length(ior) - device.camera.thin_lens_thickness;
-}
-
-__device__ float camera_thin_lens_back_principal_plane(const float ior) {
-  return camera_thin_lens_front_focal_length(ior) - camera_thin_lens_focal_length(ior);
-}
-
-__device__ float camera_thin_lens_object_distance() {
-  // Hack, focal_length is actually the object distance with respect to the origin of the camera / back vertex
-  return device.camera.focal_length * CAMERA_COMMON_INV_SCALE * (1.0f / device.camera.camera_scale);
-}
-
-__device__ float camera_thin_lens_image_plane(const float ior) {
-  const float f = camera_thin_lens_focal_length(ior);
-  const float o = camera_thin_lens_front_principal_plane(ior) - camera_thin_lens_object_distance();
-
-  float i = (f * o) / (o - f);
-
-  return i + camera_thin_lens_back_principal_plane(ior);
+  return medium.design_ior;
 }
 
 #endif /* CU_LUMINARY_CAMERA_UTILS_H */
