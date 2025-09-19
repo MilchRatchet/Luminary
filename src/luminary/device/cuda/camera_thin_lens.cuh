@@ -38,11 +38,13 @@ __device__ vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
 #endif
   float2 sample;
 
+  const float aperture_size = device.camera.thin_lens.aperture_size * CAMERA_COMMON_INV_SCALE;
+
   switch (device.camera.aperture_shape) {
     default:
     case LUMINARY_APERTURE_ROUND: {
       const float alpha = random.x * 2.0f * PI;
-      const float beta  = sqrtf(random.y) * device.camera.thin_lens.aperture_size;
+      const float beta  = sqrtf(random.y) * aperture_size;
 
       sample = make_float2(cosf(alpha) * beta, sinf(alpha) * beta);
     } break;
@@ -62,8 +64,8 @@ __device__ vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
       sample.x = sinf(angle1) * u + sinf(angle2) * v;
       sample.y = cosf(angle1) * u + cosf(angle2) * v;
 
-      sample.x *= device.camera.thin_lens.aperture_size;
-      sample.y *= device.camera.thin_lens.aperture_size;
+      sample.x *= aperture_size;
+      sample.y *= aperture_size;
     } break;
   }
 
@@ -75,7 +77,7 @@ __device__ CameraSampleResult camera_thin_lens_sample(const ushort2 pixel) {
 
   vec3 sensor_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), sensor_point));
 
-  const float focal_length = fmaxf(device.camera.object_distance, 0.01f);
+  const float focal_length = fmaxf(device.camera.object_distance * CAMERA_COMMON_INV_SCALE, 0.01f);
 
   // The minus is because we are always looking in -Z direction
   vec3 focal_point = scale_vector(sensor_to_focal_ray, -focal_length / sensor_to_focal_ray.z);
