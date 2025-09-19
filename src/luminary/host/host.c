@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <luminary/host.h>
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
