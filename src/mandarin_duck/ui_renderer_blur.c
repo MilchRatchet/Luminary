@@ -277,6 +277,9 @@ static void _ui_renderer_stack_blur_generic(
 void ui_renderer_stack_blur(UIRenderer* renderer, Display* display, Window* window) {
   MD_UNUSED(renderer);
 
+  if (window->y > (int32_t) display->height)
+    return;
+
   const uint32_t height = (window->y + window->height > display->height) ? display->height - window->y : window->height;
   _ui_renderer_stack_blur_generic(
     display->buffer, window->width, height, display->pitch, window->x, window->y, 38, window->background_blur_buffer,
