@@ -24,16 +24,16 @@ LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x10u);
 struct DeviceCameraMedium {
   float design_ior;
   float abbe;
+  float cylindrical_radius;
 } typedef DeviceCameraMedium;
-LUM_STATIC_SIZE_ASSERT(DeviceCameraMedium, 0x08u);
+LUM_STATIC_SIZE_ASSERT(DeviceCameraMedium, 0x0Cu);
 
 struct DeviceCameraInterface {
-  float diameter;
+  float cylindrical_radius;
   float radius;
   float vertex;
-  float padding;
 } typedef DeviceCameraInterface;
-LUM_STATIC_SIZE_ASSERT(DeviceCameraInterface, 0x10u);
+LUM_STATIC_SIZE_ASSERT(DeviceCameraInterface, 0x0Cu);
 
 struct DeviceCamera {
   uint32_t aperture_shape : 1;

@@ -52,6 +52,7 @@ struct CameraSimulationState {
   vec3 origin;
   vec3 ray;
   float ior;
+  float cylindrical_radius;
   float weight;
   float wavelength;
   bool is_forward;
@@ -63,31 +64,96 @@ struct CameraSimulationResult {
   float weight;
 } typedef CameraSimulationResult;
 
+__device__ bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
+  const float aperture_dist = (device.camera.physical.aperture_point - origin.z) / ray.z;
+  if (aperture_dist > 0.0f && aperture_dist < dist) {
+    const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
+
+    const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
+
+    if (vertical_aperture_hit_dist_sq > device.camera.physical.aperture_radius * device.camera.physical.aperture_radius) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+__device__ bool camera_simulation_intersect_medium_cylinder(
+  vec3& origin, vec3& ray, float& weight, const float dist, const float cylindrical_radius, const float medium_ior) {
+  if (cylindrical_radius == FLT_MAX)
+    return false;
+
+  vec3 cylindrical_ray           = get_vector(ray.x, ray.y, 0.0f);
+  const float cylindrical_length = get_length(cylindrical_ray);
+
+  if (cylindrical_length == 0.0f)
+    return false;
+
+  cylindrical_ray = scale_vector(cylindrical_ray, 1.0f / cylindrical_length);
+
+  const vec3 cylindrical_origin = get_vector(origin.x, origin.y, 0.0f);
+
+  // TODO: Optimize, this only needs 2D math but I am lazy so I use existing 3D implementations
+  float cylindrical_dist = sphere_ray_intersection(cylindrical_ray, cylindrical_origin, get_vector(0.0f, 0.0f, 0.0f), cylindrical_radius);
+
+  cylindrical_dist *= 1.0f / cylindrical_length;
+
+  if (cylindrical_dist > 0.0f && cylindrical_dist < dist) {
+    origin = add_vector(origin, scale_vector(ray, cylindrical_dist));
+
+    const vec3 cylindrical_normal = normalize_vector(get_vector(-origin.x, -origin.y, 0.0f));
+
+    const vec3 V = scale_vector(ray, -1.0f);
+
+    bool total_reflection;
+    const vec3 refraction = refract_vector(V, cylindrical_normal, medium_ior, total_reflection);
+
+    const float fresnel = (total_reflection == false) ? bsdf_fresnel(cylindrical_normal, V, refraction, medium_ior) : 1.0f;
+
+    weight *= fresnel;
+
+    ray = reflect_vector(V, cylindrical_normal);
+
+    return true;
+  }
+
+  return false;
+}
+
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 __device__ int32_t
   camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const ushort2 pixel) {
   const DeviceCameraInterface interface = device.ptrs.camera_interfaces[interface_id];
 
   const vec3 semi_circle_center = get_vector(0.0f, 0.0f, interface.vertex - interface.radius);
-  const float dist              = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
+  float dist                    = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
 
   // No hit
   if (dist == FLT_MAX) {
     state.weight = 0.0f;
-
     return 0;
   }
 
-  // Check if we have hit the aperture.
-  const float aperture_dist = (device.camera.physical.aperture_point - state.origin.z) / state.ray.z;
-  if (aperture_dist > 0.0f && aperture_dist < dist) {
-    const vec3 aperture_hit = add_vector(state.origin, scale_vector(state.ray, aperture_dist));
+  if (camera_simulation_intersect_aperture(state.origin, state.ray, dist)) {
+    state.weight = 0.0f;
+    return 0;
+  }
 
-    const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
+  // This must happen before the origin gets modified
+  // TODO: Optimize
+  const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < fabsf(interface.radius);
 
-    if (vertical_aperture_hit_dist_sq > device.camera.physical.aperture_radius * device.camera.physical.aperture_radius) {
+  if (camera_simulation_intersect_medium_cylinder(state.origin, state.ray, state.weight, dist, state.cylindrical_radius, state.ior)) {
+    dist = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
+
+    if (dist == FLT_MAX) {
       state.weight = 0.0f;
+      return 0;
+    }
 
+    if (camera_simulation_intersect_aperture(state.origin, state.ray, dist)) {
+      state.weight = 0.0f;
       return 0;
     }
   }
@@ -96,17 +162,12 @@ __device__ int32_t
   const DeviceCameraMedium medium = device.ptrs.camera_media[medium_id];
   const float medium_ior          = camera_medium_get_ior<SPECTRAL_RENDERING>(medium, state.wavelength);
 
-  // TODO: Optimize
-  const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < fabsf(interface.radius);
-
   state.origin = add_vector(state.origin, scale_vector(state.ray, dist));
 
   const float vertical_hit_dist_sq = state.origin.x * state.origin.x + state.origin.y * state.origin.y;
-
-  // Hit is past the vertical limits of the interface
-  if (vertical_hit_dist_sq > interface.diameter * interface.diameter) {
+  if (vertical_hit_dist_sq > interface.cylindrical_radius * interface.cylindrical_radius) {
+    // Hit is past the vertical limits of the interface
     state.weight = 0.0f;
-
     return 0;
   }
 
@@ -155,9 +216,10 @@ __device__ int32_t
 
   state.weight *= weight;
 
-  state.ray        = sampled_refraction ? refraction : reflection;
-  state.ior        = sampled_refraction ? medium_ior : state.ior;
-  state.is_forward = sampled_refraction ? state.is_forward : !state.is_forward;
+  state.ray                = sampled_refraction ? refraction : reflection;
+  state.ior                = sampled_refraction ? medium_ior : state.ior;
+  state.cylindrical_radius = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
+  state.is_forward         = sampled_refraction ? state.is_forward : !state.is_forward;
 
   return state.is_forward ? 1 : -1;
 }
@@ -166,12 +228,13 @@ template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 __device__ CameraSimulationResult
   camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const ushort2 pixel) {
   CameraSimulationState state;
-  state.origin     = sensor_point;
-  state.ray        = initial_direction;
-  state.ior        = 1.0f;
-  state.weight     = 1.0f;
-  state.wavelength = wavelength;
-  state.is_forward = true;
+  state.origin             = sensor_point;
+  state.ray                = initial_direction;
+  state.ior                = 1.0f;
+  state.cylindrical_radius = FLT_MAX;
+  state.weight             = 1.0f;
+  state.wavelength         = wavelength;
+  state.is_forward         = true;
 
   // There are num_interfaces + 1 media.
   const uint32_t num_interfaces = device.camera.physical.num_interfaces;
