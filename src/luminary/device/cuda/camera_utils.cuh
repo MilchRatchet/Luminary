@@ -34,12 +34,16 @@ __device__ float2 camera_get_jitter() {
 }
 
 __device__ float camera_get_image_plane() {
+#if 0
   const float f = device.camera.physical.focal_length;
   const float o = device.camera.physical.front_principal_point - device.camera.object_distance;
 
   float i = (f * o) / (o - f);
 
   return i + device.camera.physical.back_principal_point;
+#else
+  return -device.camera.physical.image_plane_distance;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////

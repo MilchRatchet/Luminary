@@ -61,7 +61,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->physical.exit_pupil_point      = 26.55f;  // These are probably wrong
   camera->physical.exit_pupil_diameter   = 41.67f;  // These are probably wrong
   camera->physical.image_plane_distance  = 65.18f;
-  camera->physical.sensor_width          = 35.0f;
+  camera->physical.sensor_width          = 20.0f;
 
   return LUMINARY_SUCCESS;
 }

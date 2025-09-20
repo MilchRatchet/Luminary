@@ -78,6 +78,20 @@ __device__ int32_t
     return 0;
   }
 
+  // Check if we have hit the aperture.
+  const float aperture_dist = (device.camera.physical.aperture_point - state.origin.z) / state.ray.z;
+  if (aperture_dist > 0.0f && aperture_dist < dist) {
+    const vec3 aperture_hit = add_vector(state.origin, scale_vector(state.ray, aperture_dist));
+
+    const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
+
+    if (vertical_aperture_hit_dist_sq > device.camera.physical.aperture_radius * device.camera.physical.aperture_radius) {
+      state.weight = 0.0f;
+
+      return 0;
+    }
+  }
+
   const int32_t medium_id         = state.is_forward ? interface_id + 1 : interface_id;
   const DeviceCameraMedium medium = device.ptrs.camera_media[medium_id];
   const float medium_ior          = camera_medium_get_ior<SPECTRAL_RENDERING>(medium, state.wavelength);
@@ -168,7 +182,7 @@ __device__ CameraSimulationResult
   for (; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
     current_interface += camera_simulation_step<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(state, iteration, current_interface, pixel);
 
-    if (current_interface > num_interfaces || current_interface < 0 || state.weight == 0.0f)
+    if (current_interface >= num_interfaces || current_interface < 0 || state.weight == 0.0f)
       break;
   }
 
