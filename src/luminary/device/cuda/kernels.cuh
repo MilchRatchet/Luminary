@@ -94,6 +94,10 @@ LUMINARY_KERNEL void tasks_create() {
 
     CameraSampleResult camera_result = camera_sample(task.index);
 
+    // Skip rays that haven't managed to leave the camera.
+    if (color_any(camera_result.weight) == false)
+      continue;
+
     task.origin = camera_result.origin;
     task.ray    = camera_result.ray;
 
