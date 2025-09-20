@@ -40,10 +40,11 @@ __device__ vec3 camera_physical_sample_exit_pupil(const vec3 sensor_point, const
   const vec3 diff = sub_vector(target_point, sensor_point);
 
   const float dist = get_length(diff);
+  const float area = device.camera.physical.exit_pupil_radius * device.camera.physical.exit_pupil_radius * PI;
 
   const vec3 ray = normalize_vector(diff);
 
-  weight = fabsf(ray.z) / (dist * dist);
+  weight = area * fabsf(ray.z) / (dist * dist);
 
   return ray;
 }
