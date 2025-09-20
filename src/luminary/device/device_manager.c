@@ -330,9 +330,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
       __FAILURE_HANDLE_CRITICAL(device_update_post(device, &camera));
       __FAILURE_HANDLE_CRITICAL(device_update_output_camera_params(device, &camera));
-
-      // TODO: Do this only if physical camera has changed
-      __FAILURE_HANDLE_CRITICAL(device_update_physical_camera(device, device_manager->physical_camera));
     }
   }
 
@@ -423,6 +420,13 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
   if (flags & SCENE_DIRTY_FLAG_INSTANCES) {
     __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_instance_updates(device_manager));
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_PHYSICAL_CAMERA) {
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+      __FAILURE_HANDLE_CRITICAL(device_update_physical_camera(device, device_manager->physical_camera));
+    }
   }
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {

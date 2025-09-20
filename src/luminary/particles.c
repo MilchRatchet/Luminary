@@ -1,6 +1,7 @@
 #include "particles.h"
 
 #include "internal_error.h"
+#include "scene.h"
 
 LuminaryResult particles_get_default(Particles* particles) {
   __CHECK_NULL_ARGUMENT(particles);
@@ -22,36 +23,34 @@ LuminaryResult particles_get_default(Particles* particles) {
   return LUMINARY_SUCCESS;
 }
 
-#define __PARTICLES_DIRTY(var)    \
-  {                               \
-    if (input->var != old->var) { \
-      *dirty = true;              \
-      return LUMINARY_SUCCESS;    \
-    }                             \
+#define __PARTICLES_CHECK_DIRTY(var)                                            \
+  {                                                                             \
+    if (input->var != old->var) {                                               \
+      *dirty_flags = SCENE_DIRTY_FLAG_PARTICLES | SCENE_DIRTY_FLAG_INTEGRATION; \
+      return LUMINARY_SUCCESS;                                                  \
+    }                                                                           \
   }
 
-LuminaryResult particles_check_for_dirty(const Particles* input, const Particles* old, bool* dirty) {
+LuminaryResult particles_check_for_dirty(const Particles* input, const Particles* old, uint32_t* dirty_flags) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(dirty);
+  __CHECK_NULL_ARGUMENT(dirty_flags);
 
-  *dirty = false;
-
-  __PARTICLES_DIRTY(active);
+  __PARTICLES_CHECK_DIRTY(active);
 
   if (input->active) {
-    __PARTICLES_DIRTY(scale);
-    __PARTICLES_DIRTY(albedo.r);
-    __PARTICLES_DIRTY(albedo.g);
-    __PARTICLES_DIRTY(albedo.b);
-    __PARTICLES_DIRTY(direction_altitude);
-    __PARTICLES_DIRTY(direction_azimuth);
-    __PARTICLES_DIRTY(speed);
-    __PARTICLES_DIRTY(phase_diameter);
-    __PARTICLES_DIRTY(seed);
-    __PARTICLES_DIRTY(count);
-    __PARTICLES_DIRTY(size);
-    __PARTICLES_DIRTY(size_variation);
+    __PARTICLES_CHECK_DIRTY(scale);
+    __PARTICLES_CHECK_DIRTY(albedo.r);
+    __PARTICLES_CHECK_DIRTY(albedo.g);
+    __PARTICLES_CHECK_DIRTY(albedo.b);
+    __PARTICLES_CHECK_DIRTY(direction_altitude);
+    __PARTICLES_CHECK_DIRTY(direction_azimuth);
+    __PARTICLES_CHECK_DIRTY(speed);
+    __PARTICLES_CHECK_DIRTY(phase_diameter);
+    __PARTICLES_CHECK_DIRTY(seed);
+    __PARTICLES_CHECK_DIRTY(count);
+    __PARTICLES_CHECK_DIRTY(size);
+    __PARTICLES_CHECK_DIRTY(size_variation);
   }
 
   return LUMINARY_SUCCESS;

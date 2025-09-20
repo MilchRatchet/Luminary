@@ -1,6 +1,7 @@
 #include "cloud.h"
 
 #include "internal_error.h"
+#include "scene.h"
 
 LuminaryResult cloud_get_default(Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(cloud);
@@ -51,71 +52,69 @@ LuminaryResult cloud_get_default(Cloud* cloud) {
   return LUMINARY_SUCCESS;
 }
 
-#define __CLOUD_DIRTY(var)        \
-  {                               \
-    if (input->var != old->var) { \
-      *dirty = true;              \
-      return LUMINARY_SUCCESS;    \
-    }                             \
+#define __CLOUD_CHECK_DIRTY(var)                                            \
+  {                                                                         \
+    if (input->var != old->var) {                                           \
+      *dirty_flags = SCENE_DIRTY_FLAG_CLOUD | SCENE_DIRTY_FLAG_INTEGRATION; \
+      return LUMINARY_SUCCESS;                                              \
+    }                                                                       \
   }
 
-static LuminaryResult _cloud_layer_check_for_dirty(const CloudLayer* input, const CloudLayer* old, bool* dirty) {
+static LuminaryResult _cloud_layer_check_for_dirty(const CloudLayer* input, const CloudLayer* old, uint32_t* dirty_flags) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(dirty);
+  __CHECK_NULL_ARGUMENT(dirty_flags);
 
-  __CLOUD_DIRTY(active);
+  __CLOUD_CHECK_DIRTY(active);
 
   if (input->active) {
-    __CLOUD_DIRTY(height_max);
-    __CLOUD_DIRTY(height_min);
-    __CLOUD_DIRTY(coverage);
-    __CLOUD_DIRTY(coverage_min);
-    __CLOUD_DIRTY(type);
-    __CLOUD_DIRTY(type_min);
-    __CLOUD_DIRTY(wind_speed);
-    __CLOUD_DIRTY(wind_angle);
+    __CLOUD_CHECK_DIRTY(height_max);
+    __CLOUD_CHECK_DIRTY(height_min);
+    __CLOUD_CHECK_DIRTY(coverage);
+    __CLOUD_CHECK_DIRTY(coverage_min);
+    __CLOUD_CHECK_DIRTY(type);
+    __CLOUD_CHECK_DIRTY(type_min);
+    __CLOUD_CHECK_DIRTY(wind_speed);
+    __CLOUD_CHECK_DIRTY(wind_angle);
   }
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult cloud_check_for_dirty(const Cloud* input, const Cloud* old, bool* dirty) {
+LuminaryResult cloud_check_for_dirty(const Cloud* input, const Cloud* old, uint32_t* dirty_flags) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(dirty);
+  __CHECK_NULL_ARGUMENT(dirty_flags);
 
-  *dirty = false;
-
-  __CLOUD_DIRTY(active);
+  __CLOUD_CHECK_DIRTY(active);
 
   if (input->active) {
-    __CLOUD_DIRTY(atmosphere_scattering);
-    __CLOUD_DIRTY(offset_x);
-    __CLOUD_DIRTY(offset_z);
-    __CLOUD_DIRTY(density);
-    __CLOUD_DIRTY(seed);
-    __CLOUD_DIRTY(droplet_diameter);
-    __CLOUD_DIRTY(steps);
-    __CLOUD_DIRTY(shadow_steps);
-    __CLOUD_DIRTY(noise_shape_scale);
-    __CLOUD_DIRTY(noise_detail_scale);
-    __CLOUD_DIRTY(noise_weather_scale);
-    __CLOUD_DIRTY(mipmap_bias);
-    __CLOUD_DIRTY(octaves);
+    __CLOUD_CHECK_DIRTY(atmosphere_scattering);
+    __CLOUD_CHECK_DIRTY(offset_x);
+    __CLOUD_CHECK_DIRTY(offset_z);
+    __CLOUD_CHECK_DIRTY(density);
+    __CLOUD_CHECK_DIRTY(seed);
+    __CLOUD_CHECK_DIRTY(droplet_diameter);
+    __CLOUD_CHECK_DIRTY(steps);
+    __CLOUD_CHECK_DIRTY(shadow_steps);
+    __CLOUD_CHECK_DIRTY(noise_shape_scale);
+    __CLOUD_CHECK_DIRTY(noise_detail_scale);
+    __CLOUD_CHECK_DIRTY(noise_weather_scale);
+    __CLOUD_CHECK_DIRTY(mipmap_bias);
+    __CLOUD_CHECK_DIRTY(octaves);
 
-    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->low, &old->low, dirty));
-    if (*dirty) {
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->low, &old->low, dirty_flags));
+    if (*dirty_flags & SCENE_DIRTY_FLAG_CLOUD) {
       return LUMINARY_SUCCESS;
     }
 
-    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->mid, &old->mid, dirty));
-    if (*dirty) {
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->mid, &old->mid, dirty_flags));
+    if (*dirty_flags & SCENE_DIRTY_FLAG_CLOUD) {
       return LUMINARY_SUCCESS;
     }
 
-    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->top, &old->top, dirty));
-    if (*dirty) {
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->top, &old->top, dirty_flags));
+    if (*dirty_flags & SCENE_DIRTY_FLAG_CLOUD) {
       return LUMINARY_SUCCESS;
     }
   }

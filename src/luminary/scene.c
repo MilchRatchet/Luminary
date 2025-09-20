@@ -144,56 +144,42 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(scene, scene_entity_to_mutex[entity]))
 
-  bool passive_dirty     = false;
-  bool output_dirty      = false;
-  bool integration_dirty = false;
-  bool buffers_dirty     = false;
-  bool hdri_dirty        = false;
+  SceneDirtyFlags flags = 0;
 
   *scene_changed = false;
 
   switch (entity) {
     case SCENE_ENTITY_SETTINGS:
-      __FAILURE_HANDLE_CRITICAL(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &integration_dirty, &buffers_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty || buffers_dirty) ? SCENE_DIRTY_FLAG_SETTINGS : 0;
+      __FAILURE_HANDLE_CRITICAL(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &flags));
       break;
     case SCENE_ENTITY_CAMERA:
-      __FAILURE_HANDLE_CRITICAL(camera_check_for_dirty((Camera*) object, &scene->camera, &output_dirty, &integration_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_CAMERA : 0;
+      __FAILURE_HANDLE_CRITICAL(camera_check_for_dirty((Camera*) object, &scene->camera, &flags));
       break;
     case SCENE_ENTITY_OCEAN:
-      __FAILURE_HANDLE_CRITICAL(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &integration_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_OCEAN : 0;
+      __FAILURE_HANDLE_CRITICAL(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &flags));
       break;
     case SCENE_ENTITY_SKY:
-      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (passive_dirty || integration_dirty || hdri_dirty) ? SCENE_DIRTY_FLAG_SKY : 0;
+      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &flags));
       break;
     case SCENE_ENTITY_CLOUD:
-      __FAILURE_HANDLE_CRITICAL(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &integration_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_CLOUD : 0;
+      __FAILURE_HANDLE_CRITICAL(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &flags));
       break;
     case SCENE_ENTITY_FOG:
-      __FAILURE_HANDLE_CRITICAL(fog_check_for_dirty((Fog*) object, &scene->fog, &integration_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_FOG : 0;
+      __FAILURE_HANDLE_CRITICAL(fog_check_for_dirty((Fog*) object, &scene->fog, &flags));
       break;
     case SCENE_ENTITY_PARTICLES:
-      __FAILURE_HANDLE_CRITICAL(particles_check_for_dirty((Particles*) object, &scene->particles, &integration_dirty));
-      scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_PARTICLES : 0;
+      __FAILURE_HANDLE_CRITICAL(particles_check_for_dirty((Particles*) object, &scene->particles, &flags));
       break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_update yet.");
   }
 
-  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_OUTPUT : 0;
-  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
-  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (buffers_dirty) ? SCENE_DIRTY_FLAG_BUFFERS : 0;
-  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (hdri_dirty) ? SCENE_DIRTY_FLAG_HDRI : 0;
+  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= flags;
 
   // We need to always update the scene because certain changes might not cause anything to be dirty.
   __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, object, entity));
 
-  if (passive_dirty || output_dirty || integration_dirty || buffers_dirty || hdri_dirty) {
+  if (flags != 0) {
     *scene_changed = true;
   }
 

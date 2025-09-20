@@ -1,6 +1,7 @@
 #include "sky.h"
 
 #include "internal_error.h"
+#include "scene.h"
 
 LuminaryResult sky_get_default(Sky* sky) {
   __CHECK_NULL_ARGUMENT(sky);
@@ -40,84 +41,68 @@ LuminaryResult sky_get_default(Sky* sky) {
   return LUMINARY_SUCCESS;
 }
 
-#define __SKY_DIRTY(var)          \
-  {                               \
-    if (input->var != old->var) { \
-      *integration_dirty = true;  \
-      return LUMINARY_SUCCESS;    \
-    }                             \
+#define SKY_ALL_DIRTY_FLAGS \
+  ((uint32_t) (SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_HDRI | SCENE_DIRTY_FLAG_PASSIVE))
+
+#define __SKY_CHECK_DIRTY(var, flags)                                  \
+  {                                                                    \
+    if (input->var != old->var) {                                      \
+      *dirty_flags |= flags;                                           \
+      if ((*dirty_flags & SKY_ALL_DIRTY_FLAGS) == SKY_ALL_DIRTY_FLAGS) \
+        return LUMINARY_SUCCESS;                                       \
+    }                                                                  \
   }
 
-#define __SKY_DIRTY_HDRI(var)                               \
-  {                                                         \
-    if (input->var != old->var) {                           \
-      *integration_dirty = true;                            \
-      *hdri_dirty |= input->mode == LUMINARY_SKY_MODE_HDRI; \
-      return LUMINARY_SUCCESS;                              \
-    }                                                       \
-  }
-
-#define __SKY_DIRTY_PASSIVE_HDRI(var)                          \
-  {                                                            \
-    if (input->var != old->var) {                              \
-      *passive_dirty |= input->mode == LUMINARY_SKY_MODE_HDRI; \
-    }                                                          \
-  }
-
-LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* passive_dirty, bool* integration_dirty, bool* hdri_dirty) {
+LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, uint32_t* dirty_flags) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(integration_dirty);
+  __CHECK_NULL_ARGUMENT(dirty_flags);
 
-  *passive_dirty     = false;
-  *integration_dirty = false;
-  *hdri_dirty        = false;
+  __SKY_CHECK_DIRTY(mode, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_HDRI);
 
-  __SKY_DIRTY_HDRI(mode);
-
-  __SKY_DIRTY_PASSIVE_HDRI(hdri_dim);
-  __SKY_DIRTY_PASSIVE_HDRI(hdri_samples);
+  __SKY_CHECK_DIRTY(hdri_dim, SCENE_DIRTY_FLAG_PASSIVE);
+  __SKY_CHECK_DIRTY(hdri_samples, SCENE_DIRTY_FLAG_PASSIVE);
 
   switch (input->mode) {
     case LUMINARY_SKY_MODE_DEFAULT:
-      __SKY_DIRTY(geometry_offset.x);
-      __SKY_DIRTY(geometry_offset.y);
-      __SKY_DIRTY(geometry_offset.z);
-      __SKY_DIRTY(altitude);
-      __SKY_DIRTY(azimuth);
-      __SKY_DIRTY(moon_altitude);
-      __SKY_DIRTY(moon_azimuth);
-      __SKY_DIRTY(moon_tex_offset);
-      __SKY_DIRTY(sun_strength);
-      __SKY_DIRTY(base_density);
-      __SKY_DIRTY(ozone_absorption);
-      __SKY_DIRTY(steps);
-      __SKY_DIRTY(stars_intensity);
-      __SKY_DIRTY(rayleigh_density);
-      __SKY_DIRTY(mie_density);
-      __SKY_DIRTY(ozone_density);
-      __SKY_DIRTY(rayleigh_falloff);
-      __SKY_DIRTY(mie_falloff);
-      __SKY_DIRTY(mie_diameter);
-      __SKY_DIRTY(ground_visibility);
-      __SKY_DIRTY(ozone_layer_thickness);
-      __SKY_DIRTY(multiscattering_factor);
-      __SKY_DIRTY(rayleigh_density);
-      __SKY_DIRTY(aerial_perspective);
-      __SKY_DIRTY(stars_count);
-      __SKY_DIRTY(stars_seed);
-      __SKY_DIRTY(stars_intensity);
+      __SKY_CHECK_DIRTY(geometry_offset.x, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(geometry_offset.y, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(geometry_offset.z, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(altitude, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(azimuth, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(moon_altitude, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(moon_azimuth, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(moon_tex_offset, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(sun_strength, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(base_density, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(ozone_absorption, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(steps, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(stars_intensity, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(rayleigh_density, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(mie_density, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(ozone_density, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(rayleigh_falloff, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(mie_falloff, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(mie_diameter, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(ground_visibility, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(ozone_layer_thickness, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(multiscattering_factor, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(rayleigh_density, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(aerial_perspective, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(stars_count, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(stars_seed, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(stars_intensity, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
       break;
     case LUMINARY_SKY_MODE_HDRI:
-      __SKY_DIRTY(altitude);
-      __SKY_DIRTY(azimuth);
-      __SKY_DIRTY(sun_strength);
-      __SKY_DIRTY(aerial_perspective);
+      __SKY_CHECK_DIRTY(altitude, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(azimuth, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(sun_strength, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(aerial_perspective, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
       break;
     case LUMINARY_SKY_MODE_CONSTANT_COLOR:
-      __SKY_DIRTY(constant_color.r);
-      __SKY_DIRTY(constant_color.g);
-      __SKY_DIRTY(constant_color.b);
+      __SKY_CHECK_DIRTY(constant_color.r, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(constant_color.g, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(constant_color.b, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
       break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid sky mode.");
