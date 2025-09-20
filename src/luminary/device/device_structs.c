@@ -53,8 +53,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->use_physical_camera    = camera->use_physical_camera;
 
   if (camera->use_physical_camera) {
-    device_camera->physical.num_interfaces        = 1;     // TODO
-    device_camera->physical.lens_length           = 0.0f;  // TODO
+    device_camera->physical.num_interfaces        = 12;
     device_camera->physical.focal_length          = camera->physical.focal_length;
     device_camera->physical.front_focal_point     = camera->physical.front_focal_point;
     device_camera->physical.back_focal_point      = camera->physical.back_focal_point;

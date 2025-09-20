@@ -253,6 +253,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_checkbox(data, "Physical", &camera.use_physical_camera);
 
   if (camera.use_physical_camera) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Sensor Width", &camera.physical.sensor_width, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.physical.allow_reflections);
     update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.physical.use_spectral_rendering);
   }

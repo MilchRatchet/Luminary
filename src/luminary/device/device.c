@@ -691,6 +691,8 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
+  __DEVICE_BUFFER_FREE(camera_interfaces);
+  __DEVICE_BUFFER_FREE(camera_media);
   __DEVICE_BUFFER_FREE(abort_flag);
 
   for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
@@ -1517,6 +1519,33 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
     DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, device->particles_handle->instance_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, DEVICE_PTR(device->particles_handle->quad_buffer));
   }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamera* physical_camera) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(physical_camera);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __DEVICE_BUFFER_FREE(camera_interfaces);
+  __DEVICE_BUFFER_FREE(camera_media);
+
+  const size_t interfaces_size = physical_camera->num_interfaces * sizeof(DeviceCameraInterface);
+  const size_t media_size      = (physical_camera->num_interfaces + 1) * sizeof(DeviceCameraMedium);
+
+  __DEVICE_BUFFER_ALLOCATE(camera_interfaces, interfaces_size);
+  __DEVICE_BUFFER_ALLOCATE(camera_media, media_size);
+
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, physical_camera->camera_interfaces, (DEVICE void*) device->buffers.camera_interfaces, 0, interfaces_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, physical_camera->camera_media, (DEVICE void*) device->buffers.camera_media, 0, media_size));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

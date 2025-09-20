@@ -5,6 +5,7 @@
 #include "device_bsdf.h"
 #include "device_library.h"
 #include "device_light.h"
+#include "device_physical_camera.h"
 #include "device_result_interface.h"
 #include "device_sampletime.h"
 #include "device_sky.h"
@@ -30,6 +31,7 @@ struct DeviceManager {
   SkyHDRI* sky_hdri;
   SkyStars* sky_stars;
   BSDFLUT* bsdf_lut;
+  PhysicalCamera* physical_camera;
   SampleTime* sample_time;
   DeviceResultInterface* result_interface;
 } typedef DeviceManager;

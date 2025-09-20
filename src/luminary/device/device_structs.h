@@ -30,7 +30,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceCameraMedium, 0x08u);
 struct DeviceCameraInterface {
   float diameter;
   float radius;
-  float center;
+  float vertex;
   float padding;
 } typedef DeviceCameraInterface;
 LUM_STATIC_SIZE_ASSERT(DeviceCameraInterface, 0x10u);
@@ -62,7 +62,6 @@ struct DeviceCamera {
   union {
     struct {
       uint32_t num_interfaces;
-      float lens_length;
       float focal_length;
       float front_focal_point;
       float back_focal_point;
@@ -81,7 +80,7 @@ struct DeviceCamera {
     } thin_lens;
   };
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x70u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x6Cu);
 
 struct DeviceOcean {
   uint32_t active : 1;

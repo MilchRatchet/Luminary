@@ -60,7 +60,7 @@ __device__ float camera_ior_cauchy_approximation(const float nd, const float abb
 template <bool SPECTRAL_RENDERING>
 __device__ float camera_medium_get_ior(const DeviceCameraMedium medium, const float wavelength) {
   if constexpr (SPECTRAL_RENDERING)
-    return camera_ior_cauchy_approximation(medium.design_ior, medium.abbe, wavelength);
+    return (medium.abbe != 0.0f) ? camera_ior_cauchy_approximation(medium.design_ior, medium.abbe, wavelength) : medium.design_ior;
 
   return medium.design_ior;
 }

@@ -99,6 +99,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_STANDARD_DIRTY(russian_roulette_threshold);
   __CAMERA_STANDARD_DIRTY(camera_scale);
   __CAMERA_STANDARD_DIRTY(object_distance);
+  __CAMERA_STANDARD_DIRTY(use_physical_camera);
 
   __CAMERA_STANDARD_DIRTY(aperture_shape);
 

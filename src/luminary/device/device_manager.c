@@ -330,6 +330,9 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
       __FAILURE_HANDLE_CRITICAL(device_update_post(device, &camera));
       __FAILURE_HANDLE_CRITICAL(device_update_output_camera_params(device, &camera));
+
+      // TODO: Do this only if physical camera has changed
+      __FAILURE_HANDLE_CRITICAL(device_update_physical_camera(device, device_manager->physical_camera));
     }
   }
 
@@ -773,6 +776,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
   __FAILURE_HANDLE(sky_stars_create(&device_manager->sky_stars));
   __FAILURE_HANDLE(bsdf_lut_create(&device_manager->bsdf_lut));
+  __FAILURE_HANDLE(physical_camera_create(&device_manager->physical_camera));
   __FAILURE_HANDLE(sample_time_create(&device_manager->sample_time));
 
   ////////////////////////////////////////////////////////////////////
@@ -1091,6 +1095,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
   __FAILURE_HANDLE(sky_stars_destroy(&(*device_manager)->sky_stars));
   __FAILURE_HANDLE(bsdf_lut_destroy(&(*device_manager)->bsdf_lut));
+  __FAILURE_HANDLE(physical_camera_destroy(&(*device_manager)->physical_camera));
   __FAILURE_HANDLE(sample_time_destroy(&(*device_manager)->sample_time));
 
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));

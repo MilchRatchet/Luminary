@@ -9,6 +9,7 @@
 #include "device_omm.h"
 #include "device_output.h"
 #include "device_particle.h"
+#include "device_physical_camera.h"
 #include "device_post.h"
 #include "device_renderer.h"
 #include "device_result_interface.h"
@@ -169,6 +170,7 @@ LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
 LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud);
 LuminaryResult device_update_particles(Device* device, const Particles* particles);
+LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamera* physical_camera);
 LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);

@@ -68,8 +68,8 @@ __device__ int32_t
   camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const ushort2 pixel) {
   const DeviceCameraInterface interface = device.ptrs.camera_interfaces[interface_id];
 
-  const vec3 semi_circle_center = get_vector(0.0f, 0.0f, interface.center);
-  const float dist              = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, interface.radius);
+  const vec3 semi_circle_center = get_vector(0.0f, 0.0f, interface.vertex - interface.radius);
+  const float dist              = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
 
   // No hit
   if (dist == FLT_MAX) {
@@ -83,9 +83,18 @@ __device__ int32_t
   const float medium_ior          = camera_medium_get_ior<SPECTRAL_RENDERING>(medium, state.wavelength);
 
   // TODO: Optimize
-  const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < interface.radius;
+  const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < fabsf(interface.radius);
 
   state.origin = add_vector(state.origin, scale_vector(state.ray, dist));
+
+  const float vertical_hit_dist_sq = state.origin.x * state.origin.x + state.origin.y * state.origin.y;
+
+  // Hit is past the vertical limits of the interface
+  if (vertical_hit_dist_sq > interface.diameter * interface.diameter) {
+    state.weight = 0.0f;
+
+    return 0;
+  }
 
   vec3 normal = normalize_vector(sub_vector(state.origin, semi_circle_center));
 
