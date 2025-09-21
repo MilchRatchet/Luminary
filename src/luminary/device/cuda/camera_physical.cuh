@@ -57,6 +57,7 @@ struct CameraSimulationState {
   float weight;
   float wavelength;
   bool is_forward;
+  bool has_reflected;  // Biased optimization: Only allow one pair of reflections
 } typedef CameraSimulationState;
 
 struct CameraSimulationResult {
@@ -187,7 +188,11 @@ __device__ int32_t
   const vec3 refraction = refract_vector(V, normal, ior, total_reflection);
   const vec3 reflection = reflect_vector(V, normal);
 
-  const bool allow_reflection = ALLOW_REFLECTIONS && (interface_id != 0 || iteration != 0);
+  bool allow_reflection = false;
+  if constexpr (ALLOW_REFLECTIONS) {
+    allow_reflection = (interface_id != 0 || iteration != 0) && ((state.has_reflected == false) || (state.is_forward == false));
+  }
+
   const bool allow_refraction = interface_id != 0 || iteration == 0;
 
   float weight;
@@ -221,6 +226,7 @@ __device__ int32_t
   state.ior                = sampled_refraction ? medium_ior : state.ior;
   state.cylindrical_radius = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
   state.is_forward         = sampled_refraction ? state.is_forward : !state.is_forward;
+  state.has_reflected      = sampled_refraction ? state.has_reflected : true;
 
   return state.is_forward ? 1 : -1;
 }
@@ -236,6 +242,7 @@ __device__ CameraSimulationResult
   state.weight             = 1.0f;
   state.wavelength         = wavelength;
   state.is_forward         = true;
+  state.has_reflected      = false;
 
   // There are num_interfaces + 1 media.
   const uint32_t num_interfaces = device.camera.physical.num_interfaces;
