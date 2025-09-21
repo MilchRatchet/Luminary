@@ -279,8 +279,11 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   update_data |=
     _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+
+  if (camera.use_physical_camera == false) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Firefly Rejection", &camera.do_firefly_rejection);
   update_data |= _window_entity_properties_add_checkbox(data, "Only Indirect Lighting", &camera.indirect_only);
@@ -310,13 +313,16 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_checkbox(data, "Lens Flare", &camera.lens_flare);
   update_data |= _window_entity_properties_add_slider(
     data, "Lens Flare Threshold", &camera.lens_flare_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
-  update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
 
-  if (camera.purkinje) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  if (camera.use_physical_camera == false) {
+    update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
+
+    if (camera.purkinje) {
+      update_data |= _window_entity_properties_add_slider(
+        data, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+    }
   }
 
   update_data |= _window_entity_properties_add_dropdown(data, "Filter", LUMINARY_FILTER_COUNT, (char**) luminary_strings_filter, &filter);

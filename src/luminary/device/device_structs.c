@@ -44,7 +44,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->aperture_blade_count   = camera->aperture_blade_count;
   device_camera->tonemap                = camera->tonemap;
   device_camera->dithering              = camera->dithering;
-  device_camera->purkinje               = camera->purkinje;
+  device_camera->purkinje               = camera->purkinje && (camera->use_physical_camera == false);
   device_camera->use_color_correction   = camera->use_color_correction;
   device_camera->do_firefly_rejection   = camera->do_firefly_rejection;
   device_camera->indirect_only          = camera->indirect_only;
