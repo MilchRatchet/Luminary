@@ -255,6 +255,10 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   if (camera.use_physical_camera) {
     update_data |= _window_entity_properties_add_slider(
       data, "Sensor Width", &camera.physical.sensor_width, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Sensor Distance", &camera.physical.image_plane_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aperture Diameter", &camera.physical.aperture_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.physical.allow_reflections);
     update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.physical.use_spectral_rendering);
   }
@@ -299,7 +303,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   update_data |=
-    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);

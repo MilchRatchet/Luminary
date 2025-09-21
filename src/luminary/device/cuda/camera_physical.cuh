@@ -72,8 +72,9 @@ __device__ bool camera_simulation_intersect_aperture(const vec3 origin, const ve
     const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
 
     const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
+    const float aperture_radius               = device.camera.physical.aperture_radius;
 
-    if (vertical_aperture_hit_dist_sq > device.camera.physical.aperture_radius * device.camera.physical.aperture_radius) {
+    if (vertical_aperture_hit_dist_sq > aperture_radius * aperture_radius) {
       return true;
     }
   }
@@ -105,13 +106,13 @@ __device__ bool camera_simulation_intersect_medium_cylinder(
     origin = add_vector(origin, scale_vector(ray, cylindrical_dist));
 
     const vec3 cylindrical_normal = normalize_vector(get_vector(-origin.x, -origin.y, 0.0f));
-
-    const vec3 V = scale_vector(ray, -1.0f);
+    const float ior               = medium_ior * (1.0f / IOR_AIR);
+    const vec3 V                  = scale_vector(ray, -1.0f);
 
     bool total_reflection;
-    const vec3 refraction = refract_vector(V, cylindrical_normal, medium_ior, total_reflection);
+    const vec3 refraction = refract_vector(V, cylindrical_normal, ior, total_reflection);
 
-    const float fresnel = (total_reflection == false) ? bsdf_fresnel(cylindrical_normal, V, refraction, medium_ior) : 1.0f;
+    const float fresnel = (total_reflection == false) ? bsdf_fresnel(cylindrical_normal, V, refraction, ior) : 1.0f;
 
     weight *= fresnel;
 
@@ -237,7 +238,7 @@ __device__ CameraSimulationResult
   CameraSimulationState state;
   state.origin             = sensor_point;
   state.ray                = initial_direction;
-  state.ior                = 1.0f;
+  state.ior                = IOR_AIR;
   state.cylindrical_radius = FLT_MAX;
   state.weight             = 1.0f;
   state.wavelength         = wavelength;

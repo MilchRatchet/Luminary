@@ -32,19 +32,25 @@ LuminaryResult physical_camera_create(PhysicalCamera** physical_camera) {
   (*physical_camera)->camera_interfaces[10] = (DeviceCameraInterface) {.radius = 251.93f, .vertex = 79.18f, .cylindrical_radius = 23.2f};
   (*physical_camera)->camera_interfaces[11] = (DeviceCameraInterface) {.radius = 94.00f, .vertex = 88.18f, .cylindrical_radius = 23.2f};
 
-  (*physical_camera)->camera_media[0]  = (DeviceCameraMedium) {.design_ior = 1.0f, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  const float scale = 50.53f / 100.0f;
+  for (uint32_t interface_id = 0; interface_id < (*physical_camera)->num_interfaces; interface_id++) {
+    (*physical_camera)->camera_interfaces[interface_id].radius *= scale;
+    (*physical_camera)->camera_interfaces[interface_id].vertex *= scale;
+  }
+
+  (*physical_camera)->camera_media[0]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
   (*physical_camera)->camera_media[1]  = (DeviceCameraMedium) {.design_ior = 1.6435f, .abbe = 53.5f, .cylindrical_radius = 14.0f};
-  (*physical_camera)->camera_media[2]  = (DeviceCameraMedium) {.design_ior = 1.0f, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  (*physical_camera)->camera_media[2]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
   (*physical_camera)->camera_media[3]  = (DeviceCameraMedium) {.design_ior = 1.6935f, .abbe = 53.5f, .cylindrical_radius = 12.0f};
   (*physical_camera)->camera_media[4]  = (DeviceCameraMedium) {.design_ior = 1.5174f, .abbe = 52.5f, .cylindrical_radius = 12.0f};
-  (*physical_camera)->camera_media[5]  = (DeviceCameraMedium) {.design_ior = 1.0f, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  (*physical_camera)->camera_media[5]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
   (*physical_camera)->camera_media[6]  = (DeviceCameraMedium) {.design_ior = 1.7174f, .abbe = 29.5f, .cylindrical_radius = 17.0f};
   (*physical_camera)->camera_media[7]  = (DeviceCameraMedium) {.design_ior = 1.6385f, .abbe = 55.5f, .cylindrical_radius = 17.0f};
-  (*physical_camera)->camera_media[8]  = (DeviceCameraMedium) {.design_ior = 1.0f, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  (*physical_camera)->camera_media[8]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
   (*physical_camera)->camera_media[9]  = (DeviceCameraMedium) {.design_ior = 1.7173f, .abbe = 47.9f, .cylindrical_radius = 20.0f};
-  (*physical_camera)->camera_media[10] = (DeviceCameraMedium) {.design_ior = 1.0f, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  (*physical_camera)->camera_media[10] = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
   (*physical_camera)->camera_media[11] = (DeviceCameraMedium) {.design_ior = 1.6935f, .abbe = 53.5f, .cylindrical_radius = 23.2f};
-  (*physical_camera)->camera_media[12] = (DeviceCameraMedium) {.design_ior = 1.0f, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  (*physical_camera)->camera_media[12] = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
 
   // TODO TODO TODO
 
