@@ -17,7 +17,7 @@
 #include "sky.h"
 
 #ifdef CUDA_STALL_VALIDATION
-WallTime* __cuda_stall_validation_macro_walltime;
+ThreadStatus* __cuda_stall_validation_macro_walltime;
 #endif
 
 #define DEVICE_ASSERT_AVAILABLE                    \
@@ -51,6 +51,7 @@ static const size_t device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEMB
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  offsetof(DeviceConstantMemory, spectral_xy_lut_tex),           // DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX
   offsetof(DeviceConstantMemory, config),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   sizeof(DeviceConstantMemory)                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
@@ -71,6 +72,7 @@ static const size_t device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBER
   sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   sizeof(DeviceTextureObject) * 4,       // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   sizeof(DeviceTextureObject) * 3,       // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX
   sizeof(DeviceExecutionConfiguration),  // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   sizeof(DeviceExecutionState)           // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
 };
@@ -106,13 +108,13 @@ void _device_init(void) {
   _device_memory_init();
 
 #ifdef CUDA_STALL_VALIDATION
-  wall_time_create(&__cuda_stall_validation_macro_walltime);
+  thread_status_create(&__cuda_stall_validation_macro_walltime);
 #endif
 }
 
 void _device_shutdown(void) {
 #ifdef CUDA_STALL_VALIDATION
-  wall_time_destroy(&__cuda_stall_validation_macro_walltime);
+  thread_status_destroy(&__cuda_stall_validation_macro_walltime);
 #endif
 
   _device_memory_shutdown();
@@ -428,6 +430,64 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_load_spectral_data(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  // XYZ LUT
+
+  void* spectral_xy_lut_data;
+  int64_t spectral_xy_lut_length;
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT, &spectral_xy_lut_data, &spectral_xy_lut_length));
+
+  void* spectral_z_lut_data;
+  int64_t spectral_z_lut_length;
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT, &spectral_z_lut_data, &spectral_z_lut_length));
+
+  const uint32_t num_elements = spectral_z_lut_length / sizeof(float);
+
+  Texture* spectral_xy_lut_tex;
+  __FAILURE_HANDLE(texture_create(&spectral_xy_lut_tex));
+  __FAILURE_HANDLE(texture_fill(spectral_xy_lut_tex, num_elements, 1, 1, spectral_xy_lut_data, TEXTURE_DATA_TYPE_FP32, 2));
+  __FAILURE_HANDLE(texture_set_memory_owner(spectral_xy_lut_tex, false));
+
+  spectral_xy_lut_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_xy_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_xy_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
+
+  Texture* spectral_z_lut_tex;
+  __FAILURE_HANDLE(texture_create(&spectral_z_lut_tex));
+  __FAILURE_HANDLE(texture_fill(spectral_z_lut_tex, num_elements, 1, 1, spectral_z_lut_data, TEXTURE_DATA_TYPE_FP32, 1));
+  __FAILURE_HANDLE(texture_set_memory_owner(spectral_z_lut_tex, false));
+
+  spectral_z_lut_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_z_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  spectral_z_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
+
+  __FAILURE_HANDLE(device_texture_create(&device->spectral_xy_tex, spectral_xy_lut_tex, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&device->spectral_z_tex, spectral_z_lut_tex, device, device->stream_main));
+
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->spectral_xy_tex, &device->constant_memory->spectral_xy_lut_tex));
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->spectral_z_tex, &device->constant_memory->spectral_z_lut_tex));
+
+  __FAILURE_HANDLE(texture_destroy(&spectral_xy_lut_tex));
+  __FAILURE_HANDLE(texture_destroy(&spectral_z_lut_tex));
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX));
+
+  // CDF
+
+  void* spectral_cdf_data;
+  int64_t spectral_cdf_length;
+  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_CDF, &spectral_cdf_data, &spectral_cdf_length));
+
+  __FAILURE_HANDLE(device_malloc(&device->buffers.spectral_cdf, spectral_cdf_length));
+  __FAILURE_HANDLE(device_upload((void*) device->buffers.spectral_cdf, spectral_cdf_data, 0, spectral_cdf_length, device->stream_main));
+
+  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.spectral_cdf, DEVICE_PTR(device->buffers.spectral_cdf));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_load_bluenoise_texture(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -473,6 +533,8 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
 
   __FAILURE_HANDLE(device_texture_destroy(&device->moon_albedo_tex));
   __FAILURE_HANDLE(device_texture_destroy(&device->moon_normal_tex));
+  __FAILURE_HANDLE(device_texture_destroy(&device->spectral_xy_tex));
+  __FAILURE_HANDLE(device_texture_destroy(&device->spectral_z_tex));
 
   return LUMINARY_SUCCESS;
 }
@@ -613,6 +675,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(frame_final);
   __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(textures);
+  __DEVICE_BUFFER_FREE(spectral_cdf);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);
   __DEVICE_BUFFER_FREE(bridge_lut);
@@ -628,6 +691,8 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
+  __DEVICE_BUFFER_FREE(camera_interfaces);
+  __DEVICE_BUFFER_FREE(camera_media);
   __DEVICE_BUFFER_FREE(abort_flag);
 
   for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
@@ -855,6 +920,7 @@ LuminaryResult device_load_embedded_data(Device* device) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(_device_load_light_bridge_lut(device));
+  __FAILURE_HANDLE(_device_load_spectral_data(device));
   __FAILURE_HANDLE(_device_load_bluenoise_texture(device));
   __FAILURE_HANDLE(_device_load_moon_textures(device));
 
@@ -1453,6 +1519,33 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
     DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, device->particles_handle->instance_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, DEVICE_PTR(device->particles_handle->quad_buffer));
   }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamera* physical_camera) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(physical_camera);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __DEVICE_BUFFER_FREE(camera_interfaces);
+  __DEVICE_BUFFER_FREE(camera_media);
+
+  const size_t interfaces_size = physical_camera->num_interfaces * sizeof(DeviceCameraInterface);
+  const size_t media_size      = (physical_camera->num_interfaces + 1) * sizeof(DeviceCameraMedium);
+
+  __DEVICE_BUFFER_ALLOCATE(camera_interfaces, interfaces_size);
+  __DEVICE_BUFFER_ALLOCATE(camera_media, media_size);
+
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, physical_camera->camera_interfaces, (DEVICE void*) device->buffers.camera_interfaces, 0, interfaces_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, physical_camera->camera_media, (DEVICE void*) device->buffers.camera_media, 0, media_size));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

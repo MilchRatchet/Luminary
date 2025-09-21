@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <luminary/host.h>
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
@@ -644,7 +643,7 @@ LuminaryResult luminary_host_get_queue_worker_name(const LuminaryHost* host, uin
       break;
   }
 
-  __FAILURE_HANDLE(wall_time_get_worker_name(queue_worker->wall_time, string));
+  __FAILURE_HANDLE(thread_status_get_worker_name(queue_worker->thread_status, string));
 
   return LUMINARY_SUCCESS;
 }
@@ -671,7 +670,7 @@ LuminaryResult luminary_host_get_queue_worker_string(const LuminaryHost* host, u
       break;
   }
 
-  __FAILURE_HANDLE(wall_time_get_string(queue_worker->wall_time, string));
+  __FAILURE_HANDLE(thread_status_get_string(queue_worker->thread_status, string));
 
   return LUMINARY_SUCCESS;
 }
@@ -698,7 +697,7 @@ LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t qu
       break;
   }
 
-  __FAILURE_HANDLE(wall_time_get_time(queue_worker->wall_time, time));
+  __FAILURE_HANDLE(thread_status_get_time(queue_worker->thread_status, time));
 
   return LUMINARY_SUCCESS;
 }

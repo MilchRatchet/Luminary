@@ -249,9 +249,9 @@ LuminaryResult device_texture_create(DeviceTexture** device_texture, const Textu
   CUDA_TEXTURE_DESC tex_desc;
   memset(&tex_desc, 0, sizeof(CUDA_TEXTURE_DESC));
 
-  __FAILURE_HANDLE(_device_texture_get_address_mode(texture->wrap_mode_S, tex_desc.addressMode + 0));
-  __FAILURE_HANDLE(_device_texture_get_address_mode(texture->wrap_mode_T, tex_desc.addressMode + 1));
-  __FAILURE_HANDLE(_device_texture_get_address_mode(texture->wrap_mode_R, tex_desc.addressMode + 2));
+  __FAILURE_HANDLE(_device_texture_get_address_mode(texture->wrap_mode_U, tex_desc.addressMode + 0));
+  __FAILURE_HANDLE(_device_texture_get_address_mode(texture->wrap_mode_V, tex_desc.addressMode + 1));
+  __FAILURE_HANDLE(_device_texture_get_address_mode(texture->wrap_mode_W, tex_desc.addressMode + 2));
   __FAILURE_HANDLE(_device_texture_get_filter_mode(texture, &tex_desc.filterMode));
   tex_desc.maxAnisotropy       = 1;
   tex_desc.flags               = CU_TRSF_NORMALIZED_COORDINATES;

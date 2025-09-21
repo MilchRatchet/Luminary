@@ -13,7 +13,7 @@ enum QueueWorkerStatus {
 struct QueueWorker {
   QueueWorkerStatus status;
   Thread* thread;
-  WallTime* wall_time;
+  ThreadStatus* thread_status;
   void* main_args;
 } typedef QueueWorker;
 

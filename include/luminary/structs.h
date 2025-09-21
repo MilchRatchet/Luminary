@@ -144,15 +144,9 @@ LUMINARY_API enum LuminaryApertureShape {
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
-  float fov;
-  float focal_length;
-  float aperture_size;
   LuminaryApertureShape aperture_shape;
   uint32_t aperture_blade_count;
   float exposure;
-  float max_exposure;
-  float min_exposure;
-  bool auto_exposure;
   LuminaryToneMap tonemap;
   float agx_custom_slope;
   float agx_custom_power;
@@ -175,6 +169,28 @@ LUMINARY_API struct LuminaryCamera {
   bool do_firefly_rejection;
   float film_grain;
   bool indirect_only;
+  float camera_scale;
+  float object_distance;
+  bool use_physical_camera;
+  struct {
+    float fov;
+    float aperture_size;
+  } thin_lens;
+  struct {
+    bool allow_reflections;
+    bool use_spectral_rendering;
+    float focal_length;
+    float front_focal_point;
+    float back_focal_point;
+    float front_principal_point;
+    float back_principal_point;
+    float aperture_point;
+    float aperture_diameter;
+    float exit_pupil_point;
+    float exit_pupil_diameter;
+    float image_plane_distance;
+    float sensor_width;
+  } physical;
 } typedef LuminaryCamera;
 
 ////////////////////////////////////////////////////////////////////

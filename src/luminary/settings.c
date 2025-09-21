@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include "internal_error.h"
+#include "scene.h"
 
 LuminaryResult settings_get_default(RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(settings);
@@ -21,6 +22,17 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   return LUMINARY_SUCCESS;
 }
 
+#define SETTINGS_ALL_DIRTY_FLAGS ((uint32_t) (SCENE_DIRTY_FLAG_SETTINGS | SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS))
+
+#define __SETTINGS_CHECK_DIRTY(var, flags)                                       \
+  {                                                                              \
+    if (input->var != old->var) {                                                \
+      *dirty_flags |= flags | SCENE_DIRTY_FLAG_SETTINGS;                         \
+      if ((*dirty_flags & SETTINGS_ALL_DIRTY_FLAGS) == SETTINGS_ALL_DIRTY_FLAGS) \
+        return LUMINARY_SUCCESS;                                                 \
+    }                                                                            \
+  }
+
 #define __SETTINGS_STANDARD_DIRTY(var) \
   {                                    \
     if (input->var != old->var) {      \
@@ -37,31 +49,26 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
     }                                     \
   }
 
-LuminaryResult settings_check_for_dirty(
-  const RendererSettings* input, const RendererSettings* old, bool* integration_dirty, bool* buffers_dirty) {
+LuminaryResult settings_check_for_dirty(const RendererSettings* input, const RendererSettings* old, uint32_t* dirty_flags) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(integration_dirty);
-  __CHECK_NULL_ARGUMENT(buffers_dirty);
+  __CHECK_NULL_ARGUMENT(dirty_flags);
 
-  *integration_dirty = false;
-  *buffers_dirty     = false;
-
-  __SETTINGS_STANDARD_DIRTY(width);
-  __SETTINGS_STANDARD_DIRTY(height);
-  __SETTINGS_STANDARD_DIRTY(supersampling);
-  __SETTINGS_INTEGRATION_DIRTY(bridge_max_num_vertices);
-  __SETTINGS_INTEGRATION_DIRTY(undersampling);
-  __SETTINGS_INTEGRATION_DIRTY(shading_mode);
+  __SETTINGS_CHECK_DIRTY(width, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS);
+  __SETTINGS_CHECK_DIRTY(height, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS);
+  __SETTINGS_CHECK_DIRTY(supersampling, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS);
+  __SETTINGS_CHECK_DIRTY(bridge_max_num_vertices, SCENE_DIRTY_FLAG_INTEGRATION);
+  __SETTINGS_CHECK_DIRTY(undersampling, SCENE_DIRTY_FLAG_INTEGRATION);
+  __SETTINGS_CHECK_DIRTY(shading_mode, SCENE_DIRTY_FLAG_INTEGRATION);
 
   if (input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-    __SETTINGS_INTEGRATION_DIRTY(max_ray_depth);
+    __SETTINGS_CHECK_DIRTY(max_ray_depth, SCENE_DIRTY_FLAG_INTEGRATION);
   }
 
-  __SETTINGS_INTEGRATION_DIRTY(region_x);
-  __SETTINGS_INTEGRATION_DIRTY(region_y);
-  __SETTINGS_INTEGRATION_DIRTY(region_width);
-  __SETTINGS_INTEGRATION_DIRTY(region_height);
+  __SETTINGS_CHECK_DIRTY(region_x, SCENE_DIRTY_FLAG_INTEGRATION);
+  __SETTINGS_CHECK_DIRTY(region_y, SCENE_DIRTY_FLAG_INTEGRATION);
+  __SETTINGS_CHECK_DIRTY(region_width, SCENE_DIRTY_FLAG_INTEGRATION);
+  __SETTINGS_CHECK_DIRTY(region_height, SCENE_DIRTY_FLAG_INTEGRATION);
 
   return LUMINARY_SUCCESS;
 }

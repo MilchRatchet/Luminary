@@ -1,6 +1,7 @@
 #include "ocean.h"
 
 #include "internal_error.h"
+#include "scene.h"
 
 LuminaryResult ocean_get_default(Ocean* ocean) {
   __CHECK_NULL_ARGUMENT(ocean);
@@ -20,19 +21,18 @@ LuminaryResult ocean_get_default(Ocean* ocean) {
   return LUMINARY_SUCCESS;
 }
 
-#define __OCEAN_DIRTY(var)        \
-  {                               \
-    if (input->var != old->var) { \
-      *dirty = true;              \
-      return LUMINARY_SUCCESS;    \
-    }                             \
+#define __OCEAN_DIRTY(var)                                                  \
+  {                                                                         \
+    if (input->var != old->var) {                                           \
+      *dirty_flags = SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OCEAN; \
+      return LUMINARY_SUCCESS;                                              \
+    }                                                                       \
   }
 
-LuminaryResult ocean_check_for_dirty(const Ocean* input, const Ocean* old, bool* dirty) {
+LuminaryResult ocean_check_for_dirty(const Ocean* input, const Ocean* old, uint32_t* dirty_flags) {
   __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
-
-  *dirty = false;
+  __CHECK_NULL_ARGUMENT(dirty_flags);
 
   __OCEAN_DIRTY(active);
 

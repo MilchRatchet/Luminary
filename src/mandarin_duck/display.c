@@ -558,7 +558,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
         LuminaryCamera camera;
         LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
-        camera.focal_length = display->focus_pixel_data.depth;
+        camera.object_distance = display->focus_pixel_data.depth;
 
         LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
 

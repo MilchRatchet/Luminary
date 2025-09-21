@@ -43,21 +43,21 @@ LuminaryResult sky_lut_create(SkyLUT** lut) {
   __FAILURE_HANDLE(
     texture_fill((*lut)->multiscattering_high, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, multiscattering_high_data, TEXTURE_DATA_TYPE_FP32, 4));
 
-  (*lut)->transmittance_low->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_low->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_low->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_low->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->transmittance_high->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_high->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->transmittance_high->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->transmittance_high->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->multiscattering_low->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_low->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_low->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_low->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
-  (*lut)->multiscattering_high->wrap_mode_R = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_high->wrap_mode_S = TEXTURE_WRAPPING_MODE_CLAMP;
-  (*lut)->multiscattering_high->wrap_mode_T = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  (*lut)->multiscattering_high->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
 
   return LUMINARY_SUCCESS;
 }
@@ -66,12 +66,10 @@ LuminaryResult sky_lut_update(SkyLUT* lut, const Sky* sky) {
   __CHECK_NULL_ARGUMENT(lut);
   __CHECK_NULL_ARGUMENT(sky);
 
-  bool passive_dirty     = false;
-  bool integration_dirty = false;
-  bool hdri_dirty        = false;
-  __FAILURE_HANDLE(sky_check_for_dirty(sky, &lut->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
+  uint32_t dirty_flags;
+  __FAILURE_HANDLE(sky_check_for_dirty(sky, &lut->sky, &dirty_flags));
 
-  if (integration_dirty) {
+  if ((dirty_flags & SCENE_DIRTY_FLAG_INTEGRATION) != 0) {
     memcpy(&lut->sky, sky, sizeof(Sky));
     lut->sky_is_dirty = true;
   }
@@ -252,17 +250,15 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(sky);
 
-  bool passive_dirty     = false;
-  bool integration_dirty = false;
-  bool hdri_dirty        = false;
-  __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &passive_dirty, &integration_dirty, &hdri_dirty));
+  uint32_t dirty_flags;
+  __FAILURE_HANDLE(sky_check_for_dirty(sky, &hdri->sky, &dirty_flags));
 
   // Check if the camera moved
-  passive_dirty |= camera->pos.x != hdri->origin.x;
-  passive_dirty |= camera->pos.y != hdri->origin.y;
-  passive_dirty |= camera->pos.z != hdri->origin.z;
+  dirty_flags |= (camera->pos.x != hdri->origin.x) ? SCENE_DIRTY_FLAG_PASSIVE : 0;
+  dirty_flags |= (camera->pos.y != hdri->origin.y) ? SCENE_DIRTY_FLAG_PASSIVE : 0;
+  dirty_flags |= (camera->pos.z != hdri->origin.z) ? SCENE_DIRTY_FLAG_PASSIVE : 0;
 
-  if (passive_dirty || integration_dirty) {
+  if ((dirty_flags & (SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_PASSIVE)) != 0) {
     memcpy(&hdri->sky, sky, sizeof(Sky));
     hdri->sky_is_dirty = true;
 

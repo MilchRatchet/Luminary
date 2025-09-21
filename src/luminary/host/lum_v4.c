@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "internal_error.h"
@@ -153,15 +154,15 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FOV_____ */
     case 6872316419616689990u:
-      sscanf(value, "%f\n", &camera->fov);
+      sscanf(value, "%f\n", &camera->thin_lens.fov);
       break;
     /* FOCALLEN */
     case 5639997998747569990u:
-      sscanf(value, "%f\n", &camera->focal_length);
+      sscanf(value, "%f\n", &camera->object_distance);
       break;
     /* APERTURE */
     case 4995148757353189441u:
-      sscanf(value, "%f\n", &camera->aperture_size);
+      sscanf(value, "%f\n", &camera->thin_lens.aperture_size);
       break;
     /* APESHAPE */
     case 4994563765644382273u:
@@ -173,20 +174,24 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* AUTOEXP_ */
     case 6868086486446921025u:
-      sscanf(value, "%u\n", &bool_uint);
-      camera->auto_exposure = bool_uint;
+      // Legacy
+      // sscanf(value, "%u\n", &bool_uint);
+      // camera->auto_exposure = bool_uint;
       break;
     /* EXPOSURE */
     case 4995148753008613445u:
       sscanf(value, "%f\n", &camera->exposure);
+      camera->exposure = logf(camera->exposure);  // Legacy conversion from linear to exponential scale
       break;
     /* MINEXPOS */
     case 6003105168358263117u:
-      sscanf(value, "%f\n", &camera->min_exposure);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->min_exposure);
       break;
     /* MAXEXPOS */
     case 6003105168358916429u:
-      sscanf(value, "%f\n", &camera->max_exposure);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->max_exposure);
       break;
     /* BLOOM___ */
     case 6872316342038383682u:
@@ -686,6 +691,9 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     .force_thin_walled         = false,
     .emission_scale            = 1.0f,
     .force_no_bloom            = false};
+
+  // Legacy scenes cannot use physical camera
+  content->camera.use_physical_camera = false;
 
   while (1) {
     fgets(line, LINE_SIZE, file);

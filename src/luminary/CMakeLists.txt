@@ -208,6 +208,9 @@ ceb_embed_files(
   ${CMAKE_SOURCE_DIR}/data/MaterialSymbols.ttf
   ${CMAKE_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_SOURCE_DIR}/data/moon/moon_normal.png
+  ${CMAKE_SOURCE_DIR}/data/spectral/cie1931_cdf.bin
+  ${CMAKE_SOURCE_DIR}/data/spectral/cie1931_xy_lut.bin
+  ${CMAKE_SOURCE_DIR}/data/spectral/cie1931_z_lut.bin
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
   ${CMAKE_SOURCE_DIR}/data/bridge/bridge_lut.bin

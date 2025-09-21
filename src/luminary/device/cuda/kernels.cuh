@@ -92,7 +92,14 @@ LUMINARY_KERNEL void tasks_create() {
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
 
-    task = camera_get_ray(task);
+    CameraSampleResult camera_result = camera_sample(task.index);
+
+    // Skip rays that haven't managed to leave the camera.
+    if (color_any(camera_result.weight) == false)
+      continue;
+
+    task.origin = camera_result.origin;
+    task.ray    = camera_result.ray;
 
     task.volume_id = uint16_t(VOLUME_TYPE_NONE);
 
@@ -131,7 +138,7 @@ LUMINARY_KERNEL void tasks_create() {
     ////////////////////////////////////////////////////////////////////
 
     // MISPayload does not need to be initialized because we allow emission directly.
-    task_throughput_record_store(task_base_address, record_pack(splat_color(1.0f)));
+    task_throughput_record_store(task_base_address, record_pack(camera_result.weight));
   }
 
   device.ptrs.trace_counts[THREAD_ID] = task_count;

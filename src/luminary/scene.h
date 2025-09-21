@@ -41,10 +41,12 @@ enum SceneEntityType {
 
 enum SceneDirtyFlag {
   // Generic
-  SCENE_DIRTY_FLAG_OUTPUT      = 0x80000000ull,
-  SCENE_DIRTY_FLAG_INTEGRATION = 0x40000000ull,
-  SCENE_DIRTY_FLAG_BUFFERS     = 0x20000000ull,
-  SCENE_DIRTY_FLAG_HDRI        = 0x10000000ull,
+  SCENE_DIRTY_FLAG_OUTPUT          = 0x80000000ull,
+  SCENE_DIRTY_FLAG_INTEGRATION     = 0x40000000ull,
+  SCENE_DIRTY_FLAG_BUFFERS         = 0x20000000ull,
+  SCENE_DIRTY_FLAG_HDRI            = 0x10000000ull,
+  SCENE_DIRTY_FLAG_PHYSICAL_CAMERA = 0x08000000ull,
+  SCENE_DIRTY_FLAG_PASSIVE         = 0x04000000ull,
   // Instances
   SCENE_DIRTY_FLAG_INSTANCES_LIGHT_LIST  = 0x01000000ull, /* Specifies that instances may have become lights or are no longer lights. */
   SCENE_DIRTY_FLAG_INSTANCES_LIGHT_DIRTY = 0x02000000ull, /* Specifies that instances that are lights, are dirty. */

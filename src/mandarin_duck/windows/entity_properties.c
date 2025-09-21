@@ -249,22 +249,40 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
     _window_entity_properties_add_slider(data, "Position", &camera.pos, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Field of View", &camera.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Aperture Size", &camera.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
-  if (camera.aperture_size > 0.0f) {
-    update_data |= _window_entity_properties_add_dropdown(
-      data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
+  update_data |= _window_entity_properties_add_checkbox(data, "Physical", &camera.use_physical_camera);
 
-    if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
-      update_data |= _window_entity_properties_add_slider(
-        data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
-    }
-
+  if (camera.use_physical_camera) {
     update_data |= _window_entity_properties_add_slider(
-      data, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+      data, "Sensor Width", &camera.physical.sensor_width, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Sensor Distance", &camera.physical.image_plane_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aperture Diameter", &camera.physical.aperture_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.physical.allow_reflections);
+    update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.physical.use_spectral_rendering);
+  }
+  else {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Field of View", &camera.thin_lens.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aperture Size", &camera.thin_lens.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  }
+
+  update_data |= _window_entity_properties_add_dropdown(
+    data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
+
+  if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+  }
+
+  update_data |=
+    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+
+  if (camera.use_physical_camera == false) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
   }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Firefly Rejection", &camera.do_firefly_rejection);
@@ -288,20 +306,23 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   update_data |=
-    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
   update_data |= _window_entity_properties_add_checkbox(data, "Lens Flare", &camera.lens_flare);
   update_data |= _window_entity_properties_add_slider(
     data, "Lens Flare Threshold", &camera.lens_flare_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
-  update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
 
-  if (camera.purkinje) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  if (camera.use_physical_camera == false) {
+    update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
+
+    if (camera.purkinje) {
+      update_data |= _window_entity_properties_add_slider(
+        data, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+    }
   }
 
   update_data |= _window_entity_properties_add_dropdown(data, "Filter", LUMINARY_FILTER_COUNT, (char**) luminary_strings_filter, &filter);

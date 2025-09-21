@@ -434,7 +434,7 @@ LuminaryResult output_handler_release_new(OutputHandler* output, uint32_t handle
   output->objects[handle].populated = true;
   output->objects[handle].reference_count--;
 
-  __FAILURE_HANDLE_CRITICAL(_wall_time_get_timestamp(&output->objects[handle].time_stamp));
+  __FAILURE_HANDLE_CRITICAL(_thread_status_get_timestamp(&output->objects[handle].time_stamp));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

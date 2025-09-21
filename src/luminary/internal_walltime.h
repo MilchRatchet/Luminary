@@ -3,6 +3,6 @@
 
 #include "utils.h"
 
-LuminaryResult _wall_time_get_timestamp(uint64_t* time);
+LuminaryResult _thread_status_get_timestamp(uint64_t* time);
 
 #endif /* LUMINARY_INTERNAL_WALLTIME_H */

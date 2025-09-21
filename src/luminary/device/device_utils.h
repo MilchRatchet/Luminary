@@ -43,6 +43,11 @@
 #define UNDERSAMPLING_STAGE_SHIFT 2
 #define UNDERSAMPLING_ITERATION_MASK 0x03
 
+#define SPECTRAL_MIN_WAVELENGTH 360
+#define SPECTRAL_MAX_WAVELENGTH 830
+
+#define IOR_AIR (1.0003f)
+
 #define TEXTURE_OBJECT_INVALID (0xFFFFFFFFFFFFFFFFull)
 
 #ifdef __cplusplus
@@ -59,14 +64,14 @@
 
 #ifdef CUDA_STALL_VALIDATION
 
-extern WallTime* __cuda_stall_validation_macro_walltime;
+extern ThreadStatus* __cuda_stall_validation_macro_walltime;
 
 #define CUDA_FAILURE_HANDLE(command)                                                                                               \
   {                                                                                                                                \
-    wall_time_start(__cuda_stall_validation_macro_walltime);                                                                       \
+    thread_status_start(__cuda_stall_validation_macro_walltime, "_DEBUG_CUDA_STALL_VALIDATION");                                   \
     const CUresult __cuda_err = (command);                                                                                         \
     double __macro_time;                                                                                                           \
-    wall_time_get_time(__cuda_stall_validation_macro_walltime, &__macro_time);                                                     \
+    thread_status_get_time(__cuda_stall_validation_macro_walltime, &__macro_time);                                                 \
     if (__macro_time > 0.01) {                                                                                                     \
       warn_message("CUDA API call (%s) stalled for %fs", #command, __macro_time);                                                  \
     }                                                                                                                              \
@@ -372,6 +377,9 @@ struct DevicePointers {
   DEVICE const Quad* LUM_RESTRICT particle_quads;
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
+  DEVICE const float* LUM_RESTRICT spectral_cdf;
+  DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
+  DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
   DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
@@ -406,6 +414,7 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG,
   DEVICE_CONSTANT_MEMORY_MEMBER_STATE,
 
@@ -453,6 +462,9 @@ struct DeviceConstantMemory {
   DeviceTextureObject cloud_noise_shape_tex;
   DeviceTextureObject cloud_noise_detail_tex;
   DeviceTextureObject cloud_noise_weather_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX
+  DeviceTextureObject spectral_xy_lut_tex;
+  DeviceTextureObject spectral_z_lut_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   DeviceExecutionConfiguration config;
   // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
