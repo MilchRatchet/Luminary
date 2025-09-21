@@ -20,7 +20,7 @@ __device__ vec3 camera_physical_sample_sensor(const ushort2 pixel) {
   vec3 sensor_point;
   sensor_point.x = device.camera.physical.sensor_width - step * (sensor_pixel.x + jitter.x);
   sensor_point.y = -vfov + step * (sensor_pixel.y + jitter.y);
-  sensor_point.z = camera_get_image_plane();
+  sensor_point.z = -camera_get_image_plane();
 
   return sensor_point;
 }
@@ -284,6 +284,10 @@ __device__ CameraSampleResult camera_physical_sample(const ushort2 pixel) {
     result.weight = mul_color(result.weight, spectral_wavelength_to_rgb(wavelength));
     result.weight = scale_color(result.weight, 1.0f / wavelength_pdf);
   }
+
+  // Physical camera simulation is in +Z direction but Luminary uses -Z convention
+  result.origin.z = -result.origin.z;
+  result.ray.z    = -result.ray.z;
 
   return result;
 }

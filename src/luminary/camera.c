@@ -51,16 +51,18 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->physical.use_spectral_rendering = false;
 
   // Temp - Canon 50mm F1.2 from 1950s
+  const float last_vertex_point = 88.18f;
+
   camera->physical.focal_length          = 50.53f;
-  camera->physical.front_focal_point     = -22.69f;
-  camera->physical.back_focal_point      = 65.18f;
-  camera->physical.front_principal_point = 27.84f;
-  camera->physical.back_principal_point  = 14.65f;
-  camera->physical.aperture_point        = 28.02f;
+  camera->physical.front_focal_point     = last_vertex_point - (-22.69f);
+  camera->physical.back_focal_point      = last_vertex_point - 65.18f;
+  camera->physical.front_principal_point = last_vertex_point - 27.84f;
+  camera->physical.back_principal_point  = last_vertex_point - 14.65f;
+  camera->physical.aperture_point        = last_vertex_point - 28.02f;
   camera->physical.aperture_diameter     = 21.411f;
-  camera->physical.exit_pupil_point      = 26.55f;  // These are probably wrong
-  camera->physical.exit_pupil_diameter   = 41.67f;  // These are probably wrong
-  camera->physical.image_plane_distance  = 65.18f;
+  camera->physical.exit_pupil_point      = last_vertex_point - 26.55f;
+  camera->physical.exit_pupil_diameter   = 34.64f;
+  camera->physical.image_plane_distance  = last_vertex_point - 65.18f;
   camera->physical.sensor_width          = 20.0f;
 
   return LUMINARY_SUCCESS;

@@ -42,7 +42,7 @@ __device__ float camera_get_image_plane() {
 
   return i + device.camera.physical.back_principal_point;
 #else
-  return -device.camera.physical.image_plane_distance;
+  return device.camera.physical.image_plane_distance;
 #endif
 }
 
