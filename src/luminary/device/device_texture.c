@@ -95,18 +95,28 @@ static LuminaryResult _device_texture_get_num_mip_levels(const Texture* tex, uin
     return LUMINARY_SUCCESS;
   }
 
-  uint16_t max_dim = max(tex->width, max(tex->height, tex->depth));
+  uint16_t min_dim;
+  switch (tex->dim) {
+    case TEXTURE_DIMENSION_TYPE_2D:
+      min_dim = min(tex->width, tex->height);
+      break;
+    case TEXTURE_DIMENSION_TYPE_3D:
+      min_dim = min(min(tex->width, tex->height), tex->depth);
+      break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension type is invalid.");
+  }
 
-  if (max_dim == 0) {
+  if (min_dim <= 1) {
     *num_mip_levels = 1;
     return LUMINARY_SUCCESS;
   }
 
   uint32_t level = 0;
 
-  while (max_dim != 1) {
+  while (min_dim > 1) {
     level++;
-    max_dim = max_dim >> 1;
+    min_dim = min_dim >> 1;
   }
 
   *num_mip_levels = level;

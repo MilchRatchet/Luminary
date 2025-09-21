@@ -51,10 +51,18 @@ LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA8(const KernelArgsMipmapGenera
 
     float4 v = tex2D<float4>(args.src, sx, sy);
 
-    v.x = fminf(255.0f * v.x + 0.5f, 255.9f);
-    v.y = fminf(255.0f * v.y + 0.5f, 255.9f);
-    v.z = fminf(255.0f * v.z + 0.5f, 255.9f);
-    v.w = fminf(255.0f * v.w + 0.5f, 255.9f);
+    v.x *= 255.0f;
+    v.y *= 255.0f;
+    v.z *= 255.0f;
+    v.w *= 255.0f;
+
+    // We need to ensure that non-zero opacity remains non-zero for opacity micromaps to work correctly.
+    v.w = (v.w > 0.0f) ? fmaxf(v.w, 0.51f) : v.w;
+
+    v.x = fminf(v.x + 0.5f, 255.9f);
+    v.y = fminf(v.y + 0.5f, 255.9f);
+    v.z = fminf(v.z + 0.5f, 255.9f);
+    v.w = fminf(v.w + 0.5f, 255.9f);
 
     surf2Dwrite(make_uchar4(v.x, v.y, v.z, v.w), args.dst, x * sizeof(uchar4), y);
 
@@ -110,10 +118,18 @@ LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA16(const KernelArgsMipmapGener
 
     float4 v = tex2D<float4>(args.src, sx, sy);
 
-    v.x = fminf(65535.0f * v.x + 0.5f, 65535.9f);
-    v.y = fminf(65535.0f * v.y + 0.5f, 65535.9f);
-    v.z = fminf(65535.0f * v.z + 0.5f, 65535.9f);
-    v.w = fminf(65535.0f * v.w + 0.5f, 65535.9f);
+    v.x *= 65535.0f;
+    v.y *= 65535.0f;
+    v.z *= 65535.0f;
+    v.w *= 65535.0f;
+
+    // We need to ensure that non-zero opacity remains non-zero for opacity micromaps to work correctly.
+    v.w = (v.w > 0.0f) ? fmaxf(v.w, 0.51f) : v.w;
+
+    v.x = fminf(v.x + 0.5f, 65535.9f);
+    v.y = fminf(v.y + 0.5f, 65535.9f);
+    v.z = fminf(v.z + 0.5f, 65535.9f);
+    v.w = fminf(v.w + 0.5f, 65535.9f);
 
     surf2Dwrite(make_ushort4(v.x, v.y, v.z, v.w), args.dst, x * sizeof(ushort4), y);
 

@@ -266,7 +266,7 @@ __device__ RGBF light_get_color(TriangleLight& triangle) {
     color = mat.emission;
   }
 
-  if (color_importance(color) > 0.0f) {
+  if (color_any(color)) {
     float alpha;
     if (mat.albedo_tex != TEXTURE_NONE) {
       const DeviceTextureObject tex = load_texture_object(mat.albedo_tex);
