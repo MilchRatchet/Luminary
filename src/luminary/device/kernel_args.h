@@ -79,6 +79,14 @@ struct KernelArgsLightComputeIntensity {
   float* dst_intensities;
 } typedef KernelArgsLightComputeIntensity;
 
+struct KernelArgsLightGridGenerate {
+  uint32_t count;
+  vec3 bounds_min;
+  vec3 bounds_span;
+  uint32_t allocated_entries;
+  MinHeapEntry* min_heap_data;
+} typedef KernelArgsLightGridGenerate;
+
 struct KernelArgsGenerateFinalImage {
   RGBF* src;
   RGBF color_correction;

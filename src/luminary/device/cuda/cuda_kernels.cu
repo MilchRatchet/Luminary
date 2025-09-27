@@ -7,6 +7,7 @@
 #include "geometry.cuh"
 #include "kernels.cuh"
 #include "light.cuh"
+#include "light_grid.cuh"
 #include "micromap.cuh"
 #include "mipmap.cuh"
 #include "ocean.cuh"

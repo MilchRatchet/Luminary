@@ -7,6 +7,8 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+#define UBF16_MAX 3.38953139e+38F
+
 __device__ float bfloat_unpack(const BFloat16 val) {
   const uint32_t data = val;
 

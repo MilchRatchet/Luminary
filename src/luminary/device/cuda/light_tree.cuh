@@ -4,6 +4,7 @@
 #include "material.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "min_heap.cuh"
 #include "ris.cuh"
 #include "utils.cuh"
 
@@ -137,6 +138,23 @@ __device__ float light_tree_importance<MATERIAL_PARTICLE>(
   const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
 
   return power / dist_sq;
+}
+
+template <>
+__device__ float light_tree_importance<MATERIAL_CACHE_POINT>(
+  const MaterialContextCachePoint ctx, const float power, const vec3 mean, const float std_dev) {
+  const vec3 PO       = sub_vector(mean, ctx.position);
+  const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
+
+  float NdotL = 1.0f;
+  if (ctx.directional) {
+    const vec3 reference_point = add_vector(mean, scale_vector(ctx.normal, LIGHT_TREE_STD_DEV_FACTOR * std_dev));
+    const vec3 L               = normalize_vector(sub_vector(reference_point, ctx.position));
+    NdotL                      = __saturatef(dot_product(L, ctx.normal));
+    NdotL                      = NdotL * (1.0f - LIGHT_TREE_STD_DEV_PERCENTILE) + LIGHT_TREE_STD_DEV_PERCENTILE;
+  }
+
+  return power * NdotL * (1.0f / dist_sq);
 }
 
 template <MaterialType TYPE>
@@ -316,6 +334,27 @@ __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransfor
   transform = load_transform(handle.instance_id);
 
   return handle;
+}
+
+__device__ void light_tree_build_max_subset(
+  const MaterialContextCachePoint ctx, MinHeap& heap, float& max_importance, float& sum_importance) {
+  const DeviceLightTreeRootHeader header = load_light_tree_root();
+
+  const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
+  const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
+  const float exp_v = exp2f(header.exp_std_dev);
+
+  for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
+    const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
+
+    for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
+      const float importance = light_tree_child_importance<MATERIAL_CACHE_POINT>(ctx, section, base, exp, exp_v, rel_child_id);
+
+      const uint16_t child_id = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
+
+      min_heap_insert(heap, child_id, importance);
+    }
+  }
 }
 
 #endif /* CU_LUMINARY_LIGHT_TREE_H */

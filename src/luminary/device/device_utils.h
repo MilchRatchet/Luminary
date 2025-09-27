@@ -192,6 +192,11 @@ struct Quad {
   vec3 normal;
 } typedef Quad;
 
+struct MinHeapEntry {
+  uint16_t value;
+  UnsignedBFloat16 key;
+} typedef MinHeapEntry;
+
 struct AGXCustomParams {
   float slope;
   float power;
@@ -297,6 +302,13 @@ struct DeviceLightSceneData {
   float total_power;
   uint32_t num_lights;
 } typedef DeviceLightSceneData;
+
+// TODO: Always store as pairs to fully use load vector size
+struct DeviceLightCacheEntry {
+  uint16_t id;
+  uint8_t importance[6];
+} typedef DeviceLightCacheEntry;
+LUM_STATIC_SIZE_ASSERT(DeviceLightCacheEntry, 0x08);
 
 #define MAX_NUM_INDIRECT_BUCKETS 3
 

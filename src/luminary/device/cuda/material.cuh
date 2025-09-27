@@ -4,7 +4,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-enum MaterialType { MATERIAL_GEOMETRY, MATERIAL_VOLUME, MATERIAL_PARTICLE } typedef MaterialType;
+enum MaterialType { MATERIAL_GEOMETRY, MATERIAL_VOLUME, MATERIAL_PARTICLE, MATERIAL_CACHE_POINT } typedef MaterialType;
 
 enum MaterialParamType {
   MATERIAL_PARAM_TYPE_NORM_FLOAT,         // [0,1]
@@ -111,9 +111,17 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   }
 };
 
+template <>
+struct MaterialContext<MATERIAL_CACHE_POINT> {
+  vec3 position;
+  vec3 normal;
+  bool directional;
+};
+
 typedef MaterialContext<MATERIAL_GEOMETRY> MaterialContextGeometry;
 typedef MaterialContext<MATERIAL_VOLUME> MaterialContextVolume;
 typedef MaterialContext<MATERIAL_PARTICLE> MaterialContextParticle;
+typedef MaterialContext<MATERIAL_CACHE_POINT> MaterialContextCachePoint;
 
 template <MaterialGeometryParam PARAM>
 __device__ uint32_t material_param_get_data(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {

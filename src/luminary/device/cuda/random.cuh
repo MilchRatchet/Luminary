@@ -213,9 +213,12 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
 ////////////////////////////////////////////////////////////////////
 
 // Integer fractions of the actual numbers
-#define R1_PHI1 2654435769u /* 0.61803398875f */
-#define R2_PHI1 3242174889u /* 0.7548776662f  */
-#define R2_PHI2 2447445413u /* 0.56984029f    */
+#define R1_PHI1 2654435769u /* 0.6180339887498948 */
+#define R2_PHI1 3242174889u /* 0.7548776662466927 */
+#define R2_PHI2 2447445413u /* 0.5698402909980532 */
+#define R3_PHI1 3518319153u /* 0.8191725133961644 */
+#define R3_PHI2 2882110345u /* 0.6710436067037890 */
+#define R3_PHI3 2360945575u /* 0.5497004779019700 */
 
 __device__ uint32_t random_r1(const uint32_t offset) {
   return (offset + 1) * R1_PHI1;
@@ -226,6 +229,14 @@ __device__ uint2 random_r2(const uint32_t index) {
   const uint32_t v2 = (1 + index) * R2_PHI2;
 
   return make_uint2(v1, v2);
+}
+
+__device__ uint3 random_r3(const uint32_t index) {
+  const uint32_t v1 = (1 + index) * R3_PHI1;
+  const uint32_t v2 = (1 + index) * R3_PHI2;
+  const uint32_t v3 = (1 + index) * R3_PHI3;
+
+  return make_uint3(v1, v2, v3);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -369,6 +380,12 @@ __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
 
 __device__ float random_grain_mask(const uint32_t x, const uint32_t y) {
   return white_noise_offset(x + y * device.settings.width);
+}
+
+__device__ float3 random_3D(const uint32_t index) {
+  const uint3 quasi = random_r3(index);
+
+  return make_float3(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y), random_uint32_t_to_float(quasi.z));
 }
 
 #endif /* CU_RANDOM_H */
