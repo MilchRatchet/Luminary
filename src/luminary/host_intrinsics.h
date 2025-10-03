@@ -1,11 +1,14 @@
 #ifndef LUMINARY_HOST_INTRINSICS_H
 #define LUMINARY_HOST_INTRINSICS_H
 
-#include <immintrin.h>
+#include <float.h>
 #include <math.h>
 #include <stdbool.h>
 
+#ifdef __x86_64__
+#include <immintrin.h>
 #define LUMINARY_X86_INTRINSICS
+#endif /* __x86_64__ */
 
 struct Vec128 {
   union {
@@ -23,6 +26,8 @@ struct Vec128 {
   };
 } typedef Vec128;
 _STATIC_ASSERT(sizeof(Vec128) == 16);
+
+#ifndef __cplusplus
 
 inline Vec128 vec128_set_1(const float a) {
 #ifdef LUMINARY_X86_INTRINSICS
@@ -191,7 +196,7 @@ inline float vec128_box_area(const Vec128 a) {
   const Vec128 c = (Vec128) {._imm = _mm_shuffle_ps(a._imm, a._imm, _MM_SHUFFLE(3, 2, 2, 1))};
   return vec128_hsum(vec128_mul(b, c));
 #else
-  return a.x * a.y + a.x * a.z + a.y * a.z
+  return a.x * a.y + a.x * a.z + a.y * a.z;
 #endif
 }
 
@@ -210,5 +215,7 @@ inline Vec128 vec128_rotate_quaternion(const Vec128 a, const Vec128 q) {
 
   return result;
 }
+
+#endif /* !__cplusplus */
 
 #endif /* LUMINARY_HOST_INTRINSICS_H */

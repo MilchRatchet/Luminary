@@ -1880,7 +1880,9 @@ LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material*
     __FAILURE_HANDLE(array_get_num_elements(tree->cache.meshes, &num_meshes));
 
     for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+      // TODO: Pass the material ID so that we only need to update the part of the mesh that uses this material.
       __FAILURE_HANDLE(_light_tree_update_cache_mesh_has_emission(tree->cache.meshes + mesh_id, tree->cache.materials));
+      // TODO: Only set this if the mesh actually uses the material
       tree->cache.meshes[mesh_id].is_dirty = true;
     }
   }

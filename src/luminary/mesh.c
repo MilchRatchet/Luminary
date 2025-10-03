@@ -20,6 +20,9 @@ LuminaryResult mesh_create(Mesh** mesh) {
 
   (*mesh)->id = mesh_id_counter++;
 
+  (*mesh)->bounding_box =
+    (MeshBoundingBox) {.min = vec128_set(-FLT_MAX, -FLT_MAX, -FLT_MAX, 0.0f), .max = vec128_set(FLT_MAX, FLT_MAX, FLT_MAX, 0.0f)};
+
   return LUMINARY_SUCCESS;
 }
 

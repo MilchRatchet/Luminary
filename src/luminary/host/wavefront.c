@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "host_intrinsics.h"
 #include "internal_error.h"
 #include "internal_path.h"
 #include "material.h"
@@ -870,12 +871,24 @@ LuminaryResult wavefront_convert_content(
 
   mesh->data.vertex_count = vertex_count;
 
+  Vec128 min_bound = vec128_set_1(FLT_MAX);
+  Vec128 max_bound = vec128_set_1(-FLT_MAX);
+
   for (uint32_t vertex_id = 0; vertex_id < vertex_count; vertex_id++) {
-    mesh->data.vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
-    mesh->data.vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
-    mesh->data.vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
+    WavefrontVertex vertex = content->vertices[vertex_id];
+
+    mesh->data.vertex_buffer[vertex_id * 4 + 0] = vertex.x;
+    mesh->data.vertex_buffer[vertex_id * 4 + 1] = vertex.y;
+    mesh->data.vertex_buffer[vertex_id * 4 + 2] = vertex.z;
     mesh->data.vertex_buffer[vertex_id * 4 + 3] = 0.0f;
+
+    Vec128 v = vec128_set(vertex.x, vertex.y, vertex.z, 0.0f);
+
+    min_bound = vec128_min(min_bound, v);
+    max_bound = vec128_min(max_bound, v);
   }
+
+  mesh->bounding_box = (MeshBoundingBox) {.min = min_bound, .max = max_bound};
 
   __FAILURE_HANDLE(host_malloc(&mesh->triangles, sizeof(Triangle) * triangle_count));
 

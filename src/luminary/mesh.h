@@ -1,6 +1,7 @@
 #ifndef LUMINARY_MESH_H
 #define LUMINARY_MESH_H
 
+#include "host_intrinsics.h"
 #include "utils.h"
 
 #define MESH_ID_INVALID (0xFFFFFFFF)
@@ -16,11 +17,17 @@ struct TriangleGeomData {
   uint32_t triangle_count;
 } typedef TriangleGeomData;
 
+struct MeshBoundingBox {
+  Vec128 min;
+  Vec128 max;
+} typedef MeshBoundingBox;
+
 struct Mesh {
   uint32_t id;
   char* name;
   TriangleGeomData data;
   Triangle* triangles;
+  MeshBoundingBox bounding_box;
 } typedef Mesh;
 
 struct MeshInstance {

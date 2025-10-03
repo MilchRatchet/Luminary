@@ -7,6 +7,7 @@
 struct MinHeap {
   uint8_t max_num_elements;
   uint8_t num_elements;
+  float sum_key;
   MinHeapEntry* data;
 } typedef MinHeap;
 
@@ -22,6 +23,7 @@ __device__ MinHeap min_heap_get(MinHeapEntry* data, uint8_t max_num_elements) {
   MinHeap heap;
   heap.max_num_elements = max_num_elements;
   heap.num_elements     = 0;
+  heap.sum_key          = 0.0f;
   heap.data             = data;
 
   return heap;
@@ -76,6 +78,8 @@ __device__ void min_heap_insert(MinHeap& heap, uint16_t value, float key) {
   MinHeapEntry new_entry = min_heap_entry_get(value, key);
 
   if (heap.num_elements < heap.max_num_elements) {
+    heap.sum_key += key;
+
     min_heap_bubble_up(heap, new_entry, heap.num_elements);
 
     heap.num_elements++;
@@ -87,7 +91,32 @@ __device__ void min_heap_insert(MinHeap& heap, uint16_t value, float key) {
   if (root.key >= new_entry.key)
     return;
 
+  heap.sum_key += key;
+  heap.sum_key -= unsigned_bfloat_unpack(root.key);
+
   min_heap_bubble_down(heap, new_entry);
+}
+
+__device__ bool min_heap_remove_min(MinHeap& heap, const float sum_key_threshold) {
+  if (heap.num_elements == 0)
+    return false;
+
+  const float min_key = unsigned_bfloat_unpack(heap.data[0].key);
+
+  if (heap.sum_key - min_key < sum_key_threshold)
+    return false;
+
+  heap.num_elements--;
+  heap.sum_key -= min_key;
+
+  if (heap.num_elements == 0)
+    return true;
+
+  MinHeapEntry last_entry = heap.data[heap.num_elements];
+
+  min_heap_bubble_down(heap, last_entry);
+
+  return true;
 }
 
 #endif /* CU_LUMINARY_MIN_HEAP_H */

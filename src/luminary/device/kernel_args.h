@@ -84,7 +84,9 @@ struct KernelArgsLightGridGenerate {
   vec3 bounds_min;
   vec3 bounds_span;
   uint32_t allocated_entries;
+  float importance_threshold;
   MinHeapEntry* min_heap_data;
+  uint8_t* dst_cache_point_num_entries;
 } typedef KernelArgsLightGridGenerate;
 
 struct KernelArgsGenerateFinalImage {
