@@ -1920,6 +1920,21 @@ LuminaryResult device_unset_abort(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_flush_update_queue(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_query_gbuffer_meta(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 

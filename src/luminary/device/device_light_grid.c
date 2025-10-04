@@ -227,6 +227,9 @@ static LuminaryResult _light_grid_generate_points(LightGrid* light_grid, Device*
   // Say we want to use N bytes, create as many cache points such that we use N bytes in the worst case.
   // If a reasonable amount of bytes is left available after pruning, create more points.
 
+  // Make sure that all the data is actually present
+  __FAILURE_HANDLE(device_flush_update_queue(device));
+
   const LightGridCache* cache = (LightGridCache*) light_grid->cache;
 
   const uint32_t num_points                = 32;

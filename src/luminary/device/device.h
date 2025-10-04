@@ -192,6 +192,7 @@ LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterfac
 LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32_t* recommended_count);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
+LuminaryResult device_flush_update_queue(Device* device);
 LuminaryResult device_query_gbuffer_meta(Device* device);
 LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, GBufferMetaData* data);
 LuminaryResult device_destroy(Device** device);
