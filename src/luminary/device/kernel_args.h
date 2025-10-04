@@ -88,6 +88,9 @@ struct KernelArgsLightGridGenerate {
   MinHeapEntry* min_heap_data;
   uint32_t* total_num_entries;
   DeviceLightCachePointMeta* dst_cache_point_meta;
+#ifdef LIGHT_GRID_EXPORT_DEBUG_OBJ
+  vec3* dst_cache_point_pos;
+#endif /* LIGHT_GRID_EXPORT_DEBUG_OBJ */
 } typedef KernelArgsLightGridGenerate;
 
 struct KernelArgsGenerateFinalImage {

@@ -16,6 +16,10 @@ LUMINARY_KERNEL void light_grid_generate(const KernelArgsLightGridGenerate args)
 
     const vec3 pos = add_vector(mul_vector(get_vector(random_pos.x, random_pos.y, random_pos.z), args.bounds_span), args.bounds_min);
 
+#ifdef LIGHT_GRID_EXPORT_DEBUG_OBJ
+    args.dst_cache_point_pos[id] = pos;
+#endif /* LIGHT_GRID_EXPORT_DEBUG_OBJ */
+
     MaterialContextCachePoint ctx;
     ctx.position    = pos;
     ctx.normal      = get_vector(0.0f, 0.0f, 0.0f);

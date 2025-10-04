@@ -1,6 +1,7 @@
 #include "device_light_grid.h"
 
 #include <float.h>
+#include <stdio.h>
 
 #include "device.h"
 #include "host_intrinsics.h"
@@ -202,6 +203,104 @@ static LuminaryResult _light_grid_cache_destroy(LightGridCache** cache) {
 }
 
 ////////////////////////////////////////////////////////////////////
+// Debug Implementation
+////////////////////////////////////////////////////////////////////
+
+#ifdef LIGHT_GRID_EXPORT_DEBUG_OBJ
+static LuminaryResult _light_grid_output_debug_obj(
+  Device* device, uint32_t num_points, DEVICE DeviceLightCachePointMeta* device_meta, DEVICE vec3* device_pos) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(device_meta);
+  __CHECK_NULL_ARGUMENT(device_pos);
+
+  DeviceLightCachePointMeta* meta;
+  __FAILURE_HANDLE(host_malloc(&meta, sizeof(DeviceLightCachePointMeta) * num_points));
+
+  vec3* pos;
+  __FAILURE_HANDLE(host_malloc(&pos, sizeof(vec3) * num_points));
+
+  __FAILURE_HANDLE(device_download(meta, device_meta, 0, sizeof(DeviceLightCachePointMeta) * num_points, device->stream_main));
+  __FAILURE_HANDLE(device_download(pos, device_pos, 0, sizeof(vec3) * num_points, device->stream_main));
+
+  FILE* obj_file = fopen("LuminaryLightGrid.obj", "wb");
+
+  if (!obj_file) {
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file LuminaryLightGrid.obj.");
+  }
+
+  FILE* mtl_file = fopen("LuminaryLightGrid.mtl", "wb");
+
+  if (!mtl_file) {
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file LuminaryLightGrid.mtl.");
+  }
+
+  fwrite("mtllib LuminaryLightGrid.mtl\n", 29, 1, obj_file);
+
+  uint32_t v_offset = 1;
+
+  for (uint32_t point_id = 0; point_id < num_points; point_id++) {
+    char buffer[4096];
+    int buffer_offset = 0;
+
+    const vec3 p         = pos[point_id];
+    const uint32_t count = meta[point_id].count;
+
+    const float size = 1.0f;
+
+    const vec3 min = (vec3) {.x = p.x - size, .y = p.y - size, .z = p.z - size};
+    const vec3 max = (vec3) {.x = p.x + size, .y = p.y + size, .z = p.z + size};
+
+    buffer_offset += sprintf(buffer + buffer_offset, "o Node%u_%u\n", point_id, count);
+
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", min.x, min.y, min.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", min.x, min.y, max.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", min.x, max.y, min.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", min.x, max.y, max.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", max.x, min.y, min.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", max.x, min.y, max.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", max.x, max.y, min.z);
+    buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", max.x, max.y, max.z);
+
+    buffer_offset += sprintf(buffer + buffer_offset, "usemtl NodeMTL%u\n", point_id);
+
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 3, v_offset + 1, v_offset + 2);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 4, v_offset + 1);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 5, v_offset + 4, v_offset + 1);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 4, v_offset + 2);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 6, v_offset + 4, v_offset + 2);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 1, v_offset + 5, v_offset + 3);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 5, v_offset + 3);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 2, v_offset + 6, v_offset + 3);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 6, v_offset + 3);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 4, v_offset + 5, v_offset + 6);
+    buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 5, v_offset + 6);
+
+    fwrite(buffer, buffer_offset, 1, obj_file);
+
+    v_offset += 8;
+    buffer_offset = 0;
+
+    const float brightness = count / 128.0f;
+
+    buffer_offset += sprintf(buffer + buffer_offset, "newmtl NodeMTL%u\n", point_id);
+    buffer_offset += sprintf(buffer + buffer_offset, "Kd %f %f %f\n", brightness, brightness, brightness);
+    buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 1.0f);
+
+    fwrite(buffer, buffer_offset, 1, mtl_file);
+  }
+
+  fclose(obj_file);
+  fclose(mtl_file);
+
+  __FAILURE_HANDLE(host_free(&pos));
+  __FAILURE_HANDLE(host_free(&meta));
+
+  return LUMINARY_SUCCESS;
+}
+#endif /* LIGHT_GRID_EXPORT_DEBUG_OBJ */
+
+////////////////////////////////////////////////////////////////////
 // Build Implementation
 ////////////////////////////////////////////////////////////////////
 
@@ -243,6 +342,11 @@ static LuminaryResult _light_grid_generate_points(LightGrid* light_grid, Device*
 
   __FAILURE_HANDLE(device_malloc(&light_grid->cache_points_meta_data, sizeof(DeviceLightCachePointMeta) * num_points));
 
+#ifdef LIGHT_GRID_EXPORT_DEBUG_OBJ
+  DEVICE vec3* device_cache_point_pos;
+  __FAILURE_HANDLE(device_malloc(&device_cache_point_pos, sizeof(vec3) * num_points));
+#endif /* LIGHT_GRID_EXPORT_DEBUG_OBJ */
+
   DEVICE uint32_t* device_total_num_entries;
   __FAILURE_HANDLE(device_malloc(&device_total_num_entries, sizeof(uint32_t)));
 
@@ -261,6 +365,9 @@ static LuminaryResult _light_grid_generate_points(LightGrid* light_grid, Device*
   light_grid_generate_args.min_heap_data        = DEVICE_PTR(min_heap_buffer);
   light_grid_generate_args.total_num_entries    = DEVICE_PTR(device_total_num_entries);
   light_grid_generate_args.dst_cache_point_meta = DEVICE_PTR(light_grid->cache_points_meta_data);
+#ifdef LIGHT_GRID_EXPORT_DEBUG_OBJ
+  light_grid_generate_args.dst_cache_point_pos = DEVICE_PTR(device_cache_point_pos);
+#endif /* LIGHT_GRID_EXPORT_DEBUG_OBJ */
 
   __FAILURE_HANDLE(
     kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_LIGHT_GRID_GENERATE], &light_grid_generate_args, device->stream_main));
@@ -269,6 +376,12 @@ static LuminaryResult _light_grid_generate_points(LightGrid* light_grid, Device*
   __FAILURE_HANDLE(device_download(&total_num_entries, device_total_num_entries, 0, sizeof(uint32_t), device->stream_main));
 
   __FAILURE_HANDLE(device_malloc(&light_grid->cache_points_data, sizeof(DeviceLightCacheEntry) * total_num_entries));
+
+#ifdef LIGHT_GRID_EXPORT_DEBUG_OBJ
+  __FAILURE_HANDLE(_light_grid_output_debug_obj(device, num_points, light_grid->cache_points_meta_data, device_cache_point_pos));
+
+  __FAILURE_HANDLE(device_free(&device_cache_point_pos));
+#endif /* LIGHT_GRID_EXPORT_DEBUG_OBJ */
 
   // TODO: Keep work buffers resident for fast rebuilds, I can split the work to keep the buffers small
   __FAILURE_HANDLE(device_free(&device_total_num_entries));
