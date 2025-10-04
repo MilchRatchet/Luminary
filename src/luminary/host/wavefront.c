@@ -885,7 +885,7 @@ LuminaryResult wavefront_convert_content(
     Vec128 v = vec128_set(vertex.x, vertex.y, vertex.z, 0.0f);
 
     min_bound = vec128_min(min_bound, v);
-    max_bound = vec128_min(max_bound, v);
+    max_bound = vec128_max(max_bound, v);
   }
 
   mesh->bounding_box = (MeshBoundingBox) {.min = min_bound, .max = max_bound};

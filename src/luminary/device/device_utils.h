@@ -310,6 +310,14 @@ struct DeviceLightCacheEntry {
 } typedef DeviceLightCacheEntry;
 LUM_STATIC_SIZE_ASSERT(DeviceLightCacheEntry, 0x08);
 
+struct DeviceLightCachePointMeta {
+  uint32_t offset;
+  uint32_t count;
+  float importance_ratio;
+  uint32_t padding;
+} typedef DeviceLightCachePointMeta;
+LUM_STATIC_SIZE_ASSERT(DeviceLightCachePointMeta, 0x10);
+
 #define MAX_NUM_INDIRECT_BUCKETS 3
 
 ////////////////////////////////////////////////////////////////////

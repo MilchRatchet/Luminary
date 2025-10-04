@@ -203,8 +203,7 @@ LUMINARY_KERNEL void tasks_sort() {
     warp_offsets[task_index] = (task_index > 0) ? (warp_offsets[task_index - 1] + warp_counts[task_index - 1]) : 0;
   }
 
-  const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
-  uint32_t thread_shift            = WARP_SIZE - 1 - thread_id_in_warp;
+  uint32_t thread_shift = WARP_SIZE - 1 - THREAD_ID_IN_WARP;
 
   uint32_t read_thread_counts[SHADING_TASK_INDEX_TOTAL];
 

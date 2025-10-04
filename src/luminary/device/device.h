@@ -4,6 +4,7 @@
 #include "device_bsdf.h"
 #include "device_cloud.h"
 #include "device_light.h"
+#include "device_light_grid.h"
 #include "device_memory.h"
 #include "device_mesh.h"
 #include "device_omm.h"
@@ -161,6 +162,8 @@ LuminaryResult device_apply_material_updates(
 LuminaryResult device_build_light_tree(Device* device, LightTree* tree);
 LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree);
 LuminaryResult device_unload_light_tree(Device* device, LightTree* tree);
+LuminaryResult device_build_light_grid(Device* device, LightGrid* light_grid);
+LuminaryResult device_update_light_grid_data(Device* device, LightGrid* light_grid);
 LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut);
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);

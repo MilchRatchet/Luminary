@@ -5,6 +5,7 @@
 #include "device_bsdf.h"
 #include "device_library.h"
 #include "device_light.h"
+#include "device_light_grid.h"
 #include "device_physical_camera.h"
 #include "device_result_interface.h"
 #include "device_sampletime.h"
@@ -27,6 +28,7 @@ struct DeviceManager {
   QueueWorker* queue_worker_main;
   RingBuffer* ringbuffer;
   LightTree* light_tree;
+  LightGrid* light_grid;
   SkyLUT* sky_lut;
   SkyHDRI* sky_hdri;
   SkyStars* sky_stars;

@@ -86,7 +86,8 @@ struct KernelArgsLightGridGenerate {
   uint32_t allocated_entries;
   float importance_threshold;
   MinHeapEntry* min_heap_data;
-  uint8_t* dst_cache_point_num_entries;
+  uint32_t* total_num_entries;
+  DeviceLightCachePointMeta* dst_cache_point_meta;
 } typedef KernelArgsLightGridGenerate;
 
 struct KernelArgsGenerateFinalImage {
