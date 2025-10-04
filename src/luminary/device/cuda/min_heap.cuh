@@ -37,14 +37,15 @@ __device__ void min_heap_swap(MinHeap& heap, uint8_t index0, uint8_t index1) {
 
 __device__ void min_heap_bubble_up(MinHeap& heap, MinHeapEntry entry, uint8_t index) {
   while (index > 0) {
-    const MinHeapEntry parent = heap.data[index >> 1];
+    const uint8_t parent_index = (index - 1) >> 1;
+    const MinHeapEntry parent  = heap.data[parent_index];
 
     if (parent.key <= entry.key)
       break;
 
     heap.data[index] = parent;
 
-    index = index >> 1;
+    index = parent_index;
   }
 
   heap.data[index] = entry;
@@ -54,8 +55,8 @@ __device__ void min_heap_bubble_down(MinHeap& heap, MinHeapEntry entry) {
   uint8_t index = 0;
 
   while (index < heap.num_elements) {
-    const uint8_t left_index  = (index + 1) * 2;
-    const uint8_t right_index = (index + 1) * 2 + 1;
+    const uint8_t left_index  = index * 2 + 1;
+    const uint8_t right_index = index * 2 + 2;
 
     const MinHeapEntry left  = (left_index < heap.num_elements) ? heap.data[left_index] : min_heap_entry_get(0xFFFF, UBF16_MAX);
     const MinHeapEntry right = (right_index < heap.num_elements) ? heap.data[right_index] : min_heap_entry_get(0xFFFF, UBF16_MAX);
