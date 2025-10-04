@@ -246,6 +246,8 @@ static LuminaryResult _light_grid_generate_points(LightGrid* light_grid, Device*
   DEVICE uint32_t* device_total_num_entries;
   __FAILURE_HANDLE(device_malloc(&device_total_num_entries, sizeof(uint32_t)));
 
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(DEVICE_CUPTR(device_total_num_entries), 0, 1, device->stream_main));
+
   const vec3 bounds_min  = (vec3) {.x = cache->min_bounds.x, .y = cache->min_bounds.y, .z = cache->min_bounds.z};
   const vec3 bounds_max  = (vec3) {.x = cache->max_bounds.x, .y = cache->max_bounds.y, .z = cache->max_bounds.z};
   const vec3 bounds_span = (vec3) {.x = bounds_max.x - bounds_min.x, .y = bounds_max.y - bounds_min.y, .z = bounds_max.z - bounds_min.z};

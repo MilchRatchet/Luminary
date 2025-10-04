@@ -16,13 +16,15 @@
 #define NUM_WARPS_PER_BLOCK (THREADS_PER_BLOCK >> WARP_SIZE_LOG)
 
 #ifndef OPTIX_KERNEL
-#define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
+#define THREAD_ID_IN_BLOCK (threadIdx.x)
+#define THREAD_ID (THREAD_ID_IN_BLOCK + blockIdx.x * blockDim.x)
 #else
-#define THREAD_ID (optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
+#define THREAD_ID_IN_BLOCK (optixGetLaunchIndex().x)
+#define THREAD_ID (THREAD_ID_IN_BLOCK + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
 #endif
 
-#define THREAD_ID_IN_WARP (THREAD_ID & WARP_SIZE_MASK)
-#define WARP_ID_IN_BLOCK (THREAD_ID >> WARP_SIZE_LOG)
+#define THREAD_ID_IN_WARP (THREAD_ID_IN_BLOCK & WARP_SIZE_MASK)
+#define WARP_ID_IN_BLOCK (THREAD_ID_IN_BLOCK >> WARP_SIZE_LOG)
 
 #ifdef OPTIX_KERNEL
 #define TASK_ID optixGetLaunchIndex().z

@@ -338,6 +338,9 @@ __device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransfor
 
 __device__ void light_tree_build_max_subset(
   const MaterialContextCachePoint ctx, MinHeap& heap, float& max_importance, float& sum_importance) {
+  max_importance = -FLT_MAX;
+  sum_importance = 0.0f;
+
   const DeviceLightTreeRootHeader header = load_light_tree_root();
 
   const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
@@ -353,6 +356,9 @@ __device__ void light_tree_build_max_subset(
       const uint16_t child_id = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
 
       min_heap_insert(heap, child_id, importance);
+
+      max_importance = fmaxf(max_importance, importance);
+      sum_importance += importance;
     }
   }
 }
