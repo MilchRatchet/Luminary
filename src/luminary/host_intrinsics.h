@@ -47,10 +47,10 @@ inline Vec128 vec128_set(const float x, const float y, const float z, const floa
 
 inline bool vec128_is_equal(const Vec128 a, const Vec128 b) {
 #ifdef LUMINARY_X86_INTRINSICS
-  // TODO: Verify that this is correct.
-  return _mm_cmpistrc(a._immi, b._immi, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY);
+  const __m128i diff = _mm_xor_si128(a._immi, b._immi);
+  return _mm_testz_si128(diff, diff);
 #else
-  return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);
+  return memcmp(&a, &b, sizeof(Vec128)) == 0;
 #endif
 }
 
