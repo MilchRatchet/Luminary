@@ -212,15 +212,11 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
     ris_lane[lane_id] = ris_lane_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_PREPASS + lane_id, pixel));
   }
 
-  uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
-#pragma unroll
-  for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    selected[lane_id] = 0xFF;
-  }
-
   const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
   const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
   const float exp_v = exp2f(header.exp_std_dev);
+
+  uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
 
 #pragma nounroll
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
@@ -249,9 +245,9 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 
 #pragma nounroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    const bool is_light  = selected[lane_id] < header.num_root_lights;
-    const uint32_t index = (is_light || selected[lane_id] == 0xFF) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
-    work.data[lane_id]   = _light_tree_continuation_pack(index, ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), is_light);
+    const bool is_light = selected[lane_id] < header.num_root_lights;
+    const uint8_t index = (is_light) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
+    work.data[lane_id]  = _light_tree_continuation_pack(index, ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), is_light);
 
     _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(lane_id, work.data[lane_id]);
   }
@@ -266,13 +262,14 @@ __device__ LightTreeResult
 
   _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(lane_id, continuation);
 
+  const float continuation_probability = _light_tree_continuation_unpack_prob(continuation);
+
   LightTreeResult result;
   result.light_id = 0xFFFFFFFF;
-  result.weight   = 1.0f / _light_tree_continuation_unpack_prob(continuation);
+  result.weight   = (continuation_probability > 0.0f) ? 1.0f / continuation_probability : 0.0f;
 
-  if (continuation.child_index == 0xFF) {
+  if (continuation_probability == 0.0f)
     return result;
-  }
 
   if (continuation.is_light) {
     result.light_id = continuation.child_index;
