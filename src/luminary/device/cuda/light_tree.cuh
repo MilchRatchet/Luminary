@@ -74,17 +74,20 @@ template <>
 __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
   const MaterialContextGeometry ctx, const float power, const vec3 mean, const float std_dev) {
   const vec3 PO       = sub_vector(mean, ctx.position);
-  const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
+  const float dist_sq = dot_product(PO, PO);
 
-  float NdotL = 1.0f;
-  if (MATERIAL_IS_SUBSTRATE_OPAQUE(ctx.flags)) {
-    const vec3 reference_point = add_vector(mean, scale_vector(ctx.normal, LIGHT_TREE_STD_DEV_FACTOR * std_dev));
-    const vec3 L               = normalize_vector(sub_vector(reference_point, ctx.position));
-    NdotL                      = __saturatef(dot_product(L, ctx.normal));
-    NdotL                      = NdotL * (1.0f - LIGHT_TREE_STD_DEV_PERCENTILE) + LIGHT_TREE_STD_DEV_PERCENTILE;
-  }
+  const float variance    = std_dev * std_dev;
+  const float inv_dist_sq = 1.0f / (dist_sq + variance);
 
-  return power * NdotL * (1.0f / dist_sq);
+  float result = power * inv_dist_sq;
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.flags))
+    return result;
+
+  const float t     = variance * inv_dist_sq;
+  const float NdotL = __saturatef(dot_product(PO, ctx.normal) * sqrtf(inv_dist_sq));
+  result            = result * fmaf(NdotL, 1.0f - t, t);
+
+  return result;
 }
 
 template <>
@@ -149,7 +152,8 @@ __device__ float light_tree_child_importance(
   const float power   = (float) section.rel_power[i];
   const float std_dev = section.rel_std_dev[i] * exp_v;
 
-  const vec3 mean = add_vector(mul_vector(get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]), exp), base);
+  const vec3 rel_mean = get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]);
+  const vec3 mean     = add_vector(mul_vector(rel_mean, exp), base);
 
   return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
@@ -163,7 +167,8 @@ __device__ float light_tree_child_importance(
   const float power   = (float) node.rel_power[i];
   const float std_dev = node.rel_std_dev[i] * exp_v;
 
-  const vec3 mean = add_vector(mul_vector(get_vector(node.rel_mean_x[i], node.rel_mean_y[i], node.rel_mean_z[i]), exp), base);
+  const vec3 rel_mean = get_vector(node.rel_mean_x[i], node.rel_mean_y[i], node.rel_mean_z[i]);
+  const vec3 mean     = add_vector(mul_vector(rel_mean, exp), base);
 
   return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
@@ -217,13 +222,19 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
   const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
   const float exp_v = exp2f(header.exp_std_dev);
 
+#pragma nounroll
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
     const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
 
+#pragma nounroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
       const float target               = light_tree_child_importance<TYPE>(ctx, section, base, exp, exp_v, rel_child_id);
       const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
 
+      if (ris_sample.resampling_probability == 0.0f)
+        continue;
+
+#pragma nounroll
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
         if (ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
           selected[lane_id] = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
@@ -236,7 +247,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 
   LightTreeWork work;
 
-#pragma unroll
+#pragma nounroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
     const bool is_light  = selected[lane_id] < header.num_root_lights;
     const uint32_t index = (is_light || selected[lane_id] == 0xFF) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
@@ -273,6 +284,7 @@ __device__ LightTreeResult
   const float random     = random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_POSTPASS + lane_id, pixel);
   RISReservoir reservoir = ris_reservoir_init(random);
 
+#pragma nounroll
   while (result.light_id == 0xFFFFFFFF) {
     const vec3 base   = get_vector(bfloat_unpack(node.x), bfloat_unpack(node.y), bfloat_unpack(node.z));
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
@@ -280,6 +292,7 @@ __device__ LightTreeResult
 
     uint8_t selected_child = 0xFF;
 
+#pragma nounroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_CHILDREN_PER_NODE; rel_child_id++) {
       const float target = light_tree_child_importance<TYPE>(ctx, node, base, exp, exp_v, rel_child_id);
 

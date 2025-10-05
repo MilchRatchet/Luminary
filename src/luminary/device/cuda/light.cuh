@@ -104,6 +104,7 @@ __device__ LightSampleResult<TYPE> light_list_resample(
 
   RISReservoir reservoir = ris_reservoir_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::RESAMPLING, pixel));
 
+#pragma nounroll
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
     const LightTreeResult output = light_tree_traverse_postpass<TYPE>(ctx, pixel, output_id, light_tree_work);
 

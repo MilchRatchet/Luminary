@@ -26,7 +26,7 @@ __device__ float2 ris_transform_stratum_2D(const uint32_t index, const uint32_t 
   return make_float2(ris_transform_stratum(index, num_samples, random.x), random.y);
 }
 
-#define RIS_COLLECT_SAMPLE_COUNT
+// #define RIS_COLLECT_SAMPLE_COUNT
 
 struct RISReservoir {
   float sum_weight;
@@ -69,9 +69,6 @@ __device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float ta
     return false;
 
   const float resampling_probability = weight / reservoir.sum_weight;
-
-  if (resampling_probability == 0.0f)
-    return false;
 
   const bool sample_accepted = (reservoir.random < resampling_probability);
 
@@ -146,11 +143,7 @@ __device__ RISLane ris_lane_init(const float random) {
 
 __device__ bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample) {
   const float resampling_probability = sample.resampling_probability;
-
-  if (resampling_probability == 0.0f)
-    return false;
-
-  const bool sample_accepted = (lane.random < resampling_probability);
+  const bool sample_accepted         = (lane.random < resampling_probability);
 
   lane.selected_target     = (sample_accepted) ? sample.target : lane.selected_target;
   const float random_shift = (sample_accepted) ? 0.0f : resampling_probability;
