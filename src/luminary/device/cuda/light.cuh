@@ -200,7 +200,7 @@ __device__ float lights_integrate_emission(
 
       const float4 texel = texture_load(tex, get_uv(u, v));
 
-      const RGBF color = scale_color(get_color(texel.x, texel.y, texel.z), texel.w);
+      const RGBF color = get_color(texel.x, texel.y, texel.z);
 
       accumulator = add_color(accumulator, color);
       texel_count++;

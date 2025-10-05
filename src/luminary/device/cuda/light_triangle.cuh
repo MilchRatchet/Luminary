@@ -260,7 +260,7 @@ __device__ RGBF light_get_color(TriangleLight& triangle) {
 
     const float4 emission = texture_load(tex, triangle.tex_coords);
 
-    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
+    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale);
   }
   else {
     color = mat.emission;
