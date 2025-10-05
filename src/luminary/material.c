@@ -18,6 +18,7 @@ LuminaryResult material_get_default(Material* material) {
   material->metallic                 = false;
   material->colored_transparency     = false;
   material->normal_map_is_compressed = true;
+  material->bidirectional_emission   = false;
   material->albedo_tex               = TEXTURE_NONE;
   material->luminance_tex            = TEXTURE_NONE;
   material->roughness_tex            = TEXTURE_NONE;
@@ -93,6 +94,7 @@ LuminaryResult material_check_for_dirty(const Material* input, const Material* o
   __MATERIAL_DIRTY(colored_transparency);
   __MATERIAL_DIRTY(roughness_as_smoothness);
   __MATERIAL_DIRTY(normal_map_is_compressed);
+  __MATERIAL_DIRTY(bidirectional_emission);
 
   return LUMINARY_SUCCESS;
 }

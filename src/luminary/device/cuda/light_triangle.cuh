@@ -94,6 +94,9 @@ __device__ TriangleLight light_triangle_sample_init(const TriangleHandle handle,
 
   triangle.material_id = v3 & 0xFFFF;
 
+  const uint8_t material_flags = __ldg(&device.ptrs.materials[triangle.material_id].flags);
+  triangle.bidirectional       = material_flags & DEVICE_MATERIAL_FLAG_BIDIRECTIONAL_EMISSION;
+
   return triangle;
 }
 
@@ -132,12 +135,18 @@ __device__ float light_triangle_get_solid_angle(const TriangleLight triangle, co
 }
 
 __device__ bool light_triangle_sample_solid_angle(
-  const vec3 origin, const vec3 vertex, const vec3 edge1, const vec3 edge2, const float2 random, vec3& ray, float& solid_angle) {
+  const vec3 origin, const vec3 vertex, const vec3 edge1, const vec3 edge2, const float2 random, const bool bidirectional, vec3& ray,
+  float& solid_angle) {
   const vec3 v0 = normalize_vector(sub_vector(vertex, origin));
   const vec3 v1 = normalize_vector(sub_vector(add_vector(vertex, edge1), origin));
   const vec3 v2 = normalize_vector(sub_vector(add_vector(vertex, edge2), origin));
 
-  const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
+  const float G0_signed = dot_product(cross_product(v0, v1), v2);
+
+  if ((bidirectional == false) && (G0_signed >= 0.0f))
+    return false;
+
+  const float G0 = fabsf(G0_signed);
   const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
   const float G2 = 1.0f + dot_product(v0, v1);
 
@@ -177,7 +186,8 @@ __device__ bool light_triangle_sample_finalize(
   float& solid_angle) {
   bool success = true;
 
-  success &= light_triangle_sample_solid_angle(origin, triangle.vertex, triangle.edge1, triangle.edge2, random, ray, solid_angle);
+  success &= light_triangle_sample_solid_angle(
+    origin, triangle.vertex, triangle.edge1, triangle.edge2, random, triangle.bidirectional, ray, solid_angle);
   success &= light_triangle_sample_finalize_dist_and_uvs(triangle, packed_light_data, origin, ray, dist);
 
   return success;
@@ -195,7 +205,7 @@ __device__ bool light_triangle_sample_microtriangle_finalize(
 
   bool success = true;
 
-  success &= light_triangle_sample_solid_angle(origin, v0, edge1, edge2, random, ray, solid_angle);
+  success &= light_triangle_sample_solid_angle(origin, v0, edge1, edge2, random, triangle.bidirectional, ray, solid_angle);
 
   if (success) {
     dist = light_triangle_intersection_uv_generic(v0, edge1, edge2, origin, ray, coords);
@@ -238,9 +248,17 @@ __device__ vec3 light_triangle_sample_bridges(TriangleLight& triangle, const flo
 __device__ bool light_triangle_sample_finalize_bridges(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const vec3 point_on_light, vec3& ray, float& dist,
   float& area) {
-  area = get_length(cross_product(triangle.edge1, triangle.edge2)) * 0.5f;
+  const vec3 cross = cross_product(triangle.edge1, triangle.edge2);
 
-  ray = normalize_vector(sub_vector(point_on_light, origin));
+  area = get_length(cross) * 0.5f;
+  ray  = sub_vector(point_on_light, origin);
+
+  if ((triangle.bidirectional == false) && dot_product(ray, cross) >= 0.0f) {
+    dist = FLT_MAX;
+    return false;
+  }
+
+  ray = normalize_vector(ray);
 
   bool success = true;
 

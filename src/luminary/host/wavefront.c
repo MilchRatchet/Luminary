@@ -809,6 +809,7 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     mat.emission_active          = has_luminance_tex || has_emission;
     mat.thin_walled              = false;
     mat.normal_map_is_compressed = true;
+    mat.bidirectional_emission   = content->args.force_bidirectional_emission;
     mat.metallic                 = wavefront_mat.specular_reflectivity.r > 0.5f;
     mat.albedo_tex               = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
     mat.luminance_tex            = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
@@ -1086,9 +1087,10 @@ LuminaryResult wavefront_convert_content(
 LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments) {
   __CHECK_NULL_ARGUMENT(arguments);
 
-  arguments->legacy_smoothness         = false;
-  arguments->force_transparency_cutout = false;
-  arguments->emission_scale            = 1.0f;
+  arguments->legacy_smoothness            = false;
+  arguments->force_transparency_cutout    = false;
+  arguments->emission_scale               = 1.0f;
+  arguments->force_bidirectional_emission = false;
 
   return LUMINARY_SUCCESS;
 }

@@ -724,6 +724,8 @@ static void _window_entity_properties_material_action(Window* window, Display* d
       update_data |=
         _window_entity_properties_add_slider(data, "Emission", &material.emission, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1023.0f, 1.0f);
     }
+
+    update_data |= _window_entity_properties_add_checkbox(data, "Bidirectional Emission", &material.bidirectional_emission);
   }
 
   if (material.roughness_tex == 0xFFFF) {

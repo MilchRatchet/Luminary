@@ -360,6 +360,7 @@ LUMINARY_API struct LuminaryMaterial {
   bool colored_transparency;
   bool roughness_as_smoothness;
   bool normal_map_is_compressed;
+  bool bidirectional_emission;
   uint16_t albedo_tex;
   uint16_t luminance_tex;
   uint16_t roughness_tex;

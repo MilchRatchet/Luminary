@@ -82,8 +82,7 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
   const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
   const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
 
-  vec3 face_normal       = normalize_vector(cross_product(edge1, edge2));
-  const float face_NdotV = -dot_product(face_normal, info.task.ray);
+  vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
   const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, position);
 
@@ -127,7 +126,8 @@ __device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationI
     albedo.a              = albedo_f.w;
   }
 
-  const bool has_emission     = mat.flags & DEVICE_MATERIAL_FLAG_EMISSION;
+  const bool emissive_side    = (is_inside == false) || (mat.flags & DEVICE_MATERIAL_FLAG_BIDIRECTIONAL_EMISSION);
+  const bool has_emission     = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && emissive_side;
   const bool include_emission = has_emission && (info.task.state & (STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_MIS_EMISSION));
 
   RGBF emission = get_color(0.0f, 0.0f, 0.0f);

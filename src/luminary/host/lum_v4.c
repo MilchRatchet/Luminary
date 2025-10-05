@@ -743,9 +743,10 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     content->camera.bloom_blend = 0.0f;
   }
 
-  content->wavefront_args.legacy_smoothness         = legacy_settings.legacy_smoothness;
-  content->wavefront_args.force_transparency_cutout = legacy_settings.force_transparency_cutout;
-  content->wavefront_args.emission_scale            = legacy_settings.emission_scale;
+  content->wavefront_args.legacy_smoothness            = legacy_settings.legacy_smoothness;
+  content->wavefront_args.force_transparency_cutout    = legacy_settings.force_transparency_cutout;
+  content->wavefront_args.emission_scale               = legacy_settings.emission_scale;
+  content->wavefront_args.force_bidirectional_emission = true;
 
   __FAILURE_HANDLE(host_free(&line));
 

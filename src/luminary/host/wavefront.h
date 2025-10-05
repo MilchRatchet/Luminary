@@ -59,6 +59,7 @@ struct WavefrontArguments {
   bool legacy_smoothness;
   bool force_transparency_cutout;
   float emission_scale;
+  bool force_bidirectional_emission;
 } typedef WavefrontArguments;
 
 enum WavefrontContentState {

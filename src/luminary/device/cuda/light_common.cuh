@@ -33,6 +33,7 @@ struct TriangleLight {
   vec3 edge2;
   UV tex_coords;
   uint16_t material_id;
+  bool bidirectional;
 } typedef TriangleLight;
 
 #endif /* CU_LUMINARY_LIGHT_COMMON_H */

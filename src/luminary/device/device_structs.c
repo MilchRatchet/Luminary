@@ -271,6 +271,7 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->flags |= material->colored_transparency ? DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY : 0;
   device_material->flags |= material->roughness_as_smoothness ? DEVICE_MATERIAL_FLAG_ROUGHNESS_AS_SMOOTHNESS : 0;
   device_material->flags |= material->normal_map_is_compressed ? DEVICE_MATERIAL_FLAG_NORMAL_MAP_COMPRESSED : 0;
+  device_material->flags |= material->bidirectional_emission ? DEVICE_MATERIAL_FLAG_BIDIRECTIONAL_EMISSION : 0;
 
   switch (material->base_substrate) {
     case LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE:
