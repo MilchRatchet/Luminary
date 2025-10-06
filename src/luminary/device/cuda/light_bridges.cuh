@@ -232,7 +232,7 @@ __device__ vec3 bridges_sample_initial_vertex(
   float random_intersection = random_1D(RANDOM_TARGET_LIGHT_GEO_INITIAL_VERTEX + output_id, pixel);
 
   const vec3 PO             = sub_vector(point_on_light, ctx.position);
-  const float dist_to_light = -dot_product(PO, ctx.V);
+  const float dist_to_light = fmaxf(-dot_product(PO, ctx.V), 0.0f);
 
   // We sample points in front of the light with a very high probability, the rest is only for unbiasedness.
   const float forward_prob = (dist_to_light < ctx.max_dist) ? BRIDGES_INITIAL_VERTEX_FORWARD_PROB : 1.0f;
