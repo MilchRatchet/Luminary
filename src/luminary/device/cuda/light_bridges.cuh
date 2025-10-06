@@ -16,20 +16,6 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
-// This must correspond to the G term used when computing the LUT.
-#define BRIDGES_HG_G_TERM (0.85f)
-#define BRIDGES_INITIAL_VERTEX_FORWARD_PROB (0.95f)
-
-__device__ vec3 bridges_phase_sample(const vec3 ray, const float2 r_dir) {
-  const float cos_angle = henyey_greenstein_phase_sample(BRIDGES_HG_G_TERM, r_dir.x);
-
-  return phase_sample_basis(cos_angle, r_dir.y, ray);
-}
-
-__device__ float bridges_phase_function(const float cos_angle) {
-  return henyey_greenstein_phase_function(cos_angle, BRIDGES_HG_G_TERM);
-}
-
 __device__ Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, initial_vertex));
   const vec3 actual_dir = normalize_vector(sub_vector(end_vertex, initial_vertex));
