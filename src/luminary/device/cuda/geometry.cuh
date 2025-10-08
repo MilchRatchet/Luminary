@@ -2,6 +2,7 @@
 #define CU_GEOMETRY_H
 
 #include "bsdf.cuh"
+#include "direct_lighting.cuh"
 #include "directives.cuh"
 #include "geometry_utils.cuh"
 #include "math.cuh"
@@ -35,13 +36,41 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     ctx_creation_info.packed_mis_payload = throughput.payload;
     ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
 
-    MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+    const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Geometry
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t task_direct_lighting_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+
+    if (direct_lighting_geometry_is_allowed(task)) {
+      const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.index);
+
+      task_direct_light_geo_store(task_direct_lighting_base_address, direct_light_geo_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Sun
+    ////////////////////////////////////////////////////////////////////
+
+    const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
+
+    task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
     const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.index);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Ambient
+    ////////////////////////////////////////////////////////////////////
+
+    const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
+
+    task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
 
     ////////////////////////////////////////////////////////////////////
     // Update delta path state

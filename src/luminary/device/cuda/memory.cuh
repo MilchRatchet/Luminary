@@ -234,6 +234,32 @@ __device__ void task_throughput_mis_payload_store(const uint32_t base_address, c
   store_task_state<PackedMISPayload, float2>(base_address, offsetof(DeviceTaskState, throughput.payload), data);
 }
 
+// DeviceTaskDirectLight
+
+__device__ DeviceTaskDirectLightGeo task_direct_light_geo_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightGeo, float4>(base_address, offsetof(DeviceTaskDirectLight, geo));
+}
+
+__device__ DeviceTaskDirectLightSun task_direct_light_sun_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightSun, float4>(base_address, offsetof(DeviceTaskDirectLight, sun));
+}
+
+__device__ DeviceTaskDirectLightAmbient task_direct_light_ambient_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightAmbient, float4>(base_address, offsetof(DeviceTaskDirectLight, ambient));
+}
+
+__device__ void task_direct_light_geo_store(const uint32_t base_address, const DeviceTaskDirectLightGeo data) {
+  store_task_state<DeviceTaskDirectLightGeo, float4>(base_address, offsetof(DeviceTaskDirectLight, geo), data);
+}
+
+__device__ void task_direct_light_sun_store(const uint32_t base_address, const DeviceTaskDirectLightSun data) {
+  store_task_state<DeviceTaskDirectLightSun, float4>(base_address, offsetof(DeviceTaskDirectLight, sun), data);
+}
+
+__device__ void task_direct_light_ambient_store(const uint32_t base_address, const DeviceTaskDirectLightAmbient data) {
+  store_task_state<DeviceTaskDirectLightAmbient, float4>(base_address, offsetof(DeviceTaskDirectLight, ambient), data);
+}
+
 ////////////////////////////////////////////////////////////////////
 // RGBF IO
 ////////////////////////////////////////////////////////////////////

@@ -157,6 +157,9 @@ typedef uint16_t BFloat16;
 typedef uint16_t UnsignedBFloat16;
 typedef uint2 PackedRecord;
 typedef uint2 PackedMISPayload;
+typedef uint2 PackedRayDirection;
+
+#define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
 
 struct Mat3x3 {
   float f11;
@@ -308,7 +311,11 @@ enum TaskStateBufferIndex {
   TASK_STATE_BUFFER_INDEX_PRESORT,
   TASK_STATE_BUFFER_INDEX_POSTSORT,
 
-  TASK_STATE_BUFFER_INDEX_COUNT
+  TASK_STATE_BUFFER_INDEX_COUNT,
+
+  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT = TASK_STATE_BUFFER_INDEX_PRESORT,
+
+  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT
 } typedef TaskStateBufferIndex;
 
 // TODO: This needs to change when adding SSS.
@@ -344,11 +351,53 @@ struct DeviceTaskState {
 LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
 
 ////////////////////////////////////////////////////////////////////
+// Task Direct Lighting
+////////////////////////////////////////////////////////////////////
+
+struct DeviceTaskDirectLightGeo {
+  uint32_t light_id;
+  RGBF light_color;
+
+  union {
+    struct {
+      vec3 ray;
+      float dist;
+    } direct;
+    struct {
+      uint32_t seed;
+      Quaternion16 rotation;
+      float scale;
+    } bridges;
+  };
+} typedef DeviceTaskDirectLightGeo;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightGeo, 0x20);
+
+struct DeviceTaskDirectLightSun {
+  PackedRecord light_color;
+  PackedRayDirection ray;
+} typedef DeviceTaskDirectLightSun;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightSun, 0x10);
+
+struct DeviceTaskDirectLightAmbient {
+  PackedRecord light_color;
+  PackedRayDirection ray;
+} typedef DeviceTaskDirectLightAmbient;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightAmbient, 0x10);
+
+struct DeviceTaskDirectLight {
+  DeviceTaskDirectLightGeo geo;
+  DeviceTaskDirectLightSun sun;
+  DeviceTaskDirectLightAmbient ambient;
+} typedef DeviceTaskDirectLight;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x40);
+
+////////////////////////////////////////////////////////////////////
 // Globals
 ////////////////////////////////////////////////////////////////////
 
 struct DevicePointers {
-  DEVICE DeviceTaskState* task_states;
+  DEVICE DeviceTaskState* LUM_RESTRICT task_states;
+  DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
   DEVICE uint16_t* LUM_RESTRICT trace_counts;  // TODO: Remove and reuse inside task_counts
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;

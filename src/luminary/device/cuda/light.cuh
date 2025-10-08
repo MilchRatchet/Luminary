@@ -49,7 +49,7 @@ __device__ TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(const Mate
 
 template <MaterialType TYPE>
 __device__ void light_evaluate_candidate(
-  const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+  const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<TYPE>& result) {
   const float2 ray_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_GEO::RAY + output_id, pixel);
 
@@ -73,7 +73,7 @@ __device__ void light_evaluate_candidate(
   const float sampling_weight = tree_sampling_weight * solid_angle;
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
-    result.handle        = handle;
+    result.light_id      = light_id;
     result.ray           = ray;
     result.light_color   = light_color;
     result.dist          = dist;
@@ -83,10 +83,10 @@ __device__ void light_evaluate_candidate(
 
 template <>
 __device__ void light_evaluate_candidate<MATERIAL_VOLUME>(
-  const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+  const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<MATERIAL_VOLUME>& result) {
   float2 target_and_weight;
-  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, handle, light_uv_packed, pixel, output_id, target_and_weight);
+  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, light_id, light_uv_packed, pixel, output_id, target_and_weight);
 
   const float target          = target_and_weight.x;
   const float sampling_weight = target_and_weight.y * tree_sampling_weight;
@@ -100,7 +100,7 @@ template <MaterialType TYPE>
 __device__ LightSampleResult<TYPE> light_list_resample(
   const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle) {
   LightSampleResult<TYPE> result;
-  result.handle = triangle_handle_get(INSTANCE_ID_INVALID, 0);
+  result.light_id = LIGHT_ID_INVALID;
 
   RISReservoir reservoir = ris_reservoir_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::RESAMPLING, pixel));
 

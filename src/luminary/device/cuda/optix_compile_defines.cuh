@@ -51,6 +51,12 @@
 #define OPTIX_COMPILATION_DEFINITION_FOUND true
 #endif
 
+#ifdef optix_kernel_shadow
+#define OPTIX_KERNEL
+#undef OPTIX_COMPILATION_DEFINITION_FOUND
+#define OPTIX_COMPILATION_DEFINITION_FOUND true
+#endif
+
 #ifdef optix_kernel_dummy_intellisense
 #define OPTIX_KERNEL
 #define OPTIX_ENABLE_GEOMETRY_DL

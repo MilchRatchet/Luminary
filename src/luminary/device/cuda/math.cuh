@@ -7,6 +7,10 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+////////////////////////////////////////////////////////////////////
+// Packing
+////////////////////////////////////////////////////////////////////
+
 __device__ float bfloat_unpack(const BFloat16 val) {
   const uint32_t data = val;
 
@@ -72,6 +76,55 @@ __device__ PackedMISPayload mis_payload_pack(const MISPayload payload) {
 
   return packed;
 }
+
+__device__ vec3 ray_unpack(const PackedRayDirection packed) {
+  float x = packed.x * (1.0f / 0xFFFFFFFF);
+  float y = packed.y * (1.0f / 0xFFFFFFFF);
+
+  x = (x * 2.0f) - 1.0f;
+  y = (y * 2.0f) - 1.0f;
+
+  vec3 ray      = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
+  const float t = __saturatef(-ray.z);
+
+  ray.x += (ray.x >= 0.0f) ? -t : t;
+  ray.y += (ray.y >= 0.0f) ? -t : t;
+
+  return normalize_vector(ray);
+}
+
+__device__ PackedRayDirection ray_pack(const vec3 ray) {
+  float x = ray.x;
+  float y = ray.y;
+  float z = ray.z;
+
+  const float recip_norm = 1.0f / (fabsf(x) + fabsf(y) + fabsf(z));
+
+  x *= recip_norm;
+  y *= recip_norm;
+  z *= recip_norm;
+
+  const float t = __saturatef(-z);
+
+  x += (x >= 0.0f) ? t : -t;
+  y += (y >= 0.0f) ? t : -t;
+
+  x = clampf(x, -1.0f, 1.0f);
+  y = clampf(y, -1.0f, 1.0f);
+
+  x = (x + 1.0f) * 0.5f;
+  y = (y + 1.0f) * 0.5f;
+
+  PackedRayDirection packed;
+  packed.x = (uint32_t) (x * 0xFFFFFFFF + 0.5);
+  packed.y = (uint32_t) (y * 0xFFFFFFFF + 0.5);
+
+  return packed;
+}
+
+////////////////////////////////////////////////////////////////////
+// Math
+////////////////////////////////////////////////////////////////////
 
 __device__ float difference_of_products(const float a, const float b, const float c, const float d) {
   const float cd = c * d;

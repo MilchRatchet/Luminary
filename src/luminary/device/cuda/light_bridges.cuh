@@ -258,7 +258,7 @@ __device__ vec3 bridges_sample_initial_vertex(
 }
 
 __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
-  MaterialContextVolume ctx, TriangleLight light, const TriangleHandle light_handle, const uint3 light_uv_packed, const ushort2 pixel,
+  MaterialContextVolume ctx, TriangleLight light, const uint32_t light_id, const uint3 light_uv_packed, const ushort2 pixel,
   const uint32_t output_id, float2& target_and_weight) {
   const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + output_id, pixel);
 
@@ -269,7 +269,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   const vec3 initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, output_id, initial_attenuation, initial_pdf);
 
   LightSampleResult<MATERIAL_VOLUME> result;
-  result.handle = triangle_handle_get(INSTANCE_ID_INVALID, 0);
+  result.light_id = LIGHT_ID_INVALID;
 
   if (initial_pdf == 0.0f || color_importance(initial_attenuation) == 0.0f)
     return result;
@@ -333,7 +333,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   target_and_weight.x = color_importance(sample_path_weight);
   target_and_weight.y = sample_weight;
 
-  result.handle      = light_handle;
+  result.light_id    = light_id;
   result.light_color = sample_path_weight;
   result.rotation    = sample_rotation;
   result.scale       = sample_path_scale;

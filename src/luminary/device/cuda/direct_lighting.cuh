@@ -1,91 +1,23 @@
 #ifndef CU_LUMINARY_DIRECT_LIGHTING_H
 #define CU_LUMINARY_DIRECT_LIGHTING_H
 
-#if defined(OPTIX_KERNEL)
-
 #include "bsdf.cuh"
 #include "caustics.cuh"
 #include "light.cuh"
+#include "light_shadow.cuh"
 #include "material.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "optix_include.cuh"
 #include "random.cuh"
 #include "sky.cuh"
 #include "utils.cuh"
-
-// #define DIRECT_LIGHTING_NO_SHADOW
-
-struct DirectLightingShadowTask {
-  OptixTraceStatus trace_status;
-  vec3 origin;
-  vec3 ray;
-  float limit;
-  TriangleHandle target_light;
-  VolumeType volume_type;
-} typedef DirectLightingShadowTask;
-
-struct DirectLightingBSDFSample {
-  uint32_t light_id;
-  vec3 ray;
-  bool is_refraction;
-} typedef DirectLightingBSDFSample;
-
-////////////////////////////////////////////////////////////////////
-// Utils
-////////////////////////////////////////////////////////////////////
-
-__device__ bool direct_lighting_geometry_is_valid(const DeviceTask task) {
-  return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
-}
-
-////////////////////////////////////////////////////////////////////
-// Shadowing
-////////////////////////////////////////////////////////////////////
-
-__device__ RGBF direct_lighting_sun_shadowing(const TriangleHandle handle, const DirectLightingShadowTask task) {
-#ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_sun_shadowing(handle, task.origin, task.ray, task.limit, task.trace_status);
-
-  if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
-    return splat_color(0.0f);
-
-  if (task.trace_status == OPTIX_TRACE_STATUS_OPTIONAL_UNUSED)
-    return splat_color(1.0f);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(task.volume_type, task.origin, task.ray, task.limit));
-
-  return visibility;
-#else  /* !DIRECT_LIGHTING_NO_SHADOW */
-  return splat_color(1.0f);
-#endif /* DIRECT_LIGHTING_NO_SHADOW */
-}
-
-__device__ RGBF direct_lighting_shadowing(const TriangleHandle handle, const DirectLightingShadowTask task) {
-#ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_geometry_shadowing(handle, task.origin, task.ray, task.limit, task.target_light, task.trace_status);
-
-  if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
-    return splat_color(0.0f);
-
-  if (task.trace_status == OPTIX_TRACE_STATUS_OPTIONAL_UNUSED)
-    return splat_color(1.0f);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(task.volume_type, task.origin, task.ray, task.limit));
-
-  return visibility;
-#else  /* !DIRECT_LIGHTING_NO_SHADOW */
-  return splat_color(1.0f);
-#endif /* DIRECT_LIGHTING_NO_SHADOW */
-}
 
 ////////////////////////////////////////////////////////////////////
 // Sun
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ RGBF
-  direct_lighting_sun_direct(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos, DirectLightingShadowTask& task) {
+__device__ DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
   ////////////////////////////////////////////////////////////////////
   // Sample a direction using BSDF importance sampling
   ////////////////////////////////////////////////////////////////////
@@ -133,8 +65,9 @@ __device__ RGBF
   const float sum_weights = weight_bsdf + weight_solid_angle;
 
   if (sum_weights == 0.0f) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
   }
 
   float target_pdf;
@@ -154,33 +87,39 @@ __device__ RGBF
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
   if (target_pdf == 0.0f) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
   }
 
   if (color_importance(light_color) == 0.0f) {
-    task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-    return splat_color(0.0f);
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
   }
 
   ////////////////////////////////////////////////////////////////////
-  // Create shadow task
+  // Volume transmittance
   ////////////////////////////////////////////////////////////////////
 
-  task.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task.origin       = ctx.position;
-  task.ray          = dir;
-  task.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
-  task.limit        = FLT_MAX;
-  task.volume_type  = ctx.volume_type;
+  light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.origin, dir, FLT_MAX));
 
-  return light_color;
+  ////////////////////////////////////////////////////////////////////
+  // Create task
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTaskDirectLightSun task;
+  task.light_color = record_pack(light_color);
+  task.ray         = ray_pack(dir);
+
+  return task;
 }
 
 template <MaterialType TYPE>
-__device__ RGBF direct_lighting_sun_caustic(
-  MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos, const bool is_underwater, DirectLightingShadowTask& task0,
-  DirectLightingShadowTask& task1) {
+__device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
+  // Caustics are only for underwater starting with v1.2.0
+  constexpr bool IS_UNDERWATER = true;
+
   ////////////////////////////////////////////////////////////////////
   // Sample a caustic connection vertex using RIS
   ////////////////////////////////////////////////////////////////////
@@ -188,10 +127,13 @@ __device__ RGBF direct_lighting_sun_caustic(
   float solid_angle;
   const float2 sun_dir_random                  = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_SUN_RAY, index);
   const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
-  const CausticsSamplingDomain sampling_domain = caustics_get_domain(ctx, sun_dir, is_underwater);
+  const CausticsSamplingDomain sampling_domain = caustics_get_domain(ctx, sun_dir, IS_UNDERWATER);
 
-  if (sampling_domain.valid == false)
-    return splat_color(0.0f);
+  if (sampling_domain.valid == false) {
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
+  }
 
   vec3 connection_point;
   float sum_connection_weight = 0.0f;
@@ -200,7 +142,7 @@ __device__ RGBF direct_lighting_sun_caustic(
   if (sampling_domain.fast_path) {
     vec3 sample_point;
     float sample_weight;
-    caustics_find_connection_point(ctx, index, sampling_domain, is_underwater, 0, 1, sample_point, sample_weight);
+    caustics_find_connection_point(ctx, index, sampling_domain, IS_UNDERWATER, 0, 1, sample_point, sample_weight);
 
     sum_connection_weight = sample_weight;
     connection_point      = sample_point;
@@ -238,7 +180,7 @@ __device__ RGBF direct_lighting_sun_caustic(
       vec3 sample_point;
       float sample_weight = 0.0f;
       const bool valid_hit =
-        caustics_find_connection_point(ctx, index, sampling_domain, is_underwater, current_index, num_samples, sample_point, sample_weight);
+        caustics_find_connection_point(ctx, index, sampling_domain, IS_UNDERWATER, current_index, num_samples, sample_point, sample_weight);
 
       if (valid_hit == false || sample_weight == 0.0f)
         continue;
@@ -270,14 +212,16 @@ __device__ RGBF direct_lighting_sun_caustic(
     // Inspired by the famous factor required for refraction when sampling importance. Note that one of the IOR is 1.0f.
     connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index;
 
-    if (is_underwater) {
+    if (IS_UNDERWATER) {
       // ... and why not apply it again, we are just sampling some extra importance clearly. And a 2.0f for good measure.
       connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index * 2.0f;
     }
   }
 
   if (sum_connection_weight == 0.0f) {
-    return splat_color(0.0f);
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -306,79 +250,36 @@ __device__ RGBF direct_lighting_sun_caustic(
   light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
   if (color_importance(light_color) == 0.0f) {
-    return splat_color(0.0f);
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
   }
 
   ////////////////////////////////////////////////////////////////////
-  // Create shadow task
+  // Volume transmittance
   ////////////////////////////////////////////////////////////////////
 
-  task0.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task0.origin       = ctx.position;
-  task0.ray          = dir;
-  task0.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
-  task0.limit        = dist;
-  task0.volume_type  = ctx.volume_type;
+  const VolumeType second_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
 
-  task1.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task1.origin       = connection_point;
-  task1.ray          = sun_dir;
-  task1.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
-  task1.limit        = FLT_MAX;
-  task1.volume_type  = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+  light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.origin, dir, dist));
+  light_color = mul_color(light_color, volume_integrate_transmittance(second_volume, connection_point, sun_dir, FLT_MAX));
+
+  ////////////////////////////////////////////////////////////////////
+  // Create task
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTaskDirectLightSun task;
+  task.light_color = record_pack(light_color);
+  task.ray         = ray_pack(dir);
 
   return light_color;
-}
-
-////////////////////////////////////////////////////////////////////
-// Geometry
-////////////////////////////////////////////////////////////////////
-
-template <MaterialType TYPE>
-__device__ RGBF direct_lighting_geometry_sample(MaterialContext<TYPE> ctx, const ushort2 pixel, DirectLightingShadowTask& task) {
-  const LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
-
-  const bool valid_sample = sample.handle.instance_id != INSTANCE_ID_INVALID;
-
-  ////////////////////////////////////////////////////////////////////
-  // Create shadow task
-  ////////////////////////////////////////////////////////////////////
-
-  task.trace_status = (valid_sample) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  task.origin       = ctx.position;
-  task.ray          = sample.ray;
-  task.target_light = sample.handle;
-  task.limit        = sample.dist;
-  task.volume_type  = ctx.volume_type;
-
-  return (valid_sample) ? sample.light_color : splat_color(0.0f);
-}
-
-template <>
-__device__ RGBF
-  direct_lighting_geometry_sample<MATERIAL_VOLUME>(MaterialContextVolume ctx, const ushort2 pixel, DirectLightingShadowTask& task) {
-  const LightSampleResult<MATERIAL_VOLUME> sample = light_sample(ctx, pixel);
-
-  const RGBF shadowed_result = bridges_sample_apply_shadowing(ctx, sample, pixel);
-
-  ////////////////////////////////////////////////////////////////////
-  // Create dummy shadow task
-  ////////////////////////////////////////////////////////////////////
-
-  task.trace_status = OPTIX_TRACE_STATUS_ABORT;
-  task.origin       = get_vector(0.0f, 0.0f, 0.0f);
-  task.ray          = get_vector(0.0f, 0.0f, 1.0f);
-  task.target_light = triangle_handle_get(INSTANCE_ID_INVALID, 0);
-  task.limit        = 0.0f;
-  task.volume_type  = VOLUME_TYPE_NONE;
-
-  return shadowed_result;
 }
 
 ////////////////////////////////////////////////////////////////////
 // Ambient
 ////////////////////////////////////////////////////////////////////
 
+#if 0
 template <MaterialType TYPE>
 __device__ RGBF direct_lighting_ambient_sample(
   MaterialContext<TYPE> ctx, const ushort2 index, DirectLightingShadowTask& task1, DirectLightingShadowTask& task2) {
@@ -459,99 +360,112 @@ __device__ RGBF direct_lighting_ambient_sample(
 
   return light_color;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////
-// Main function
+// Utils
+////////////////////////////////////////////////////////////////////
+
+__device__ bool direct_lighting_geometry_is_allowed(const DeviceTask task) {
+  return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
+}
+
+////////////////////////////////////////////////////////////////////
+// Main functions
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ RGBF direct_lighting_sun(const MaterialContext<TYPE> ctx, const ushort2 index) {
+__device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 index) {
+  if (LIGHTS_ARE_PRESENT == false) {
+    DeviceTaskDirectLightGeo task;
+    task.light_id = LIGHT_ID_INVALID;
+    return task;
+  }
+
+  LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
+
   ////////////////////////////////////////////////////////////////////
-  // Decide on method
+  // Volume transmittance
   ////////////////////////////////////////////////////////////////////
 
+  if constexpr (TYPE != MATERIAL_VOLUME) {
+    const RGBF transmittance = volume_integrate_transmittance(ctx.volume_type, ctx.origin, sample.ray, sample.dist);
+    sample.light_color       = mul_color(sample.light_color, transmittance);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Create task
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTaskDirectLightGeo task;
+  task.light_id    = sample.light_id;
+  task.light_color = sample.light_color;
+  task.direct.ray  = sample.ray;
+  task.direct.dist = sample.dist;
+
+  return task;
+}
+
+template <MaterialType TYPE>
+__device__ DeviceTaskDirectLightSun direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const ushort2 index) {
   const vec3 sky_pos = world_to_sky_transform(ctx.position);
 
   const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const bool inside_earth      = get_length(sky_pos) < SKY_EARTH_RADIUS;
   const bool sun_visible       = (sun_below_horizon == false) && (inside_earth == false);
 
-  bool sample_direct  = true;
-  bool sample_caustic = false;
-  bool is_underwater  = false;
-
-  if (device.ocean.active) {
-    is_underwater  = ctx.volume_type == VOLUME_TYPE_OCEAN;
-    sample_direct  = !is_underwater;
-    sample_caustic = (device.ocean.caustics_active && TYPE == MATERIAL_GEOMETRY) || is_underwater;
-  }
-
   // Sun is not present
   if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR || sun_visible == false) {
-    sample_direct  = false;
-    sample_caustic = false;
+    DeviceTaskDirectLightSun task;
+    task.light_color = splat_color(0.0f);
+
+    return task;
   }
 
-  ////////////////////////////////////////////////////////////////////
-  // Execute sun lighting
-  ////////////////////////////////////////////////////////////////////
-
-  DirectLightingShadowTask task_caustic0;
-  task_caustic0.trace_status = OPTIX_TRACE_STATUS_ABORT;
-  DirectLightingShadowTask task_caustic1;
-  task_caustic1.trace_status = OPTIX_TRACE_STATUS_ABORT;
-  RGBF light_caustic         = splat_color(0.0f);
-
-  if (sample_caustic) {
-    light_caustic = direct_lighting_sun_caustic(ctx, index, sky_pos, is_underwater, task_caustic0, task_caustic1);
+  DeviceTaskDirectLightSun task;
+  if (ctx.volume_type == VOLUME_TYPE_OCEAN) {
+    task = direct_lighting_sun_caustic(ctx, index, sky_pos);
+  }
+  else {
+    task = direct_lighting_sun_direct(ctx, index, sky_pos);
   }
 
-  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(ctx.get_handle(), task_caustic0));
-  light_caustic = mul_color(light_caustic, direct_lighting_sun_shadowing(ctx.get_handle(), task_caustic1));
-
-  DirectLightingShadowTask task_direct;
-  task_direct.trace_status = OPTIX_TRACE_STATUS_ABORT;
-  RGBF light_direct        = splat_color(0.0f);
-
-  if (sample_direct) {
-    light_direct = direct_lighting_sun_direct(ctx, index, sky_pos, task_direct);
-  }
-
-  light_direct = mul_color(light_direct, direct_lighting_sun_shadowing(ctx.get_handle(), task_direct));
-
-  return add_color(light_caustic, light_direct);
+  return task;
 }
 
 template <MaterialType TYPE>
-__device__ RGBF direct_lighting_geometry(const MaterialContext<TYPE> ctx, const ushort2 index) {
-  DirectLightingShadowTask task;
-  RGBF light = direct_lighting_geometry_sample<TYPE>(ctx, index, task);
+__device__ DeviceTaskDirectLightAmbient
+  direct_lighting_ambient_create_task(const MaterialContext<TYPE>& ctx, const BSDFSampleInfo<TYPE>& bounce_sample, const ushort2 index) {
+  ////////////////////////////////////////////////////////////////////
+  // Compute ambient color
+  ////////////////////////////////////////////////////////////////////
 
-  light = mul_color(light, direct_lighting_shadowing(ctx.get_handle(), task));
+  RGBF light_color = sky_color_no_compute(ctx.position, bounce_sample.ray, 0);
+  light_color      = mul_color(light_color, bounce_sample.weight);
 
-  return light;
+  ////////////////////////////////////////////////////////////////////
+  // Create task
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTaskDirectLightAmbient task;
+  task.light_color = record_pack(light_color);
+  task.ray         = ray_direction_pack(bounce_sample.ray);
+
+  return task;
 }
 
-template <>
-__device__ RGBF direct_lighting_geometry<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 index) {
-  DirectLightingShadowTask task;
-  RGBF light = direct_lighting_geometry_sample(ctx, index, task);
+#ifdef OPTIX_KERNEL
 
-  return light;
+__device__ RGBF direct_lighting_geometry_evaluate_task(
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightGeo& direct_light_task) {
 }
 
-template <MaterialType TYPE>
-__device__ RGBF direct_lighting_ambient(const MaterialContext<TYPE> ctx, const ushort2 index) {
-  DirectLightingShadowTask task1;
-  task1.trace_status = OPTIX_TRACE_STATUS_ABORT;
-  DirectLightingShadowTask task2;
-  task2.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
-  RGBF light         = direct_lighting_ambient_sample(ctx, index, task1, task2);
+__device__ RGBF direct_lighting_sun_evaluate_task(
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightSun& direct_light_task) {
+}
 
-  light = mul_color(light, direct_lighting_sun_shadowing(ctx.get_handle(), task1));
-  light = mul_color(light, direct_lighting_sun_shadowing(ctx.get_handle(), task2));
-
-  return light;
+__device__ RGBF direct_lighting_ambient_evaluate_task(
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightAmbient& direct_light_task) {
 }
 
 #endif /* OPTIX_KERNEL */

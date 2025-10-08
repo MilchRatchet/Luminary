@@ -4,6 +4,18 @@
 #include "material.cuh"
 #include "utils.cuh"
 
+////////////////////////////////////////////////////////////////////
+// Utils
+////////////////////////////////////////////////////////////////////
+
+__device__ bool light_allow_geo_direct_lighting(const DeviceTask task) {
+  return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
+}
+
+////////////////////////////////////////////////////////////////////
+// Bridges
+////////////////////////////////////////////////////////////////////
+
 // This must correspond to the G term used when computing the LUT.
 #define BRIDGES_HG_G_TERM (0.85f)
 #define BRIDGES_INITIAL_VERTEX_FORWARD_PROB (0.95f)
@@ -20,16 +32,15 @@ __device__ float bridges_phase_function(const float cos_angle) {
 
 template <MaterialType TYPE>
 struct LightSampleResult {
-  TriangleHandle handle;
+  uint32_t light_id;
   vec3 ray;
   RGBF light_color;
   float dist;
-  bool is_refraction;
 };
 
 template <>
 struct LightSampleResult<MATERIAL_VOLUME> {
-  TriangleHandle handle;
+  uint32_t light_id;
   RGBF light_color;
   uint32_t seed;
   Quaternion rotation;
