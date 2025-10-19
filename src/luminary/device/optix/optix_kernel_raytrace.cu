@@ -1,5 +1,5 @@
 // OptiX translation unit setup
-#include "optix_compile_defines.cuh"
+#define OPTIX_KERNEL
 //
 
 #include "math.cuh"

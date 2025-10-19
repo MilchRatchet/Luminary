@@ -13,21 +13,24 @@
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
-  // TODO: Combine particle and geometry tasks into one as they have the same shadow logic
-  const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
-  const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
-  const uint32_t task_id     = TASK_ID;
+  const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
+  const uint32_t task_id    = TASK_ID;
 
   if (task_id >= task_count)
     return;
 
-  const uint32_t task_base_address = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
+  const uint32_t task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
   DeviceTask task                  = task_load(task_base_address);
   const DeviceTaskTrace trace      = task_trace_load(task_base_address);
 
+  const VolumeType volume_type  = VolumeType(task.volume_id);
+  const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
+
+  MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
+
   task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-  const uint32_t direct_light_task_base_address = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+  const uint32_t direct_light_task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
   RGBF accumulated_light = splat_color(0.0f);
 
@@ -36,13 +39,20 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   {
-    const DeviceTaskDirectLightGeo direct_light_task = task_direct_light_geo_load(direct_light_task_base_address);
+    const DeviceTaskDirectLightBridges direct_light_task = task_direct_light_bridges_load(direct_light_task_base_address);
 
-    const bool is_allowed          = direct_lighting_geometry_is_allowed(task);
-    const RGBF direct_light_result = direct_lighting_geometry_evaluate_task(task, trace, direct_light_task, is_allowed);
+    const bool is_allowed          = direct_lighting_bridges_is_allowed(ctx);
+    const RGBF direct_light_result = direct_lighting_bridges_evaluate_task(ctx, direct_light_task, task.index, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
   }
+
+  ////////////////////////////////////////////////////////////////////
+  // Initial vertex sampling for Sun and Ambient
+  ////////////////////////////////////////////////////////////////////
+
+  RGBF initial_vertex_weight;
+  volume_sample_sky_dl_initial_vertex(ctx, task.index, initial_vertex_weight);
 
   ////////////////////////////////////////////////////////////////////
   // Shadow Sun
@@ -51,10 +61,10 @@ extern "C" __global__ void __raygen__optix() {
   {
     const DeviceTaskDirectLightSun direct_light_task = task_direct_light_sun_load(direct_light_task_base_address);
 
-    const bool is_allowed          = direct_lighting_sun_is_allowed(task);
+    const bool is_allowed          = direct_lighting_sun_is_allowed(ctx);
     const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, direct_light_task, is_allowed);
 
-    accumulated_light = add_color(accumulated_light, direct_light_result);
+    accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -64,10 +74,10 @@ extern "C" __global__ void __raygen__optix() {
   {
     const DeviceTaskDirectLightAmbient direct_light_task = task_direct_light_ambient_load(direct_light_task_base_address);
 
-    const bool is_allowed          = direct_lighting_ambient_is_allowed(task);
+    const bool is_allowed          = direct_lighting_ambient_is_allowed(ctx);
     const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, direct_light_task, is_allowed);
 
-    accumulated_light = add_color(accumulated_light, direct_light_result);
+    accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
   }
 
   ////////////////////////////////////////////////////////////////////

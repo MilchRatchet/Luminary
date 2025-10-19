@@ -18,13 +18,9 @@ struct ShadowTraceTask {
   VolumeType volume_type;
 } typedef DirectLightingShadowTask;
 
-////////////////////////////////////////////////////////////////////
-// Shadowing
-////////////////////////////////////////////////////////////////////
-
-__device__ RGBF direct_lighting_sun_shadowing(const TriangleHandle handle, const ShadowTraceTask task) {
+__device__ RGBF shadow_evaluate(const ShadowTraceTask& task, const TriangleHandle self_handle) {
 #ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_sun_shadowing(handle, task.origin, task.ray, task.limit, task.trace_status);
+  RGBF visibility = optix_geometry_shadowing(self_handle, task.origin, task.ray, task.limit, task.target_light, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
@@ -40,9 +36,9 @@ __device__ RGBF direct_lighting_sun_shadowing(const TriangleHandle handle, const
 #endif /* DIRECT_LIGHTING_NO_SHADOW */
 }
 
-__device__ RGBF direct_lighting_shadowing(const TriangleHandle handle, const ShadowTraceTask task) {
+__device__ RGBF shadow_evaluate_sun(const ShadowTraceTask& task, const TriangleHandle self_handle) {
 #ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_geometry_shadowing(handle, task.origin, task.ray, task.limit, task.target_light, task.trace_status);
+  RGBF visibility = optix_sun_shadowing(self_handle, task.origin, task.ray, task.limit, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);

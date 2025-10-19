@@ -263,4 +263,6 @@ __device__ bool triangle_handle_equal(const TriangleHandle handle1, const Triang
   return (handle1.instance_id == handle2.instance_id) && (handle1.tri_id == handle2.tri_id);
 }
 
+#define TRIANGLE_HANDLE_INVALID (triangle_handle_get(INSTANCE_ID_INVALID, 0))
+
 #endif /* CU_UTILS_H */

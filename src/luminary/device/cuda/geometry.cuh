@@ -54,9 +54,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting Sun
     ////////////////////////////////////////////////////////////////////
 
-    const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
+    if (direct_lighting_sun_is_allowed(task)) {
+      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
 
-    task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
+      task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
@@ -68,9 +70,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting Ambient
     ////////////////////////////////////////////////////////////////////
 
-    const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
+    if (direct_lighting_ambient_is_allowed(task)) {
+      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
 
-    task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
+      task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Update delta path state

@@ -172,22 +172,10 @@ foreach(kernel_arch ${kernel_archs})
   compile_ptx(optix_kernel_raytrace optix_kernel_raytrace ${kernel_arch} ptx_file)
   list(APPEND ptx_files ${ptx_file})
 
-  compile_ptx(optix_kernel_shading_geometry optix_kernel_shading_geometry_geo ${kernel_arch} ptx_file)
+  compile_ptx(optix_kernel_shadow optix_kernel_shadow ${kernel_arch} ptx_file)
   list(APPEND ptx_files ${ptx_file})
 
-  compile_ptx(optix_kernel_shading_geometry optix_kernel_shading_geometry_sky ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
-
-  compile_ptx(optix_kernel_shading_volume optix_kernel_shading_volume_geo ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
-
-  compile_ptx(optix_kernel_shading_volume optix_kernel_shading_volume_sky ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
-
-  compile_ptx(optix_kernel_shading_particles optix_kernel_shading_particles_geo ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
-
-  compile_ptx(optix_kernel_shading_particles optix_kernel_shading_particles_sky ${kernel_arch} ptx_file)
+  compile_ptx(optix_kernel_shadow_volume optix_kernel_shadow_volume ${kernel_arch} ptx_file)
   list(APPEND ptx_files ${ptx_file})
 endforeach()
 

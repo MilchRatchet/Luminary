@@ -357,18 +357,8 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
 struct DeviceTaskDirectLightGeo {
   uint32_t light_id;
   RGBF light_color;
-
-  union {
-    struct {
-      vec3 ray;
-      float dist;
-    } direct;
-    struct {
-      uint32_t seed;
-      Quaternion16 rotation;
-      float scale;
-    } bridges;
-  };
+  vec3 ray;
+  float dist;
 } typedef DeviceTaskDirectLightGeo;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightGeo, 0x20);
 
@@ -384,8 +374,20 @@ struct DeviceTaskDirectLightAmbient {
 } typedef DeviceTaskDirectLightAmbient;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightAmbient, 0x10);
 
+struct DeviceTaskDirectLightBridges {
+  uint32_t light_id;
+  RGBF light_color;
+  uint32_t seed;
+  Quaternion16 rotation;
+  float scale;
+} typedef DeviceTaskDirectLightBridges;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightBridges, 0x20);
+
 struct DeviceTaskDirectLight {
-  DeviceTaskDirectLightGeo geo;
+  union {
+    DeviceTaskDirectLightGeo geo;
+    DeviceTaskDirectLightBridges bridges;
+  };
   DeviceTaskDirectLightSun sun;
   DeviceTaskDirectLightAmbient ambient;
 } typedef DeviceTaskDirectLight;

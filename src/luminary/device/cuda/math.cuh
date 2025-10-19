@@ -8,121 +8,6 @@
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
-// Packing
-////////////////////////////////////////////////////////////////////
-
-__device__ float bfloat_unpack(const BFloat16 val) {
-  const uint32_t data = val;
-
-  return __uint_as_float(data << 16);
-}
-
-__device__ BFloat16 bfloat_pack(const float val) {
-  return __float_as_uint(val) >> 16;
-}
-
-__device__ float unsigned_bfloat_unpack(const UnsignedBFloat16 val) {
-  const uint32_t data = val;
-
-  return __uint_as_float(data << 15);
-}
-
-__device__ UnsignedBFloat16 unsigned_bfloat_pack(const float val) {
-  return (__float_as_uint(val) >> 15) & 0xFFFF;
-}
-
-__device__ RGBF record_unpack(const PackedRecord packed) {
-  // 21 bits each
-  const uint32_t red   = packed.x & 0x1FFFFF;
-  const uint32_t green = (packed.x >> 21) | ((packed.y & 0x3FF) << 11);
-  const uint32_t blue  = packed.y >> 10;
-
-  RGBF record;
-  record.r = __uint_as_float(red << 11);
-  record.g = __uint_as_float(green << 11);
-  record.b = __uint_as_float(blue << 11);
-
-  return record;
-}
-
-__device__ PackedRecord record_pack(const RGBF record) {
-  const uint32_t red   = __float_as_uint(record.r) >> 11;
-  const uint32_t green = __float_as_uint(record.g) >> 11;
-  const uint32_t blue  = __float_as_uint(record.b) >> 11;
-
-  PackedRecord packed;
-  packed.x = red | (green << 21);
-  packed.y = (green >> 11) | (blue << 10);
-
-  return packed;
-}
-
-__device__ MISPayload mis_payload_unpack(const PackedMISPayload packed) {
-  MISPayload payload;
-  payload.origin.x             = bfloat_unpack(packed.x & 0xFFFF);
-  payload.origin.y             = bfloat_unpack(packed.x >> 16);
-  payload.origin.z             = bfloat_unpack(packed.y & 0xFFFF);
-  payload.sampling_probability = unsigned_bfloat_unpack(packed.y >> 16);
-
-  return payload;
-}
-
-__device__ PackedMISPayload mis_payload_pack(const MISPayload payload) {
-  PackedMISPayload packed;
-  packed.x = (uint32_t) bfloat_pack(payload.origin.x);
-  packed.x |= ((uint32_t) bfloat_pack(payload.origin.y)) << 16;
-  packed.y = (uint32_t) bfloat_pack(payload.origin.z);
-  packed.y |= ((uint32_t) unsigned_bfloat_pack(payload.sampling_probability)) << 16;
-
-  return packed;
-}
-
-__device__ vec3 ray_unpack(const PackedRayDirection packed) {
-  float x = packed.x * (1.0f / 0xFFFFFFFF);
-  float y = packed.y * (1.0f / 0xFFFFFFFF);
-
-  x = (x * 2.0f) - 1.0f;
-  y = (y * 2.0f) - 1.0f;
-
-  vec3 ray      = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
-  const float t = __saturatef(-ray.z);
-
-  ray.x += (ray.x >= 0.0f) ? -t : t;
-  ray.y += (ray.y >= 0.0f) ? -t : t;
-
-  return normalize_vector(ray);
-}
-
-__device__ PackedRayDirection ray_pack(const vec3 ray) {
-  float x = ray.x;
-  float y = ray.y;
-  float z = ray.z;
-
-  const float recip_norm = 1.0f / (fabsf(x) + fabsf(y) + fabsf(z));
-
-  x *= recip_norm;
-  y *= recip_norm;
-  z *= recip_norm;
-
-  const float t = __saturatef(-z);
-
-  x += (x >= 0.0f) ? t : -t;
-  y += (y >= 0.0f) ? t : -t;
-
-  x = clampf(x, -1.0f, 1.0f);
-  y = clampf(y, -1.0f, 1.0f);
-
-  x = (x + 1.0f) * 0.5f;
-  y = (y + 1.0f) * 0.5f;
-
-  PackedRayDirection packed;
-  packed.x = (uint32_t) (x * 0xFFFFFFFF + 0.5);
-  packed.y = (uint32_t) (y * 0xFFFFFFFF + 0.5);
-
-  return packed;
-}
-
-////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////
 
@@ -1725,6 +1610,132 @@ __device__ vec3 normal_adaptation_apply(const vec3 V, vec3 shading_normal, const
   }
 
   return shading_normal;
+}
+
+////////////////////////////////////////////////////////////////////
+// Packing
+////////////////////////////////////////////////////////////////////
+
+__device__ float bfloat_unpack(const BFloat16 val) {
+  const uint32_t data = val;
+
+  return __uint_as_float(data << 16);
+}
+
+__device__ BFloat16 bfloat_pack(const float val) {
+  return __float_as_uint(val) >> 16;
+}
+
+__device__ float unsigned_bfloat_unpack(const UnsignedBFloat16 val) {
+  const uint32_t data = val;
+
+  return __uint_as_float(data << 15);
+}
+
+__device__ UnsignedBFloat16 unsigned_bfloat_pack(const float val) {
+  return (__float_as_uint(val) >> 15) & 0xFFFF;
+}
+
+__device__ RGBF record_unpack(const PackedRecord packed) {
+  // 21 bits each
+  const uint32_t red   = packed.x & 0x1FFFFF;
+  const uint32_t green = (packed.x >> 21) | ((packed.y & 0x3FF) << 11);
+  const uint32_t blue  = packed.y >> 10;
+
+  RGBF record;
+  record.r = __uint_as_float(red << 11);
+  record.g = __uint_as_float(green << 11);
+  record.b = __uint_as_float(blue << 11);
+
+  return record;
+}
+
+__device__ PackedRecord record_pack(const RGBF record) {
+  const uint32_t red   = __float_as_uint(record.r) >> 11;
+  const uint32_t green = __float_as_uint(record.g) >> 11;
+  const uint32_t blue  = __float_as_uint(record.b) >> 11;
+
+  PackedRecord packed;
+  packed.x = red | (green << 21);
+  packed.y = (green >> 11) | (blue << 10);
+
+  return packed;
+}
+
+__device__ MISPayload mis_payload_unpack(const PackedMISPayload packed) {
+  MISPayload payload;
+  payload.origin.x             = bfloat_unpack(packed.x & 0xFFFF);
+  payload.origin.y             = bfloat_unpack(packed.x >> 16);
+  payload.origin.z             = bfloat_unpack(packed.y & 0xFFFF);
+  payload.sampling_probability = unsigned_bfloat_unpack(packed.y >> 16);
+
+  return payload;
+}
+
+__device__ PackedMISPayload mis_payload_pack(const MISPayload payload) {
+  PackedMISPayload packed;
+  packed.x = (uint32_t) bfloat_pack(payload.origin.x);
+  packed.x |= ((uint32_t) bfloat_pack(payload.origin.y)) << 16;
+  packed.y = (uint32_t) bfloat_pack(payload.origin.z);
+  packed.y |= ((uint32_t) unsigned_bfloat_pack(payload.sampling_probability)) << 16;
+
+  return packed;
+}
+
+__device__ vec3 ray_unpack(const PackedRayDirection packed) {
+  float x = packed.x * (1.0f / 0xFFFFFFFF);
+  float y = packed.y * (1.0f / 0xFFFFFFFF);
+
+  x = (x * 2.0f) - 1.0f;
+  y = (y * 2.0f) - 1.0f;
+
+  vec3 ray      = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
+  const float t = __saturatef(-ray.z);
+
+  ray.x += (ray.x >= 0.0f) ? -t : t;
+  ray.y += (ray.y >= 0.0f) ? -t : t;
+
+  return normalize_vector(ray);
+}
+
+__device__ PackedRayDirection ray_pack(const vec3 ray) {
+  float x = ray.x;
+  float y = ray.y;
+  float z = ray.z;
+
+  const float recip_norm = 1.0f / (fabsf(x) + fabsf(y) + fabsf(z));
+
+  x *= recip_norm;
+  y *= recip_norm;
+  z *= recip_norm;
+
+  const float t = __saturatef(-z);
+
+  x += (x >= 0.0f) ? t : -t;
+  y += (y >= 0.0f) ? t : -t;
+
+  x = clampf(x, -1.0f, 1.0f);
+  y = clampf(y, -1.0f, 1.0f);
+
+  x = (x + 1.0f) * 0.5f;
+  y = (y + 1.0f) * 0.5f;
+
+  PackedRayDirection packed;
+  packed.x = (uint32_t) (x * 0xFFFFFFFF + 0.5f);
+  packed.y = (uint32_t) (y * 0xFFFFFFFF + 0.5f);
+
+  return packed;
+}
+
+__device__ Quaternion16 quaternion_pack(const Quaternion q) {
+  // We use the inverse of the quaternion so that it matches with our Quaternion to Matrix conversion for the OptiX BVH.
+  Quaternion16 dst;
+  dst.x = (uint16_t) (((1.0f - q.x) * 0x7FFF) + 0.5f);
+  dst.y = (uint16_t) (((1.0f - q.y) * 0x7FFF) + 0.5f);
+  dst.z = (uint16_t) (((1.0f - q.z) * 0x7FFF) + 0.5f);
+  dst.w = (uint16_t) (((1.0f + q.w) * 0x7FFF) + 0.5f);
+
+  return dst;
 }
 
 #endif /* CU_MATH_H */

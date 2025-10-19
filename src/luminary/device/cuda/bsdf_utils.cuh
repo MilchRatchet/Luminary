@@ -41,7 +41,7 @@ struct BSDFSampleInfo<MATERIAL_GEOMETRY> {
 template <>
 struct BSDFSampleInfo<MATERIAL_VOLUME> {
   vec3 ray;
-  static constexpr RGBF weight              = {1.0f, 1.0f, 1.0f};
+  const RGBF weight                         = {1.0f, 1.0f, 1.0f};
   static constexpr bool is_transparent_pass = false;
   static constexpr bool is_microfacet_based = false;
 };

@@ -51,26 +51,6 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
   }
 }
 
-__device__ bool volume_should_do_geometry_direct_lighting(const VolumeType type, const uint8_t state) {
-  if ((state & STATE_FLAG_DELTA_PATH) == 0)
-    return false;
-
-  if (type == VOLUME_TYPE_NONE)
-    return false;
-
-  if (type == VOLUME_TYPE_OCEAN && (device.ocean.triangle_light_contribution == false))
-    return false;
-
-  return true;
-}
-
-__device__ bool volume_should_do_sky_direct_lighting(const VolumeType type, const uint8_t state) {
-  if (type == VOLUME_TYPE_NONE)
-    return false;
-
-  return true;
-}
-
 struct VolumePath {
   union {
     float2 data;
@@ -328,24 +308,32 @@ __device__ MaterialContextVolume volume_get_context(const DeviceTask task, const
   return ctx;
 }
 
-__device__ void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, DeviceTaskThroughput& throughput) {
+__device__ float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const ushort2 pixel) {
   const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, pixel);
 
-  const float t = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
+  const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
 
+  ctx.position = add_vector(ctx.position, scale_vector(ctx.V, -dist));
+
+  return dist;
+}
+
+__device__ RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContextVolume& ctx, const float dist) {
   const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
 
-  RGBF record = record_unpack(throughput.record);
+  RGBF weight;
+  weight.r = expf(-dist * volume_transmittance.r) * ctx.descriptor.scattering.r;
+  weight.g = expf(-dist * volume_transmittance.g) * ctx.descriptor.scattering.g;
+  weight.b = expf(-dist * volume_transmittance.b) * ctx.descriptor.scattering.b;
 
-  record.r *= expf(-t * volume_transmittance.r) * ctx.descriptor.scattering.r;
-  record.g *= expf(-t * volume_transmittance.g) * ctx.descriptor.scattering.g;
-  record.b *= expf(-t * volume_transmittance.b) * ctx.descriptor.scattering.b;
+  weight = scale_color(weight, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.max_dist, dist));
 
-  record = scale_color(record, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.max_dist, t));
+  return weight;
+}
 
-  throughput.record = record_pack(record);
-
-  ctx.position = add_vector(ctx.position, scale_vector(ctx.V, -t));
+__device__ void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, RGBF& weight) {
+  const float dist = volume_sample_sky_dl_initial_vertex_dist(ctx, pixel);
+  weight           = volume_sample_sky_dl_initial_vertex_weight(ctx, dist);
 }
 
 #endif /* CU_VOLUME_UTILS_H */

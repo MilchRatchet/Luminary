@@ -248,6 +248,10 @@ __device__ DeviceTaskDirectLightAmbient task_direct_light_ambient_load(const uin
   return load_task_state<DeviceTaskDirectLightAmbient, float4>(base_address, offsetof(DeviceTaskDirectLight, ambient));
 }
 
+__device__ DeviceTaskDirectLightBridges task_direct_light_bridges_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightBridges, float4>(base_address, offsetof(DeviceTaskDirectLight, bridges));
+}
+
 __device__ void task_direct_light_geo_store(const uint32_t base_address, const DeviceTaskDirectLightGeo data) {
   store_task_state<DeviceTaskDirectLightGeo, float4>(base_address, offsetof(DeviceTaskDirectLight, geo), data);
 }
@@ -258,6 +262,10 @@ __device__ void task_direct_light_sun_store(const uint32_t base_address, const D
 
 __device__ void task_direct_light_ambient_store(const uint32_t base_address, const DeviceTaskDirectLightAmbient data) {
   store_task_state<DeviceTaskDirectLightAmbient, float4>(base_address, offsetof(DeviceTaskDirectLight, ambient), data);
+}
+
+__device__ void task_direct_light_bridges_store(const uint32_t base_address, const DeviceTaskDirectLightBridges data) {
+  store_task_state<DeviceTaskDirectLightBridges, float4>(base_address, offsetof(DeviceTaskDirectLight, bridges), data);
 }
 
 ////////////////////////////////////////////////////////////////////

@@ -1,15 +1,12 @@
 #ifndef CU_LUMINARY_LIGHT_BRIDGES_H
 #define CU_LUMINARY_LIGHT_BRIDGES_H
 
-#if defined(OPTIX_KERNEL)
-
 #include "light.cuh"
 #include "light_common.cuh"
 #include "light_triangle.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
-#include "optix_include.cuh"
 #include "random.cuh"
 #include "ris.cuh"
 #include "utils.cuh"
@@ -342,11 +339,16 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   return result;
 }
 
-__device__ RGBF
-  bridges_sample_apply_shadowing(const MaterialContextVolume ctx, const LightSampleResult<MATERIAL_VOLUME> sample, const ushort2 pixel) {
-  bool bridge_is_valid = true;
-  bridge_is_valid &= sample.handle.instance_id != INSTANCE_ID_INVALID;
-  bridge_is_valid &= sample.seed != 0xFFFFFFFF;
+#ifdef OPTIX_KERNEL
+
+#include "optix_include.cuh"
+
+__device__ RGBF bridges_sample_apply_shadowing(
+  const MaterialContextVolume ctx, const DeviceTaskDirectLightBridges& direct_light_task, const ushort2 pixel, const bool sample_is_valid) {
+  const uint32_t seed = direct_light_task.seed;
+
+  bool bridge_is_valid = sample_is_valid;
+  bridge_is_valid &= seed != 0xFFFFFFFF;
 
   ////////////////////////////////////////////////////////////////////
   // Get light sample
@@ -355,20 +357,23 @@ __device__ RGBF
   OptixTraceStatus trace_status = (bridge_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
   vec3 light_vector             = get_vector(0.0f, 0.0f, 1.0f);
   vec3 initial_vertex           = get_vector(0.0f, 0.0f, 0.0f);
+  TriangleHandle light_handle   = TRIANGLE_HANDLE_INVALID;
 
   if (bridge_is_valid) {
-    const DeviceTransform light_transform = load_transform(sample.handle.instance_id);
+    light_handle = device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id];
+
+    const DeviceTransform light_transform = load_transform(light_handle.instance_id);
 
     uint3 light_uv_packed;
-    TriangleLight light = light_triangle_sample_init(sample.handle, light_transform, light_uv_packed);
+    TriangleLight light = light_triangle_sample_init(light_handle, light_transform, light_uv_packed);
 
-    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + sample.seed, pixel);
+    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + seed, pixel);
 
     const vec3 point_on_light = light_triangle_sample_bridges(light, random_light_point);
 
     RGBF initial_attenuation;
     float initial_pdf;
-    initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, sample.seed, initial_attenuation, initial_pdf);
+    initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, seed, initial_attenuation, initial_pdf);
 
     vec3 light_dir;
     float area, light_dist;
@@ -384,7 +389,7 @@ __device__ RGBF
   uint32_t vertex_count;
   if (bridge_is_valid) {
     float vertex_count_pdf;
-    vertex_count = bridges_sample_vertex_count(ctx.descriptor, get_length(light_vector), sample.seed, pixel, vertex_count_pdf);
+    vertex_count = bridges_sample_vertex_count(ctx.descriptor, get_length(light_vector), seed, pixel, vertex_count_pdf);
   }
   else {
     vertex_count = 1;
@@ -394,9 +399,12 @@ __device__ RGBF
   // Compute visibility of path
   ////////////////////////////////////////////////////////////////////
 
+  const Quaternion16 rotation = direct_light_task.rotation;
+  const float scale           = direct_light_task.scale;
+
   vec3 current_vertex            = initial_vertex;
   vec3 current_direction_sampled = normalize_vector(light_vector);
-  vec3 current_direction         = quaternion_apply(sample.rotation, current_direction_sampled);
+  vec3 current_direction         = quaternion16_apply(rotation, current_direction_sampled);
 
   // We don't need to trace visibility to the initial vertex as it was sampled with an interval that we know has no intersections
   RGBF shadow_term = splat_color(1.0f);
@@ -404,31 +412,31 @@ __device__ RGBF
   float sum_dist = 0.0f;
 
   float dist;
-  dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * sample.scale;
+  dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * scale;
 
   shadow_term = mul_color(
-    shadow_term, optix_geometry_shadowing(ctx.get_handle(), current_vertex, current_direction, dist, sample.handle, trace_status));
+    shadow_term, optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status));
 
   sum_dist += dist;
 
   for (int i = 1; i < vertex_count; i++) {
     current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
 
-    const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
+    const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
 
     current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
 
-    current_direction = quaternion_apply(sample.rotation, current_direction_sampled);
+    current_direction = quaternion16_apply(rotation, current_direction_sampled);
 
-    dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel)) * sample.scale;
+    dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel)) * scale;
 
     shadow_term = mul_color(
-      shadow_term, optix_geometry_shadowing(ctx.get_handle(), current_vertex, current_direction, dist, sample.handle, trace_status));
+      shadow_term, optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status));
 
     sum_dist += dist;
   }
 
-  return mul_color(sample.light_color, shadow_term);
+  return mul_color(direct_light_task.light_color, shadow_term);
 }
 
 #endif /* OPTIX_KERNEL */

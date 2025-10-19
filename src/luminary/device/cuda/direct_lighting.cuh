@@ -4,6 +4,7 @@
 #include "bsdf.cuh"
 #include "caustics.cuh"
 #include "light.cuh"
+#include "light_bridges.cuh"
 #include "light_shadow.cuh"
 #include "material.cuh"
 #include "math.cuh"
@@ -102,7 +103,7 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialContext<T
   // Volume transmittance
   ////////////////////////////////////////////////////////////////////
 
-  light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.origin, dir, FLT_MAX));
+  light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.position, dir, FLT_MAX));
 
   ////////////////////////////////////////////////////////////////////
   // Create task
@@ -241,13 +242,13 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<
 
   const vec3 ocean_normal =
     (sampling_domain.fast_path) ? get_vector(0.0f, 1.0f, 0.0f) : ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
-  const vec3 normal = scale_vector(ocean_normal, (is_underwater) ? -1.0f : 1.0f);
+  const vec3 normal = scale_vector(ocean_normal, (IS_UNDERWATER) ? -1.0f : 1.0f);
 
   bool total_reflection;
   const vec3 refraction_dir          = refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior, total_reflection);
   const float reflection_coefficient = ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior);
 
-  light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
+  light_color = scale_color(light_color, (IS_UNDERWATER) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
   if (color_importance(light_color) == 0.0f) {
     DeviceTaskDirectLightSun task;
@@ -261,7 +262,7 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<
 
   const VolumeType second_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
 
-  light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.origin, dir, dist));
+  light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.position, dir, dist));
   light_color = mul_color(light_color, volume_integrate_transmittance(second_volume, connection_point, sun_dir, FLT_MAX));
 
   ////////////////////////////////////////////////////////////////////
@@ -272,102 +273,66 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<
   task.light_color = record_pack(light_color);
   task.ray         = ray_pack(dir);
 
-  return light_color;
+  return task;
 }
-
-////////////////////////////////////////////////////////////////////
-// Ambient
-////////////////////////////////////////////////////////////////////
-
-#if 0
-template <MaterialType TYPE>
-__device__ RGBF direct_lighting_ambient_sample(
-  MaterialContext<TYPE> ctx, const ushort2 index, DirectLightingShadowTask& task1, DirectLightingShadowTask& task2) {
-  ////////////////////////////////////////////////////////////////////
-  // Early exit
-  ////////////////////////////////////////////////////////////////////
-
-  // We don't support compute based sky due to register/performance reasons and because
-  // we would have to include clouds then aswell.
-  if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT) {
-    return splat_color(0.0f);
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Sample ray
-  ////////////////////////////////////////////////////////////////////
-
-  const BSDFSampleInfo<TYPE> bounce_info = bsdf_sample<MaterialContext<TYPE>::RANDOM_DL_AMBIENT>(ctx, index);
-
-  // No ocean caustics reflection sampling for ambient DL
-  if ((ctx.volume_type != VOLUME_TYPE_OCEAN) && device.ocean.active && (bounce_info.ray.y < 0.0f)) {
-    return splat_color(0.0f);
-  }
-
-  RGBF light_color = sky_color_no_compute(ctx.position, bounce_info.ray, 0);
-  light_color      = mul_color(light_color, bounce_info.weight);
-
-  if (color_importance(light_color) == 0.0f) {
-    return splat_color(0.0f);
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Create shadow task
-  ////////////////////////////////////////////////////////////////////
-
-  task1.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-  task1.origin       = ctx.position;
-  task1.ray          = bounce_info.ray;
-  task1.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
-  task1.limit        = FLT_MAX;
-  task1.volume_type  = ctx.volume_type;
-
-  ////////////////////////////////////////////////////////////////////
-  // Ocean caustic refraction task
-  ////////////////////////////////////////////////////////////////////
-
-  // Add a second ray for ocean refraction
-  if ((ctx.volume_type == VOLUME_TYPE_OCEAN) && (bounce_info.ray.y > 0.0f)) {
-    const float ocean_intersection_dist = ocean_intersection_solver(ctx.position, bounce_info.ray, 0.0f, FLT_MAX);
-
-    const vec3 ocean_intersection = add_vector(ctx.position, scale_vector(bounce_info.ray, ocean_intersection_dist));
-
-    // Ocean normal points up, we come from below, so flip it
-    const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_intersection), -1.0f);
-    const vec3 ocean_V      = scale_vector(bounce_info.ray, -1.0f);
-
-    bool total_reflection;
-    const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
-
-    if (total_reflection) {
-      task1.trace_status = OPTIX_TRACE_STATUS_ABORT;
-      return splat_color(0.0f);
-    }
-
-    const float fresnel_term = bsdf_fresnel(ocean_normal, ocean_V, refraction, device.ocean.refractive_index);
-
-    light_color = scale_color(light_color, 1.0f - fresnel_term);
-
-    task1.limit = ocean_intersection_dist;
-
-    task2.trace_status = OPTIX_TRACE_STATUS_EXECUTE;
-    task2.origin       = ocean_intersection;
-    task2.ray          = refraction;
-    task2.target_light = triangle_handle_get(HIT_TYPE_SKY, 0);
-    task2.limit        = FLT_MAX;
-    task2.volume_type  = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
-  }
-
-  return light_color;
-}
-#endif
 
 ////////////////////////////////////////////////////////////////////
 // Utils
 ////////////////////////////////////////////////////////////////////
 
-__device__ bool direct_lighting_geometry_is_allowed(const DeviceTask task) {
-  return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
+__device__ bool direct_lighting_geometry_is_allowed(const DeviceTask& task) {
+  bool allow_geometry_lighting = true;
+
+  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == false;
+  allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
+
+  return allow_geometry_lighting;
+}
+
+__device__ bool direct_lighting_sun_is_allowed(const DeviceTask& task) {
+  bool allow_sun_lighting = true;
+
+  allow_sun_lighting &= device.sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
+
+  return allow_sun_lighting;
+}
+
+__device__ bool direct_lighting_sun_is_allowed(const MaterialContextVolume& ctx) {
+  bool allow_sun_lighting = true;
+
+  allow_sun_lighting &= device.sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
+  allow_sun_lighting &= ctx.volume_type != VOLUME_TYPE_NONE;
+
+  return allow_sun_lighting;
+}
+
+__device__ bool direct_lighting_ambient_is_allowed(const DeviceTask& task) {
+  bool allow_ambient_lighting = true;
+
+  allow_ambient_lighting &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
+
+  return allow_ambient_lighting;
+}
+
+__device__ bool direct_lighting_ambient_is_allowed(const MaterialContextVolume& ctx) {
+  bool allow_ambient_lighting = true;
+
+  allow_ambient_lighting &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
+  allow_ambient_lighting &= ctx.volume_type != VOLUME_TYPE_NONE;
+
+  return allow_ambient_lighting;
+}
+
+__device__ bool direct_lighting_bridges_is_allowed(const MaterialContextVolume& ctx) {
+  bool allow_geometry_lighting = true;
+
+  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == false;
+  allow_geometry_lighting &= (ctx.state & STATE_FLAG_DELTA_PATH) != 0;
+  allow_geometry_lighting &= (ctx.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
+  allow_geometry_lighting &= ctx.volume_type != VOLUME_TYPE_NONE;
+  allow_geometry_lighting &= (ctx.volume_type != VOLUME_TYPE_OCEAN) || device.ocean.triangle_light_contribution;
+
+  return allow_geometry_lighting;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -375,13 +340,7 @@ __device__ bool direct_lighting_geometry_is_allowed(const DeviceTask task) {
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 index) {
-  if (LIGHTS_ARE_PRESENT == false) {
-    DeviceTaskDirectLightGeo task;
-    task.light_id = LIGHT_ID_INVALID;
-    return task;
-  }
-
+__device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel) {
   LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
 
   ////////////////////////////////////////////////////////////////////
@@ -389,7 +348,7 @@ __device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const M
   ////////////////////////////////////////////////////////////////////
 
   if constexpr (TYPE != MATERIAL_VOLUME) {
-    const RGBF transmittance = volume_integrate_transmittance(ctx.volume_type, ctx.origin, sample.ray, sample.dist);
+    const RGBF transmittance = volume_integrate_transmittance(ctx.volume_type, ctx.position, sample.ray, sample.dist);
     sample.light_color       = mul_color(sample.light_color, transmittance);
   }
 
@@ -400,14 +359,14 @@ __device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const M
   DeviceTaskDirectLightGeo task;
   task.light_id    = sample.light_id;
   task.light_color = sample.light_color;
-  task.direct.ray  = sample.ray;
-  task.direct.dist = sample.dist;
+  task.ray         = sample.ray;
+  task.dist        = sample.dist;
 
   return task;
 }
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightSun direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const ushort2 index) {
+__device__ DeviceTaskDirectLightSun direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
   const vec3 sky_pos = world_to_sky_transform(ctx.position);
 
   const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -415,19 +374,19 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_create_task(const Materi
   const bool sun_visible       = (sun_below_horizon == false) && (inside_earth == false);
 
   // Sun is not present
-  if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR || sun_visible == false) {
+  if (sun_visible == false) {
     DeviceTaskDirectLightSun task;
-    task.light_color = splat_color(0.0f);
+    task.light_color = PACKED_RECORD_BLACK;
 
     return task;
   }
 
   DeviceTaskDirectLightSun task;
   if (ctx.volume_type == VOLUME_TYPE_OCEAN) {
-    task = direct_lighting_sun_caustic(ctx, index, sky_pos);
+    task = direct_lighting_sun_caustic(ctx, pixel, sky_pos);
   }
   else {
-    task = direct_lighting_sun_direct(ctx, index, sky_pos);
+    task = direct_lighting_sun_direct(ctx, pixel, sky_pos);
   }
 
   return task;
@@ -449,7 +408,24 @@ __device__ DeviceTaskDirectLightAmbient
 
   DeviceTaskDirectLightAmbient task;
   task.light_color = record_pack(light_color);
-  task.ray         = ray_direction_pack(bounce_sample.ray);
+  task.ray         = ray_pack(bounce_sample.ray);
+
+  return task;
+}
+
+__device__ DeviceTaskDirectLightBridges direct_lighting_bridges_create_task(const MaterialContextVolume& ctx, const ushort2 index) {
+  LightSampleResult<MATERIAL_VOLUME> sample = light_sample(ctx, index);
+
+  ////////////////////////////////////////////////////////////////////
+  // Create task
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTaskDirectLightBridges task;
+  task.light_id    = sample.light_id;
+  task.light_color = sample.light_color;
+  task.rotation    = quaternion_pack(sample.rotation);
+  task.scale       = sample.scale;
+  task.seed        = sample.seed;
 
   return task;
 }
@@ -457,15 +433,152 @@ __device__ DeviceTaskDirectLightAmbient
 #ifdef OPTIX_KERNEL
 
 __device__ RGBF direct_lighting_geometry_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightGeo& direct_light_task) {
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightGeo& direct_light_task, const bool is_allowed) {
+  const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
+
+  ShadowTraceTask shadow_task;
+  shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+  shadow_task.origin       = task.origin;
+  shadow_task.ray          = direct_light_task.ray;
+  shadow_task.limit        = direct_light_task.dist;
+  shadow_task.target_light =
+    (sample_is_valid) ? device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id] : TRIANGLE_HANDLE_INVALID;
+  shadow_task.volume_type = (VolumeType) task.volume_id;
+
+  const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
+
+  return mul_color(direct_light_task.light_color, visibility);
 }
 
 __device__ RGBF direct_lighting_sun_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightSun& direct_light_task) {
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightSun& direct_light_task, const bool is_allowed) {
+  const vec3 ray = ray_unpack(direct_light_task.ray);
+
+  float limit = FLT_MAX;
+
+  if (task.volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
+    const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
+
+    limit = (dist > 0.0f) ? dist : FLT_MAX;
+  }
+
+  const bool sample_is_valid = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
+
+  ShadowTraceTask shadow_task;
+  shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+  shadow_task.origin       = task.origin;
+  shadow_task.ray          = ray;
+  shadow_task.limit        = limit;
+  shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
+  shadow_task.volume_type  = (VolumeType) task.volume_id;
+
+  RGBF visibility = shadow_evaluate_sun(shadow_task, trace.handle);
+
+  RGBF light_color = record_unpack(direct_light_task.light_color);
+  light_color      = mul_color(light_color, visibility);
+
+  if (sample_is_valid && task.volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
+    const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
+
+    // Ocean normal points up, we come from below, so flip it
+    const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_pos), -1.0f);
+    const vec3 ocean_V      = scale_vector(ray, -1.0f);
+
+    bool total_reflection;
+    const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
+
+    if (total_reflection) {
+      shadow_task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    }
+
+    const float fresnel_term = bsdf_fresnel(ocean_normal, ocean_V, refraction, device.ocean.refractive_index);
+
+    light_color = scale_color(light_color, 1.0f - fresnel_term);
+
+    shadow_task.origin       = ocean_pos;
+    shadow_task.ray          = refraction;
+    shadow_task.limit        = FLT_MAX;
+    shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
+    shadow_task.volume_type  = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+  }
+  else {
+    shadow_task.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
+  }
+
+  light_color = mul_color(light_color, shadow_evaluate_sun(shadow_task, TRIANGLE_HANDLE_INVALID));
+
+  return light_color;
 }
 
 __device__ RGBF direct_lighting_ambient_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightAmbient& direct_light_task) {
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightAmbient& direct_light_task, const bool is_allowed) {
+  const vec3 ray = ray_unpack(direct_light_task.ray);
+
+  float limit = FLT_MAX;
+
+  if (task.volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
+    const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
+
+    limit = (dist > 0.0f) ? dist : FLT_MAX;
+  }
+
+  const bool sample_is_valid = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
+
+  ShadowTraceTask shadow_task;
+  shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+  shadow_task.origin       = task.origin;
+  shadow_task.ray          = ray;
+  shadow_task.limit        = limit;
+  shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
+  shadow_task.volume_type  = (VolumeType) task.volume_id;
+
+  RGBF visibility = shadow_evaluate_sun(shadow_task, trace.handle);
+
+  RGBF light_color = record_unpack(direct_light_task.light_color);
+  light_color      = mul_color(light_color, visibility);
+  light_color      = mul_color(light_color, volume_integrate_transmittance((VolumeType) task.volume_id, task.origin, ray, limit));
+
+  if (sample_is_valid && task.volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
+    const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
+
+    // Ocean normal points up, we come from below, so flip it
+    const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_pos), -1.0f);
+    const vec3 ocean_V      = scale_vector(ray, -1.0f);
+
+    bool total_reflection;
+    const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
+
+    if (total_reflection) {
+      shadow_task.trace_status = OPTIX_TRACE_STATUS_ABORT;
+    }
+
+    const VolumeType second_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+
+    const float fresnel_term = bsdf_fresnel(ocean_normal, ocean_V, refraction, device.ocean.refractive_index);
+
+    light_color = scale_color(light_color, 1.0f - fresnel_term);
+    light_color = mul_color(light_color, volume_integrate_transmittance(second_volume, ocean_pos, refraction, FLT_MAX));
+
+    shadow_task.origin       = ocean_pos;
+    shadow_task.ray          = refraction;
+    shadow_task.limit        = FLT_MAX;
+    shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
+    shadow_task.volume_type  = second_volume;
+  }
+  else {
+    shadow_task.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
+  }
+
+  light_color = mul_color(light_color, shadow_evaluate_sun(shadow_task, TRIANGLE_HANDLE_INVALID));
+
+  return light_color;
+}
+
+__device__ RGBF direct_lighting_bridges_evaluate_task(
+  const MaterialContextVolume& ctx, const DeviceTaskDirectLightBridges& direct_light_task, const ushort2 index, const bool is_allowed) {
+  const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
+
+  return bridges_sample_apply_shadowing(ctx, direct_light_task, index, sample_is_valid);
 }
 
 #endif /* OPTIX_KERNEL */

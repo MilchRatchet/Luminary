@@ -1,8 +1,6 @@
 #ifndef CU_LIGHT_H
 #define CU_LIGHT_H
 
-#if defined(OPTIX_KERNEL)
-
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
@@ -73,11 +71,10 @@ __device__ void light_evaluate_candidate(
   const float sampling_weight = tree_sampling_weight * solid_angle;
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
-    result.light_id      = light_id;
-    result.ray           = ray;
-    result.light_color   = light_color;
-    result.dist          = dist;
-    result.is_refraction = is_refraction;
+    result.light_id    = light_id;
+    result.ray         = ray;
+    result.light_color = light_color;
+    result.dist        = dist;
   }
 }
 
@@ -122,7 +119,7 @@ __device__ LightSampleResult<TYPE> light_list_resample(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    light_evaluate_candidate(ctx, pixel, triangle_light, light_handle, light_uv_packed, output.weight, output_id, reservoir, result);
+    light_evaluate_candidate(ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, reservoir, result);
   }
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
@@ -154,7 +151,7 @@ __device__ LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx,
   return result;
 }
 
-#else /* OPTIX_KERNEL */
+#ifndef OPTIX_KERNEL
 
 #include "light_microtriangle.cuh"
 #include "math.cuh"
