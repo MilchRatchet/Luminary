@@ -283,7 +283,7 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<
 __device__ bool direct_lighting_geometry_is_allowed(const DeviceTask& task) {
   bool allow_geometry_lighting = true;
 
-  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == false;
+  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
   allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
 
   return allow_geometry_lighting;
@@ -326,7 +326,7 @@ __device__ bool direct_lighting_ambient_is_allowed(const MaterialContextVolume& 
 __device__ bool direct_lighting_bridges_is_allowed(const MaterialContextVolume& ctx) {
   bool allow_geometry_lighting = true;
 
-  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == false;
+  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
   allow_geometry_lighting &= (ctx.state & STATE_FLAG_DELTA_PATH) != 0;
   allow_geometry_lighting &= (ctx.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
   allow_geometry_lighting &= ctx.volume_type != VOLUME_TYPE_NONE;
@@ -443,7 +443,6 @@ __device__ RGBF direct_lighting_geometry_evaluate_task(
   shadow_task.limit        = direct_light_task.dist;
   shadow_task.target_light =
     (sample_is_valid) ? device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id] : TRIANGLE_HANDLE_INVALID;
-  shadow_task.volume_type = (VolumeType) task.volume_id;
 
   const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
 
@@ -470,7 +469,6 @@ __device__ RGBF direct_lighting_sun_evaluate_task(
   shadow_task.ray          = ray;
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
-  shadow_task.volume_type  = (VolumeType) task.volume_id;
 
   RGBF visibility = shadow_evaluate_sun(shadow_task, trace.handle);
 
@@ -480,8 +478,10 @@ __device__ RGBF direct_lighting_sun_evaluate_task(
   if (sample_is_valid && task.volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
+    const bool fast_path = caustics_is_fast_path<MATERIAL_GEOMETRY>(task.state);
+
     // Ocean normal points up, we come from below, so flip it
-    const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_pos), -1.0f);
+    const vec3 ocean_normal = (fast_path) ? get_vector(0.0f, -1.0f, 0.0f) : scale_vector(ocean_get_normal(ocean_pos), -1.0f);
     const vec3 ocean_V      = scale_vector(ray, -1.0f);
 
     bool total_reflection;
@@ -491,15 +491,10 @@ __device__ RGBF direct_lighting_sun_evaluate_task(
       shadow_task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     }
 
-    const float fresnel_term = bsdf_fresnel(ocean_normal, ocean_V, refraction, device.ocean.refractive_index);
-
-    light_color = scale_color(light_color, 1.0f - fresnel_term);
-
     shadow_task.origin       = ocean_pos;
     shadow_task.ray          = refraction;
     shadow_task.limit        = FLT_MAX;
     shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
-    shadow_task.volume_type  = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
   }
   else {
     shadow_task.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
@@ -530,7 +525,6 @@ __device__ RGBF direct_lighting_ambient_evaluate_task(
   shadow_task.ray          = ray;
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
-  shadow_task.volume_type  = (VolumeType) task.volume_id;
 
   RGBF visibility = shadow_evaluate_sun(shadow_task, trace.handle);
 
@@ -563,7 +557,6 @@ __device__ RGBF direct_lighting_ambient_evaluate_task(
     shadow_task.ray          = refraction;
     shadow_task.limit        = FLT_MAX;
     shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
-    shadow_task.volume_type  = second_volume;
   }
   else {
     shadow_task.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;

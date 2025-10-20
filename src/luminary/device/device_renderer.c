@@ -105,7 +105,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
     action.cuda_type = CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
-    if (args->render_particles && depth != args->max_depth) {
+    if (args->render_particles) {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
       action.cuda_type = CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));

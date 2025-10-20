@@ -400,7 +400,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x40);
 struct DevicePointers {
   DEVICE DeviceTaskState* LUM_RESTRICT task_states;
   DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
-  DEVICE uint16_t* LUM_RESTRICT trace_counts;  // TODO: Remove and reuse inside task_counts
+  DEVICE uint16_t* LUM_RESTRICT trace_counts;
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;
   DEVICE RGBF* LUM_RESTRICT frame_current_result;

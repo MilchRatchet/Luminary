@@ -133,11 +133,11 @@ __device__ uint32_t task_get_base_address(const uint32_t task_id, const TaskStat
 }
 
 template <typename DATA_TYPE, typename LOAD_TYPE>
-__device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t member_offset) {
+__device__ DATA_TYPE load_task_state(const void* LUM_RESTRICT src_ptr, const uint32_t base_address, const uint32_t member_offset) {
   const uint32_t chunk_id          = member_offset >> 4;
   const uint32_t sub_member_offset = member_offset & 0xF;
 
-  const float4* ptr = ((const float4*) device.ptrs.task_states);
+  const float4* ptr = ((const float4* LUM_RESTRICT) src_ptr);
 
   ptr += base_address;
   ptr += chunk_id * WARP_SIZE;
@@ -159,11 +159,12 @@ __device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t
 }
 
 template <typename DATA_TYPE, typename STORE_TYPE>
-__device__ void store_task_state(const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
+__device__ void store_task_state(
+  void* LUM_RESTRICT dst_ptr, const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
   const uint32_t chunk_id          = member_offset >> 4;
   const uint32_t sub_member_offset = member_offset & 0xF;
 
-  float4* ptr = ((float4*) device.ptrs.task_states);
+  float4* ptr = ((float4*) dst_ptr);
 
   ptr += base_address;
   ptr += chunk_id * WARP_SIZE;
@@ -185,87 +186,95 @@ __device__ void store_task_state(const uint32_t base_address, const uint32_t mem
 }
 
 __device__ DeviceTask task_load(const uint32_t base_address) {
-  return load_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task));
+  return load_task_state<DeviceTask, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, task));
 }
 
 __device__ DeviceTaskTrace task_trace_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result));
+  return load_task_state<DeviceTaskTrace, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result));
 }
 
 __device__ DeviceTaskThroughput task_throughput_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput));
+  return load_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput));
 }
 
 // DeviceTask
 
 __device__ void task_store(const uint32_t base_address, const DeviceTask data) {
-  store_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task), data);
+  store_task_state<DeviceTask, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, task), data);
 }
 
 // DeviceTaskTrace
 
 __device__ void task_trace_store(const uint32_t base_address, const DeviceTaskTrace data) {
-  store_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result), data);
+  store_task_state<DeviceTaskTrace, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result), data);
 }
 
 __device__ void task_trace_handle_store(const uint32_t base_address, const TriangleHandle data) {
-  store_task_state<TriangleHandle, float2>(base_address, offsetof(DeviceTaskState, trace_result.handle), data);
+  store_task_state<TriangleHandle, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.handle), data);
 }
 
 __device__ void task_trace_depth_store(const uint32_t base_address, const float data) {
-  store_task_state<float, float>(base_address, offsetof(DeviceTaskState, trace_result.depth), data);
+  store_task_state<float, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.depth), data);
 }
 
 __device__ void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
-  store_task_state<DeviceIORStack, float>(base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
+  store_task_state<DeviceIORStack, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
 }
 
 // DeviceTaskThroughput
 
 __device__ void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
-  store_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput), data);
+  store_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput), data);
 }
 
 __device__ void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
-  store_task_state<PackedRecord, float2>(base_address, offsetof(DeviceTaskState, throughput.record), data);
+  store_task_state<PackedRecord, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.record), data);
 }
 
 __device__ void task_throughput_mis_payload_store(const uint32_t base_address, const PackedMISPayload data) {
-  store_task_state<PackedMISPayload, float2>(base_address, offsetof(DeviceTaskState, throughput.payload), data);
+  store_task_state<PackedMISPayload, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.payload), data);
 }
 
 // DeviceTaskDirectLight
 
 __device__ DeviceTaskDirectLightGeo task_direct_light_geo_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskDirectLightGeo, float4>(base_address, offsetof(DeviceTaskDirectLight, geo));
+  return load_task_state<DeviceTaskDirectLightGeo, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, geo));
 }
 
 __device__ DeviceTaskDirectLightSun task_direct_light_sun_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskDirectLightSun, float4>(base_address, offsetof(DeviceTaskDirectLight, sun));
+  return load_task_state<DeviceTaskDirectLightSun, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, sun));
 }
 
 __device__ DeviceTaskDirectLightAmbient task_direct_light_ambient_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskDirectLightAmbient, float4>(base_address, offsetof(DeviceTaskDirectLight, ambient));
+  return load_task_state<DeviceTaskDirectLightAmbient, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, ambient));
 }
 
 __device__ DeviceTaskDirectLightBridges task_direct_light_bridges_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskDirectLightBridges, float4>(base_address, offsetof(DeviceTaskDirectLight, bridges));
+  return load_task_state<DeviceTaskDirectLightBridges, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, bridges));
 }
 
 __device__ void task_direct_light_geo_store(const uint32_t base_address, const DeviceTaskDirectLightGeo data) {
-  store_task_state<DeviceTaskDirectLightGeo, float4>(base_address, offsetof(DeviceTaskDirectLight, geo), data);
+  store_task_state<DeviceTaskDirectLightGeo, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, geo), data);
 }
 
 __device__ void task_direct_light_sun_store(const uint32_t base_address, const DeviceTaskDirectLightSun data) {
-  store_task_state<DeviceTaskDirectLightSun, float4>(base_address, offsetof(DeviceTaskDirectLight, sun), data);
+  store_task_state<DeviceTaskDirectLightSun, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, sun), data);
 }
 
 __device__ void task_direct_light_ambient_store(const uint32_t base_address, const DeviceTaskDirectLightAmbient data) {
-  store_task_state<DeviceTaskDirectLightAmbient, float4>(base_address, offsetof(DeviceTaskDirectLight, ambient), data);
+  store_task_state<DeviceTaskDirectLightAmbient, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, ambient), data);
 }
 
 __device__ void task_direct_light_bridges_store(const uint32_t base_address, const DeviceTaskDirectLightBridges data) {
-  store_task_state<DeviceTaskDirectLightBridges, float4>(base_address, offsetof(DeviceTaskDirectLight, bridges), data);
+  store_task_state<DeviceTaskDirectLightBridges, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, bridges), data);
 }
 
 ////////////////////////////////////////////////////////////////////

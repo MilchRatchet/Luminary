@@ -10,11 +10,13 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+static_assert(
+  SHADING_TASK_INDEX_PARTICLE == SHADING_TASK_INDEX_GEOMETRY + 1, "This assumes that particle tasks come directly after geometry tasks.");
+
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
-  // TODO: Combine particle and geometry tasks into one as they have the same shadow logic
-  const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
+  const uint32_t task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] + device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE];
   const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
   const uint32_t task_id     = TASK_ID;
 

@@ -15,7 +15,6 @@ struct ShadowTraceTask {
   vec3 ray;
   float limit;
   TriangleHandle target_light;
-  VolumeType volume_type;
 } typedef DirectLightingShadowTask;
 
 __device__ RGBF shadow_evaluate(const ShadowTraceTask& task, const TriangleHandle self_handle) {
@@ -27,8 +26,6 @@ __device__ RGBF shadow_evaluate(const ShadowTraceTask& task, const TriangleHandl
 
   if (task.trace_status == OPTIX_TRACE_STATUS_OPTIONAL_UNUSED)
     return splat_color(1.0f);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(task.volume_type, task.origin, task.ray, task.limit));
 
   return visibility;
 #else  /* !DIRECT_LIGHTING_NO_SHADOW */
@@ -45,8 +42,6 @@ __device__ RGBF shadow_evaluate_sun(const ShadowTraceTask& task, const TriangleH
 
   if (task.trace_status == OPTIX_TRACE_STATUS_OPTIONAL_UNUSED)
     return splat_color(1.0f);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(task.volume_type, task.origin, task.ray, task.limit));
 
   return visibility;
 #else  /* !DIRECT_LIGHTING_NO_SHADOW */
