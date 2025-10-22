@@ -188,7 +188,7 @@ __device__ LightTreeContinuation _light_tree_continuation_pack(const uint8_t chi
 
   continuation.is_light    = is_light ? 1 : 0;
   continuation.child_index = child_index;
-  continuation.probability = max((uint32_t) ((0xFFFFF * probability) + 0.5f), 1);
+  continuation.probability = (probability > 0.0f) ? max((uint32_t) ((0xFFFFF * probability) + 0.5f), 1) : 0;
 
   return continuation;
 }
