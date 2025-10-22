@@ -19,6 +19,7 @@ __device__ bool light_allow_geo_direct_lighting(const DeviceTask task) {
 // This must correspond to the G term used when computing the LUT.
 #define BRIDGES_HG_G_TERM (0.85f)
 #define BRIDGES_INITIAL_VERTEX_FORWARD_PROB (0.95f)
+#define BRIDGES_MAX_VERTEX_COUNT 15
 
 __device__ vec3 bridges_phase_sample(const vec3 ray, const float2 r_dir) {
   const float cos_angle = henyey_greenstein_phase_sample(BRIDGES_HG_G_TERM, r_dir.x);

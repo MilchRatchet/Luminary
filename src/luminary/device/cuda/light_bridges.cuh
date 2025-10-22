@@ -117,16 +117,18 @@ __device__ uint32_t
   // Sample a vertex count based on importance LUT
   ////////////////////////////////////////////////////////////////////
 
+  const uint32_t max_num_vertices = min(device.settings.bridge_max_num_vertices, BRIDGES_MAX_VERTEX_COUNT);
+
   // Fallback values. These come into play if sum_importance is 0.0f.
   // This happens when effective dist is too large.
-  uint32_t selected_vertex_count = device.settings.bridge_max_num_vertices - 1;
+  uint32_t selected_vertex_count = max_num_vertices - 1;
 
-  for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
+  for (uint32_t vertex_count = 0; vertex_count < max_num_vertices; vertex_count++) {
     // TODO: The paper uses some additional terms here for the importance
-    const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
+    const float importance = bridges_get_vertex_count_importance(vertex_count + 1, effective_dist);
 
     if (ris_reservoir_add_sample(ris_reservoir, importance, 1.0f)) {
-      selected_vertex_count = i;
+      selected_vertex_count = vertex_count;
     }
   }
 
@@ -386,13 +388,10 @@ __device__ RGBF bridges_sample_apply_shadowing(
   // Get sampled vertex count
   ////////////////////////////////////////////////////////////////////
 
-  uint32_t vertex_count;
+  uint32_t vertex_count = 1;
   if (bridge_is_valid) {
     float vertex_count_pdf;
     vertex_count = bridges_sample_vertex_count(ctx.descriptor, get_length(light_vector), seed, pixel, vertex_count_pdf);
-  }
-  else {
-    vertex_count = 1;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -409,31 +408,34 @@ __device__ RGBF bridges_sample_apply_shadowing(
   // We don't need to trace visibility to the initial vertex as it was sampled with an interval that we know has no intersections
   RGBF shadow_term = splat_color(1.0f);
 
-  float sum_dist = 0.0f;
-
   float dist;
   dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * scale;
 
-  shadow_term = mul_color(
-    shadow_term, optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status));
+  const RGBF shadow_vertex0 =
+    optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status);
+  shadow_term = mul_color(shadow_term, shadow_vertex0);
 
-  sum_dist += dist;
+  for (uint32_t vertex_id = 1; vertex_id < BRIDGES_MAX_VERTEX_COUNT; vertex_id++) {
+    const bool vertex_is_valid = (vertex_id < vertex_count);
 
-  for (int i = 1; i < vertex_count; i++) {
-    current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
+    if (vertex_is_valid) {
+      current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
 
-    const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
+      const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + vertex_id, pixel);
 
-    current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
+      current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
 
-    current_direction = quaternion16_apply(rotation, current_direction_sampled);
+      current_direction = quaternion16_apply(rotation, current_direction_sampled);
 
-    dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel)) * scale;
+      dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + vertex_id, pixel)) * scale;
+    }
 
-    shadow_term = mul_color(
-      shadow_term, optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status));
+    // We always execute all shadow rays as Nvidia hardware prefers that over conditional branching.
+    const OptixTraceStatus trace_status_vertex = (vertex_is_valid) ? trace_status : OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
 
-    sum_dist += dist;
+    const RGBF shadow_vertex =
+      optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status_vertex);
+    shadow_term = mul_color(shadow_term, shadow_vertex);
   }
 
   return mul_color(direct_light_task.light_color, shadow_term);
