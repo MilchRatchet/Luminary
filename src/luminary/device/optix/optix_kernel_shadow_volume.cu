@@ -28,8 +28,6 @@ extern "C" __global__ void __raygen__optix() {
 
   MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
 
-  task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
-
   const uint32_t direct_light_task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
   RGBF accumulated_light = splat_color(0.0f);
@@ -53,6 +51,8 @@ extern "C" __global__ void __raygen__optix() {
 
   RGBF initial_vertex_weight;
   volume_sample_sky_dl_initial_vertex(ctx, task.index, initial_vertex_weight);
+
+  task.origin = ctx.position;
 
   ////////////////////////////////////////////////////////////////////
   // Shadow Sun

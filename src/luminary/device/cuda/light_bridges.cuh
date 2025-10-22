@@ -438,7 +438,7 @@ __device__ RGBF bridges_sample_apply_shadowing(
     shadow_term = mul_color(shadow_term, shadow_vertex);
   }
 
-  return mul_color(direct_light_task.light_color, shadow_term);
+  return (bridge_is_valid) ? mul_color(direct_light_task.light_color, shadow_term) : splat_color(0.0f);
 }
 
 #endif /* OPTIX_KERNEL */
