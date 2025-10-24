@@ -240,21 +240,18 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<
   const RGBF bsdf_value = bsdf_evaluate(ctx, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
   light_color           = mul_color(light_color, bsdf_value);
 
-  const vec3 ocean_normal =
-    (sampling_domain.fast_path) ? get_vector(0.0f, 1.0f, 0.0f) : ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
-  const vec3 normal = scale_vector(ocean_normal, (IS_UNDERWATER) ? -1.0f : 1.0f);
-
-  bool total_reflection;
-  const vec3 refraction_dir          = refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior, total_reflection);
-  const float reflection_coefficient = ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior);
-
-  light_color = scale_color(light_color, (IS_UNDERWATER) ? 1.0f - reflection_coefficient : reflection_coefficient);
-
   if (color_importance(light_color) == 0.0f) {
     DeviceTaskDirectLightSun task;
     task.light_color = PACKED_RECORD_BLACK;
     return task;
   }
+
+  const vec3 ocean_normal =
+    (sampling_domain.fast_path) ? get_vector(0.0f, 1.0f, 0.0f) : ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
+  const vec3 normal = scale_vector(ocean_normal, (IS_UNDERWATER) ? -1.0f : 1.0f);
+
+  bool total_reflection;
+  const vec3 refraction_dir = refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior, total_reflection);
 
   ////////////////////////////////////////////////////////////////////
   // Volume transmittance
@@ -478,6 +475,9 @@ __device__ RGBF direct_lighting_sun_evaluate_task(
   if (sample_is_valid && task.volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
+    // Volume and particle rendering always use the geometry logic here, this means we get low variance sampling as we use the caustics fast
+    // path, but then apply Fresnel here. This means we are essentially taking the integral over a very small subspace. It looks nice and is
+    // fast.
     const bool fast_path = caustics_is_fast_path<MATERIAL_GEOMETRY>(task.state);
 
     // Ocean normal points up, we come from below, so flip it
@@ -486,6 +486,9 @@ __device__ RGBF direct_lighting_sun_evaluate_task(
 
     bool total_reflection;
     const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
+
+    const float fresnel = ocean_reflection_coefficient(ocean_normal, ray, refraction, 1.0f / device.ocean.refractive_index);
+    light_color         = scale_color(light_color, 1.0f - fresnel);
 
     if (total_reflection) {
       shadow_task.trace_status = OPTIX_TRACE_STATUS_ABORT;

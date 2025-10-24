@@ -51,7 +51,7 @@ __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool i
 
 template <MaterialType TYPE>
 __device__ bool caustics_is_fast_path(const uint16_t state) {
-  bool fast_path = (TYPE == MATERIAL_VOLUME);     // Currently, no proper caustics for volume rendering
+  bool fast_path = (TYPE != MATERIAL_GEOMETRY);   // Currently, no proper caustics for volume or particle rendering
   fast_path |= (device.ocean.amplitude == 0.0f);  // Fast path is assuming amplitude == 0, so if that is actually true we can just do it.
   fast_path |= (device.ocean.caustics_active == false);       // Caustics not active still means we want the shift in direction.
   fast_path |= (state & STATE_FLAG_ALLOW_EMISSION == false);  // If we are indirect lighting, proper caustics are too noisy.
