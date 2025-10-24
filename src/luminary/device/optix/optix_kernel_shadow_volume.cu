@@ -21,7 +21,11 @@ extern "C" __global__ void __raygen__optix() {
 
   const uint32_t task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
   DeviceTask task                  = task_load(task_base_address);
-  const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+  DeviceTaskTrace trace            = task_trace_load(task_base_address);
+
+  // The trace handle contains the actual handle of the ray's end point but the direct lighting functions assume that it is
+  // the handle of the starting point so we must invalidate it.
+  trace.handle = TRIANGLE_HANDLE_INVALID;
 
   const VolumeType volume_type  = VolumeType(task.volume_id);
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);

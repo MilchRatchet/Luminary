@@ -83,7 +83,8 @@ __device__ RGBF optix_geometry_shadowing(
   payload.handle_origin = handle;
 
   optixKernelFunctionShadowTrace(
-    device.optix_bvh_shadow, position, dir, eps, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, status, payload);
+    device.optix_bvh_shadow, position, dir, eps, dist, 0.0f, OptixVisibilityMask(0xFFFF),
+    OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, status, payload);
 
   if (payload.handle.instance_id == HIT_TYPE_REJECT) {
     payload.throughput = get_color(0.0f, 0.0f, 0.0f);
