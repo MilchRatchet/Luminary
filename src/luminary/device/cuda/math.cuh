@@ -1738,4 +1738,12 @@ __device__ Quaternion16 quaternion_pack(const Quaternion q) {
   return dst;
 }
 
+__device__ float normed_float_unpack(const uint16_t data) {
+  return (data / ((float) 0xFFFF));
+}
+
+__device__ float unsigned_float_unpack(const uint16_t data) {
+  return __uint_as_float(data << 15);
+}
+
 #endif /* CU_MATH_H */

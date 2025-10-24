@@ -414,10 +414,6 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   return quad;
 }
 
-__device__ float unpack_float_from_uint16(const uint32_t data) {
-  return __uint_as_float(data << 15);
-}
-
 __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, const uint32_t offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
@@ -425,18 +421,18 @@ __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, co
 
   DeviceMaterial mat;
   mat.flags            = __float_as_uint(v0.x) & 0x00FF;
-  mat.roughness_clamp  = random_uint16_t_to_float(__float_as_uint(v0.x) & 0xFF00);
+  mat.roughness_clamp  = normed_float_unpack(__float_as_uint(v0.x) & 0xFF00);
   mat.metallic_tex     = __float_as_uint(v0.x) >> 16;
-  mat.roughness        = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
-  mat.refraction_index = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;
-  mat.albedo.r         = random_uint16_t_to_float(__float_as_uint(v0.z) & 0xFFFF);
-  mat.albedo.g         = random_uint16_t_to_float(__float_as_uint(v0.z) >> 16);
-  mat.albedo.b         = random_uint16_t_to_float(__float_as_uint(v0.w) & 0xFFFF);
-  mat.albedo.a         = random_uint16_t_to_float(__float_as_uint(v0.w) >> 16);
-  mat.emission.r       = random_uint16_t_to_float(__float_as_uint(v1.x) & 0xFFFF);
-  mat.emission.g       = random_uint16_t_to_float(__float_as_uint(v1.x) >> 16);
-  mat.emission.b       = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
-  mat.emission_scale   = unpack_float_from_uint16(__float_as_uint(v1.y) >> 16);
+  mat.roughness        = normed_float_unpack(__float_as_uint(v0.y) & 0xFFFF);
+  mat.refraction_index = normed_float_unpack(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;
+  mat.albedo.r         = normed_float_unpack(__float_as_uint(v0.z) & 0xFFFF);
+  mat.albedo.g         = normed_float_unpack(__float_as_uint(v0.z) >> 16);
+  mat.albedo.b         = normed_float_unpack(__float_as_uint(v0.w) & 0xFFFF);
+  mat.albedo.a         = normed_float_unpack(__float_as_uint(v0.w) >> 16);
+  mat.emission.r       = normed_float_unpack(__float_as_uint(v1.x) & 0xFFFF);
+  mat.emission.g       = normed_float_unpack(__float_as_uint(v1.x) >> 16);
+  mat.emission.b       = normed_float_unpack(__float_as_uint(v1.y) & 0xFFFF);
+  mat.emission_scale   = unsigned_float_unpack(__float_as_uint(v1.y) >> 16);
   mat.albedo_tex       = __float_as_uint(v1.z) & 0xFFFF;
   mat.luminance_tex    = __float_as_uint(v1.z) >> 16;
   mat.roughness_tex    = __float_as_uint(v1.w) & 0xFFFF;
@@ -452,10 +448,10 @@ __device__ RGBAF load_material_albedo(const DeviceMaterialCompressed* data, cons
   const float2 v    = __ldg(ptr + 1);
 
   RGBAF albedo;
-  albedo.r = random_uint16_t_to_float(__float_as_uint(v.x) & 0xFFFF);
-  albedo.g = random_uint16_t_to_float(__float_as_uint(v.x) >> 16);
-  albedo.b = random_uint16_t_to_float(__float_as_uint(v.y) & 0xFFFF);
-  albedo.a = random_uint16_t_to_float(__float_as_uint(v.y) >> 16);
+  albedo.r = normed_float_unpack(__float_as_uint(v.x) & 0xFFFF);
+  albedo.g = normed_float_unpack(__float_as_uint(v.x) >> 16);
+  albedo.b = normed_float_unpack(__float_as_uint(v.y) & 0xFFFF);
+  albedo.a = normed_float_unpack(__float_as_uint(v.y) >> 16);
 
   return albedo;
 }
