@@ -1,8 +1,6 @@
 #ifndef CU_LUMINARY_MICROMAP_H
 #define CU_LUMINARY_MICROMAP_H
 
-#include <optix_micromap.h>
-
 #include "math.cuh"
 #include "memory.cuh"
 #include "utils.cuh"

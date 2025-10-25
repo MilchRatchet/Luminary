@@ -735,7 +735,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // CUDA context creation
   ////////////////////////////////////////////////////////////////////
 
-  CUDA_FAILURE_HANDLE(cuCtxCreate(&device->cuda_ctx, 0, device->cuda_device));
+  CUDA_FAILURE_HANDLE(cuCtxCreate(&device->cuda_ctx, (CUctxCreateParams*) 0, 0, device->cuda_device));
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 

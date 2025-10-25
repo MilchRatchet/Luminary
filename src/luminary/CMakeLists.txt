@@ -4,10 +4,10 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # Find packages
 #=============================================================
 
-set(LUMINARY_CUDA_VERSION 12.9 CACHE INTERNAL "CUDA Version")
+set(LUMINARY_CUDA_VERSION 13.0 CACHE INTERNAL "CUDA Version")
 set(LUMINARY_OPTIX_VERSION 9.0 CACHE INTERNAL "OptiX Version")
 
-find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED QUIET)
+find_package(CUDAToolkit ${LUMINARY_CUDA_VERSION} REQUIRED QUIET)
 
 # OptiX is a header only library, the headers are provided through a git submodule.
 set(OptiX_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/optix-dev/include")
@@ -127,56 +127,56 @@ endforeach()
 
 
 #=============================================================
-# Create PTX files
+# Create OptiX-IR files
 #=============================================================
 
-function(compile_ptx cuda_file_name kernel_name kernel_arch out_ptx_file)
+function(compile_optixir cuda_file_name kernel_name kernel_arch out_optixir_file)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
   # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
-  set(ptx_file "${CMAKE_BINARY_DIR}/ptx/${kernel_name}_${kernel_arch}.ptx")
+  set(optixir_file "${CMAKE_BINARY_DIR}/optix-ir/${kernel_name}_${kernel_arch}.optix-ir")
   add_custom_command(
     OUTPUT
-      ${ptx_file}
+      ${optixir_file}
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${cuda_file_name}.cu"
-      --ptx ${CUDA_KERNEL_FLAGS} --gpu-architecture=${kernel_arch}
+      --optix-ir ${CUDA_KERNEL_FLAGS} --gpu-architecture=${kernel_arch}
       -D${kernel_name}
-      -o ${ptx_file}
+      -o ${optixir_file}
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${cuda_file_name}.cu"
       "${luminary_gpu_header_files}"
       "${luminary_cpu_header_files}"
     COMMENT
-      "Compiling ${kernel_name}_${kernel_arch}.ptx"
+      "Compiling ${kernel_name}_${kernel_arch}.optix-ir"
   )
 
   add_custom_target(
     ${kernel_name}_${kernel_arch}
     DEPENDS
-      ${ptx_file}
+      ${optixir_file}
     COMMENT
       "Target for compiled OptiX kernel."
   )
 
   add_dependencies(Luminary ${kernel_name}_${kernel_arch})
 
-  set(${out_ptx_file} ${ptx_file} PARENT_SCOPE)
+  set(${out_optixir_file} ${optixir_file} PARENT_SCOPE)
 endfunction()
 
-set(ptx_files)
+set(optixir_files)
 
 foreach(kernel_arch ${kernel_archs})
-  set(ptx_file)
+  set(optixir_file)
 
-  compile_ptx(optix_kernel_raytrace optix_kernel_raytrace ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
+  compile_optixir(optix_kernel_raytrace optix_kernel_raytrace ${kernel_arch} optixir_file)
+  list(APPEND optixir_files ${optixir_file})
 
-  compile_ptx(optix_kernel_shadow optix_kernel_shadow ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
+  compile_optixir(optix_kernel_shadow optix_kernel_shadow ${kernel_arch} optixir_file)
+  list(APPEND optixir_files ${optixir_file})
 
-  compile_ptx(optix_kernel_shadow_volume optix_kernel_shadow_volume ${kernel_arch} ptx_file)
-  list(APPEND ptx_files ${ptx_file})
+  compile_optixir(optix_kernel_shadow_volume optix_kernel_shadow_volume ${kernel_arch} optixir_file)
+  list(APPEND optixir_files ${optixir_file})
 endforeach()
 
 #=============================================================
@@ -190,7 +190,7 @@ ceb_embed_files(
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
   ${cubin_files}
-  ${ptx_files}
+  ${optixir_files}
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_SOURCE_DIR}/data/LuminaryFontBold.ttf
   ${CMAKE_SOURCE_DIR}/data/MaterialSymbols.ttf
