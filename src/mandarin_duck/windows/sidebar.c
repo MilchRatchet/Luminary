@@ -60,17 +60,13 @@ static void _window_sidebar_entity_properties_action(Window* window, Display* di
   }
 }
 
-static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] = {
-  [DISPLAY_MOUSE_MODE_DEFAULT]       = "Move",
-  [DISPLAY_MOUSE_MODE_SELECT]        = "Select",
-  [DISPLAY_MOUSE_MODE_FOCUS]         = "Focus Camera",
-  [DISPLAY_MOUSE_MODE_RENDER_REGION] = "Render Region"};
+static const char* _window_mouse_modes_tooltip_string[DISPLAY_MOUSE_MODE_COUNT] =
+  {[DISPLAY_MOUSE_MODE_DEFAULT] = "Move", [DISPLAY_MOUSE_MODE_SELECT] = "Select", [DISPLAY_MOUSE_MODE_FOCUS] = "Focus Camera"};
 
 static const ElementButtonImage _window_mouse_modes_button_images[DISPLAY_MOUSE_MODE_COUNT] = {
-  [DISPLAY_MOUSE_MODE_DEFAULT]       = ELEMENT_BUTTON_IMAGE_MOVE,
-  [DISPLAY_MOUSE_MODE_SELECT]        = ELEMENT_BUTTON_IMAGE_SELECT,
-  [DISPLAY_MOUSE_MODE_FOCUS]         = ELEMENT_BUTTON_IMAGE_FOCUS,
-  [DISPLAY_MOUSE_MODE_RENDER_REGION] = ELEMENT_BUTTON_IMAGE_REGION};
+  [DISPLAY_MOUSE_MODE_DEFAULT] = ELEMENT_BUTTON_IMAGE_MOVE,
+  [DISPLAY_MOUSE_MODE_SELECT]  = ELEMENT_BUTTON_IMAGE_SELECT,
+  [DISPLAY_MOUSE_MODE_FOCUS]   = ELEMENT_BUTTON_IMAGE_FOCUS};
 
 static void _window_sidebar_mouse_modes_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);

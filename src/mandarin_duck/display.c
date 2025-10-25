@@ -26,6 +26,7 @@ static void _display_handle_resize(Display* display) {
   display->buffer      = display->sdl_surface->pixels;
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
 
+  render_region_handler_set_display_size(display->region, display->width, display->height);
   display_zoom_handler_set_display_size(display->zoom_handler, display->width, display->height);
 }
 
@@ -526,25 +527,10 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       if (display->keyboard_state->keys[SDL_SCANCODE_3].phase == KEY_PHASE_PRESSED) {
         display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
       }
-
-      if (display->keyboard_state->keys[SDL_SCANCODE_4].phase == KEY_PHASE_PRESSED) {
-        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_RENDER_REGION);
-      }
     }
 
-    if (ui_status.received_hover || ui_status.received_mouse_action) {
-      switch (display->mouse_mode) {
-        case DISPLAY_MOUSE_MODE_DEFAULT:
-        case DISPLAY_MOUSE_MODE_SELECT:
-        case DISPLAY_MOUSE_MODE_FOCUS:
-        default:
-          break;
-        case DISPLAY_MOUSE_MODE_RENDER_REGION:
-          render_region_remove_focus(display->region, host);
-          break;
-      }
-    }
-    else {
+    if (
+      (ui_status.received_hover == false) && (ui_status.received_mouse_action == false) && (ui_status.received_keyboard_action == false)) {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
         default:
@@ -552,8 +538,9 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             const bool left_pressed  = display->mouse_state->phase == MOUSE_PHASE_PRESSED;
             const bool right_pressed = display->mouse_state->right_phase == MOUSE_PHASE_PRESSED;
             const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+            const bool ctrl_down     = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
 
-            if ((left_pressed || right_pressed) && alt_down) {
+            if ((left_pressed || right_pressed) && alt_down && (ctrl_down == false)) {
               _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
 
               if (display->move_pixel_data.pixel_query_is_valid) {
@@ -565,11 +552,12 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             const bool left_pressed  = display->mouse_state->down;
             const bool right_pressed = display->mouse_state->right_down;
             const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+            const bool ctrl_down     = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
 
             const bool cond0 = (display->camera_handler->mode == CAMERA_MODE_ORBIT && !left_pressed);
             const bool cond1 = (display->camera_handler->mode == CAMERA_MODE_ZOOM && !right_pressed);
 
-            if (cond0 || cond1 || !alt_down) {
+            if (cond0 || cond1 || !alt_down || ctrl_down) {
               display->active_camera_movement = !display->show_ui;
               display_set_mouse_visible(display, true);
 
@@ -582,9 +570,6 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
           if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
             _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
           }
-          break;
-        case DISPLAY_MOUSE_MODE_RENDER_REGION:
-          render_region_handle_inputs(display->region, display, host, display->mouse_state);
           break;
       }
     }
@@ -608,7 +593,10 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
   }
 
-  display_zoom_handler_update(display->zoom_handler, display->mouse_state);
+  if (ui_status.received_keyboard_action == false) {
+    display_zoom_handler_update(display->zoom_handler, display->mouse_state);
+    render_region_handle_inputs(display->region, host, display->mouse_state, display->keyboard_state);
+  }
 }
 
 void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory) {
