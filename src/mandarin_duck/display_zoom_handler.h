@@ -19,6 +19,10 @@ struct DisplayZoomHandler {
 void display_zoom_handler_create(DisplayZoomHandler** zoom);
 void display_zoom_handler_set_display_size(DisplayZoomHandler* zoom, uint32_t width, uint32_t height);
 void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse);
+void display_zoom_handler_image_to_screen(
+  const DisplayZoomHandler* zoom, uint32_t x, uint32_t y, uint32_t* restrict out_x, uint32_t* restrict out_y);
+void display_zoom_handler_screen_to_image(
+  const DisplayZoomHandler* zoom, uint32_t x, uint32_t y, uint32_t* restrict out_x, uint32_t* restrict out_y);
 void display_zoom_handler_destroy(DisplayZoomHandler** zoom);
 
 #endif /* MANDARIN_DUCK_DISPLAY_ZOOM_HANDLER */

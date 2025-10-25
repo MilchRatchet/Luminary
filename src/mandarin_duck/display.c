@@ -595,7 +595,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
 
   if (ui_status.received_keyboard_action == false) {
     display_zoom_handler_update(display->zoom_handler, display->mouse_state);
-    render_region_handle_inputs(display->region, host, display->mouse_state, display->keyboard_state);
+    render_region_handle_inputs(display->region, display, host, display->mouse_state, display->keyboard_state);
   }
 }
 

@@ -87,6 +87,26 @@ void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse) {
   _display_zoom_handler_update_offset(zoom);
 }
 
+void display_zoom_handler_image_to_screen(
+  const DisplayZoomHandler* zoom, uint32_t x, uint32_t y, uint32_t* restrict out_x, uint32_t* restrict out_y) {
+  MD_CHECK_NULL_ARGUMENT(zoom);
+  MD_CHECK_NULL_ARGUMENT(out_x);
+  MD_CHECK_NULL_ARGUMENT(out_y);
+
+  *out_x = (x - zoom->offset_x) << zoom->scale;
+  *out_y = (y - zoom->offset_y) << zoom->scale;
+}
+
+void display_zoom_handler_screen_to_image(
+  const DisplayZoomHandler* zoom, uint32_t x, uint32_t y, uint32_t* restrict out_x, uint32_t* restrict out_y) {
+  MD_CHECK_NULL_ARGUMENT(zoom);
+  MD_CHECK_NULL_ARGUMENT(out_x);
+  MD_CHECK_NULL_ARGUMENT(out_y);
+
+  *out_x = (x >> zoom->scale) + zoom->offset_x;
+  *out_y = (y >> zoom->scale) + zoom->offset_y;
+}
+
 void display_zoom_handler_destroy(DisplayZoomHandler** zoom) {
   MD_CHECK_NULL_ARGUMENT(zoom);
 

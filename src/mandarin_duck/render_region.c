@@ -19,27 +19,6 @@ void render_region_handler_set_display_size(RenderRegion* region, uint32_t width
   region->display_height = height;
 }
 
-static void _render_region_get_vertex(RenderRegion* region, uint32_t vertex, uint32_t* x, uint32_t* y) {
-  switch (vertex) {
-    case RENDER_REGION_VERTEX_TOP_LEFT:
-      *x = region->x;
-      *y = region->y;
-      break;
-    case RENDER_REGION_VERTEX_TOP_RIGHT:
-      *x = region->x + region->width;
-      *y = region->y;
-      break;
-    case RENDER_REGION_VERTEX_BOTTOM_LEFT:
-      *x = region->x;
-      *y = region->y + region->height;
-      break;
-    case RENDER_REGION_VERTEX_BOTTOM_RIGHT:
-      *x = region->x + region->width;
-      *y = region->y + region->height;
-      break;
-  }
-}
-
 static void _render_region_compute_size(RenderRegion* region) {
   MD_CHECK_NULL_ARGUMENT(region);
 
@@ -72,8 +51,8 @@ static void _render_region_commit(RenderRegion* region, LuminaryHost* host) {
     if (region->is_active) {
       settings.region_x      = region->x / region->display_width;
       settings.region_y      = region->y / region->display_height;
-      settings.region_width  = region->width / region->display_width;
-      settings.region_height = region->height / region->display_height;
+      settings.region_width  = ceilf(region->width) / region->display_width;
+      settings.region_height = ceilf(region->height) / region->display_height;
     }
     else {
       settings.region_x      = 0.0f;
@@ -88,8 +67,10 @@ static void _render_region_commit(RenderRegion* region, LuminaryHost* host) {
   region->is_selecting = false;
 }
 
-void render_region_handle_inputs(RenderRegion* region, LuminaryHost* host, MouseState* mouse_state, KeyboardState* keyboard_state) {
+void render_region_handle_inputs(
+  RenderRegion* region, Display* display, LuminaryHost* host, MouseState* mouse_state, KeyboardState* keyboard_state) {
   MD_CHECK_NULL_ARGUMENT(region);
+  MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
   MD_CHECK_NULL_ARGUMENT(mouse_state);
   MD_CHECK_NULL_ARGUMENT(keyboard_state);
@@ -102,17 +83,24 @@ void render_region_handle_inputs(RenderRegion* region, LuminaryHost* host, Mouse
     return;
   }
 
+  const DisplayZoomHandler* zoom = display->zoom_handler;
+
   if (region->is_selecting == false) {
-    region->x_internal      = mouse_state->x;
-    region->y_internal      = mouse_state->y;
+    uint32_t x, y;
+    display_zoom_handler_screen_to_image(zoom, mouse_state->x, mouse_state->y, &x, &y);
+
+    region->x_internal      = x;
+    region->y_internal      = y;
     region->width_internal  = 0.0f;
     region->height_internal = 0.0f;
 
     region->is_selecting = true;
   }
 
-  region->width_internal += mouse_state->x_motion;
-  region->height_internal += mouse_state->y_motion;
+  const float scale = 1.0f / (1u << zoom->scale);
+
+  region->width_internal += mouse_state->x_motion * scale;
+  region->height_internal += mouse_state->y_motion * scale;
 
   _render_region_compute_size(region);
 }
@@ -126,49 +114,17 @@ void render_region_render(RenderRegion* region, Display* display, UIRenderer* re
   if (region->is_active == false && region->is_selecting == false)
     return;
 
+  const DisplayZoomHandler* zoom = display->zoom_handler;
+
   const uint32_t color = (region->is_selecting) ? MD_COLOR_ACCENT_LIGHT_1 : MD_COLOR_WHITE;
 
-  uint32_t vertex_x;
-  uint32_t vertex_y;
-  _render_region_get_vertex(region, RENDER_REGION_VERTEX_TOP_LEFT, &vertex_x, &vertex_y);
+  uint32_t x, y;
+  display_zoom_handler_image_to_screen(zoom, region->x, region->y, &x, &y);
 
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_BORDER_LENGTH, RENDER_REGION_VERTEX_SIZE, vertex_x, vertex_y, 0, 0, color,
-    UI_RENDERER_BACKGROUND_MODE_OPAQUE);
+  const uint32_t width  = ((uint32_t) ceilf(region->width)) << zoom->scale;
+  const uint32_t height = ((uint32_t) ceilf(region->height)) << zoom->scale;
 
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_VERTEX_SIZE, RENDER_REGION_BORDER_LENGTH, vertex_x, vertex_y, 0, 0, color,
-    UI_RENDERER_BACKGROUND_MODE_OPAQUE);
-
-  _render_region_get_vertex(region, RENDER_REGION_VERTEX_TOP_RIGHT, &vertex_x, &vertex_y);
-
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_BORDER_LENGTH, RENDER_REGION_VERTEX_SIZE, vertex_x - RENDER_REGION_BORDER_LENGTH, vertex_y, 0, 0,
-    color, UI_RENDERER_BACKGROUND_MODE_OPAQUE);
-
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_VERTEX_SIZE, RENDER_REGION_BORDER_LENGTH, vertex_x - RENDER_REGION_VERTEX_SIZE, vertex_y, 0, 0, color,
-    UI_RENDERER_BACKGROUND_MODE_OPAQUE);
-
-  _render_region_get_vertex(region, RENDER_REGION_VERTEX_BOTTOM_LEFT, &vertex_x, &vertex_y);
-
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_BORDER_LENGTH, RENDER_REGION_VERTEX_SIZE, vertex_x, vertex_y - RENDER_REGION_VERTEX_SIZE, 0, 0, color,
-    UI_RENDERER_BACKGROUND_MODE_OPAQUE);
-
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_VERTEX_SIZE, RENDER_REGION_BORDER_LENGTH, vertex_x, vertex_y - RENDER_REGION_BORDER_LENGTH, 0, 0,
-    color, UI_RENDERER_BACKGROUND_MODE_OPAQUE);
-
-  _render_region_get_vertex(region, RENDER_REGION_VERTEX_BOTTOM_RIGHT, &vertex_x, &vertex_y);
-
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_BORDER_LENGTH, RENDER_REGION_VERTEX_SIZE, vertex_x - RENDER_REGION_BORDER_LENGTH,
-    vertex_y - RENDER_REGION_VERTEX_SIZE, 0, 0, color, UI_RENDERER_BACKGROUND_MODE_OPAQUE);
-
-  ui_renderer_render_rounded_box(
-    renderer, display, RENDER_REGION_VERTEX_SIZE, RENDER_REGION_BORDER_LENGTH, vertex_x - RENDER_REGION_VERTEX_SIZE,
-    vertex_y - RENDER_REGION_BORDER_LENGTH, 0, 0, color, UI_RENDERER_BACKGROUND_MODE_OPAQUE);
+  ui_renderer_render_rounded_box(renderer, display, width, height, x, y, 0, color, 0, UI_RENDERER_BACKGROUND_MODE_TRANSPARENT);
 }
 
 void render_region_destroy(RenderRegion** region) {
