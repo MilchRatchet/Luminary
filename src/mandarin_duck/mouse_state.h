@@ -12,6 +12,7 @@ struct MouseState {
   float y;
   float x_motion;
   float y_motion;
+  float wheel_motion;
   MousePhase phase;
   bool down;
   MousePhase right_phase;

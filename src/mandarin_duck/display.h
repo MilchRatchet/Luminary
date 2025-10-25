@@ -5,6 +5,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include "camera_handler.h"
+#include "display_zoom_handler.h"
 #include "keyboard_state.h"
 #include "mouse_state.h"
 #include "render_region.h"
@@ -70,6 +71,7 @@ struct Display {
   LuminaryOutputPromiseHandle output_promise_handle;
   RenderRegion* region;
   const uint32_t* splash_screen;
+  DisplayZoomHandler* zoom_handler;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);

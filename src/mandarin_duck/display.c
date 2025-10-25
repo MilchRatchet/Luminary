@@ -25,6 +25,8 @@ static void _display_handle_resize(Display* display) {
   display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
   display->buffer      = display->sdl_surface->pixels;
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
+
+  display_zoom_handler_set_display_size(display->zoom_handler, display->width, display->height);
 }
 
 static void _display_handle_display_change(Display* display) {
@@ -67,13 +69,35 @@ static void _display_handle_display_change(Display* display) {
 }
 
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
-  uint8_t* buffer = image.buffer;
+  if (display->zoom_handler->scale == 0) {
+    uint8_t* buffer = image.buffer;
 
-  const uint32_t width  = (display->width < image.width) ? display->width : image.width;
-  const uint32_t height = (display->height < image.height) ? display->height : image.height;
+    const uint32_t width  = (display->width < image.width) ? display->width : image.width;
+    const uint32_t height = (display->height < image.height) ? display->height : image.height;
 
-  for (uint32_t y = 0; y < height; y++) {
-    memcpy(display->buffer + y * display->pitch, buffer + y * image.ld * sizeof(LuminaryARGB8), sizeof(LuminaryARGB8) * width);
+    for (uint32_t y = 0; y < height; y++) {
+      memcpy(display->buffer + y * display->pitch, buffer + y * image.ld * sizeof(LuminaryARGB8), sizeof(LuminaryARGB8) * width);
+    }
+
+    return;
+  }
+
+  const uint32_t scale        = display->zoom_handler->scale;
+  const uint32_t src_offset_x = display->zoom_handler->offset_x;
+  const uint32_t src_offset_y = display->zoom_handler->offset_y;
+
+  const LuminaryARGB8* src = (const LuminaryARGB8*) image.buffer;
+
+  for (uint32_t y = 0; y < display->height; y++) {
+    const LuminaryARGB8* src_row = src + ((y >> scale) + src_offset_y) * image.ld;
+    LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
+
+    for (uint32_t x = 0; x < display->width; x++) {
+      const LuminaryARGB8* src_element = src_row + ((x >> scale) + src_offset_x);
+      LuminaryARGB8* dst_element       = dst_row + x;
+
+      *dst_element = *src_element;
+    }
   }
 }
 
@@ -92,8 +116,10 @@ static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const 
   bool mouse_hovers_background = false;
   user_interface_mouse_hovers_background(display->ui, display, &mouse_hovers_background);
 
-  display->mouse_state->x = prev_mouse_x;
-  display->mouse_state->y = prev_mouse_y;
+  if (mouse_hovers_background == false) {
+    display->mouse_state->x = prev_mouse_x;
+    display->mouse_state->y = prev_mouse_y;
+  }
 
   const bool alt_down = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
 
@@ -149,9 +175,6 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
 
   SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
-  _display_handle_display_change(display);
-  _display_handle_resize(display);
-
   keyboard_state_create(&display->keyboard_state);
   mouse_state_create(&display->mouse_state);
   camera_handler_create(&display->camera_handler);
@@ -159,6 +182,10 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   ui_renderer_create(&display->ui_renderer);
   text_renderer_create(&display->text_renderer);
   render_region_create(&display->region);
+  display_zoom_handler_create(&display->zoom_handler);
+
+  _display_handle_display_change(display);
+  _display_handle_resize(display);
 
   display->selected_cursor = SDL_SYSTEM_CURSOR_DEFAULT;
   for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
@@ -571,6 +598,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   if (display->active_camera_movement) {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
   }
+
+  display_zoom_handler_update(display->zoom_handler, display->mouse_state);
 }
 
 void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory) {
@@ -750,6 +779,7 @@ void display_destroy(Display** display) {
   ui_renderer_destroy(&(*display)->ui_renderer);
   text_renderer_destroy(&(*display)->text_renderer);
   render_region_destroy(&(*display)->region);
+  display_zoom_handler_destroy(&(*display)->zoom_handler);
 
   LUM_FAILURE_HANDLE(host_free(display));
 
