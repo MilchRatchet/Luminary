@@ -13,7 +13,7 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
-__device__ Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
+LUMINARY_FUNCTION Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, initial_vertex));
   const vec3 actual_dir = normalize_vector(sub_vector(end_vertex, initial_vertex));
 
@@ -50,7 +50,7 @@ __device__ Quaternion bridges_compute_rotation(const vec3 initial_vertex, const 
   return rotation;
 }
 
-__device__ float bridges_log_factorial(const uint32_t vertex_count) {
+LUMINARY_FUNCTION float bridges_log_factorial(const uint32_t vertex_count) {
   if (vertex_count == 1)
     return 0.0f;
 
@@ -65,7 +65,7 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
 }
 
 // TODO: Package the LUT differently so I achieve good alignment, this can all be done using no more than 2 load instructions.
-__device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
+LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
   const uint32_t lut_offset = (vertex_count - 1) * 21;
 
   const float min_dist    = __ldg(device.ptrs.bridge_lut + lut_offset + 0);
@@ -106,7 +106,7 @@ __device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count
   return h00 * y0 + h10 * step * dy0 + h01 * y1 + h11 * step * dy1;
 }
 
-__device__ uint32_t
+LUMINARY_FUNCTION uint32_t
   bridges_sample_vertex_count(const VolumeDescriptor volume, const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
   const float effective_dist = light_dist * volume.max_scattering;
 
@@ -137,7 +137,7 @@ __device__ uint32_t
   return 1 + selected_vertex_count;
 }
 
-__device__ RGBF bridges_sample_bridge(
+LUMINARY_FUNCTION RGBF bridges_sample_bridge(
   MaterialContextVolume ctx, const vec3 light_point, const vec3 initial_vertex, const uint32_t seed, const ushort2 pixel, float& path_pdf,
   vec3& end_vertex, float& scale) {
   const vec3 light_vector  = sub_vector(light_point, initial_vertex);
@@ -212,7 +212,7 @@ __device__ RGBF bridges_sample_bridge(
   return path_weight;
 }
 
-__device__ vec3 bridges_sample_initial_vertex(
+LUMINARY_FUNCTION vec3 bridges_sample_initial_vertex(
   MaterialContextVolume ctx, const vec3 point_on_light, const ushort2 pixel, const uint32_t output_id, RGBF& attenuation, float& pdf) {
   float random_intersection = random_1D(RANDOM_TARGET_LIGHT_GEO_INITIAL_VERTEX + output_id, pixel);
 
@@ -256,7 +256,7 @@ __device__ vec3 bridges_sample_initial_vertex(
   return add_vector(ctx.position, scale_vector(ctx.V, -t));
 }
 
-__device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
+LUMINARY_FUNCTION LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   MaterialContextVolume ctx, TriangleLight light, const uint32_t light_id, const uint3 light_uv_packed, const ushort2 pixel,
   const uint32_t output_id, float2& target_and_weight) {
   const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + output_id, pixel);
@@ -345,7 +345,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
 
 #include "optix_include.cuh"
 
-__device__ RGBF bridges_sample_apply_shadowing(
+LUMINARY_FUNCTION RGBF bridges_sample_apply_shadowing(
   const MaterialContextVolume ctx, const DeviceTaskDirectLightBridges& direct_light_task, const ushort2 pixel, const bool sample_is_valid) {
   const uint32_t seed = direct_light_task.seed;
 

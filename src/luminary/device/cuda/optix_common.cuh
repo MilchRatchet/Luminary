@@ -18,7 +18,7 @@ enum OptixAlphaResult {
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
+LUMINARY_FUNCTION OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
   const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
@@ -46,7 +46,7 @@ __device__ OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
   return OPTIX_ALPHA_RESULT_OPAQUE;
 }
 
-__device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, const DeviceMaterial material) {
+LUMINARY_FUNCTION RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, const DeviceMaterial material) {
   RGBAF albedo = material.albedo;
 
   if (material.albedo_tex != TEXTURE_NONE) {
@@ -65,7 +65,7 @@ __device__ RGBAF optix_get_albedo_for_shadowing(const TriangleHandle handle, con
   return albedo;
 }
 
-__device__ bool particle_opacity_cutout(const float2 coord) {
+LUMINARY_FUNCTION bool particle_opacity_cutout(const float2 coord) {
   const float dx = coord.x - 0.5f;
   const float dy = coord.y - 0.5f;
 
@@ -74,7 +74,7 @@ __device__ bool particle_opacity_cutout(const float2 coord) {
   return (r > 0.25f);
 }
 
-__device__ RGBF optix_geometry_shadowing(
+LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
   const TriangleHandle handle, const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light,
   const OptixTraceStatus status) {
   OptixKernelFunctionShadowTracePayload payload;
@@ -93,7 +93,7 @@ __device__ RGBF optix_geometry_shadowing(
   return payload.throughput;
 }
 
-__device__ RGBF
+LUMINARY_FUNCTION RGBF
   optix_sun_shadowing(const TriangleHandle handle, const vec3 position, const vec3 dir, const float dist, const OptixTraceStatus status) {
   OptixKernelFunctionShadowSunTracePayload payload;
   payload.throughput    = splat_color(1.0f);

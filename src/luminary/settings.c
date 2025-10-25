@@ -9,7 +9,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->width                   = 2560;
   settings->height                  = 1440;
   settings->max_ray_depth           = 4;
-  settings->bridge_max_num_vertices = 8;
+  settings->bridge_max_num_vertices = 15;
   settings->undersampling           = 2;
   settings->supersampling           = 1;
   settings->shading_mode            = LUMINARY_SHADING_MODE_DEFAULT;

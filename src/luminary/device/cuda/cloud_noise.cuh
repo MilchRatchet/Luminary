@@ -12,11 +12,11 @@
 /*
  * Cubic interpolation with second derivative equal to 0 on boundaries
  */
-__device__ float interp_cubic_d2(const float x) {
+LUMINARY_FUNCTION float interp_cubic_d2(const float x) {
   return x * x * x * (x * (x * 6.0f - 15.0f) + 10.0f);
 }
 
-__device__ void perlin_hash(
+LUMINARY_FUNCTION void perlin_hash(
   vec3 grid, float scale, bool tile, float4& low0, float4& low1, float4& low2, float4& high0, float4& high1, float4& high2) {
   const float2 offset = make_float2(50.0f, 161.0f);
   const float domain  = 69.0f;
@@ -56,7 +56,7 @@ __device__ void perlin_hash(
   high2 = make_float4(fractf(p.x * high.z), fractf(p.y * high.z), fractf(p.z * high.z), fractf(p.w * high.z));
 }
 
-__device__ float perlin(vec3 p, const float scale, const bool tile) {
+LUMINARY_FUNCTION float perlin(vec3 p, const float scale, const bool tile) {
   p = scale_vector(p, scale);
 
   vec3 p1 = get_vector(floorf(p.x), floorf(p.y), floorf(p.z));
@@ -109,7 +109,7 @@ __device__ float perlin(vec3 p, const float scale, const bool tile) {
   return ((final * 1.5f) + 1.0f) * 0.5f;
 }
 
-__device__ float perlin_octaves(const vec3 p, const float scale, const int octaves, const bool tile) {
+LUMINARY_FUNCTION float perlin_octaves(const vec3 p, const float scale, const int octaves, const bool tile) {
   float frequency   = 1.0f;
   float persistence = 1.0f;
 
@@ -125,7 +125,7 @@ __device__ float perlin_octaves(const vec3 p, const float scale, const int octav
   return value;
 }
 
-__device__ vec3 voronoi_hash(vec3 x, float scale) {
+LUMINARY_FUNCTION vec3 voronoi_hash(vec3 x, float scale) {
   x.x = fmodf(x.x, scale);
   x.y = fmodf(x.y, scale);
   x.z = fmodf(x.z, scale);
@@ -139,7 +139,7 @@ __device__ vec3 voronoi_hash(vec3 x, float scale) {
   return get_vector(fractf(sinf(x.x) * h), fractf(sinf(x.y) * h), fractf(sinf(x.z) * h));
 }
 
-__device__ vec3 voronoi(vec3 x, float scale, float seed, bool inverted) {
+LUMINARY_FUNCTION vec3 voronoi(vec3 x, float scale, float seed, bool inverted) {
   x = scale_vector(x, scale);
   x = add_vector_const(x, 0.5f);
 
@@ -176,7 +176,7 @@ __device__ vec3 voronoi(vec3 x, float scale, float seed, bool inverted) {
   }
 }
 
-__device__ float worley_octaves(const vec3 p, float scale, const int octaves, const float seed, const float persistence) {
+LUMINARY_FUNCTION float worley_octaves(const vec3 p, float scale, const int octaves, const float seed, const float persistence) {
   float value = __saturatef(voronoi(p, scale, seed, true).x);
 
   float frequency = 2.0f;
@@ -190,7 +190,7 @@ __device__ float worley_octaves(const vec3 p, float scale, const int octaves, co
   return value;
 }
 
-__device__ float dilate_perlin_worley(const float p, const float w, float x) {
+LUMINARY_FUNCTION float dilate_perlin_worley(const float p, const float w, float x) {
   float curve = 0.75f;
 
   if (x < 0.5f) {

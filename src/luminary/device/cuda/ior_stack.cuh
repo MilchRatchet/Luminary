@@ -18,15 +18,15 @@ enum IORStackMethod {
 
 // BSDF transparent fast path relies on this precision.
 // If the precision is improved in the future we will run into INFs with surfaces with refractive index close to 1.
-__device__ uint32_t ior_compress(const float ior) {
+LUMINARY_FUNCTION uint32_t ior_compress(const float ior) {
   return (__float_as_uint((0.5f * (ior - 1.0f)) + 1.0f) >> 15) & 0xFF;
 }
 
-__device__ float ior_decompress(const uint32_t compressed_ior) {
+LUMINARY_FUNCTION float ior_decompress(const uint32_t compressed_ior) {
   return ((__uint_as_float(0x3F800000u | (compressed_ior << 15)) - 1.0f) * 2.0f) + 1.0f;
 }
 
-__device__ float ior_stack_interact(DeviceIORStack& stack, const float ior, const IORStackMethod method) {
+LUMINARY_FUNCTION float ior_stack_interact(DeviceIORStack& stack, const float ior, const IORStackMethod method) {
   uint32_t current_stack;
   if (method == IOR_STACK_METHOD_RESET) {
     current_stack = 0;

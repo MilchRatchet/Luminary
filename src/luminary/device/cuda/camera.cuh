@@ -8,7 +8,7 @@
 #include "spectral.cuh"
 #include "utils.cuh"
 
-__device__ CameraSampleResult camera_sample(const ushort2 pixel) {
+LUMINARY_FUNCTION CameraSampleResult camera_sample(const ushort2 pixel) {
   CameraSampleResult result;
   if (device.camera.use_physical_camera) {
     const bool allow_reflections  = device.camera.allow_reflections;

@@ -8,7 +8,7 @@
 // Utils
 ////////////////////////////////////////////////////////////////////
 
-__device__ bool light_allow_geo_direct_lighting(const DeviceTask task) {
+LUMINARY_FUNCTION bool light_allow_geo_direct_lighting(const DeviceTask task) {
   return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
 }
 
@@ -21,13 +21,13 @@ __device__ bool light_allow_geo_direct_lighting(const DeviceTask task) {
 #define BRIDGES_INITIAL_VERTEX_FORWARD_PROB (0.95f)
 #define BRIDGES_MAX_VERTEX_COUNT 15
 
-__device__ vec3 bridges_phase_sample(const vec3 ray, const float2 r_dir) {
+LUMINARY_FUNCTION vec3 bridges_phase_sample(const vec3 ray, const float2 r_dir) {
   const float cos_angle = henyey_greenstein_phase_sample(BRIDGES_HG_G_TERM, r_dir.x);
 
   return phase_sample_basis(cos_angle, r_dir.y, ray);
 }
 
-__device__ float bridges_phase_function(const float cos_angle) {
+LUMINARY_FUNCTION float bridges_phase_function(const float cos_angle) {
   return henyey_greenstein_phase_function(cos_angle, BRIDGES_HG_G_TERM);
 }
 

@@ -5,7 +5,7 @@
 #include "utils.cuh"
 
 static_assert(LIGHT_NUM_MICROTRIANGLES == 64, "This code requires this specific number of microtriangles.");
-__device__ void light_microtriangle_id_to_bary(const uint32_t id, float2& bary0, float2& bary1, float2& bary2) {
+LUMINARY_FUNCTION void light_microtriangle_id_to_bary(const uint32_t id, float2& bary0, float2& bary1, float2& bary2) {
   uint32_t row_id;
   uint32_t col_id;
 
@@ -65,7 +65,7 @@ __device__ void light_microtriangle_id_to_bary(const uint32_t id, float2& bary0,
   bary2.y *= 1.0f / 8.0f;
 }
 
-__device__ uint32_t light_microtriangle_bary_to_id(const float2 bary) {
+LUMINARY_FUNCTION uint32_t light_microtriangle_bary_to_id(const float2 bary) {
   const uint32_t index_row = min((uint32_t) (fmaxf(bary.x, 0.0f) * 8.0f), 7);
   const float row_mod      = bary.x * 8.0f - index_row;
 

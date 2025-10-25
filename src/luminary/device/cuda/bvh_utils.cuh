@@ -15,7 +15,7 @@ enum BVHAlphaResult { BVH_ALPHA_RESULT_OPAQUE = 0, BVH_ALPHA_RESULT_SEMI = 1, BV
  * @param coords Hit coordinates in triangle.
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, float2 coords) {
+LUMINARY_FUNCTION BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, float2 coords) {
   if (t.albedo_tex == TEXTURE_NONE)
     return BVH_ALPHA_RESULT_OPAQUE;
 

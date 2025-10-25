@@ -6,7 +6,7 @@
 #include "sky_defines.h"
 #include "utils.cuh"
 
-__device__ bool cloud_shadow_layer(const vec3 origin, const vec3 ray, const int step_count, const CloudLayerType layer) {
+LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, const int step_count, const CloudLayerType layer) {
   float2 cloud_layer_intersect;
   float max_dist;
 
@@ -59,7 +59,7 @@ __device__ bool cloud_shadow_layer(const vec3 origin, const vec3 ray, const int 
   return false;
 }
 
-__device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
+LUMINARY_FUNCTION float cloud_shadow(const vec3 origin, const vec3 ray) {
   if (!device.cloud.active || !device.cloud.atmosphere_scattering) {
     return 1.0f;
   }

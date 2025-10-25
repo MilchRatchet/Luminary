@@ -18,7 +18,7 @@
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
+LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
   ////////////////////////////////////////////////////////////////////
   // Sample a direction using BSDF importance sampling
   ////////////////////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialContext<T
 }
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
+LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
   // Caustics are only for underwater starting with v1.2.0
   constexpr bool IS_UNDERWATER = true;
 
@@ -277,7 +277,7 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<
 // Utils
 ////////////////////////////////////////////////////////////////////
 
-__device__ bool direct_lighting_geometry_is_allowed(const DeviceTask& task) {
+LUMINARY_FUNCTION bool direct_lighting_geometry_is_allowed(const DeviceTask& task) {
   bool allow_geometry_lighting = true;
 
   allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
@@ -286,7 +286,7 @@ __device__ bool direct_lighting_geometry_is_allowed(const DeviceTask& task) {
   return allow_geometry_lighting;
 }
 
-__device__ bool direct_lighting_sun_is_allowed(const DeviceTask& task) {
+LUMINARY_FUNCTION bool direct_lighting_sun_is_allowed(const DeviceTask& task) {
   bool allow_sun_lighting = true;
 
   allow_sun_lighting &= device.sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
@@ -294,7 +294,7 @@ __device__ bool direct_lighting_sun_is_allowed(const DeviceTask& task) {
   return allow_sun_lighting;
 }
 
-__device__ bool direct_lighting_sun_is_allowed(const MaterialContextVolume& ctx) {
+LUMINARY_FUNCTION bool direct_lighting_sun_is_allowed(const MaterialContextVolume& ctx) {
   bool allow_sun_lighting = true;
 
   allow_sun_lighting &= device.sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
@@ -303,7 +303,7 @@ __device__ bool direct_lighting_sun_is_allowed(const MaterialContextVolume& ctx)
   return allow_sun_lighting;
 }
 
-__device__ bool direct_lighting_ambient_is_allowed(const DeviceTask& task) {
+LUMINARY_FUNCTION bool direct_lighting_ambient_is_allowed(const DeviceTask& task) {
   bool allow_ambient_lighting = true;
 
   allow_ambient_lighting &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
@@ -311,7 +311,7 @@ __device__ bool direct_lighting_ambient_is_allowed(const DeviceTask& task) {
   return allow_ambient_lighting;
 }
 
-__device__ bool direct_lighting_ambient_is_allowed(const MaterialContextVolume& ctx) {
+LUMINARY_FUNCTION bool direct_lighting_ambient_is_allowed(const MaterialContextVolume& ctx) {
   bool allow_ambient_lighting = true;
 
   allow_ambient_lighting &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
@@ -320,7 +320,7 @@ __device__ bool direct_lighting_ambient_is_allowed(const MaterialContextVolume& 
   return allow_ambient_lighting;
 }
 
-__device__ bool direct_lighting_bridges_is_allowed(const MaterialContextVolume& ctx) {
+LUMINARY_FUNCTION bool direct_lighting_bridges_is_allowed(const MaterialContextVolume& ctx) {
   bool allow_geometry_lighting = true;
 
   allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
@@ -337,7 +337,7 @@ __device__ bool direct_lighting_bridges_is_allowed(const MaterialContextVolume& 
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel) {
   LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
 
   ////////////////////////////////////////////////////////////////////
@@ -363,7 +363,7 @@ __device__ DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const M
 }
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightSun direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
   const vec3 sky_pos = world_to_sky_transform(ctx.position);
 
   const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -390,7 +390,7 @@ __device__ DeviceTaskDirectLightSun direct_lighting_sun_create_task(const Materi
 }
 
 template <MaterialType TYPE>
-__device__ DeviceTaskDirectLightAmbient
+LUMINARY_FUNCTION DeviceTaskDirectLightAmbient
   direct_lighting_ambient_create_task(const MaterialContext<TYPE>& ctx, const BSDFSampleInfo<TYPE>& bounce_sample, const ushort2 index) {
   ////////////////////////////////////////////////////////////////////
   // Compute ambient color
@@ -410,7 +410,7 @@ __device__ DeviceTaskDirectLightAmbient
   return task;
 }
 
-__device__ DeviceTaskDirectLightBridges direct_lighting_bridges_create_task(const MaterialContextVolume& ctx, const ushort2 index) {
+LUMINARY_FUNCTION DeviceTaskDirectLightBridges direct_lighting_bridges_create_task(const MaterialContextVolume& ctx, const ushort2 index) {
   LightSampleResult<MATERIAL_VOLUME> sample = light_sample(ctx, index);
 
   ////////////////////////////////////////////////////////////////////
@@ -429,7 +429,7 @@ __device__ DeviceTaskDirectLightBridges direct_lighting_bridges_create_task(cons
 
 #ifdef OPTIX_KERNEL
 
-__device__ RGBF direct_lighting_geometry_evaluate_task(
+LUMINARY_FUNCTION RGBF direct_lighting_geometry_evaluate_task(
   const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightGeo& direct_light_task, const bool is_allowed) {
   const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
 
@@ -446,7 +446,7 @@ __device__ RGBF direct_lighting_geometry_evaluate_task(
   return mul_color(direct_light_task.light_color, visibility);
 }
 
-__device__ RGBF direct_lighting_sun_evaluate_task(
+LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
   const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightSun& direct_light_task, const bool is_allowed) {
   const vec3 ray = ray_unpack(direct_light_task.ray);
 
@@ -508,7 +508,7 @@ __device__ RGBF direct_lighting_sun_evaluate_task(
   return light_color;
 }
 
-__device__ RGBF direct_lighting_ambient_evaluate_task(
+LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
   const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightAmbient& direct_light_task, const bool is_allowed) {
   const vec3 ray = ray_unpack(direct_light_task.ray);
 
@@ -570,7 +570,7 @@ __device__ RGBF direct_lighting_ambient_evaluate_task(
   return light_color;
 }
 
-__device__ RGBF direct_lighting_bridges_evaluate_task(
+LUMINARY_FUNCTION RGBF direct_lighting_bridges_evaluate_task(
   const MaterialContextVolume& ctx, const DeviceTaskDirectLightBridges& direct_light_task, const ushort2 index, const bool is_allowed) {
   const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
 

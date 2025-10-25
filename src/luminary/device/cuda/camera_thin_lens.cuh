@@ -5,7 +5,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-__device__ vec3 camera_thin_lens_sample_sensor(const ushort2 pixel) {
+LUMINARY_FUNCTION vec3 camera_thin_lens_sample_sensor(const ushort2 pixel) {
   const float2 jitter = camera_get_jitter();
 
   const float step = 2.0f * (device.camera.thin_lens.fov / device.settings.width);
@@ -27,7 +27,7 @@ __device__ vec3 camera_thin_lens_sample_sensor(const ushort2 pixel) {
 
 // We force the weight to be 1, else the brightness of the image would depend on aperture size.
 // That would be realistic but not practical.
-__device__ vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
+LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
   if (device.camera.thin_lens.aperture_size == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
@@ -72,7 +72,7 @@ __device__ vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
   return get_vector(sample.x, sample.y, 0.0f);
 }
 
-__device__ CameraSampleResult camera_thin_lens_sample(const ushort2 pixel) {
+LUMINARY_FUNCTION CameraSampleResult camera_thin_lens_sample(const ushort2 pixel) {
   const vec3 sensor_point = camera_thin_lens_sample_sensor(pixel);
 
   vec3 sensor_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), sensor_point));

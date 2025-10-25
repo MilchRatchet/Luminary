@@ -8,7 +8,7 @@
 // TODO: It is time to move this to another file, directives is a name coming from some really ancient Luminary days.
 #define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
 
-__device__ bool task_russian_roulette(const DeviceTask task, const uint8_t state, RGBF& record) {
+LUMINARY_FUNCTION bool task_russian_roulette(const DeviceTask task, const uint8_t state, RGBF& record) {
   if (state & STATE_FLAG_DELTA_PATH)
     return true;
 

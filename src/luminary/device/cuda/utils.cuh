@@ -27,6 +27,9 @@
 #define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(THREADS_PER_BLOCK)
 #define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
+#define LUMINARY_FUNCTION __device__ __forceinline__
+#define LUMINARY_FUNCTION_NO_INLINE __device__ __noinline__
+
 #ifndef eps
 #define eps FLT_EPSILON
 #endif /* eps */
@@ -140,7 +143,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 
 #define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
 
-__device__ bool is_selected_pixel(const ushort2 index) {
+LUMINARY_FUNCTION bool is_selected_pixel(const ushort2 index) {
   if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
     return false;
 
@@ -148,22 +151,22 @@ __device__ bool is_selected_pixel(const ushort2 index) {
   return (index.x == device.state.user_selected_x && index.y == device.state.user_selected_y);
 }
 
-__device__ bool is_selected_pixel_lenient(const ushort2 index) {
+LUMINARY_FUNCTION bool is_selected_pixel_lenient(const ushort2 index) {
   if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
     return true;
 
   return is_selected_pixel(index);
 }
 
-__device__ bool is_center_pixel(const ushort2 index) {
+LUMINARY_FUNCTION bool is_center_pixel(const ushort2 index) {
   return ((index.x == device.settings.width >> 1) && (index.y == device.settings.height >> 1));
 }
 
-__device__ uint32_t get_pixel_id(const ushort2 pixel) {
+LUMINARY_FUNCTION uint32_t get_pixel_id(const ushort2 pixel) {
   return pixel.x + device.settings.width * pixel.y;
 }
 
-__device__ bool is_non_finite(const float a) {
+LUMINARY_FUNCTION bool is_non_finite(const float a) {
 #ifndef __INTELLISENSE__
   return isnan(a) || isinf(a);
 #else
@@ -181,7 +184,7 @@ __device__ bool is_non_finite(const float a) {
     return;                                                                                                           \
   }
 
-__device__ ShadingTaskIndex shading_task_index_from_instance_id(const uint32_t instance_id) {
+LUMINARY_FUNCTION ShadingTaskIndex shading_task_index_from_instance_id(const uint32_t instance_id) {
   if (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
     return SHADING_TASK_INDEX_GEOMETRY;
   }
@@ -212,7 +215,7 @@ __device__ ShadingTaskIndex shading_task_index_from_instance_id(const uint32_t i
 
 #define UTILS_DEBUG_NAN_COLOR (get_color(1.0f, 0.0f, 0.0f))
 
-__device__ bool _utils_debug_nans(const RGBF color, const char* func, const uint32_t line, const char* var) {
+LUMINARY_FUNCTION bool _utils_debug_nans(const RGBF color, const char* func, const uint32_t line, const char* var) {
   const float sum_color = color.r + color.g + color.b;
   if (isnan(sum_color) || isinf(sum_color)) {
     printf("[%s:%u] Failed NaN check. %s = (%f %f %f).\n", func, line, var, color.r, color.g, color.b);
@@ -222,7 +225,7 @@ __device__ bool _utils_debug_nans(const RGBF color, const char* func, const uint
   return false;
 }
 
-__device__ bool _utils_debug_nans(const float value, const char* func, const uint32_t line, const char* var) {
+LUMINARY_FUNCTION bool _utils_debug_nans(const float value, const char* func, const uint32_t line, const char* var) {
   if (isnan(value) || isinf(value)) {
     printf("[%s:%u] Failed NaN check. %s = %f.\n", func, line, var, value);
 
@@ -249,7 +252,7 @@ __device__ bool _utils_debug_nans(const float value, const char* func, const uin
 /* instance_id refers to the light instance id, the actual instance_id is obtain through device.ptrs.light_instance_map. */
 typedef TriangleHandle LightTriangleHandle;
 
-__device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint32_t tri_id) {
+LUMINARY_FUNCTION TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint32_t tri_id) {
   TriangleHandle handle;
 
   handle.instance_id = instance_id;
@@ -258,7 +261,7 @@ __device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const 
   return handle;
 }
 
-__device__ bool triangle_handle_equal(const TriangleHandle handle1, const TriangleHandle handle2) {
+LUMINARY_FUNCTION bool triangle_handle_equal(const TriangleHandle handle1, const TriangleHandle handle2) {
   return (handle1.instance_id == handle2.instance_id) && (handle1.tri_id == handle2.tri_id);
 }
 

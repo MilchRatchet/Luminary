@@ -16,13 +16,13 @@
 // For light tree based technique, we stratify the RIS light tree random number dimensions using 1D latin hypercube sampling
 // to achieve the desired ordered stratification. The other dimensions are entirely dependent on this first dimension so it makes no
 // sense to apply any further stratification for those within RIS.
-__device__ float ris_transform_stratum(const uint32_t index, const uint32_t num_samples, const float random) {
+LUMINARY_FUNCTION float ris_transform_stratum(const uint32_t index, const uint32_t num_samples, const float random) {
   const float section_length = 1.0f / num_samples;
 
   return (index + random) * section_length;
 }
 
-__device__ float2 ris_transform_stratum_2D(const uint32_t index, const uint32_t num_samples, const float2 random) {
+LUMINARY_FUNCTION float2 ris_transform_stratum_2D(const uint32_t index, const uint32_t num_samples, const float2 random) {
   return make_float2(ris_transform_stratum(index, num_samples, random.x), random.y);
 }
 
@@ -37,7 +37,7 @@ struct RISReservoir {
 #endif  // RIS_COLLECT_SAMPLE_COUNT
 } typedef RISReservoir;
 
-__device__ void ris_reservoir_reset(RISReservoir& reservoir) {
+LUMINARY_FUNCTION void ris_reservoir_reset(RISReservoir& reservoir) {
   reservoir.sum_weight      = 0.0f;
   reservoir.selected_target = 0.0f;
 
@@ -46,7 +46,7 @@ __device__ void ris_reservoir_reset(RISReservoir& reservoir) {
 #endif  // RIS_COLLECT_SAMPLE_COUNT
 }
 
-__device__ RISReservoir ris_reservoir_init(const float random) {
+LUMINARY_FUNCTION RISReservoir ris_reservoir_init(const float random) {
   RISReservoir reservoir;
 
   reservoir.random = random;
@@ -56,7 +56,7 @@ __device__ RISReservoir ris_reservoir_init(const float random) {
   return reservoir;
 }
 
-__device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float target, const float sampling_weight) {
+LUMINARY_FUNCTION bool ris_reservoir_add_sample(RISReservoir& reservoir, const float target, const float sampling_weight) {
   const float weight = target * sampling_weight;
 
   reservoir.sum_weight += weight;
@@ -81,11 +81,11 @@ __device__ bool ris_reservoir_add_sample(RISReservoir& reservoir, const float ta
   return sample_accepted;
 }
 
-__device__ float ris_reservoir_get_sampling_weight(const RISReservoir reservoir) {
+LUMINARY_FUNCTION float ris_reservoir_get_sampling_weight(const RISReservoir reservoir) {
   return (reservoir.selected_target > 0.0f) ? reservoir.sum_weight / reservoir.selected_target : 0.0f;
 }
 
-__device__ float ris_reservoir_get_sampling_prob(const RISReservoir reservoir) {
+LUMINARY_FUNCTION float ris_reservoir_get_sampling_prob(const RISReservoir reservoir) {
   return (reservoir.sum_weight > 0.0f) ? reservoir.selected_target / reservoir.sum_weight : 1.0f;
 }
 
@@ -103,11 +103,11 @@ struct RISLane {
   float random;
 } typedef RISLane;
 
-__device__ void ris_aggregator_reset(RISAggregator& aggregator) {
+LUMINARY_FUNCTION void ris_aggregator_reset(RISAggregator& aggregator) {
   aggregator.sum_weight = 0.0f;
 }
 
-__device__ RISAggregator ris_aggregator_init(void) {
+LUMINARY_FUNCTION RISAggregator ris_aggregator_init(void) {
   RISAggregator aggregator;
 
   ris_aggregator_reset(aggregator);
@@ -115,7 +115,7 @@ __device__ RISAggregator ris_aggregator_init(void) {
   return aggregator;
 }
 
-__device__ RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggregator, const float target, const float sampling_weight) {
+LUMINARY_FUNCTION RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggregator, const float target, const float sampling_weight) {
   const float weight = target * sampling_weight;
 
   aggregator.sum_weight += weight;
@@ -127,11 +127,11 @@ __device__ RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggregator, 
   return handle;
 }
 
-__device__ void ris_lane_reset(RISLane& lane) {
+LUMINARY_FUNCTION void ris_lane_reset(RISLane& lane) {
   lane.selected_target = 0.0f;
 }
 
-__device__ RISLane ris_lane_init(const float random) {
+LUMINARY_FUNCTION RISLane ris_lane_init(const float random) {
   RISLane lane;
 
   lane.random = random;
@@ -141,7 +141,7 @@ __device__ RISLane ris_lane_init(const float random) {
   return lane;
 }
 
-__device__ bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample) {
+LUMINARY_FUNCTION bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample) {
   const float resampling_probability = sample.resampling_probability;
   const bool sample_accepted         = (lane.random < resampling_probability);
 
@@ -154,11 +154,11 @@ __device__ bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle sample)
   return sample_accepted;
 }
 
-__device__ float ris_lane_get_sampling_weight(const RISLane lane, const RISAggregator aggregator) {
+LUMINARY_FUNCTION float ris_lane_get_sampling_weight(const RISLane lane, const RISAggregator aggregator) {
   return (lane.selected_target > 0.0f) ? aggregator.sum_weight / lane.selected_target : 0.0f;
 }
 
-__device__ float ris_lane_get_sampling_prob(const RISLane lane, const RISAggregator aggregator) {
+LUMINARY_FUNCTION float ris_lane_get_sampling_prob(const RISLane lane, const RISAggregator aggregator) {
   return (aggregator.sum_weight > 0.0f) ? (lane.selected_target / aggregator.sum_weight) : 0.0f;
 }
 

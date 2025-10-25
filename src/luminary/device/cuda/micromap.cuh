@@ -19,7 +19,7 @@ struct OMMTextureTriangle {
   bool is_invisible;
 } typedef OMMTextureTriangle;
 
-__device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mesh_id, const uint32_t tri_id) {
+LUMINARY_FUNCTION OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mesh_id, const uint32_t tri_id) {
   const uint32_t material_id = material_id_load(mesh_id, tri_id);
   const uint16_t tex         = __ldg(&device.ptrs.materials[material_id].albedo_tex);
 
@@ -47,7 +47,7 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mes
 }
 
 // Load triangle only once for the refinement steps
-__device__ uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
+LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
   if (tri.tex_id == TEXTURE_NONE) {
     // Materials without an albedo texture can have their opacity changed, so we cannot use OMMs there.
     return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;

@@ -47,7 +47,7 @@ LUMINARY_KERNEL void camera_post_lens_flare_ghosts(const KernelArgsCameraPostLen
   }
 }
 
-__device__ UV _lens_flare_fisheye(UV uv, const float compression, const float zoom) {
+LUMINARY_FUNCTION UV _lens_flare_fisheye(UV uv, const float compression, const float zoom) {
   uv.u = 2.0f * uv.u - 1.0f;
   uv.v = 2.0f * uv.v - 1.0f;
 
