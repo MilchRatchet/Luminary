@@ -18,7 +18,7 @@
 
 #define PURKINJE_STRENGTH (5000.0f)
 
-__device__ RGBF purkinje_shift(RGBF pixel) {
+LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
   if (luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))
     return pixel;
 

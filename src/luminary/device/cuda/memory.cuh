@@ -8,17 +8,17 @@
 // Interleaved storage access
 ////////////////////////////////////////////////////////////////////
 
-__device__ void* interleaved_buffer_get_entry_address_chunk_16(
+LUMINARY_FUNCTION void* interleaved_buffer_get_entry_address_chunk_16(
   void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
   return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
 }
 
-__device__ void* interleaved_buffer_get_entry_address_chunk_8(
+LUMINARY_FUNCTION void* interleaved_buffer_get_entry_address_chunk_8(
   void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
   return (void*) (((float*) ptr) + (count * chunk + id) * 2 + offset);
 }
 
-__device__ void* triangle_get_entry_address(
+LUMINARY_FUNCTION void* triangle_get_entry_address(
   const DeviceTriangle* tri_ptr, const uint32_t chunk, const uint32_t offset, const uint32_t tri_id, const uint32_t triangle_count) {
   return interleaved_buffer_get_entry_address_chunk_16((void*) tri_ptr, triangle_count, chunk, offset, tri_id);
 }
@@ -28,7 +28,7 @@ __device__ void* triangle_get_entry_address(
 ////////////////////////////////////////////////////////////////////
 
 template <typename T>
-__device__ T warp_reduce_sum(T sum) {
+LUMINARY_FUNCTION T warp_reduce_sum(T sum) {
   const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
   sum += __shfl_xor_sync(mask, sum, 16);
   sum += __shfl_xor_sync(mask, sum, 8);
@@ -39,7 +39,7 @@ __device__ T warp_reduce_sum(T sum) {
 }
 
 template <typename T>
-__device__ T warp_reduce_max(T max_value) {
+LUMINARY_FUNCTION T warp_reduce_max(T max_value) {
   const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
   max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
   max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
@@ -50,7 +50,7 @@ __device__ T warp_reduce_max(T max_value) {
 }
 
 template <typename T>
-__device__ T warp_reduce_prefixsum(T value) {
+LUMINARY_FUNCTION T warp_reduce_prefixsum(T value) {
   // It is important that all threads are participating. In theory, this should also work as long as all threads enter this function but
   // then some are predicated off. However, I had issues with that. The intention now is to pass in a 0 if a thread does not want to
   // participate.
@@ -74,7 +74,7 @@ __device__ T warp_reduce_prefixsum(T value) {
 ////////////////////////////////////////////////////////////////////
 
 template <typename DATA_TYPE, typename LOAD_TYPE, typename STRIDE_TYPE = DATA_TYPE>
-__device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
+LUMINARY_FUNCTION DATA_TYPE load_generic(const void* src, uint32_t offset) {
   static_assert(
     (sizeof(DATA_TYPE) / sizeof(LOAD_TYPE)) * sizeof(LOAD_TYPE) == sizeof(DATA_TYPE), "DATA_TYPE must be a multiple of LOAD_TYPE in size.");
   const LOAD_TYPE* ptr = (const LOAD_TYPE*) (((const STRIDE_TYPE*) src) + offset);
@@ -103,7 +103,7 @@ __device__ DATA_TYPE load_generic(const void* src, uint32_t offset) {
 // Task State IO
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint32_t
+LUMINARY_FUNCTION uint32_t
   task_address_impl(const uint32_t thread_id_in_warp, const uint32_t warp_id, const uint32_t task_id, const TaskStateBufferIndex index) {
   constexpr uint32_t num_chunks = sizeof(DeviceTaskState) / sizeof(float4);
 
@@ -117,7 +117,7 @@ __device__ uint32_t
   return base_address;
 }
 
-__device__ uint32_t task_arbitrary_warp_address(const uint32_t warp_offset, const TaskStateBufferIndex index) {
+LUMINARY_FUNCTION uint32_t task_arbitrary_warp_address(const uint32_t warp_offset, const TaskStateBufferIndex index) {
   const uint32_t thread_id_in_warp = warp_offset & WARP_SIZE_MASK;
   const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
   const uint32_t task_id           = warp_offset >> WARP_SIZE_LOG;
@@ -125,7 +125,7 @@ __device__ uint32_t task_arbitrary_warp_address(const uint32_t warp_offset, cons
   return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
 }
 
-__device__ uint32_t task_get_base_address(const uint32_t task_id, const TaskStateBufferIndex index) {
+LUMINARY_FUNCTION uint32_t task_get_base_address(const uint32_t task_id, const TaskStateBufferIndex index) {
   const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
   const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
 
@@ -133,11 +133,11 @@ __device__ uint32_t task_get_base_address(const uint32_t task_id, const TaskStat
 }
 
 template <typename DATA_TYPE, typename LOAD_TYPE>
-__device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t member_offset) {
+LUMINARY_FUNCTION DATA_TYPE load_task_state(const void* LUM_RESTRICT src_ptr, const uint32_t base_address, const uint32_t member_offset) {
   const uint32_t chunk_id          = member_offset >> 4;
   const uint32_t sub_member_offset = member_offset & 0xF;
 
-  const float4* ptr = ((const float4*) device.ptrs.task_states);
+  const float4* ptr = ((const float4* LUM_RESTRICT) src_ptr);
 
   ptr += base_address;
   ptr += chunk_id * WARP_SIZE;
@@ -159,11 +159,12 @@ __device__ DATA_TYPE load_task_state(const uint32_t base_address, const uint32_t
 }
 
 template <typename DATA_TYPE, typename STORE_TYPE>
-__device__ void store_task_state(const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
+LUMINARY_FUNCTION void store_task_state(
+  void* LUM_RESTRICT dst_ptr, const uint32_t base_address, const uint32_t member_offset, const DATA_TYPE src) {
   const uint32_t chunk_id          = member_offset >> 4;
   const uint32_t sub_member_offset = member_offset & 0xF;
 
-  float4* ptr = ((float4*) device.ptrs.task_states);
+  float4* ptr = ((float4*) dst_ptr);
 
   ptr += base_address;
   ptr += chunk_id * WARP_SIZE;
@@ -184,67 +185,109 @@ __device__ void store_task_state(const uint32_t base_address, const uint32_t mem
   }
 }
 
-__device__ DeviceTask task_load(const uint32_t base_address) {
-  return load_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task));
+LUMINARY_FUNCTION DeviceTask task_load(const uint32_t base_address) {
+  return load_task_state<DeviceTask, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, task));
 }
 
-__device__ DeviceTaskTrace task_trace_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result));
+LUMINARY_FUNCTION DeviceTaskTrace task_trace_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskTrace, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result));
 }
 
-__device__ DeviceTaskThroughput task_throughput_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput));
+LUMINARY_FUNCTION DeviceTaskThroughput task_throughput_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput));
 }
 
 // DeviceTask
 
-__device__ void task_store(const uint32_t base_address, const DeviceTask data) {
-  store_task_state<DeviceTask, float4>(base_address, offsetof(DeviceTaskState, task), data);
+LUMINARY_FUNCTION void task_store(const uint32_t base_address, const DeviceTask data) {
+  store_task_state<DeviceTask, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, task), data);
 }
 
 // DeviceTaskTrace
 
-__device__ void task_trace_store(const uint32_t base_address, const DeviceTaskTrace data) {
-  store_task_state<DeviceTaskTrace, float4>(base_address, offsetof(DeviceTaskState, trace_result), data);
+LUMINARY_FUNCTION void task_trace_store(const uint32_t base_address, const DeviceTaskTrace data) {
+  store_task_state<DeviceTaskTrace, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result), data);
 }
 
-__device__ void task_trace_handle_store(const uint32_t base_address, const TriangleHandle data) {
-  store_task_state<TriangleHandle, float2>(base_address, offsetof(DeviceTaskState, trace_result.handle), data);
+LUMINARY_FUNCTION void task_trace_handle_store(const uint32_t base_address, const TriangleHandle data) {
+  store_task_state<TriangleHandle, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.handle), data);
 }
 
-__device__ void task_trace_depth_store(const uint32_t base_address, const float data) {
-  store_task_state<float, float>(base_address, offsetof(DeviceTaskState, trace_result.depth), data);
+LUMINARY_FUNCTION void task_trace_depth_store(const uint32_t base_address, const float data) {
+  store_task_state<float, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.depth), data);
 }
 
-__device__ void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
-  store_task_state<DeviceIORStack, float>(base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
+LUMINARY_FUNCTION void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
+  store_task_state<DeviceIORStack, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
 }
 
 // DeviceTaskThroughput
 
-__device__ void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
-  store_task_state<DeviceTaskThroughput, float4>(base_address, offsetof(DeviceTaskState, throughput), data);
+LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
+  store_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput), data);
 }
 
-__device__ void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
-  store_task_state<PackedRecord, float2>(base_address, offsetof(DeviceTaskState, throughput.record), data);
+LUMINARY_FUNCTION void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
+  store_task_state<PackedRecord, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.record), data);
 }
 
-__device__ void task_throughput_mis_payload_store(const uint32_t base_address, const PackedMISPayload data) {
-  store_task_state<PackedMISPayload, float2>(base_address, offsetof(DeviceTaskState, throughput.payload), data);
+LUMINARY_FUNCTION void task_throughput_mis_payload_store(const uint32_t base_address, const PackedMISPayload data) {
+  store_task_state<PackedMISPayload, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.payload), data);
+}
+
+// DeviceTaskDirectLight
+
+LUMINARY_FUNCTION DeviceTaskDirectLightGeo task_direct_light_geo_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightGeo, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, geo));
+}
+
+LUMINARY_FUNCTION DeviceTaskDirectLightSun task_direct_light_sun_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightSun, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, sun));
+}
+
+LUMINARY_FUNCTION DeviceTaskDirectLightAmbient task_direct_light_ambient_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightAmbient, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, ambient));
+}
+
+LUMINARY_FUNCTION DeviceTaskDirectLightBridges task_direct_light_bridges_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskDirectLightBridges, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, bridges));
+}
+
+LUMINARY_FUNCTION void task_direct_light_geo_store(const uint32_t base_address, const DeviceTaskDirectLightGeo data) {
+  store_task_state<DeviceTaskDirectLightGeo, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, geo), data);
+}
+
+LUMINARY_FUNCTION void task_direct_light_sun_store(const uint32_t base_address, const DeviceTaskDirectLightSun data) {
+  store_task_state<DeviceTaskDirectLightSun, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, sun), data);
+}
+
+LUMINARY_FUNCTION void task_direct_light_ambient_store(const uint32_t base_address, const DeviceTaskDirectLightAmbient data) {
+  store_task_state<DeviceTaskDirectLightAmbient, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, ambient), data);
+}
+
+LUMINARY_FUNCTION void task_direct_light_bridges_store(const uint32_t base_address, const DeviceTaskDirectLightBridges data) {
+  store_task_state<DeviceTaskDirectLightBridges, float4>(
+    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, bridges), data);
 }
 
 ////////////////////////////////////////////////////////////////////
 // RGBF IO
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF load_RGBF(const RGBF* ptr) {
+LUMINARY_FUNCTION RGBF load_RGBF(const RGBF* ptr) {
   return *ptr;
 }
 
 #ifdef UTILS_DEBUG_MODE
 
-__device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color, const char* func, uint32_t line) {
+LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color, const char* func, uint32_t line) {
   RGBF sanitized_color = color;
   if (is_non_finite(luminance(color))) {
     // Debug code to identify paths that cause NaNs and INFs
@@ -266,7 +309,7 @@ __device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF 
 
 #else /* UTILS_DEBUG_MODE */
 
-__device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color) {
+LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color) {
   const RGBF sanitized_color = is_non_finite(luminance(color)) ? UTILS_DEBUG_NAN_COLOR : color;
 
   buffer[offset] = sanitized_color;
@@ -280,7 +323,7 @@ __device__ void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF 
 // Beauty Buffer IO
 ////////////////////////////////////////////////////////////////////
 
-__device__ void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, const bool mode_set, RGBF* buffer) {
+LUMINARY_FUNCTION void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, const bool mode_set, RGBF* buffer) {
   RGBF output = beauty;
   if (!mode_set) {
     output = add_color(beauty, load_RGBF(buffer + pixel));
@@ -288,15 +331,15 @@ __device__ void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel
   store_RGBF(buffer, pixel, output);
 }
 
-__device__ void write_beauty_buffer_direct(const RGBF beauty, const uint32_t pixel, const bool mode_set = false) {
+LUMINARY_FUNCTION void write_beauty_buffer_direct(const RGBF beauty, const uint32_t pixel, const bool mode_set = false) {
   write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_direct_buffer);
 }
 
-__device__ void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t pixel, const bool mode_set = false) {
+LUMINARY_FUNCTION void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t pixel, const bool mode_set = false) {
   write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_indirect_buffer);
 }
 
-__device__ void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state, const bool mode_set = false) {
+LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state, const bool mode_set = false) {
   const bool is_direct = state & STATE_FLAG_DELTA_PATH;
 
   RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
@@ -304,13 +347,13 @@ __device__ void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, con
   write_beauty_buffer_impl(beauty, pixel, mode_set, buffer);
 }
 
-__device__ void write_beauty_buffer_forced(const RGBF beauty, const uint32_t pixel) {
+LUMINARY_FUNCTION void write_beauty_buffer_forced(const RGBF beauty, const uint32_t pixel) {
   write_beauty_buffer(beauty, pixel, STATE_FLAG_DELTA_PATH, true);
 }
 
 #ifndef NO_LUMINARY_BVH
 
-__device__ TraversalTriangle load_traversal_triangle(const int offset) {
+LUMINARY_FUNCTION TraversalTriangle load_traversal_triangle(const int offset) {
   float4* ptr     = (float4*) (device.bvh_triangles + offset);
   const float4 v1 = __ldg(ptr);
   const float4 v2 = __ldg(ptr + 1);
@@ -328,11 +371,11 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
 
 #endif
 
-__device__ uint32_t mesh_id_load(const uint32_t instance_id) {
+LUMINARY_FUNCTION uint32_t mesh_id_load(const uint32_t instance_id) {
   return __ldg(device.ptrs.instance_mesh_id + instance_id);
 }
 
-__device__ uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
+LUMINARY_FUNCTION uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
   const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
   const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
   const uint32_t data           = __ldg((uint32_t*) triangle_get_entry_address(ptr, 3, 3, triangle_id, triangle_count));
@@ -341,7 +384,7 @@ __device__ uint16_t material_id_load(const uint32_t mesh_id, const uint32_t tria
   return material_id;
 }
 
-__device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
+LUMINARY_FUNCTION UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
   const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
@@ -356,7 +399,7 @@ __device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2
   return lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }
 
-__device__ Quad load_quad(const Quad* data, const int offset) {
+LUMINARY_FUNCTION Quad load_quad(const Quad* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
@@ -371,29 +414,25 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   return quad;
 }
 
-__device__ float unpack_float_from_uint16(const uint32_t data) {
-  return __uint_as_float(data << 15);
-}
-
-__device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, const uint32_t offset) {
+LUMINARY_FUNCTION DeviceMaterial load_material(const DeviceMaterialCompressed* data, const uint32_t offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);
 
   DeviceMaterial mat;
   mat.flags            = __float_as_uint(v0.x) & 0x00FF;
-  mat.roughness_clamp  = random_uint16_t_to_float(__float_as_uint(v0.x) & 0xFF00);
+  mat.roughness_clamp  = normed_float_unpack(__float_as_uint(v0.x) & 0xFF00);
   mat.metallic_tex     = __float_as_uint(v0.x) >> 16;
-  mat.roughness        = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
-  mat.refraction_index = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;
-  mat.albedo.r         = random_uint16_t_to_float(__float_as_uint(v0.z) & 0xFFFF);
-  mat.albedo.g         = random_uint16_t_to_float(__float_as_uint(v0.z) >> 16);
-  mat.albedo.b         = random_uint16_t_to_float(__float_as_uint(v0.w) & 0xFFFF);
-  mat.albedo.a         = random_uint16_t_to_float(__float_as_uint(v0.w) >> 16);
-  mat.emission.r       = random_uint16_t_to_float(__float_as_uint(v1.x) & 0xFFFF);
-  mat.emission.g       = random_uint16_t_to_float(__float_as_uint(v1.x) >> 16);
-  mat.emission.b       = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
-  mat.emission_scale   = unpack_float_from_uint16(__float_as_uint(v1.y) >> 16);
+  mat.roughness        = normed_float_unpack(__float_as_uint(v0.y) & 0xFFFF);
+  mat.refraction_index = normed_float_unpack(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;
+  mat.albedo.r         = normed_float_unpack(__float_as_uint(v0.z) & 0xFFFF);
+  mat.albedo.g         = normed_float_unpack(__float_as_uint(v0.z) >> 16);
+  mat.albedo.b         = normed_float_unpack(__float_as_uint(v0.w) & 0xFFFF);
+  mat.albedo.a         = normed_float_unpack(__float_as_uint(v0.w) >> 16);
+  mat.emission.r       = normed_float_unpack(__float_as_uint(v1.x) & 0xFFFF);
+  mat.emission.g       = normed_float_unpack(__float_as_uint(v1.x) >> 16);
+  mat.emission.b       = normed_float_unpack(__float_as_uint(v1.y) & 0xFFFF);
+  mat.emission_scale   = unsigned_float_unpack(__float_as_uint(v1.y) >> 16);
   mat.albedo_tex       = __float_as_uint(v1.z) & 0xFFFF;
   mat.luminance_tex    = __float_as_uint(v1.z) >> 16;
   mat.roughness_tex    = __float_as_uint(v1.w) & 0xFFFF;
@@ -404,20 +443,20 @@ __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, co
   return mat;
 }
 
-__device__ RGBAF load_material_albedo(const DeviceMaterialCompressed* data, const uint32_t offset) {
+LUMINARY_FUNCTION RGBAF load_material_albedo(const DeviceMaterialCompressed* data, const uint32_t offset) {
   const float2* ptr = (float2*) (data + offset);
   const float2 v    = __ldg(ptr + 1);
 
   RGBAF albedo;
-  albedo.r = random_uint16_t_to_float(__float_as_uint(v.x) & 0xFFFF);
-  albedo.g = random_uint16_t_to_float(__float_as_uint(v.x) >> 16);
-  albedo.b = random_uint16_t_to_float(__float_as_uint(v.y) & 0xFFFF);
-  albedo.a = random_uint16_t_to_float(__float_as_uint(v.y) >> 16);
+  albedo.r = normed_float_unpack(__float_as_uint(v.x) & 0xFFFF);
+  albedo.g = normed_float_unpack(__float_as_uint(v.x) >> 16);
+  albedo.b = normed_float_unpack(__float_as_uint(v.y) & 0xFFFF);
+  albedo.a = normed_float_unpack(__float_as_uint(v.y) >> 16);
 
   return albedo;
 }
 
-__device__ DeviceTransform load_transform(const uint32_t offset) {
+LUMINARY_FUNCTION DeviceTransform load_transform(const uint32_t offset) {
   const float4* ptr = (float4*) (device.ptrs.instance_transforms + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);
@@ -438,7 +477,7 @@ __device__ DeviceTransform load_transform(const uint32_t offset) {
   return trans;
 }
 
-__device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
+LUMINARY_FUNCTION DeviceTextureObject load_texture_object(const uint16_t offset) {
   const float4* ptr = (float4*) (device.ptrs.textures + offset);
   const float4 v0   = __ldg(ptr + 0);
 
@@ -452,7 +491,7 @@ __device__ DeviceTextureObject load_texture_object(const uint16_t offset) {
   return float4_to_tex_converter.tex;
 }
 
-__device__ Star star_load(const uint32_t offset) {
+LUMINARY_FUNCTION Star star_load(const uint32_t offset) {
   union {
     float4 data;
     Star star;

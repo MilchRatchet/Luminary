@@ -8,12 +8,12 @@
 #define MIS_FORCE_FULL_GI (-1.0f)
 
 template <MaterialType TYPE>
-__device__ float mis_compute_gi_pdf(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_refraction) {
+LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_refraction) {
   return 0.0f;
 }
 
 template <>
-__device__ float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
+LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
   float gi_pdf;
   if (is_refraction) {
     const float refraction_index = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
@@ -44,14 +44,14 @@ __device__ float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec
   return gi_pdf;
 }
 
-__device__ float mis_compute_weight_base(const float gi_pdf, const float solid_angle, const float power, const float dist_sq) {
+LUMINARY_FUNCTION float mis_compute_weight_base(const float gi_pdf, const float solid_angle, const float power, const float dist_sq) {
   const float dl_pdf =
     LIGHT_GEO_MAX_SAMPLES * (1.0f / solid_angle) * (power / dist_sq) * (1.0f / device.ptrs.light_scene_data->total_power);
 
   return gi_pdf / (gi_pdf + dl_pdf);
 }
 
-__device__ float mis_compute_weight_gi(const float gi_pdf, const float solid_angle, const float power, const float dist_sq) {
+LUMINARY_FUNCTION float mis_compute_weight_gi(const float gi_pdf, const float solid_angle, const float power, const float dist_sq) {
   if (gi_pdf == MIS_FORCE_FULL_GI)
     return 1.0f;
 
@@ -59,14 +59,14 @@ __device__ float mis_compute_weight_gi(const float gi_pdf, const float solid_ang
 }
 
 template <MaterialType TYPE>
-__device__ float mis_compute_weight_dl(
+LUMINARY_FUNCTION float mis_compute_weight_dl(
   const MaterialContext<TYPE> ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angl,
   const bool is_refractione) {
   return 1.0f;
 }
 
 template <>
-__device__ float mis_compute_weight_dl(
+LUMINARY_FUNCTION float mis_compute_weight_dl(
   const MaterialContextGeometry ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angle,
   const bool is_refraction) {
   if (device.state.depth == device.settings.max_ray_depth)
@@ -83,7 +83,7 @@ __device__ float mis_compute_weight_dl(
   return 1.0f - mis_compute_weight_base(gi_pdf, solid_angle, power, dist_sq);
 }
 
-__device__ MISPayload mis_get_payload(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
+LUMINARY_FUNCTION MISPayload mis_get_payload(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
   MISPayload mis_data;
   mis_data.origin               = ctx.position;
   mis_data.sampling_probability = mis_compute_gi_pdf(ctx, L, is_refraction);

@@ -28,13 +28,19 @@
 #define BSDF_LUT_SIZE 32
 
 #define LIGHT_TREE_LIGHT_ID_NULL (0xFFFFFFFF)
+#define LIGHT_TREE_ROOT_MAX_CHILD_COUNT 128
 #define LIGHT_TREE_MAX_CHILDREN_PER_SECTION 8
+#define LIGHT_TREE_ROOT_MAX_NUM_SECTIONS (LIGHT_TREE_ROOT_MAX_CHILD_COUNT / LIGHT_TREE_MAX_CHILDREN_PER_SECTION)
 #define LIGHT_TREE_CHILDREN_PER_NODE 8
 #define LIGHT_TREE_NODE_SECTION_REL_SIZE (sizeof(DeviceLightTreeRootSection) / sizeof(DeviceLightTreeRootHeader))
 #define LIGHT_GEO_MAX_SAMPLES 8
 #define LIGHT_GEO_MAX_BRIDGE_LENGTH 8
 #define LIGHT_SUN_CAUSTICS_MAX_SAMPLES 128
 #define LIGHT_NUM_MICROTRIANGLES 64
+
+static_assert(
+  LIGHT_TREE_ROOT_MAX_CHILD_COUNT % LIGHT_TREE_MAX_CHILDREN_PER_SECTION == 0,
+  "Light tree root node max children must be a multiple of max children per root section.");
 
 #define OMM_REFINEMENT_NEEDED_FLAG (0x80)
 
@@ -157,6 +163,9 @@ typedef uint16_t BFloat16;
 typedef uint16_t UnsignedBFloat16;
 typedef uint2 PackedRecord;
 typedef uint2 PackedMISPayload;
+typedef uint2 PackedRayDirection;
+
+#define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
 
 struct Mat3x3 {
   float f11;
@@ -308,7 +317,11 @@ enum TaskStateBufferIndex {
   TASK_STATE_BUFFER_INDEX_PRESORT,
   TASK_STATE_BUFFER_INDEX_POSTSORT,
 
-  TASK_STATE_BUFFER_INDEX_COUNT
+  TASK_STATE_BUFFER_INDEX_COUNT,
+
+  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT = TASK_STATE_BUFFER_INDEX_PRESORT,
+
+  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT
 } typedef TaskStateBufferIndex;
 
 // TODO: This needs to change when adding SSS.
@@ -344,12 +357,56 @@ struct DeviceTaskState {
 LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
 
 ////////////////////////////////////////////////////////////////////
+// Task Direct Lighting
+////////////////////////////////////////////////////////////////////
+
+struct DeviceTaskDirectLightGeo {
+  uint32_t light_id;
+  RGBF light_color;
+  vec3 ray;
+  float dist;
+} typedef DeviceTaskDirectLightGeo;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightGeo, 0x20);
+
+struct DeviceTaskDirectLightSun {
+  PackedRecord light_color;
+  PackedRayDirection ray;
+} typedef DeviceTaskDirectLightSun;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightSun, 0x10);
+
+struct DeviceTaskDirectLightAmbient {
+  PackedRecord light_color;
+  PackedRayDirection ray;
+} typedef DeviceTaskDirectLightAmbient;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightAmbient, 0x10);
+
+struct DeviceTaskDirectLightBridges {
+  uint32_t light_id;
+  RGBF light_color;
+  uint32_t seed;
+  Quaternion16 rotation;
+  float scale;
+} typedef DeviceTaskDirectLightBridges;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightBridges, 0x20);
+
+struct DeviceTaskDirectLight {
+  union {
+    DeviceTaskDirectLightGeo geo;
+    DeviceTaskDirectLightBridges bridges;
+  };
+  DeviceTaskDirectLightSun sun;
+  DeviceTaskDirectLightAmbient ambient;
+} typedef DeviceTaskDirectLight;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x40);
+
+////////////////////////////////////////////////////////////////////
 // Globals
 ////////////////////////////////////////////////////////////////////
 
 struct DevicePointers {
-  DEVICE DeviceTaskState* task_states;
-  DEVICE uint16_t* LUM_RESTRICT trace_counts;  // TODO: Remove and reuse inside task_counts
+  DEVICE DeviceTaskState* LUM_RESTRICT task_states;
+  DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
+  DEVICE uint16_t* LUM_RESTRICT trace_counts;
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;
   DEVICE RGBF* LUM_RESTRICT frame_current_result;

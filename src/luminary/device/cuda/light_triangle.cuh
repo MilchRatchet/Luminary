@@ -7,7 +7,7 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-__device__ float light_triangle_intersection_uv_generic(
+LUMINARY_FUNCTION float light_triangle_intersection_uv_generic(
   const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, edge2);
   const float a = dot_product(edge1, h);
@@ -30,11 +30,11 @@ __device__ float light_triangle_intersection_uv_generic(
   return __fslctf(t, FLT_MAX, t);
 }
 
-__device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
+LUMINARY_FUNCTION float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   return light_triangle_intersection_uv_generic(triangle.vertex, triangle.edge1, triangle.edge2, origin, ray, coords);
 }
 
-__device__ TriangleLight
+LUMINARY_FUNCTION TriangleLight
   light_triangle_load(const TriangleHandle handle, const vec3 origin, const vec3 ray, const DeviceTransform trans, float& dist) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
@@ -68,7 +68,8 @@ __device__ TriangleLight
   return triangle;
 }
 
-__device__ TriangleLight light_triangle_sample_init(const TriangleHandle handle, const DeviceTransform trans, uint3& packed_light_data) {
+LUMINARY_FUNCTION TriangleLight
+  light_triangle_sample_init(const TriangleHandle handle, const DeviceTransform trans, uint3& packed_light_data) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
   const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
@@ -100,7 +101,7 @@ __device__ TriangleLight light_triangle_sample_init(const TriangleHandle handle,
   return triangle;
 }
 
-__device__ bool light_triangle_sample_finalize_dist_and_uvs(
+LUMINARY_FUNCTION bool light_triangle_sample_finalize_dist_and_uvs(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const vec3 ray, float& dist) {
   float2 coords;
   dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
@@ -118,7 +119,7 @@ __device__ bool light_triangle_sample_finalize_dist_and_uvs(
   return true;
 }
 
-__device__ float light_triangle_get_solid_angle_generic(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 origin) {
+LUMINARY_FUNCTION float light_triangle_get_solid_angle_generic(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 origin) {
   const vec3 v0 = normalize_vector(sub_vector(vertex, origin));
   const vec3 v1 = normalize_vector(sub_vector(add_vector(vertex, edge1), origin));
   const vec3 v2 = normalize_vector(sub_vector(add_vector(vertex, edge2), origin));
@@ -130,11 +131,11 @@ __device__ float light_triangle_get_solid_angle_generic(const vec3 vertex, const
   return 2.0f * atan2f(G0, G1 + G2);
 }
 
-__device__ float light_triangle_get_solid_angle(const TriangleLight triangle, const vec3 origin) {
+LUMINARY_FUNCTION float light_triangle_get_solid_angle(const TriangleLight triangle, const vec3 origin) {
   return light_triangle_get_solid_angle_generic(triangle.vertex, triangle.edge1, triangle.edge2, origin);
 }
 
-__device__ bool light_triangle_sample_solid_angle(
+LUMINARY_FUNCTION bool light_triangle_sample_solid_angle(
   const vec3 origin, const vec3 vertex, const vec3 edge1, const vec3 edge2, const float2 random, const bool bidirectional, vec3& ray,
   float& solid_angle) {
   const vec3 v0 = normalize_vector(sub_vector(vertex, origin));
@@ -181,7 +182,7 @@ __device__ bool light_triangle_sample_solid_angle(
  * Robust solid angle sampling method from
  * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
  */
-__device__ bool light_triangle_sample_finalize(
+LUMINARY_FUNCTION bool light_triangle_sample_finalize(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist,
   float& solid_angle) {
   bool success = true;
@@ -193,7 +194,7 @@ __device__ bool light_triangle_sample_finalize(
   return success;
 }
 
-__device__ bool light_triangle_sample_microtriangle_finalize(
+LUMINARY_FUNCTION bool light_triangle_sample_microtriangle_finalize(
   TriangleLight& triangle, const float2 bary0, const float2 bary1, const float2 bary2, const uint3 packed_light_data, const vec3 origin,
   const float2 random, vec3& ray, float& dist, float& solid_angle, float2& coords) {
   const vec3 v0 = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, bary0.x), scale_vector(triangle.edge2, bary0.y)));
@@ -231,7 +232,7 @@ __device__ bool light_triangle_sample_microtriangle_finalize(
   return success;
 }
 
-__device__ vec3 light_triangle_sample_bridges(TriangleLight& triangle, const float2 random) {
+LUMINARY_FUNCTION vec3 light_triangle_sample_bridges(TriangleLight& triangle, const float2 random) {
   const float r1 = sqrtf(random.x);
   const float r2 = random.y;
 
@@ -245,7 +246,7 @@ __device__ vec3 light_triangle_sample_bridges(TriangleLight& triangle, const flo
   return point_on_light;
 }
 
-__device__ bool light_triangle_sample_finalize_bridges(
+LUMINARY_FUNCTION bool light_triangle_sample_finalize_bridges(
   TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const vec3 point_on_light, vec3& ray, float& dist,
   float& area) {
   const vec3 cross = cross_product(triangle.edge1, triangle.edge2);
@@ -267,7 +268,7 @@ __device__ bool light_triangle_sample_finalize_bridges(
   return success;
 }
 
-__device__ RGBF light_get_color(TriangleLight& triangle) {
+LUMINARY_FUNCTION RGBF light_get_color(TriangleLight& triangle) {
   RGBF color = splat_color(0.0f);
 
   // TODO: Implement a light weight DeviceLightMaterial type

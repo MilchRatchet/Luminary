@@ -44,7 +44,7 @@
 ////////////////////////////////////////////////////////////////////
 
 // [Wil21]
-__device__ float sky_mie_density(const float height) {
+LUMINARY_FUNCTION float sky_mie_density(const float height) {
   // INSO (insoluble = dust-like particles)
   const float INSO = expf(-height * (1.0f / device.sky.mie_falloff));
 
@@ -61,7 +61,7 @@ __device__ float sky_mie_density(const float height) {
   return device.sky.base_density * (INSO + WASO);
 }
 
-__device__ float sky_ozone_density(const float height) {
+LUMINARY_FUNCTION float sky_ozone_density(const float height) {
   if (!device.sky.ozone_absorption)
     return 0.0f;
 
@@ -75,7 +75,7 @@ __device__ float sky_ozone_density(const float height) {
  * @param ray Direction of ray
  * @result 2 floats, first value is the start, second value is the length of the path.
  */
-__device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const float min_height, const float max_height) {
+LUMINARY_FUNCTION float2 sky_compute_path(const vec3 origin, const vec3 ray, const float min_height, const float max_height) {
   const float height = get_length(origin);
 
   if (height <= min_height)
@@ -107,7 +107,7 @@ __device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const floa
 ////////////////////////////////////////////////////////////////////
 
 // [Bru17]
-__device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const float mu) {
+LUMINARY_FUNCTION Spectrum sky_compute_transmittance_optical_depth(const float r, const float mu) {
   const int steps = 2500;
 
   // Distance to top of atmosphere
@@ -183,7 +183,7 @@ struct msScatteringResult {
 } typedef msScatteringResult;
 
 // [Hil20]
-__device__ msScatteringResult sky_compute_multiscattering_integration(
+LUMINARY_FUNCTION msScatteringResult sky_compute_multiscattering_integration(
   const vec3 origin, const vec3 ray, const vec3 sun_pos, const DeviceTextureObject transmission_low,
   const DeviceTextureObject transmission_high) {
   msScatteringResult result;
@@ -335,7 +335,7 @@ LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(KernelArgsSkyComp
 // Atmosphere Integration
 ////////////////////////////////////////////////////////////////////
 
-__device__ Spectrum sky_compute_atmosphere(
+LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
   Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const bool cloud_shadows,
   const int steps, ushort2 pixel) {
   Spectrum result = spectrum_set1(0.0f);
@@ -505,7 +505,8 @@ __device__ Spectrum sky_compute_atmosphere(
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, ushort2 pixel) {
+LUMINARY_FUNCTION RGBF
+  sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, ushort2 pixel) {
   Spectrum unused = spectrum_set1(0.0f);
 
   const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, pixel);
@@ -513,7 +514,7 @@ __device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float lim
   return sky_compute_color_from_spectrum(radiance);
 }
 
-__device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, ushort2 pixel) {
+LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, ushort2 pixel) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
   const float base_range = (IS_PRIMARY_RAY) ? 40.0f : 80.0f;
@@ -530,7 +531,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
   return inscattering;
 }
 
-__device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint8_t state) {
+LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint8_t state) {
   RGBF sky;
   switch (device.sky.mode) {
     default:
@@ -563,7 +564,7 @@ __device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const ui
   return sky;
 }
 
-__device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const ushort2 index) {
+LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const ushort2 index) {
   RGBF sky;
   switch (device.sky.mode) {
     default:

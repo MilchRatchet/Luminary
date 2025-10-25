@@ -1,22 +1,19 @@
 #ifndef CU_LUMINARY_LIGHT_BRIDGES_H
 #define CU_LUMINARY_LIGHT_BRIDGES_H
 
-#if defined(OPTIX_KERNEL)
-
 #include "light.cuh"
 #include "light_common.cuh"
 #include "light_triangle.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
-#include "optix_include.cuh"
 #include "random.cuh"
 #include "ris.cuh"
 #include "utils.cuh"
 #include "utils.h"
 #include "volume_utils.cuh"
 
-__device__ Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
+LUMINARY_FUNCTION Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, initial_vertex));
   const vec3 actual_dir = normalize_vector(sub_vector(end_vertex, initial_vertex));
 
@@ -53,7 +50,7 @@ __device__ Quaternion bridges_compute_rotation(const vec3 initial_vertex, const 
   return rotation;
 }
 
-__device__ float bridges_log_factorial(const uint32_t vertex_count) {
+LUMINARY_FUNCTION float bridges_log_factorial(const uint32_t vertex_count) {
   if (vertex_count == 1)
     return 0.0f;
 
@@ -68,7 +65,7 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
 }
 
 // TODO: Package the LUT differently so I achieve good alignment, this can all be done using no more than 2 load instructions.
-__device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
+LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
   const uint32_t lut_offset = (vertex_count - 1) * 21;
 
   const float min_dist    = __ldg(device.ptrs.bridge_lut + lut_offset + 0);
@@ -109,7 +106,7 @@ __device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count
   return h00 * y0 + h10 * step * dy0 + h01 * y1 + h11 * step * dy1;
 }
 
-__device__ uint32_t
+LUMINARY_FUNCTION uint32_t
   bridges_sample_vertex_count(const VolumeDescriptor volume, const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
   const float effective_dist = light_dist * volume.max_scattering;
 
@@ -120,16 +117,19 @@ __device__ uint32_t
   // Sample a vertex count based on importance LUT
   ////////////////////////////////////////////////////////////////////
 
+  const uint32_t max_num_vertices = min(device.settings.bridge_max_num_vertices, BRIDGES_MAX_VERTEX_COUNT);
+
   // Fallback values. These come into play if sum_importance is 0.0f.
   // This happens when effective dist is too large.
-  uint32_t selected_vertex_count = device.settings.bridge_max_num_vertices - 1;
+  uint32_t selected_vertex_count = max_num_vertices - 1;
 
-  for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
+#pragma unroll
+  for (uint32_t vertex_count = 0; vertex_count < max_num_vertices; vertex_count++) {
     // TODO: The paper uses some additional terms here for the importance
-    const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
+    const float importance = bridges_get_vertex_count_importance(vertex_count + 1, effective_dist);
 
     if (ris_reservoir_add_sample(ris_reservoir, importance, 1.0f)) {
-      selected_vertex_count = i;
+      selected_vertex_count = vertex_count;
     }
   }
 
@@ -138,7 +138,7 @@ __device__ uint32_t
   return 1 + selected_vertex_count;
 }
 
-__device__ RGBF bridges_sample_bridge(
+LUMINARY_FUNCTION RGBF bridges_sample_bridge(
   MaterialContextVolume ctx, const vec3 light_point, const vec3 initial_vertex, const uint32_t seed, const ushort2 pixel, float& path_pdf,
   vec3& end_vertex, float& scale) {
   const vec3 light_vector  = sub_vector(light_point, initial_vertex);
@@ -167,6 +167,8 @@ __device__ RGBF bridges_sample_bridge(
 
     sum_dist += dist;
   }
+
+  LUMINARY_ASSUME(vertex_count <= BRIDGES_MAX_VERTEX_COUNT);
 
   for (uint32_t i = 1; i < vertex_count; i++) {
     const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
@@ -213,7 +215,7 @@ __device__ RGBF bridges_sample_bridge(
   return path_weight;
 }
 
-__device__ vec3 bridges_sample_initial_vertex(
+LUMINARY_FUNCTION vec3 bridges_sample_initial_vertex(
   MaterialContextVolume ctx, const vec3 point_on_light, const ushort2 pixel, const uint32_t output_id, RGBF& attenuation, float& pdf) {
   float random_intersection = random_1D(RANDOM_TARGET_LIGHT_GEO_INITIAL_VERTEX + output_id, pixel);
 
@@ -257,8 +259,8 @@ __device__ vec3 bridges_sample_initial_vertex(
   return add_vector(ctx.position, scale_vector(ctx.V, -t));
 }
 
-__device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
-  MaterialContextVolume ctx, TriangleLight light, const TriangleHandle light_handle, const uint3 light_uv_packed, const ushort2 pixel,
+LUMINARY_FUNCTION LightSampleResult<MATERIAL_VOLUME> bridges_sample(
+  MaterialContextVolume ctx, TriangleLight light, const uint32_t light_id, const uint3 light_uv_packed, const ushort2 pixel,
   const uint32_t output_id, float2& target_and_weight) {
   const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + output_id, pixel);
 
@@ -269,7 +271,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   const vec3 initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, output_id, initial_attenuation, initial_pdf);
 
   LightSampleResult<MATERIAL_VOLUME> result;
-  result.handle = triangle_handle_get(INSTANCE_ID_INVALID, 0);
+  result.light_id = LIGHT_ID_INVALID;
 
   if (initial_pdf == 0.0f || color_importance(initial_attenuation) == 0.0f)
     return result;
@@ -333,7 +335,7 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   target_and_weight.x = color_importance(sample_path_weight);
   target_and_weight.y = sample_weight;
 
-  result.handle      = light_handle;
+  result.light_id    = light_id;
   result.light_color = sample_path_weight;
   result.rotation    = sample_rotation;
   result.scale       = sample_path_scale;
@@ -342,11 +344,16 @@ __device__ LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   return result;
 }
 
-__device__ RGBF
-  bridges_sample_apply_shadowing(const MaterialContextVolume ctx, const LightSampleResult<MATERIAL_VOLUME> sample, const ushort2 pixel) {
-  bool bridge_is_valid = true;
-  bridge_is_valid &= sample.handle.instance_id != INSTANCE_ID_INVALID;
-  bridge_is_valid &= sample.seed != 0xFFFFFFFF;
+#ifdef OPTIX_KERNEL
+
+#include "optix_include.cuh"
+
+LUMINARY_FUNCTION RGBF bridges_sample_apply_shadowing(
+  const MaterialContextVolume ctx, const DeviceTaskDirectLightBridges& direct_light_task, const ushort2 pixel, const bool sample_is_valid) {
+  const uint32_t seed = direct_light_task.seed;
+
+  bool bridge_is_valid = sample_is_valid;
+  bridge_is_valid &= seed != 0xFFFFFFFF;
 
   ////////////////////////////////////////////////////////////////////
   // Get light sample
@@ -355,20 +362,23 @@ __device__ RGBF
   OptixTraceStatus trace_status = (bridge_is_valid) ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
   vec3 light_vector             = get_vector(0.0f, 0.0f, 1.0f);
   vec3 initial_vertex           = get_vector(0.0f, 0.0f, 0.0f);
+  TriangleHandle light_handle   = TRIANGLE_HANDLE_INVALID;
 
   if (bridge_is_valid) {
-    const DeviceTransform light_transform = load_transform(sample.handle.instance_id);
+    light_handle = device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id];
+
+    const DeviceTransform light_transform = load_transform(light_handle.instance_id);
 
     uint3 light_uv_packed;
-    TriangleLight light = light_triangle_sample_init(sample.handle, light_transform, light_uv_packed);
+    TriangleLight light = light_triangle_sample_init(light_handle, light_transform, light_uv_packed);
 
-    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + sample.seed, pixel);
+    const float2 random_light_point = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_LIGHT_POINT + seed, pixel);
 
     const vec3 point_on_light = light_triangle_sample_bridges(light, random_light_point);
 
     RGBF initial_attenuation;
     float initial_pdf;
-    initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, sample.seed, initial_attenuation, initial_pdf);
+    initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, pixel, seed, initial_attenuation, initial_pdf);
 
     vec3 light_dir;
     float area, light_dist;
@@ -381,54 +391,57 @@ __device__ RGBF
   // Get sampled vertex count
   ////////////////////////////////////////////////////////////////////
 
-  uint32_t vertex_count;
+  uint32_t vertex_count = 1;
   if (bridge_is_valid) {
     float vertex_count_pdf;
-    vertex_count = bridges_sample_vertex_count(ctx.descriptor, get_length(light_vector), sample.seed, pixel, vertex_count_pdf);
-  }
-  else {
-    vertex_count = 1;
+    vertex_count = bridges_sample_vertex_count(ctx.descriptor, get_length(light_vector), seed, pixel, vertex_count_pdf);
   }
 
   ////////////////////////////////////////////////////////////////////
   // Compute visibility of path
   ////////////////////////////////////////////////////////////////////
 
+  const Quaternion16 rotation = direct_light_task.rotation;
+  const float scale           = direct_light_task.scale;
+
   vec3 current_vertex            = initial_vertex;
   vec3 current_direction_sampled = normalize_vector(light_vector);
-  vec3 current_direction         = quaternion_apply(sample.rotation, current_direction_sampled);
+  vec3 current_direction         = quaternion16_apply(rotation, current_direction_sampled);
 
   // We don't need to trace visibility to the initial vertex as it was sampled with an interval that we know has no intersections
   RGBF shadow_term = splat_color(1.0f);
 
-  float sum_dist = 0.0f;
-
   float dist;
-  dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * sample.scale;
+  dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, pixel)) * scale;
 
-  shadow_term = mul_color(
-    shadow_term, optix_geometry_shadowing(ctx.get_handle(), current_vertex, current_direction, dist, sample.handle, trace_status));
+  const RGBF shadow_vertex0 =
+    optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status);
+  shadow_term = mul_color(shadow_term, shadow_vertex0);
 
-  sum_dist += dist;
+  for (uint32_t vertex_id = 1; vertex_id < BRIDGES_MAX_VERTEX_COUNT; vertex_id++) {
+    const bool vertex_is_valid = (vertex_id < vertex_count);
 
-  for (int i = 1; i < vertex_count; i++) {
-    current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
+    if (vertex_is_valid) {
+      current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
 
-    const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);
+      const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + vertex_id, pixel);
 
-    current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
+      current_direction_sampled = bridges_phase_sample(current_direction_sampled, random_phase);
 
-    current_direction = quaternion_apply(sample.rotation, current_direction_sampled);
+      current_direction = quaternion16_apply(rotation, current_direction_sampled);
 
-    dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + sample.seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel)) * sample.scale;
+      dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + vertex_id, pixel)) * scale;
+    }
 
-    shadow_term = mul_color(
-      shadow_term, optix_geometry_shadowing(ctx.get_handle(), current_vertex, current_direction, dist, sample.handle, trace_status));
+    // We always execute all shadow rays as Nvidia hardware prefers that over conditional branching.
+    const OptixTraceStatus trace_status_vertex = (vertex_is_valid) ? trace_status : OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
 
-    sum_dist += dist;
+    const RGBF shadow_vertex =
+      optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status_vertex);
+    shadow_term = mul_color(shadow_term, shadow_vertex);
   }
 
-  return mul_color(sample.light_color, shadow_term);
+  return (bridge_is_valid) ? mul_color(direct_light_task.light_color, shadow_term) : splat_color(0.0f);
 }
 
 #endif /* OPTIX_KERNEL */

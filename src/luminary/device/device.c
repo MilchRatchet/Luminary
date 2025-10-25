@@ -629,14 +629,14 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     const uint32_t stale_tail_tasks = tile_count * allocated_tasks - internal_pixel_count;
 
     // If the number of resident tasks in the last tile is above a threshold, then accept this tasks per thread.
-    if (allocated_tasks - stale_tail_tasks > thread_count * MINIMUM_TASKS_PER_THREAD) {
+    if (allocated_tasks - stale_tail_tasks > thread_count * MINIMUM_TASKS_PER_THREAD)
       break;
-    }
 
     tasks_per_thread++;
   }
 
   __DEVICE_BUFFER_ALLOCATE(task_states, sizeof(DeviceTaskState) * allocated_tasks * TASK_STATE_BUFFER_INDEX_COUNT);
+  __DEVICE_BUFFER_ALLOCATE(task_direct_light, sizeof(DeviceTaskDirectLight) * allocated_tasks * TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT);
   __DEVICE_BUFFER_ALLOCATE(trace_counts, sizeof(uint16_t) * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
@@ -665,6 +665,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   __DEVICE_BUFFER_FREE(task_states);
+  __DEVICE_BUFFER_FREE(task_direct_light);
   __DEVICE_BUFFER_FREE(trace_counts);
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
@@ -734,7 +735,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // CUDA context creation
   ////////////////////////////////////////////////////////////////////
 
-  CUDA_FAILURE_HANDLE(cuCtxCreate(&device->cuda_ctx, 0, device->cuda_device));
+  CUDA_FAILURE_HANDLE(cuCtxCreate(&device->cuda_ctx, (CUctxCreateParams*) 0, 0, device->cuda_device));
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 

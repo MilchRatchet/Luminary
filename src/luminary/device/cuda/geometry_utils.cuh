@@ -10,7 +10,7 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-__device__ vec3 geometry_compute_normal(
+LUMINARY_FUNCTION vec3 geometry_compute_normal(
   vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords, UV tex_coords,
   bool normal_map_is_compressed, vec3& face_normal, bool& is_inside) {
   is_inside = dot_product(face_normal, ray) > 0.0f;
@@ -63,7 +63,7 @@ struct GeometryContextCreationInfo {
   uint32_t hints;
 } typedef GeometryContextCreationInfo;
 
-__device__ MaterialContextGeometry geometry_get_context(GeometryContextCreationInfo info) {
+LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(GeometryContextCreationInfo info) {
   const uint32_t mesh_id      = mesh_id_load(info.trace.handle.instance_id);
   const DeviceTransform trans = load_transform(info.trace.handle.instance_id);
 

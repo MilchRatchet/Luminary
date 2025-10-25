@@ -28,6 +28,73 @@
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
+LUMINARY_KERNEL void volume_process_inscattering() {
+  HANDLE_DEVICE_ABORT();
+
+  const uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
+
+  LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
+
+  for (uint32_t i = 0; i < task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
+    const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    const DeviceTask task            = task_load(task_base_address);
+
+    const VolumeType volume_type = VolumeType(task.volume_id);
+
+    const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
+
+    const DeviceTaskTrace trace = task_trace_load(task_base_address);
+
+    MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Geometry
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t task_direct_lighting_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+
+    if (direct_lighting_bridges_is_allowed(ctx)) {
+      const DeviceTaskDirectLightBridges direct_light_bridges_task = direct_lighting_bridges_create_task(ctx, task.index);
+
+      task_direct_light_bridges_store(task_direct_lighting_base_address, direct_light_bridges_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Initial vertex sampling for Sun and Ambient
+    ////////////////////////////////////////////////////////////////////
+
+    volume_sample_sky_dl_initial_vertex_dist(ctx, task.index);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Sun
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_sun_is_allowed(ctx)) {
+      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
+
+      task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Bounce Ray Sampling
+    ////////////////////////////////////////////////////////////////////
+
+    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_DL_AMBIENT>(ctx, task.index);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Ambient
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_ambient_is_allowed(ctx)) {
+      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
+
+      task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
+    }
+  }
+}
+
 LUMINARY_KERNEL void volume_process_events() {
   HANDLE_DEVICE_ABORT();
 

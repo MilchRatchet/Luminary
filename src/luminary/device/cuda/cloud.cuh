@@ -44,7 +44,7 @@
 // Integrator functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_extinction(const vec3 origin, const vec3 ray, const CloudLayerType layer) {
+LUMINARY_FUNCTION float cloud_extinction(const vec3 origin, const vec3 ray, const CloudLayerType layer) {
   const float iter_step = 1.0f / device.cloud.shadow_steps;
 
   float optical_depth = 0.0f;
@@ -80,7 +80,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
 /*
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
-__device__ CloudRenderResult
+LUMINARY_FUNCTION CloudRenderResult
   clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, const ushort2 pixel) {
   if (dist < 0.0f || start == FLT_MAX) {
     CloudRenderResult result;
@@ -240,7 +240,7 @@ __device__ CloudRenderResult
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ float clouds_render(
+LUMINARY_FUNCTION float clouds_render(
   vec3 origin, const vec3 ray, const float limit, const ushort2 pixel, RGBF& color, RGBF& transmittance, float& transmittance_cloud_only) {
   float2 intersections[3];
   CloudRenderResult results[3];

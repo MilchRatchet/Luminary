@@ -5,7 +5,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-__device__ vec3 camera_physical_sample_sensor(const ushort2 pixel) {
+LUMINARY_FUNCTION vec3 camera_physical_sample_sensor(const ushort2 pixel) {
   const float2 jitter = camera_get_jitter();
 
   const float step = 2.0f * (device.camera.physical.sensor_width / device.settings.width);
@@ -25,7 +25,7 @@ __device__ vec3 camera_physical_sample_sensor(const ushort2 pixel) {
   return sensor_point;
 }
 
-__device__ vec3 camera_physical_sample_exit_pupil(const vec3 sensor_point, const ushort2 pixel, float& weight) {
+LUMINARY_FUNCTION vec3 camera_physical_sample_exit_pupil(const vec3 sensor_point, const ushort2 pixel, float& weight) {
 #ifndef CAMERA_DEBUG_RENDER
   const float2 random = random_2D(RANDOM_TARGET_LENS, pixel);
 #else
@@ -66,7 +66,7 @@ struct CameraSimulationResult {
   float weight;
 } typedef CameraSimulationResult;
 
-__device__ bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
+LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
   const float aperture_dist = (device.camera.physical.aperture_point - origin.z) / ray.z;
   if (aperture_dist > 0.0f && aperture_dist < dist) {
     const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
@@ -82,7 +82,7 @@ __device__ bool camera_simulation_intersect_aperture(const vec3 origin, const ve
   return false;
 }
 
-__device__ bool camera_simulation_intersect_medium_cylinder(
+LUMINARY_FUNCTION bool camera_simulation_intersect_medium_cylinder(
   vec3& origin, vec3& ray, float& weight, const float dist, const float cylindrical_radius, const float medium_ior) {
   if (cylindrical_radius == FLT_MAX)
     return false;
@@ -125,7 +125,7 @@ __device__ bool camera_simulation_intersect_medium_cylinder(
 }
 
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
-__device__ int32_t
+LUMINARY_FUNCTION int32_t
   camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const ushort2 pixel) {
   const DeviceCameraInterface interface = device.ptrs.camera_interfaces[interface_id];
 
@@ -233,7 +233,7 @@ __device__ int32_t
 }
 
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
-__device__ CameraSimulationResult
+LUMINARY_FUNCTION CameraSimulationResult
   camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const ushort2 pixel) {
   CameraSimulationState state;
   state.origin             = sensor_point;
@@ -270,7 +270,7 @@ __device__ CameraSimulationResult
 }
 
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
-__device__ CameraSampleResult camera_physical_sample(const ushort2 pixel) {
+LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const ushort2 pixel) {
   float wavelength_pdf;
   const float wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, pixel), wavelength_pdf);
 

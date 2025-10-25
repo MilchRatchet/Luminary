@@ -269,7 +269,7 @@ LUMINARY_KERNEL void tasks_sort() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
-__device__ RGBF final_image_get_undersampling_sample(
+LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
   const KernelArgsGenerateFinalImage args, const uint16_t source_x, const uint16_t source_y, const uint32_t output_scale,
   const uint32_t undersampling_iteration, const uint32_t undersampling_stage) {
   const uint32_t offset_x = (undersampling_iteration & 0b01) ? 0 : output_scale >> 1;

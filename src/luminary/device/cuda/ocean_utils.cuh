@@ -25,12 +25,12 @@
 #define OCEAN_ITERATIONS_NORMAL 8
 #define OCEAN_ITERATIONS_NORMAL_CAUSTICS 8
 
-__device__ float ocean_hash(const float2 p) {
+LUMINARY_FUNCTION float ocean_hash(const float2 p) {
   const float x = p.x + p.y * (311.7f / 127.1f);
   return (__float_as_uint(x) * 2654435769u) * (1.0f / 0xFFFFFFFFu);
 }
 
-__device__ float ocean_noise(const float2 p) {
+LUMINARY_FUNCTION float ocean_noise(const float2 p) {
   float2 integral;
   integral.x = floorf(p.x);
   integral.y = floorf(p.y);
@@ -54,7 +54,7 @@ __device__ float ocean_noise(const float2 p) {
   return -1.0f + 2.0f * lerp(a, b, fractional.y);
 }
 
-__device__ float ocean_octave(float2 p) {
+LUMINARY_FUNCTION float ocean_octave(float2 p) {
   const float offset = ocean_noise(p);
   p.x += offset;
   p.y += offset;
@@ -80,7 +80,7 @@ __device__ float ocean_octave(float2 p) {
   return octave;
 }
 
-__device__ float ocean_get_height(const vec3 p, const int steps) {
+LUMINARY_FUNCTION float ocean_get_height(const vec3 p, const int steps) {
   float amplitude = 1.0f;
   float frequency = device.ocean.frequency;
 
@@ -106,15 +106,15 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
   return h;
 }
 
-__device__ float ocean_get_relative_height(const vec3 p, const int steps) {
+LUMINARY_FUNCTION float ocean_get_relative_height(const vec3 p, const int steps) {
   return p.y - (device.ocean.height + ocean_get_height(p, steps));
 }
 
-__device__ bool ocean_is_underwater(const vec3 p) {
+LUMINARY_FUNCTION bool ocean_is_underwater(const vec3 p) {
   return ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION) < 0.0f;
 }
 
-__device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
+LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
   const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
 
   // Sobel filter
@@ -135,7 +135,7 @@ __device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN
   return normalize_vector(normal);
 }
 
-__device__ vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
+LUMINARY_FUNCTION vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
   const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
 
   const float h_0 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
@@ -151,7 +151,7 @@ __device__ vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = 
   return normalize_vector(normal);
 }
 
-__device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
+LUMINARY_FUNCTION float ocean_far_distance(const vec3 origin, const vec3 ray) {
   if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
   }
@@ -173,7 +173,7 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
   return (s >= eps) ? s : FLT_MAX;
 }
 
-__device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
+LUMINARY_FUNCTION float ocean_short_distance(const vec3 origin, const vec3 ray) {
   if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
   }
@@ -196,7 +196,7 @@ __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   return (s1 * s2 < 0.0f) ? fmaxf(s1, s2) : fminf(s1, s2);
 }
 
-__device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, const float start, const float limit) {
+LUMINARY_FUNCTION float ocean_intersection_solver(const vec3 origin, const vec3 ray, const float start, const float limit) {
   if (start >= limit)
     return FLT_MAX;
 
@@ -265,7 +265,7 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
   return FLT_MAX;
 }
 
-__device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, const float limit) {
+LUMINARY_FUNCTION float ocean_intersection_distance(const vec3 origin, const vec3 ray, const float limit) {
   float start = 0.0f;
 
   if (origin.y < OCEAN_MIN_HEIGHT || origin.y > OCEAN_MAX_HEIGHT) {
@@ -291,7 +291,7 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
 // M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses,
 // 2023.
 
-__device__ RGBF ocean_jerlov_scattering_coefficient(const JerlovWaterType type) {
+LUMINARY_FUNCTION RGBF ocean_jerlov_scattering_coefficient(const JerlovWaterType type) {
   switch (type) {
     case LUMINARY_JERLOV_WATER_TYPE_I:
       return get_color(0.001f, 0.002f, 0.004f);
@@ -318,7 +318,7 @@ __device__ RGBF ocean_jerlov_scattering_coefficient(const JerlovWaterType type) 
   return get_color(0.0f, 0.0f, 0.0f);
 }
 
-__device__ RGBF ocean_jerlov_absorption_coefficient(const JerlovWaterType type) {
+LUMINARY_FUNCTION RGBF ocean_jerlov_absorption_coefficient(const JerlovWaterType type) {
   switch (type) {
     case LUMINARY_JERLOV_WATER_TYPE_I:
       return get_color(0.309f, 0.053f, 0.009f);
@@ -345,7 +345,7 @@ __device__ RGBF ocean_jerlov_absorption_coefficient(const JerlovWaterType type) 
   return get_color(0.0f, 0.0f, 0.0f);
 }
 
-__device__ float ocean_molecular_weight(const JerlovWaterType type) {
+LUMINARY_FUNCTION float ocean_molecular_weight(const JerlovWaterType type) {
   switch (type) {
     case LUMINARY_JERLOV_WATER_TYPE_I:
       return 0.93f;
@@ -374,13 +374,13 @@ __device__ float ocean_molecular_weight(const JerlovWaterType type) {
 
 // Henyey Greenstein importance sampling for g = 0
 // pbrt v3 - Light Transport II: Volume Rendering - Sampling Volume Scattering
-__device__ float ocean_molecular_phase_sampling_cosine(const float r) {
+LUMINARY_FUNCTION float ocean_molecular_phase_sampling_cosine(const float r) {
   return 2.0f * r - 1.0f;
 }
 
 // Henyey Greenstein importance sampling for g != 0
 // pbrt v3 - Light Transport II: Volume Rendering - Sampling Volume Scattering
-__device__ float ocean_particle_phase_sampling_cosine(const float r) {
+LUMINARY_FUNCTION float ocean_particle_phase_sampling_cosine(const float r) {
   const float g = 0.924f;
 
   float denom = (1.0f - g + 2.0f * g * r);
@@ -393,7 +393,7 @@ __device__ float ocean_particle_phase_sampling_cosine(const float r) {
   return (1.0f + g * g - s * s) / (2.0f * g);
 }
 
-__device__ vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const float r_choice) {
+LUMINARY_FUNCTION vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const float r_choice) {
   const float molecular_weight = ocean_molecular_weight((JerlovWaterType) device.ocean.water_type);
 
   float cos_angle;
@@ -407,7 +407,7 @@ __device__ vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const f
   return phase_sample_basis(cos_angle, r_dir.y, ray);
 }
 
-__device__ float ocean_phase_sampling_cos_angle(const float r_dir, const float r_choice) {
+LUMINARY_FUNCTION float ocean_phase_sampling_cos_angle(const float r_dir, const float r_choice) {
   const float molecular_weight = ocean_molecular_weight((JerlovWaterType) device.ocean.water_type);
 
   float cos_angle;
@@ -421,15 +421,15 @@ __device__ float ocean_phase_sampling_cos_angle(const float r_dir, const float r
   return cos_angle;
 }
 
-__device__ float ocean_molecular_phase(const float cos_angle) {
+LUMINARY_FUNCTION float ocean_molecular_phase(const float cos_angle) {
   return henyey_greenstein_phase_function(cos_angle, 0.0f);
 }
 
-__device__ float ocean_particle_phase(const float cos_angle) {
+LUMINARY_FUNCTION float ocean_particle_phase(const float cos_angle) {
   return henyey_greenstein_phase_function(cos_angle, 0.924f);
 }
 
-__device__ float ocean_phase(const float cos_angle) {
+LUMINARY_FUNCTION float ocean_phase(const float cos_angle) {
   const float molecular_weight = ocean_molecular_weight((JerlovWaterType) device.ocean.water_type);
 
   const float molecular_phase = ocean_molecular_phase(cos_angle);
@@ -444,7 +444,8 @@ __device__ float ocean_phase(const float cos_angle) {
  *  - The light is not polarized.
  *  - The IORs are wavelength independent.
  */
-__device__ float ocean_reflection_coefficient(const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in_over_out) {
+LUMINARY_FUNCTION float ocean_reflection_coefficient(
+  const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in_over_out) {
   const float NdotV = -dot_product(ray, normal);
   const float NdotT = -dot_product(refraction, normal);
 
@@ -463,7 +464,7 @@ __device__ float ocean_reflection_coefficient(const vec3 normal, const vec3 ray,
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-__device__ MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceIORStack& ior_stack) {
+LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceIORStack& ior_stack) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;

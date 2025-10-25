@@ -7,11 +7,11 @@
 
 #define FOG_DENSITY (0.001f * device.fog.density)
 
-__device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
+LUMINARY_FUNCTION RGBF volume_get_transmittance(const VolumeDescriptor volume) {
   return add_color(volume.absorption, volume.scattering);
 }
 
-__device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
+LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_fog() {
   VolumeDescriptor volume;
 
   volume.type           = VOLUME_TYPE_FOG;
@@ -25,7 +25,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   return volume;
 }
 
-__device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
+LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_ocean() {
   VolumeDescriptor volume;
 
   volume.type       = VOLUME_TYPE_OCEAN;
@@ -40,7 +40,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   return volume;
 }
 
-__device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) {
+LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) {
   switch (type) {
     case VOLUME_TYPE_FOG:
       return volume_get_descriptor_preset_fog();
@@ -49,26 +49,6 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
     default:
       return {};
   }
-}
-
-__device__ bool volume_should_do_geometry_direct_lighting(const VolumeType type, const uint8_t state) {
-  if ((state & STATE_FLAG_DELTA_PATH) == 0)
-    return false;
-
-  if (type == VOLUME_TYPE_NONE)
-    return false;
-
-  if (type == VOLUME_TYPE_OCEAN && (device.ocean.triangle_light_contribution == false))
-    return false;
-
-  return true;
-}
-
-__device__ bool volume_should_do_sky_direct_lighting(const VolumeType type, const uint8_t state) {
-  if (type == VOLUME_TYPE_NONE)
-    return false;
-
-  return true;
 }
 
 struct VolumePath {
@@ -81,7 +61,7 @@ struct VolumePath {
   };
 } typedef VolumePath;
 
-__device__ VolumePath make_volume_path(const float start, const float length) {
+LUMINARY_FUNCTION VolumePath make_volume_path(const float start, const float length) {
   VolumePath path;
 
   path.start  = start;
@@ -101,7 +81,7 @@ __device__ VolumePath make_volume_path(const float start, const float length) {
  *                  - [x] = Start in world space.
  *                  - [y] = Distance through fog in world space.
  */
-__device__ VolumePath volume_compute_path(
+LUMINARY_FUNCTION VolumePath volume_compute_path(
   const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, const bool ocean_fast_path = false) {
   if (limit <= 0.0f)
     return make_volume_path(-FLT_MAX, 0.0f);
@@ -191,7 +171,8 @@ __device__ VolumePath volume_compute_path(
  * @param max_length Maximum distance ray may travel after start.
  * @result Distance of intersection point and origin in world space.
  */
-__device__ float volume_sample_intersection(const VolumeDescriptor volume, const float start, const float max_length, const float random) {
+LUMINARY_FUNCTION float volume_sample_intersection(
+  const VolumeDescriptor volume, const float start, const float max_length, const float random) {
   // [FonWKH17] Equation 15
   const float t = (-logf(random)) / volume.max_scattering;
 
@@ -201,15 +182,15 @@ __device__ float volume_sample_intersection(const VolumeDescriptor volume, const
   return start + t;
 }
 
-__device__ float volume_sample_intersection_pdf(const VolumeDescriptor volume, const float start, const float t) {
+LUMINARY_FUNCTION float volume_sample_intersection_pdf(const VolumeDescriptor volume, const float start, const float t) {
   return volume.max_scattering * expf(-volume.max_scattering * (t - start));
 }
 
-__device__ float volume_sample_intersection_miss_probability(const VolumeDescriptor volume, const float depth) {
+LUMINARY_FUNCTION float volume_sample_intersection_miss_probability(const VolumeDescriptor volume, const float depth) {
   return expf(-volume.max_scattering * depth);
 }
 
-__device__ float volume_sample_intersection_bounded(const VolumeDescriptor volume, const float max_length, const float random) {
+LUMINARY_FUNCTION float volume_sample_intersection_bounded(const VolumeDescriptor volume, const float max_length, const float random) {
   const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
 
   // [FonWKH17] Equation 15
@@ -218,17 +199,17 @@ __device__ float volume_sample_intersection_bounded(const VolumeDescriptor volum
   return t;
 }
 
-__device__ float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const float max_length, const float t) {
+LUMINARY_FUNCTION float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const float max_length, const float t) {
   const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
 
   return volume.max_scattering * expf(-volume.max_scattering * t) / prob_hit_at_max;
 }
 
 template <MaterialType TYPE>
-__device__ float volume_phase_evaluate(const MaterialContext<TYPE> ctx, const vec3 ray);
+LUMINARY_FUNCTION float volume_phase_evaluate(const MaterialContext<TYPE> ctx, const vec3 ray);
 
 template <>
-__device__ float volume_phase_evaluate<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const vec3 ray) {
+LUMINARY_FUNCTION float volume_phase_evaluate<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const vec3 ray) {
   const float cos_angle = -dot_product(ctx.V, ray);
 
   float phase;
@@ -245,7 +226,7 @@ __device__ float volume_phase_evaluate<MATERIAL_VOLUME>(const MaterialContextVol
 }
 
 template <>
-__device__ float volume_phase_evaluate<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const vec3 ray) {
+LUMINARY_FUNCTION float volume_phase_evaluate<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const vec3 ray) {
   const float cos_angle = -dot_product(ctx.V, ray);
 
   const float diameter            = device.particles.phase_diameter;
@@ -253,7 +234,7 @@ __device__ float volume_phase_evaluate<MATERIAL_PARTICLE>(const MaterialContextP
   return jendersie_eon_phase_function(cos_angle, params);
 }
 
-__device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float length) {
+LUMINARY_FUNCTION RGBF volume_integrate_transmittance_precomputed(const VolumeDescriptor volume, const float length) {
   const RGBF volume_transmittance = volume_get_transmittance(volume);
 
   RGBF result;
@@ -264,7 +245,8 @@ __device__ RGBF volume_integrate_transmittance_precomputed(const VolumeDescripto
   return result;
 }
 
-__device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const vec3 ray, const float depth, const bool force_path = false) {
+LUMINARY_FUNCTION RGBF
+  volume_integrate_transmittance_ocean(const vec3 origin, const vec3 ray, const float depth, const bool force_path = false) {
   RGBF ocean_transmittance = get_color(1.0f, 1.0f, 1.0f);
 
   if (device.ocean.active) {
@@ -283,7 +265,7 @@ __device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const ve
   return ocean_transmittance;
 }
 
-__device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec3 ray, const float depth) {
+LUMINARY_FUNCTION float volume_integrate_transmittance_fog(const vec3 origin, const vec3 ray, const float depth) {
   float fog_transmittance = 1.0f;
 
   if (device.fog.active) {
@@ -298,7 +280,7 @@ __device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec
   return fog_transmittance;
 }
 
-__device__ RGBF volume_integrate_transmittance(const VolumeType volume_type, const vec3 origin, const vec3 ray, const float depth) {
+LUMINARY_FUNCTION RGBF volume_integrate_transmittance(const VolumeType volume_type, const vec3 origin, const vec3 ray, const float depth) {
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
   const VolumePath path = volume_compute_path(volume, origin, ray, depth);
@@ -316,7 +298,7 @@ __device__ RGBF volume_integrate_transmittance(const VolumeType volume_type, con
   return transmittance;
 }
 
-__device__ MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume, const float max_dist) {
+LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume, const float max_dist) {
   MaterialContextVolume ctx;
   ctx.descriptor  = volume;
   ctx.position    = task.origin;
@@ -328,24 +310,32 @@ __device__ MaterialContextVolume volume_get_context(const DeviceTask task, const
   return ctx;
 }
 
-__device__ void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, DeviceTaskThroughput& throughput) {
+LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const ushort2 pixel) {
   const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, pixel);
 
-  const float t = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
+  const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
 
+  ctx.position = add_vector(ctx.position, scale_vector(ctx.V, -dist));
+
+  return dist;
+}
+
+LUMINARY_FUNCTION RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContextVolume& ctx, const float dist) {
   const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
 
-  RGBF record = record_unpack(throughput.record);
+  RGBF weight;
+  weight.r = expf(-dist * volume_transmittance.r) * ctx.descriptor.scattering.r;
+  weight.g = expf(-dist * volume_transmittance.g) * ctx.descriptor.scattering.g;
+  weight.b = expf(-dist * volume_transmittance.b) * ctx.descriptor.scattering.b;
 
-  record.r *= expf(-t * volume_transmittance.r) * ctx.descriptor.scattering.r;
-  record.g *= expf(-t * volume_transmittance.g) * ctx.descriptor.scattering.g;
-  record.b *= expf(-t * volume_transmittance.b) * ctx.descriptor.scattering.b;
+  weight = scale_color(weight, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.max_dist, dist));
 
-  record = scale_color(record, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.max_dist, t));
+  return weight;
+}
 
-  throughput.record = record_pack(record);
-
-  ctx.position = add_vector(ctx.position, scale_vector(ctx.V, -t));
+LUMINARY_FUNCTION void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, RGBF& weight) {
+  const float dist = volume_sample_sky_dl_initial_vertex_dist(ctx, pixel);
+  weight           = volume_sample_sky_dl_initial_vertex_weight(ctx, dist);
 }
 
 #endif /* CU_VOLUME_UTILS_H */

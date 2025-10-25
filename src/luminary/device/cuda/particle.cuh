@@ -29,7 +29,43 @@ LUMINARY_KERNEL void particle_process_tasks() {
 
     const MaterialContextParticle ctx = particle_get_context(task, trace.handle.instance_id);
 
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Geometry
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t task_direct_lighting_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+
+    if (direct_lighting_geometry_is_allowed(task)) {
+      const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.index);
+
+      task_direct_light_geo_store(task_direct_lighting_base_address, direct_light_geo_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Sun
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_sun_is_allowed(task)) {
+      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
+
+      task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Bounce Ray Sampling
+    ////////////////////////////////////////////////////////////////////
+
     const BSDFSampleInfo<MATERIAL_PARTICLE> bounce_info = bsdf_sample<MaterialContextParticle::RANDOM_GI>(ctx, task.index);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Ambient
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_ambient_is_allowed(task)) {
+      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
+
+      task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
+    }
 
     uint16_t new_state = task.state;
 

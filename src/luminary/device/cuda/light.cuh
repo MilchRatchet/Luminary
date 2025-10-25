@@ -1,8 +1,6 @@
 #ifndef CU_LIGHT_H
 #define CU_LIGHT_H
 
-#if defined(OPTIX_KERNEL)
-
 #include "bsdf.cuh"
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
@@ -38,18 +36,18 @@
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-__device__ TriangleHandle light_get_blocked_handle(const MaterialContext<TYPE> ctx) {
+LUMINARY_FUNCTION TriangleHandle light_get_blocked_handle(const MaterialContext<TYPE> ctx) {
   return triangle_handle_get(INSTANCE_ID_INVALID, 0);
 }
 
 template <>
-__device__ TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx) {
+LUMINARY_FUNCTION TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx) {
   return triangle_handle_get(ctx.instance_id, ctx.tri_id);
 }
 
 template <MaterialType TYPE>
-__device__ void light_evaluate_candidate(
-  const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+LUMINARY_FUNCTION void light_evaluate_candidate(
+  const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<TYPE>& result) {
   const float2 ray_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_GEO::RAY + output_id, pixel);
 
@@ -73,20 +71,19 @@ __device__ void light_evaluate_candidate(
   const float sampling_weight = tree_sampling_weight * solid_angle;
 
   if (ris_reservoir_add_sample(reservoir, target, sampling_weight)) {
-    result.handle        = handle;
-    result.ray           = ray;
-    result.light_color   = light_color;
-    result.dist          = dist;
-    result.is_refraction = is_refraction;
+    result.light_id    = light_id;
+    result.ray         = ray;
+    result.light_color = light_color;
+    result.dist        = dist;
   }
 }
 
 template <>
-__device__ void light_evaluate_candidate<MATERIAL_VOLUME>(
-  const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const TriangleHandle handle, const uint3 light_uv_packed,
+LUMINARY_FUNCTION void light_evaluate_candidate<MATERIAL_VOLUME>(
+  const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<MATERIAL_VOLUME>& result) {
   float2 target_and_weight;
-  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, handle, light_uv_packed, pixel, output_id, target_and_weight);
+  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, light_id, light_uv_packed, pixel, output_id, target_and_weight);
 
   const float target          = target_and_weight.x;
   const float sampling_weight = target_and_weight.y * tree_sampling_weight;
@@ -97,10 +94,10 @@ __device__ void light_evaluate_candidate<MATERIAL_VOLUME>(
 }
 
 template <MaterialType TYPE>
-__device__ LightSampleResult<TYPE> light_list_resample(
+LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
   const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle) {
   LightSampleResult<TYPE> result;
-  result.handle = triangle_handle_get(INSTANCE_ID_INVALID, 0);
+  result.light_id = LIGHT_ID_INVALID;
 
   RISReservoir reservoir = ris_reservoir_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::RESAMPLING, pixel));
 
@@ -122,7 +119,7 @@ __device__ LightSampleResult<TYPE> light_list_resample(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    light_evaluate_candidate(ctx, pixel, triangle_light, light_handle, light_uv_packed, output.weight, output_id, reservoir, result);
+    light_evaluate_candidate(ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, reservoir, result);
   }
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
@@ -133,7 +130,7 @@ __device__ LightSampleResult<TYPE> light_list_resample(
 }
 
 template <MaterialType TYPE>
-__device__ LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
@@ -154,7 +151,7 @@ __device__ LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx,
   return result;
 }
 
-#else /* OPTIX_KERNEL */
+#ifndef OPTIX_KERNEL
 
 #include "light_microtriangle.cuh"
 #include "math.cuh"
@@ -165,7 +162,7 @@ __device__ LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx,
 // Light Processing
 ////////////////////////////////////////////////////////////////////
 
-__device__ float lights_integrate_emission(
+LUMINARY_FUNCTION float lights_integrate_emission(
   const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2, const uint32_t microtriangle_id) {
   const DeviceTextureObject tex = load_texture_object(material.luminance_tex);
 

@@ -138,13 +138,13 @@ struct RandomSet {
 // Based on the uint64 conversion from Sebastiano Vigna and David Blackman (https://prng.di.unimi.it/)
 ////////////////////////////////////////////////////////////////////
 
-__device__ float random_uint32_t_to_float(const uint32_t v) {
+LUMINARY_FUNCTION float random_uint32_t_to_float(const uint32_t v) {
   const uint32_t i = 0x3F800000u | (v >> 9);
 
   return __uint_as_float(i) - 1.0f;
 }
 
-__device__ float random_uint16_t_to_float(const uint16_t v) {
+LUMINARY_FUNCTION float random_uint16_t_to_float(const uint16_t v) {
   const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
 
   return __uint_as_float(i) - 1.0f;
@@ -157,7 +157,7 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 #define RANDOM_MAX (__uint_as_float(0x3F7FFFFFu))
 #define RANDOM_MIN (0.0f)
 
-__device__ float random_saturate(const float random) {
+LUMINARY_FUNCTION float random_saturate(const float random) {
   return fminf(fmaxf(random, RANDOM_MIN), RANDOM_MAX);
 }
 
@@ -166,7 +166,7 @@ __device__ float random_saturate(const float random) {
 ////////////////////////////////////////////////////////////////////
 
 // This is the base generator for random 32 bits.
-__device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
+LUMINARY_FUNCTION uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
   const uint32_t key     = key_offset;
   const uint32_t counter = offset;
 
@@ -191,7 +191,7 @@ __device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32
 }
 
 // This is the base generator for random 16 bits.
-__device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32_t offset) {
+LUMINARY_FUNCTION uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32_t offset) {
   const uint32_t key     = key_offset;
   const uint32_t counter = offset;
 
@@ -217,11 +217,11 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
 #define R2_PHI1 3242174889u /* 0.7548776662f  */
 #define R2_PHI2 2447445413u /* 0.56984029f    */
 
-__device__ uint32_t random_r1(const uint32_t offset) {
+LUMINARY_FUNCTION uint32_t random_r1(const uint32_t offset) {
   return (offset + 1) * R1_PHI1;
 }
 
-__device__ uint2 random_r2(const uint32_t index) {
+LUMINARY_FUNCTION uint2 random_r2(const uint32_t index) {
   const uint32_t v1 = (1 + index) * R2_PHI1;
   const uint32_t v2 = (1 + index) * R2_PHI2;
 
@@ -232,7 +232,7 @@ __device__ uint2 random_r2(const uint32_t index) {
 // Sobol [Bur20] [Ahm24]
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint32_t random_laine_karras_permutation(uint32_t x, uint32_t seed) {
+LUMINARY_FUNCTION uint32_t random_laine_karras_permutation(uint32_t x, uint32_t seed) {
   x += seed;
   x ^= x * 0x6c50b47cu;
   x ^= x * 0xb82f1e52u;
@@ -241,18 +241,18 @@ __device__ uint32_t random_laine_karras_permutation(uint32_t x, uint32_t seed) {
   return x;
 }
 
-__device__ uint32_t random_nested_uniform_scramble_base2(uint32_t x, uint32_t seed) {
+LUMINARY_FUNCTION uint32_t random_nested_uniform_scramble_base2(uint32_t x, uint32_t seed) {
   x = __brev(x);
   x = random_laine_karras_permutation(x, seed);
   x = __brev(x);
   return x;
 }
 
-__device__ uint32_t random_hash_combine(uint32_t seed, uint32_t v) {
+LUMINARY_FUNCTION uint32_t random_hash_combine(uint32_t seed, uint32_t v) {
   return seed ^ (v + (seed << 6) + (seed >> 2));
 }
 
-__device__ uint32_t random_sobol_P(uint32_t v) {
+LUMINARY_FUNCTION uint32_t random_sobol_P(uint32_t v) {
   v ^= v << 16;
   v ^= (v & 0x00FF00FF) << 8;
   v ^= (v & 0x0F0F0F0F) << 4;
@@ -261,7 +261,7 @@ __device__ uint32_t random_sobol_P(uint32_t v) {
   return v;
 }
 
-__device__ uint2 random_sobol_base(uint32_t offset, const uint32_t seed) {
+LUMINARY_FUNCTION uint2 random_sobol_base(uint32_t offset, const uint32_t seed) {
   // The index into the sequence is given by:
   // const uint32_t index = random_nested_uniform_scramble_base2(offset, seed);
   // Then applying the J matrix to the index as in [Ahm24]:
@@ -272,7 +272,7 @@ __device__ uint2 random_sobol_base(uint32_t offset, const uint32_t seed) {
   return make_uint2(J, random_sobol_P(J));
 }
 
-__device__ uint2 random_sobol(const uint32_t offset, const uint32_t dimension) {
+LUMINARY_FUNCTION uint2 random_sobol(const uint32_t offset, const uint32_t dimension) {
   const uint32_t seed = random_uint32_t_base(0xfcbd6e15, dimension);
 
   const uint2 sobol = random_sobol_base(offset, seed);
@@ -287,23 +287,23 @@ __device__ uint2 random_sobol(const uint32_t offset, const uint32_t dimension) {
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint32_t random_uint32_t(const uint32_t offset) {
+LUMINARY_FUNCTION uint32_t random_uint32_t(const uint32_t offset) {
   return random_uint32_t_base(0xfcbd6e15, offset);
 }
 
-__device__ uint16_t random_uint16_t(const uint32_t offset) {
+LUMINARY_FUNCTION uint16_t random_uint16_t(const uint32_t offset) {
   return random_uint16_t_base(0xfcbd6e15, offset);
 }
 
-__device__ float white_noise_precise_offset(const uint32_t offset) {
+LUMINARY_FUNCTION float white_noise_precise_offset(const uint32_t offset) {
   return random_uint32_t_to_float(random_uint32_t(offset));
 }
 
-__device__ float white_noise_offset(const uint32_t offset) {
+LUMINARY_FUNCTION float white_noise_offset(const uint32_t offset) {
   return random_uint16_t_to_float(random_uint16_t(offset));
 }
 
-__device__ uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
+LUMINARY_FUNCTION uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
   const uint32_t pixel      = (x & BLUENOISE_TEX_DIM_MASK) + (y & BLUENOISE_TEX_DIM_MASK) * BLUENOISE_TEX_DIM;
   const uint32_t blue_noise = __ldg(device.ptrs.bluenoise_2D + pixel);
 
@@ -314,7 +314,7 @@ __device__ uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
 // Warning: The lowest bit is always 0 for these random numbers.
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint2 random_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+LUMINARY_FUNCTION uint2 random_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   uint32_t dimension_index = target + depth * RANDOM_TARGET_COUNT;
 
   uint2 quasi = random_sobol(sequence_id, dimension_index);
@@ -328,46 +328,47 @@ __device__ uint2 random_2D_base(const uint32_t target, const ushort2 pixel, cons
   return quasi;
 }
 
-__device__ float2 random_2D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+LUMINARY_FUNCTION float2
+  random_2D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   const uint2 quasi = random_2D_base(target, pixel, sequence_id, depth);
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
 
-__device__ uint32_t random_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+LUMINARY_FUNCTION uint32_t random_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   return random_2D_base(target, pixel, sequence_id, depth).x;
 }
 
-__device__ float random_1D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+LUMINARY_FUNCTION float random_1D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   return random_uint32_t_to_float(random_1D_base(target, pixel, sequence_id, depth));
 }
 
-__device__ float random_1D(const uint32_t target, const ushort2 pixel) {
+LUMINARY_FUNCTION float random_1D(const uint32_t target, const ushort2 pixel) {
   return random_1D_base_float(target, pixel, device.state.sample_id, device.state.depth);
 }
 
 // This is a global version that is constant within a given frame.
-__device__ float random_1D_global(const uint32_t target) {
+LUMINARY_FUNCTION float random_1D_global(const uint32_t target) {
   return random_1D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
 }
 
-__device__ float2 random_2D(const uint32_t target, const ushort2 pixel) {
+LUMINARY_FUNCTION float2 random_2D(const uint32_t target, const ushort2 pixel) {
   return random_2D_base_float(target, pixel, device.state.sample_id, device.state.depth);
 }
 
 // This is a global version that is constant within a given frame.
-__device__ float2 random_2D_global(const uint32_t target) {
+LUMINARY_FUNCTION float2 random_2D_global(const uint32_t target) {
   return random_2D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
 }
 
-__device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
+LUMINARY_FUNCTION float random_dither_mask(const uint32_t x, const uint32_t y) {
   const uint32_t pixel      = (x & BLUENOISE_TEX_DIM_MASK) + (y & BLUENOISE_TEX_DIM_MASK) * BLUENOISE_TEX_DIM;
   const uint16_t blue_noise = __ldg(device.ptrs.bluenoise_1D + pixel);
 
   return random_uint16_t_to_float(blue_noise);
 }
 
-__device__ float random_grain_mask(const uint32_t x, const uint32_t y) {
+LUMINARY_FUNCTION float random_grain_mask(const uint32_t x, const uint32_t y) {
   return white_noise_offset(x + y * device.settings.width);
 }
 

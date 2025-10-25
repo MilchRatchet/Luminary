@@ -22,7 +22,7 @@ struct CameraSampleResult {
   RGBF weight;
 } typedef CameraSampleResult;
 
-__device__ float2 camera_get_jitter() {
+LUMINARY_FUNCTION float2 camera_get_jitter() {
 #ifndef CAMERA_DEBUG_RENDER
   if (device.state.sample_id == 0)
     return make_float2(0.5f, 0.5f);
@@ -33,7 +33,7 @@ __device__ float2 camera_get_jitter() {
 #endif
 }
 
-__device__ float camera_get_image_plane() {
+LUMINARY_FUNCTION float camera_get_image_plane() {
 #if 0
   const float f = device.camera.physical.focal_length;
   const float o = device.camera.object_distance * CAMERA_COMMON_INV_SCALE - device.camera.physical.front_principal_point;
@@ -50,7 +50,7 @@ __device__ float camera_get_image_plane() {
 // Dispersion
 ////////////////////////////////////////////////////////////////////
 
-__device__ float camera_ior_cauchy_approximation(const float nd, const float abbe, const float wavelength) {
+LUMINARY_FUNCTION float camera_ior_cauchy_approximation(const float nd, const float abbe, const float wavelength) {
   const float range_factor =
     (1.0f / (CAMERA_FRAUNHOFER_F_LINE * CAMERA_FRAUNHOFER_F_LINE)) - (1.0f / (CAMERA_FRAUNHOFER_C_LINE * CAMERA_FRAUNHOFER_C_LINE));
 
@@ -62,7 +62,7 @@ __device__ float camera_ior_cauchy_approximation(const float nd, const float abb
 }
 
 template <bool SPECTRAL_RENDERING>
-__device__ float camera_medium_get_ior(const DeviceCameraMedium medium, const float wavelength) {
+LUMINARY_FUNCTION float camera_medium_get_ior(const DeviceCameraMedium medium, const float wavelength) {
   if constexpr (SPECTRAL_RENDERING)
     return (medium.abbe != 0.0f) ? camera_ior_cauchy_approximation(medium.design_ior, medium.abbe, wavelength) : medium.design_ior;
 

@@ -11,7 +11,7 @@
 #define FNV_PRIME (0x01000193u)
 #define FNV_OFFSET_BASIS (0x811c9dc5u)
 
-__device__ uint32_t hash_map_compute_hash_uint2(const uint2 value) {
+LUMINARY_FUNCTION uint32_t hash_map_compute_hash_uint2(const uint2 value) {
   uint32_t hash = FNV_OFFSET_BASIS;
 
   hash ^= (value.x >> 0) & 0xFF;
@@ -35,7 +35,7 @@ __device__ uint32_t hash_map_compute_hash_uint2(const uint2 value) {
   return hash;
 }
 
-__device__ uint32_t
+LUMINARY_FUNCTION uint32_t
   hash_map_get_uint2_to_uint32(const uint32_t* hashmap_ptr, const uint2* key_value_map, const uint32_t mask, const uint2 value) {
   uint32_t hash = hash_map_compute_hash_uint2(value) & mask;
 

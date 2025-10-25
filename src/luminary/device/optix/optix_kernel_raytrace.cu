@@ -1,5 +1,5 @@
 // OptiX translation unit setup
-#include "optix_compile_defines.cuh"
+#define OPTIX_KERNEL
 //
 
 #include "math.cuh"
@@ -15,7 +15,7 @@
 // GBufferMetaData
 ////////////////////////////////////////////////////////////////////
 
-__device__ void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
+LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
   if (device.state.sample_id != 0 || device.state.depth != 0)
     return;
 
@@ -77,7 +77,7 @@ __device__ void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytrac
 // Raytracing passes
 ////////////////////////////////////////////////////////////////////
 
-__device__ void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResult& result) {
+LUMINARY_FUNCTION void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResult& result) {
   OptixKernelFunctionGeometryTracePayload payload;
   payload.depth  = result.depth;
   payload.handle = result.handle;
@@ -92,7 +92,7 @@ __device__ void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResu
   result.handle = payload.handle;
 }
 
-__device__ void optix_raytrace_particles(const DeviceTask task, OptixRaytraceResult& result) {
+LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, OptixRaytraceResult& result) {
   OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
 
   // Particles can not be hit by non delta path due to their negligible contribution
@@ -129,7 +129,7 @@ __device__ void optix_raytrace_particles(const DeviceTask task, OptixRaytraceRes
   }
 }
 
-__device__ void optix_raytrace_ocean(const DeviceTask task, OptixRaytraceResult& result) {
+LUMINARY_FUNCTION void optix_raytrace_ocean(const DeviceTask task, OptixRaytraceResult& result) {
   if (device.ocean.active == false)
     return;
 

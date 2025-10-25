@@ -8,11 +8,11 @@
 // of the legacy naming of "temporal frames".
 
 // Simple tent filter.
-__device__ float temporal_gather_pixel_weight(const float x, const float y) {
+LUMINARY_FUNCTION float temporal_gather_pixel_weight(const float x, const float y) {
   return (1.0f - x) * (1.0f - y);
 }
 
-__device__ RGBF temporal_gather_pixel_load(
+LUMINARY_FUNCTION RGBF temporal_gather_pixel_load(
   const RGBF* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
   const float sample_y) {
   const uint32_t index_x = (uint32_t) max(min((int32_t) sample_x, width - 1), 0);
@@ -28,7 +28,7 @@ __device__ RGBF temporal_gather_pixel_load(
   return scale_color(pixel, temporal_gather_pixel_weight(rx, ry));
 }
 
-__device__ RGBF temporal_gather_pixel(
+LUMINARY_FUNCTION RGBF temporal_gather_pixel(
   const RGBF* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
   const uint32_t height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
@@ -153,7 +153,7 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   }
 }
 
-__device__ void temporal_load_buckets(
+LUMINARY_FUNCTION void temporal_load_buckets(
   const float* src, uint32_t x, uint32_t y, float values[9 * MAX_NUM_INDIRECT_BUCKETS], uint32_t& num_buckets) {
   if (y) {
     if (x) {
@@ -190,7 +190,7 @@ __device__ void temporal_load_buckets(
   }
 }
 
-__device__ float temporal_apply_median_of_means(float buckets[], const uint32_t num_buckets) {
+LUMINARY_FUNCTION float temporal_apply_median_of_means(float buckets[], const uint32_t num_buckets) {
   // Sort
   {
     uint32_t i = 1;

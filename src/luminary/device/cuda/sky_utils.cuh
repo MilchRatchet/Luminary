@@ -6,19 +6,19 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-__device__ float sky_height(const vec3 point) {
+LUMINARY_FUNCTION float sky_height(const vec3 point) {
   return get_length(point) - SKY_EARTH_RADIUS;
 }
 
-__device__ float world_to_sky_scale(float input) {
+LUMINARY_FUNCTION float world_to_sky_scale(float input) {
   return input * 0.001f;
 }
 
-__device__ float sky_to_world_scale(float input) {
+LUMINARY_FUNCTION float sky_to_world_scale(float input) {
   return input * 1000.0f;
 }
 
-__device__ vec3 world_to_sky_transform(vec3 input) {
+LUMINARY_FUNCTION vec3 world_to_sky_transform(vec3 input) {
   vec3 result;
 
   result.x = world_to_sky_scale(input.x);
@@ -30,7 +30,7 @@ __device__ vec3 world_to_sky_transform(vec3 input) {
   return result;
 }
 
-__device__ vec3 sky_to_world_transform(vec3 input) {
+LUMINARY_FUNCTION vec3 sky_to_world_transform(vec3 input) {
   vec3 result;
 
   input = sub_vector(input, device.sky.geometry_offset);
@@ -42,11 +42,11 @@ __device__ vec3 sky_to_world_transform(vec3 input) {
   return result;
 }
 
-__device__ bool sky_ray_hits_sun(const vec3 origin_sky, const vec3 ray) {
+LUMINARY_FUNCTION bool sky_ray_hits_sun(const vec3 origin_sky, const vec3 ray) {
   return sphere_ray_intersection(ray, origin_sky, device.sky.sun_pos, SKY_SUN_RADIUS) != FLT_MAX;
 }
 
-__device__ RGBF sky_hdri_sample(const vec3 ray) {
+LUMINARY_FUNCTION RGBF sky_hdri_sample(const vec3 ray) {
   const float theta = atan2f(ray.z, ray.x);
   const float phi   = asinf(ray.y);
 
@@ -62,7 +62,7 @@ __device__ RGBF sky_hdri_sample(const vec3 ray) {
   return get_color(hdri.x, hdri.y, hdri.z);
 }
 
-__device__ float sky_hdri_sample_alpha(const vec3 ray) {
+LUMINARY_FUNCTION float sky_hdri_sample_alpha(const vec3 ray) {
   const float theta = atan2f(ray.z, ray.x);
   const float phi   = asinf(ray.y);
 
@@ -73,24 +73,24 @@ __device__ float sky_hdri_sample_alpha(const vec3 ray) {
 }
 
 // [Hil20]
-__device__ float sky_unit_to_sub_uv(const float u, const float resolution) {
+LUMINARY_FUNCTION float sky_unit_to_sub_uv(const float u, const float resolution) {
   return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f));
 }
 
 // [Hil20]
-__device__ float sky_sub_to_unit_uv(const float u, const float resolution) {
+LUMINARY_FUNCTION float sky_sub_to_unit_uv(const float u, const float resolution) {
   return (u - 0.5f / resolution) * (resolution / (resolution - 1.0f));
 }
 
-__device__ float sky_rayleigh_phase(const float cos_angle) {
+LUMINARY_FUNCTION float sky_rayleigh_phase(const float cos_angle) {
   return 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
 }
 
-__device__ float sky_rayleigh_density(const float height) {
+LUMINARY_FUNCTION float sky_rayleigh_density(const float height) {
   return 2.5f * device.sky.base_density * expf(-height * (1.0f / device.sky.rayleigh_falloff));
 }
 
-__device__ float sky_mie_phase(const float cos_angle, const JendersieEonParams params) {
+LUMINARY_FUNCTION float sky_mie_phase(const float cos_angle, const JendersieEonParams params) {
   return jendersie_eon_phase_function(cos_angle, params);
 }
 
@@ -103,7 +103,7 @@ struct Spectrum {
 } typedef Spectrum;
 
 // This is the spectrum that transforms to the identity color (1,1,1)
-__device__ Spectrum spectrum_get_ident() {
+LUMINARY_FUNCTION Spectrum spectrum_get_ident() {
   Spectrum result;
 
   result.v[0] = 8.4205e-03f;
@@ -118,7 +118,7 @@ __device__ Spectrum spectrum_get_ident() {
   return result;
 }
 
-__device__ Spectrum spectrum_set1(const float v) {
+LUMINARY_FUNCTION Spectrum spectrum_set1(const float v) {
   Spectrum result;
 
 #pragma unroll
@@ -129,7 +129,7 @@ __device__ Spectrum spectrum_set1(const float v) {
   return result;
 }
 
-__device__ Spectrum spectrum_set(
+LUMINARY_FUNCTION Spectrum spectrum_set(
   const float v0, const float v1, const float v2, const float v3, const float v4, const float v5, const float v6, const float v7) {
   Spectrum result;
 
@@ -145,7 +145,7 @@ __device__ Spectrum spectrum_set(
   return result;
 }
 
-__device__ Spectrum spectrum_add(const Spectrum a, const Spectrum b) {
+LUMINARY_FUNCTION Spectrum spectrum_add(const Spectrum a, const Spectrum b) {
   Spectrum result;
 
 #pragma unroll
@@ -156,7 +156,7 @@ __device__ Spectrum spectrum_add(const Spectrum a, const Spectrum b) {
   return result;
 }
 
-__device__ Spectrum spectrum_sub(const Spectrum a, const Spectrum b) {
+LUMINARY_FUNCTION Spectrum spectrum_sub(const Spectrum a, const Spectrum b) {
   Spectrum result;
 
 #pragma unroll
@@ -167,7 +167,7 @@ __device__ Spectrum spectrum_sub(const Spectrum a, const Spectrum b) {
   return result;
 }
 
-__device__ Spectrum spectrum_scale(const Spectrum a, const float b) {
+LUMINARY_FUNCTION Spectrum spectrum_scale(const Spectrum a, const float b) {
   Spectrum result;
 
 #pragma unroll
@@ -178,7 +178,7 @@ __device__ Spectrum spectrum_scale(const Spectrum a, const float b) {
   return result;
 }
 
-__device__ Spectrum spectrum_mul(const Spectrum a, const Spectrum b) {
+LUMINARY_FUNCTION Spectrum spectrum_mul(const Spectrum a, const Spectrum b) {
   Spectrum result;
 
 #pragma unroll
@@ -189,7 +189,7 @@ __device__ Spectrum spectrum_mul(const Spectrum a, const Spectrum b) {
   return result;
 }
 
-__device__ Spectrum spectrum_inv(const Spectrum a) {
+LUMINARY_FUNCTION Spectrum spectrum_inv(const Spectrum a) {
   Spectrum result;
 
 #pragma unroll
@@ -200,7 +200,7 @@ __device__ Spectrum spectrum_inv(const Spectrum a) {
   return result;
 }
 
-__device__ Spectrum spectrum_exp(const Spectrum a) {
+LUMINARY_FUNCTION Spectrum spectrum_exp(const Spectrum a) {
   Spectrum result;
 
 #pragma unroll
@@ -211,7 +211,7 @@ __device__ Spectrum spectrum_exp(const Spectrum a) {
   return result;
 }
 
-__device__ Spectrum spectrum_merge(const float4 low, const float4 high) {
+LUMINARY_FUNCTION Spectrum spectrum_merge(const float4 low, const float4 high) {
   Spectrum result;
 
   result.v[0] = low.x;
@@ -226,7 +226,7 @@ __device__ Spectrum spectrum_merge(const float4 low, const float4 high) {
   return result;
 }
 
-__device__ float4 spectrum_split_low(const Spectrum a) {
+LUMINARY_FUNCTION float4 spectrum_split_low(const Spectrum a) {
   float4 result;
 
   result.x = a.v[0];
@@ -237,7 +237,7 @@ __device__ float4 spectrum_split_low(const Spectrum a) {
   return result;
 }
 
-__device__ float4 spectrum_split_high(const Spectrum a) {
+LUMINARY_FUNCTION float4 spectrum_split_high(const Spectrum a) {
   float4 result;
 
   result.x = a.v[4];
@@ -276,7 +276,7 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 #define SKY_WORLD_REFERENCE_HEIGHT (get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f))))
 
 // [Hil20]
-__device__ UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
+LUMINARY_FUNCTION UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
   height += SKY_EARTH_RADIUS;
 
   const float H   = sqrtf(fmaxf(0.0f, SKY_ATMO_RADIUS * SKY_ATMO_RADIUS - SKY_EARTH_RADIUS * SKY_EARTH_RADIUS));
@@ -294,7 +294,7 @@ __device__ UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
 }
 
 // [Wil21]
-__device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
+LUMINARY_FUNCTION RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
   // Radiance to XYZ
   //  {{0.0076500,0.2345212,0.3027571,0.0357158,0.0698887,0.4671353,0.9607998,0.9384000},
   //   {0.0002170,0.0085286,0.0548572,0.2024885,0.7218860,0.9971143,0.8316430,0.4412000},
@@ -322,7 +322,7 @@ __device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
 // This is a quick way of obtaining the color of the sun disk times transmittance
 // Note that it is not checked whether the sun is actually hit by ray, it is simply assumed
 // Inscattering is not included
-__device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool include_cloud_hdri = true) {
+LUMINARY_FUNCTION RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool include_cloud_hdri = true) {
   const float height           = sky_height(origin);
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 

@@ -5,7 +5,7 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-__device__ RGBF tonemap_aces(RGBF pixel) {
+LUMINARY_FUNCTION RGBF tonemap_aces(RGBF pixel) {
   RGBF color;
   color.r = 0.59719f * pixel.r + 0.35458f * pixel.g + 0.04823f * pixel.b;
   color.g = 0.07600f * pixel.r + 0.90834f * pixel.g + 0.01566f * pixel.b;
@@ -28,7 +28,7 @@ __device__ RGBF tonemap_aces(RGBF pixel) {
   return pixel;
 }
 
-__device__ RGBF uncharted2_partial(RGBF pixel) {
+LUMINARY_FUNCTION RGBF uncharted2_partial(RGBF pixel) {
   const float a = 0.15f;
   const float b = 0.50f;
   const float c = 0.10f;
@@ -44,7 +44,7 @@ __device__ RGBF uncharted2_partial(RGBF pixel) {
   return result;
 }
 
-__device__ RGBF tonemap_uncharted2(RGBF pixel) {
+LUMINARY_FUNCTION RGBF tonemap_uncharted2(RGBF pixel) {
   const float exposure_bias = 2.0f;
 
   pixel = mul_color(pixel, get_color(exposure_bias, exposure_bias, exposure_bias));
@@ -56,7 +56,7 @@ __device__ RGBF tonemap_uncharted2(RGBF pixel) {
   return mul_color(pixel, scale);
 }
 
-__device__ RGBF tonemap_reinhard(RGBF pixel) {
+LUMINARY_FUNCTION RGBF tonemap_reinhard(RGBF pixel) {
   const float factor = 1.0f / (1.0f + luminance(pixel));
   pixel.r *= factor;
   pixel.g *= factor;
@@ -69,14 +69,14 @@ __device__ RGBF tonemap_reinhard(RGBF pixel) {
 // AgX approximation based on https://iolite-engine.com/blog_posts/minimal_agx_implementation
 //
 
-__device__ float agx_constrast_approx_polynomial(float v) {
+LUMINARY_FUNCTION float agx_constrast_approx_polynomial(float v) {
   const float v2 = v * v;
   const float v4 = v2 * v2;
 
   return 15.5f * v4 * v2 - 40.14f * v4 * v + 31.96f * v4 - 6.868f * v2 * v + 0.4298f * v2 + 0.1191f * v - 0.00232f;
 }
 
-__device__ RGBF agx_contrast_approx(RGBF pixel) {
+LUMINARY_FUNCTION RGBF agx_contrast_approx(RGBF pixel) {
   const float r = agx_constrast_approx_polynomial(pixel.r);
   const float g = agx_constrast_approx_polynomial(pixel.g);
   const float b = agx_constrast_approx_polynomial(pixel.b);
@@ -84,7 +84,7 @@ __device__ RGBF agx_contrast_approx(RGBF pixel) {
   return get_color(r, g, b);
 }
 
-__device__ RGBF agx_conversion(RGBF pixel) {
+LUMINARY_FUNCTION RGBF agx_conversion(RGBF pixel) {
   RGBF agx;
 
   agx = get_color(0.0f, 0.0f, 0.0f);
@@ -109,7 +109,7 @@ __device__ RGBF agx_conversion(RGBF pixel) {
   return agx_contrast_approx(agx);
 }
 
-__device__ RGBF agx_inv_conversion(RGBF pixel) {
+LUMINARY_FUNCTION RGBF agx_inv_conversion(RGBF pixel) {
   RGBF agx;
 
   agx = get_color(0.0f, 0.0f, 0.0f);
@@ -128,7 +128,7 @@ __device__ RGBF agx_inv_conversion(RGBF pixel) {
   return agx;
 }
 
-__device__ RGBF agx_look(RGBF pixel, const RGBF slope, const RGBF power, const float saturation) {
+LUMINARY_FUNCTION RGBF agx_look(RGBF pixel, const RGBF slope, const RGBF power, const float saturation) {
   const float lum = luminance(pixel);
 
   pixel = mul_color(pixel, slope);
@@ -144,14 +144,14 @@ __device__ RGBF agx_look(RGBF pixel, const RGBF slope, const RGBF power, const f
   return pixel;
 }
 
-__device__ RGBF tonemap_agx(RGBF pixel) {
+LUMINARY_FUNCTION RGBF tonemap_agx(RGBF pixel) {
   pixel = agx_conversion(pixel);
   pixel = agx_inv_conversion(pixel);
 
   return pixel;
 }
 
-__device__ RGBF tonemap_agx_punchy(RGBF pixel) {
+LUMINARY_FUNCTION RGBF tonemap_agx_punchy(RGBF pixel) {
   pixel = agx_conversion(pixel);
   pixel = agx_look(pixel, get_color(1.0f, 1.0f, 1.0f), get_color(1.35f, 1.35f, 1.35f), 1.4f);
   pixel = agx_inv_conversion(pixel);
@@ -159,7 +159,7 @@ __device__ RGBF tonemap_agx_punchy(RGBF pixel) {
   return pixel;
 }
 
-__device__ RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params) {
+LUMINARY_FUNCTION RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params) {
   pixel = agx_conversion(pixel);
 
   RGBF slope = get_color(agx_params.slope, agx_params.slope, agx_params.slope);
@@ -171,7 +171,7 @@ __device__ RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params)
   return pixel;
 }
 
-__device__ RGBF
+LUMINARY_FUNCTION RGBF
   tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const RGBF color_correction, const AGXCustomParams agx_params) {
   if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
     return pixel;

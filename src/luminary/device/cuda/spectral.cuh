@@ -4,7 +4,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-__device__ float spectral_sample_wavelength(const float random, float& pdf) {
+LUMINARY_FUNCTION float spectral_sample_wavelength(const float random, float& pdf) {
   uint32_t range = SPECTRAL_MAX_WAVELENGTH - SPECTRAL_MIN_WAVELENGTH + 1;
   uint32_t first = 0;
 
@@ -36,7 +36,7 @@ __device__ float spectral_sample_wavelength(const float random, float& pdf) {
   return remap(random, cdf_lower, cdf_higher, wavelength_lower, wavelength_higher);
 }
 
-__device__ RGBF spectral_xyz_to_rgb(const float3 XYZ) {
+LUMINARY_FUNCTION RGBF spectral_xyz_to_rgb(const float3 XYZ) {
   RGBF result;
 
   result.r = 3.2406f * XYZ.x - 1.5372f * XYZ.y - 0.4986f * XYZ.z;
@@ -46,7 +46,7 @@ __device__ RGBF spectral_xyz_to_rgb(const float3 XYZ) {
   return result;
 }
 
-__device__ float3 spectral_wavelength_to_xyz(const float wavelength) {
+LUMINARY_FUNCTION float3 spectral_wavelength_to_xyz(const float wavelength) {
   const float sample = remap01(wavelength, SPECTRAL_MIN_WAVELENGTH, SPECTRAL_MAX_WAVELENGTH);
 
   const float2 XY = tex2D<float2>(device.spectral_xy_lut_tex.handle, sample, 0.0f);
@@ -55,7 +55,7 @@ __device__ float3 spectral_wavelength_to_xyz(const float wavelength) {
   return make_float3(XY.x, XY.y, Z);
 }
 
-__device__ RGBF spectral_wavelength_to_rgb(const float wavelength) {
+LUMINARY_FUNCTION RGBF spectral_wavelength_to_rgb(const float wavelength) {
   const float3 XYZ = spectral_wavelength_to_xyz(wavelength);
 
   return spectral_xyz_to_rgb(XYZ);

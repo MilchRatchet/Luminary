@@ -21,13 +21,9 @@ struct OptixKernelConfig {
 
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE]              = {.name = "optix_kernel_raytrace", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_GEO]  = {.name = "optix_kernel_shading_geometry_geo", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY_SKY]  = {.name = "optix_kernel_shading_geometry_sky", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_GEO]    = {.name = "optix_kernel_shading_volume_geo", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_SKY]    = {.name = "optix_kernel_shading_volume_sky", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_GEO] = {.name = "optix_kernel_shading_particles_geo", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES_SKY] = {.name = "optix_kernel_shading_particles_sky", .register_count = 40, .allow_gas = false}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE]      = {.name = "optix_kernel_raytrace", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADOW]        = {.name = "optix_kernel_shadow", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADOW_VOLUME] = {.name = "optix_kernel_shadow_volume", .register_count = 40, .allow_gas = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__shadow_trace", "__anyhit__shadow_sun_trace"};
@@ -101,19 +97,19 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   memset(*kernel, 0, sizeof(OptixKernel));
 
   ////////////////////////////////////////////////////////////////////
-  // Get PTX
+  // Get OptiX-IR
   ////////////////////////////////////////////////////////////////////
 
-  char ptx_name[4096];
-  sprintf(ptx_name, "%s_sm_%u%u.ptx", optix_kernel_configs[type].name, device->properties.major, device->properties.minor);
+  char optixir_name[4096];
+  sprintf(optixir_name, "%s_sm_%u%u.optix-ir", optix_kernel_configs[type].name, device->properties.major, device->properties.minor);
 
-  int64_t ptx_length;
-  char* ptx;
-  uint64_t ptx_info;
+  int64_t optixir_length;
+  char* optixir;
+  uint64_t optixir_info;
 
-  ceb_access(ptx_name, (void**) &ptx, &ptx_length, &ptx_info);
+  ceb_access(optixir_name, (void**) &optixir, &optixir_length, &optixir_info);
 
-  if (ptx_info || !ptx_length) {
+  if (optixir_info || !optixir_length) {
     warn_message(
       "Failed to load OptiX kernel %s for CUDA architecture sm_%u%u. All devices of this architecture will be unavailable. Recompile "
       "Luminary "
@@ -158,7 +154,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
 
   OPTIX_FAILURE_HANDLE_LOG(
     optixModuleCreate(
-      device->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &(*kernel)->module),
+      device->optix_ctx, &module_compile_options, &pipeline_compile_options, optixir, optixir_length, log, &log_size, &(*kernel)->module),
     log, log_size);
 
   ////////////////////////////////////////////////////////////////////

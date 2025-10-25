@@ -34,6 +34,7 @@
 
 #define MATERIAL_ID_INVALID 0xFFFF
 #define INSTANCE_ID_INVALID 0xFFFFFFFF
+#define LIGHT_ID_INVALID 0xFFFFFFFF
 #define DEPTH_INVALID -1.0f
 
 // Print stats for the work queues

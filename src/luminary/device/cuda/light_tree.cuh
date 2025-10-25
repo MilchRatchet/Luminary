@@ -65,10 +65,10 @@ struct LightTreeWork {
 #endif /* LIGHT_TREE_DEBUG_TRAVERSAL */
 
 template <MaterialType TYPE>
-__device__ float light_tree_importance(const MaterialContext<TYPE> ctx, const float power, const vec3 mean, const float std_dev);
+LUMINARY_FUNCTION float light_tree_importance(const MaterialContext<TYPE> ctx, const float power, const vec3 mean, const float std_dev);
 
 template <>
-__device__ float light_tree_importance<MATERIAL_GEOMETRY>(
+LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
   const MaterialContextGeometry ctx, const float power, const vec3 mean, const float std_dev) {
   const vec3 PO       = sub_vector(mean, ctx.position);
   const float dist_sq = dot_product(PO, PO);
@@ -88,7 +88,7 @@ __device__ float light_tree_importance<MATERIAL_GEOMETRY>(
 }
 
 template <>
-__device__ float light_tree_importance<MATERIAL_VOLUME>(
+LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const MaterialContextVolume ctx, const float power, const vec3 mean, const float std_dev) {
   const vec3 PO = sub_vector(mean, ctx.position);
 
@@ -131,7 +131,7 @@ __device__ float light_tree_importance<MATERIAL_VOLUME>(
 }
 
 template <>
-__device__ float light_tree_importance<MATERIAL_PARTICLE>(
+LUMINARY_FUNCTION float light_tree_importance<MATERIAL_PARTICLE>(
   const MaterialContextParticle ctx, const float power, const vec3 mean, const float std_dev) {
   const vec3 PO       = sub_vector(mean, ctx.position);
   const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
@@ -140,7 +140,7 @@ __device__ float light_tree_importance<MATERIAL_PARTICLE>(
 }
 
 template <MaterialType TYPE>
-__device__ float light_tree_child_importance(
+LUMINARY_FUNCTION float light_tree_child_importance(
   const MaterialContext<TYPE> ctx, const DeviceLightTreeRootSection section, const vec3 base, const vec3 exp, const float exp_v,
   const uint32_t i) {
   if (section.rel_power[i] == 0)
@@ -156,7 +156,7 @@ __device__ float light_tree_child_importance(
 }
 
 template <MaterialType TYPE>
-__device__ float light_tree_child_importance(
+LUMINARY_FUNCTION float light_tree_child_importance(
   const MaterialContext<TYPE> ctx, const DeviceLightTreeNode node, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
   if (node.rel_power[i] == 0)
     return 0.0f;
@@ -170,7 +170,7 @@ __device__ float light_tree_child_importance(
   return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
 
-__device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint32_t& queue_write_ptr) {
+LUMINARY_FUNCTION uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint32_t& queue_write_ptr) {
   uint32_t output_ptr;
   if (inplace_output_ptr != 0xFFFFFFFF) {
     output_ptr         = inplace_output_ptr;
@@ -183,22 +183,23 @@ __device__ uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr, uint3
   return output_ptr;
 }
 
-__device__ LightTreeContinuation _light_tree_continuation_pack(const uint8_t child_index, const float probability, const bool is_light) {
+LUMINARY_FUNCTION LightTreeContinuation
+  _light_tree_continuation_pack(const uint8_t child_index, const float probability, const bool is_light) {
   LightTreeContinuation continuation;
 
   continuation.is_light    = is_light ? 1 : 0;
   continuation.child_index = child_index;
-  continuation.probability = max((uint32_t) ((0xFFFFF * probability) + 0.5f), 1);
+  continuation.probability = (probability > 0.0f) ? max((uint32_t) ((0xFFFFF * probability) + 0.5f), 1) : 0;
 
   return continuation;
 }
 
-__device__ float _light_tree_continuation_unpack_prob(const LightTreeContinuation continuation) {
+LUMINARY_FUNCTION float _light_tree_continuation_unpack_prob(const LightTreeContinuation continuation) {
   return continuation.probability * (1.0f / 0xFFFFF) * LIGHT_TREE_NUM_OUTPUTS;
 }
 
 template <MaterialType TYPE>
-__device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
   const DeviceLightTreeRootHeader header = load_light_tree_root();
 
   RISAggregator ris_aggregator = ris_aggregator_init();
@@ -215,11 +216,13 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 
   uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
 
+  LUMINARY_ASSUME(header.num_sections <= LIGHT_TREE_ROOT_MAX_NUM_SECTIONS);
+
 #pragma nounroll
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
     const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
 
-#pragma nounroll
+#pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
       const float target               = light_tree_child_importance<TYPE>(ctx, section, base, exp, exp_v, rel_child_id);
       const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
@@ -227,7 +230,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
       if (ris_sample.resampling_probability == 0.0f)
         continue;
 
-#pragma nounroll
+#pragma unroll
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
         if (ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
           selected[lane_id] = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
@@ -240,7 +243,7 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 
   LightTreeWork work;
 
-#pragma nounroll
+#pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
     const bool is_light = selected[lane_id] < header.num_root_lights;
     const uint8_t index = (is_light) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
@@ -253,8 +256,8 @@ __device__ LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE>
 }
 
 template <MaterialType TYPE>
-__device__ LightTreeResult
-  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork work) {
+LUMINARY_FUNCTION LightTreeResult
+  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork& work) {
   const LightTreeContinuation continuation = work.data[lane_id];
 
   _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(lane_id, continuation);
@@ -286,7 +289,7 @@ __device__ LightTreeResult
 
     uint8_t selected_child = 0xFF;
 
-#pragma nounroll
+#pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_CHILDREN_PER_NODE; rel_child_id++) {
       const float target = light_tree_child_importance<TYPE>(ctx, node, base, exp, exp_v, rel_child_id);
 
@@ -317,7 +320,7 @@ __device__ LightTreeResult
   return result;
 }
 
-__device__ TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {
+LUMINARY_FUNCTION TriangleHandle light_tree_get_light(const uint32_t id, DeviceTransform& transform) {
   const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[id];
 
   transform = load_transform(handle.instance_id);

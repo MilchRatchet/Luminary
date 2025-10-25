@@ -20,7 +20,7 @@ struct CausticsSamplingDomain {
 
 // Assuming a flat plane with a normal of (0,1,0), find the unique solution.
 template <MaterialType TYPE>
-__device__ vec3 caustics_solve_for_normal(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_underwater, bool& valid) {
+LUMINARY_FUNCTION vec3 caustics_solve_for_normal(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_underwater, bool& valid) {
   // Get view vector
   vec3 ray;
   if (is_underwater) {
@@ -39,7 +39,7 @@ __device__ vec3 caustics_solve_for_normal(const MaterialContext<TYPE> ctx, const
   return add_vector(ctx.position, scale_vector(ray, dist));
 }
 
-__device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
+LUMINARY_FUNCTION vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
   if (is_refraction) {
     bool total_reflection;
     return refract_vector(V, normal, device.ocean.refractive_index, total_reflection);
@@ -50,14 +50,21 @@ __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool i
 }
 
 template <MaterialType TYPE>
-__device__ CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_underwater) {
+LUMINARY_FUNCTION bool caustics_is_fast_path(const uint16_t state) {
+  bool fast_path = (TYPE != MATERIAL_GEOMETRY);   // Currently, no proper caustics for volume or particle rendering
+  fast_path |= (device.ocean.amplitude == 0.0f);  // Fast path is assuming amplitude == 0, so if that is actually true we can just do it.
+  fast_path |= (device.ocean.caustics_active == false);       // Caustics not active still means we want the shift in direction.
+  fast_path |= (state & STATE_FLAG_ALLOW_EMISSION == false);  // If we are indirect lighting, proper caustics are too noisy.
+
+  return fast_path;
+}
+
+template <MaterialType TYPE>
+LUMINARY_FUNCTION CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_underwater) {
   bool is_valid;
   const vec3 center = caustics_solve_for_normal(ctx, L, is_underwater, is_valid);
 
-  bool fast_path = (TYPE != MATERIAL_GEOMETRY);   // Phase based kernels never do proper caustics
-  fast_path |= (device.ocean.amplitude == 0.0f);  // Fast path is assuming amplitude == 0, so if that is actually true we can just do it.
-  fast_path |= (device.ocean.caustics_active == false);           // Caustics not active still means we want the shift in direction.
-  fast_path |= (ctx.state & STATE_FLAG_ALLOW_EMISSION == false);  // If we are indirect lighting, proper caustics are too noisy.
+  const bool fast_path = caustics_is_fast_path<TYPE>(ctx.state);
 
   // Fast path that assumes a flat ocean.
   if (fast_path) {
@@ -114,7 +121,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const MaterialContext<TYPE
 }
 
 template <MaterialType TYPE>
-__device__ bool caustics_find_connection_point(
+LUMINARY_FUNCTION bool caustics_find_connection_point(
   const MaterialContext<TYPE> ctx, const ushort2 index, const CausticsSamplingDomain domain, const bool is_refraction,
   const uint32_t iteration, const uint32_t num_iterations, vec3& point, float& sample_weight) {
   if (domain.fast_path) {

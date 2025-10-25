@@ -10,7 +10,7 @@ struct TextureLoadArgs {
   float4 default_result;
 } typedef TextureLoadArgs;
 
-__device__ TextureLoadArgs texture_get_default_args() {
+LUMINARY_FUNCTION TextureLoadArgs texture_get_default_args() {
   TextureLoadArgs args;
 
   args.flip_v         = true;
@@ -21,11 +21,11 @@ __device__ TextureLoadArgs texture_get_default_args() {
   return args;
 }
 
-__device__ bool texture_is_valid(const DeviceTextureObject tex) {
+LUMINARY_FUNCTION bool texture_is_valid(const DeviceTextureObject tex) {
   return tex.handle != TEXTURE_OBJECT_INVALID;
 }
 
-__device__ float4 texture_load(DeviceTextureObject tex, UV uv, const TextureLoadArgs args = texture_get_default_args()) {
+LUMINARY_FUNCTION float4 texture_load(DeviceTextureObject tex, UV uv, const TextureLoadArgs args = texture_get_default_args()) {
   if (texture_is_valid(tex) == false)
     return args.default_result;
 
