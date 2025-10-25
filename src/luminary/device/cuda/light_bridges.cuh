@@ -123,6 +123,7 @@ LUMINARY_FUNCTION uint32_t
   // This happens when effective dist is too large.
   uint32_t selected_vertex_count = max_num_vertices - 1;
 
+#pragma unroll
   for (uint32_t vertex_count = 0; vertex_count < max_num_vertices; vertex_count++) {
     // TODO: The paper uses some additional terms here for the importance
     const float importance = bridges_get_vertex_count_importance(vertex_count + 1, effective_dist);
@@ -166,6 +167,8 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
 
     sum_dist += dist;
   }
+
+  LUMINARY_ASSUME(vertex_count <= BRIDGES_MAX_VERTEX_COUNT);
 
   for (uint32_t i = 1; i < vertex_count; i++) {
     const float2 random_phase = random_2D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_PHASE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, pixel);

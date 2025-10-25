@@ -6,6 +6,11 @@
 #include "../device_utils.h"
 #include "../kernel_args.h"
 
+// Part of compile configuration
+#ifndef LUMINARY_MIN_BLOCKS_PER_SM
+#define LUMINARY_MIN_BLOCKS_PER_SM 1
+#endif /* LUMINARY_MIN_BLOCKS_PER_SM */
+
 #define NUM_THREADS (THREADS_PER_BLOCK * device.config.num_blocks)
 
 #define WARP_SIZE_LOG 5
@@ -16,19 +21,21 @@
 
 #ifndef OPTIX_KERNEL
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
-#else
+#else /* !OPTIX_KERNEL */
 #define THREAD_ID (optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
-#endif
+#endif /* OPTIX_KERNEL */
 
 #ifdef OPTIX_KERNEL
 #define TASK_ID optixGetLaunchIndex().z
-#endif
+#endif /* OPTIX_KERNEL */
 
-#define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(THREADS_PER_BLOCK)
+#define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(THREADS_PER_BLOCK, LUMINARY_MIN_BLOCKS_PER_SM)
 #define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
 #define LUMINARY_FUNCTION __device__ __forceinline__
 #define LUMINARY_FUNCTION_NO_INLINE __device__ __noinline__
+
+#define LUMINARY_ENABLE_SMEM_SPILLING asm volatile(".pragma \"enable_smem_spilling\";")
 
 #ifndef eps
 #define eps FLT_EPSILON

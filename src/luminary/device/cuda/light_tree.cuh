@@ -216,11 +216,13 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
   uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
 
+  LUMINARY_ASSUME(header.num_sections <= LIGHT_TREE_ROOT_MAX_NUM_SECTIONS);
+
 #pragma nounroll
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
     const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
 
-#pragma nounroll
+#pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
       const float target               = light_tree_child_importance<TYPE>(ctx, section, base, exp, exp_v, rel_child_id);
       const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
@@ -228,7 +230,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
       if (ris_sample.resampling_probability == 0.0f)
         continue;
 
-#pragma nounroll
+#pragma unroll
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
         if (ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
           selected[lane_id] = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
@@ -241,7 +243,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
   LightTreeWork work;
 
-#pragma nounroll
+#pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
     const bool is_light = selected[lane_id] < header.num_root_lights;
     const uint8_t index = (is_light) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
@@ -255,7 +257,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION LightTreeResult
-  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork work) {
+  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork& work) {
   const LightTreeContinuation continuation = work.data[lane_id];
 
   _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(lane_id, continuation);
@@ -287,7 +289,7 @@ LUMINARY_FUNCTION LightTreeResult
 
     uint8_t selected_child = 0xFF;
 
-#pragma nounroll
+#pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_CHILDREN_PER_NODE; rel_child_id++) {
       const float target = light_tree_child_importance<TYPE>(ctx, node, base, exp, exp_v, rel_child_id);
 

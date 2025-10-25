@@ -69,7 +69,7 @@ string(REPLACE "," ";" user_specified_archs ${LUMINARY_KERNEL_ARCHS})
 
 set(kernel_archs)
 foreach(user_specified_arch ${user_specified_archs})
-  if(${user_specified_arch} MATCHES "^sm_[0-9]+a?")
+  if(${user_specified_arch} MATCHES "^sm_[0-9]+")
     list(APPEND kernel_archs ${user_specified_arch})
   else()
     message(WARNING "${user_specified_arch} is not a valid CUDA architecture input. The input must be in the form of sm_120,sm90a,...")
@@ -79,6 +79,23 @@ endforeach()
 if(NOT kernel_archs)
   message(FATAL_ERROR "No kernel architectures specified.")
 endif()
+
+#=============================================================
+# Architecture Mappings
+#=============================================================
+
+# Min SM counts
+set(LUMINARY_sm_75_MIN_BLOCKS_PER_SM  4)
+set(LUMINARY_sm_80_MIN_BLOCKS_PER_SM  8)
+set(LUMINARY_sm_86_MIN_BLOCKS_PER_SM  6)
+set(LUMINARY_sm_87_MIN_BLOCKS_PER_SM  6)
+set(LUMINARY_sm_89_MIN_BLOCKS_PER_SM  6)
+set(LUMINARY_sm_90_MIN_BLOCKS_PER_SM  8)
+set(LUMINARY_sm_100_MIN_BLOCKS_PER_SM 8)
+set(LUMINARY_sm_103_MIN_BLOCKS_PER_SM 8)
+set(LUMINARY_sm_110_MIN_BLOCKS_PER_SM 8)
+set(LUMINARY_sm_120_MIN_BLOCKS_PER_SM 6)
+set(LUMINARY_sm_121_MIN_BLOCKS_PER_SM 6)
 
 #=============================================================
 # Create CUBIN files
@@ -95,6 +112,7 @@ function(compile_cubin kernel_name kernel_arch out_cubin_file)
       --cubin ${CUDA_KERNEL_FLAGS} --gpu-architecture=${kernel_arch}
       -o ${cubin_file}
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
+      -D"LUMINARY_MIN_BLOCKS_PER_SM"=${LUMINARY_${kernel_arch}_MIN_BLOCKS_PER_SM}
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/${kernel_name}.cu"
       "${luminary_gpu_header_files}"
