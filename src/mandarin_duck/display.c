@@ -121,9 +121,18 @@ static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const 
     display->mouse_state->y = prev_mouse_y;
   }
 
-  const bool alt_down = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+  const bool alt_down         = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+  const bool ctrl_down        = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
+  const bool right_mouse_down = display->mouse_state->right_down;
 
-  return (mouse_hovers_background && !alt_down && !display->is_maximized) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+  bool is_draggable = true;
+  is_draggable &= mouse_hovers_background;
+  is_draggable &= alt_down == false;
+  is_draggable &= ctrl_down == false;
+  is_draggable &= right_mouse_down == false;
+  is_draggable &= display->is_maximized == false;
+
+  return (is_draggable) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
 }
 
 static void _display_set_hittest(Display* display, bool enable) {

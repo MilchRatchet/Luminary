@@ -10,7 +10,10 @@ struct DisplayZoomHandler {
   uint32_t offset_x;
   uint32_t offset_y;
   uint32_t scale;
+  float offset_x_internal;
+  float offset_y_internal;
   float mouse_wheel_accumulate;
+  uint32_t max_scale;
 } typedef DisplayZoomHandler;
 
 void display_zoom_handler_create(DisplayZoomHandler** zoom);
