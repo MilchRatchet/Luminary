@@ -197,6 +197,11 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   _display_handle_display_change(display);
   _display_handle_resize(display);
 
+  // We have gathered the screen and window sizes, now pretend that we changed displays again to ensure
+  // that the window is within the bounds and is centered.
+  _display_handle_display_change(display);
+  SDL_SetWindowPosition(display->sdl_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+
   display->selected_cursor = SDL_SYSTEM_CURSOR_DEFAULT;
   for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
     display->sdl_cursors[cursor_id] = SDL_CreateSystemCursor(cursor_id);
