@@ -389,8 +389,14 @@ static void _display_set_default_cursor(Display* display) {
 static void _display_query_pixel_info(Display* display, LuminaryHost* host, float request_x, float request_y) {
   MD_CHECK_NULL_ARGUMENT(display);
 
-  const float rel_x = request_x / display->width;
-  const float rel_y = request_y / display->height;
+  const uint32_t screen_x = (uint32_t) fmaxf(request_x, 0.0f);
+  const uint32_t screen_y = (uint32_t) fmaxf(request_y, 0.0f);
+
+  uint32_t image_x, image_y;
+  display_zoom_handler_screen_to_image(display->zoom_handler, screen_x, screen_y, &image_x, &image_y);
+
+  const float rel_x = image_x / ((float) display->width);
+  const float rel_y = image_y / ((float) display->height);
 
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
@@ -402,8 +408,8 @@ static void _display_query_pixel_info(Display* display, LuminaryHost* host, floa
 
   LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &result));
 
-  display->reference_x = request_x;
-  display->reference_y = request_y;
+  display->reference_x = screen_x;
+  display->reference_y = screen_y;
 
   display->awaiting_pixel_query_result = !result.pixel_query_is_valid;
 
