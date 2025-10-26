@@ -941,6 +941,17 @@ LuminaryResult device_get_internal_resolution(Device* device, uint32_t* width, u
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_get_internal_render_resolution(Device* device, uint32_t* width, uint32_t* height) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(width);
+  __CHECK_NULL_ARGUMENT(height);
+
+  *width  = device->constant_memory->settings.window_width;
+  *height = device->constant_memory->settings.window_height;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_count) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(task_count);
