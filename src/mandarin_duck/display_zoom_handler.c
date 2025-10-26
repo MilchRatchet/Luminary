@@ -93,8 +93,8 @@ void display_zoom_handler_image_to_screen(
   MD_CHECK_NULL_ARGUMENT(out_x);
   MD_CHECK_NULL_ARGUMENT(out_y);
 
-  *out_x = (x - zoom->offset_x) << zoom->scale;
-  *out_y = (y - zoom->offset_y) << zoom->scale;
+  *out_x = (x >= zoom->offset_x) ? (x - zoom->offset_x) << zoom->scale : 0;
+  *out_y = (y >= zoom->offset_y) ? (y - zoom->offset_y) << zoom->scale : 0;
 }
 
 void display_zoom_handler_screen_to_image(
