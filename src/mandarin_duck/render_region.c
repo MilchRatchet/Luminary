@@ -121,10 +121,14 @@ void render_region_render(RenderRegion* region, Display* display, UIRenderer* re
   uint32_t x, y;
   display_zoom_handler_image_to_screen(zoom, region->x, region->y, &x, &y);
 
-  uint32_t width  = ((uint32_t) ceilf(region->width)) << zoom->scale;
-  uint32_t height = ((uint32_t) ceilf(region->height)) << zoom->scale;
+  const float region_x1 = ceilf(region->x + region->width);
+  const float region_y1 = ceilf(region->y + region->height);
 
-  height = min(height, region->display_height - y);
+  uint32_t x1, y1;
+  display_zoom_handler_image_to_screen(zoom, region_x1, region_y1, &x1, &y1);
+
+  const uint32_t width  = x1 - x;
+  const uint32_t height = y1 - y;
 
   ui_renderer_render_rounded_box(renderer, display, width, height, x, y, 0, color, 0, UI_RENDERER_BACKGROUND_MODE_TRANSPARENT);
 }

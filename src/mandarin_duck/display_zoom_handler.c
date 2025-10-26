@@ -93,8 +93,11 @@ void display_zoom_handler_image_to_screen(
   MD_CHECK_NULL_ARGUMENT(out_x);
   MD_CHECK_NULL_ARGUMENT(out_y);
 
-  *out_x = (x >= zoom->offset_x) ? (x - zoom->offset_x) << zoom->scale : 0;
-  *out_y = (y >= zoom->offset_y) ? (y - zoom->offset_y) << zoom->scale : 0;
+  const uint32_t screen_x = (x >= zoom->offset_x) ? (x - zoom->offset_x) << zoom->scale : 0;
+  const uint32_t screen_y = (y >= zoom->offset_y) ? (y - zoom->offset_y) << zoom->scale : 0;
+
+  *out_x = min(screen_x, zoom->display_width);
+  *out_y = min(screen_y, zoom->display_height);
 }
 
 void display_zoom_handler_screen_to_image(
