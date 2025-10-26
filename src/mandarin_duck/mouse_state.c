@@ -19,8 +19,9 @@ void mouse_state_copy(MouseState* dst, MouseState* src) {
 void mouse_state_reset_motion(MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
-  mouse_state->x_motion = 0.0f;
-  mouse_state->y_motion = 0.0f;
+  mouse_state->x_motion     = 0.0f;
+  mouse_state->y_motion     = 0.0f;
+  mouse_state->wheel_motion = 0.0f;
 }
 
 void mouse_state_step_phase(MouseState* mouse_state) {
@@ -77,7 +78,12 @@ void mouse_state_update_button(MouseState* mouse_state, SDL_MouseButtonEvent sdl
 void mouse_state_update_wheel(MouseState* mouse_state, SDL_MouseWheelEvent sdl_event) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
-  MD_UNUSED(sdl_event);
+  float mouse_wheel_update = sdl_event.y;
+
+  if (sdl_event.direction == SDL_MOUSEWHEEL_FLIPPED)
+    mouse_wheel_update = -mouse_wheel_update;
+
+  mouse_state->wheel_motion += mouse_wheel_update;
 }
 
 void mouse_state_destroy(MouseState** mouse_state) {

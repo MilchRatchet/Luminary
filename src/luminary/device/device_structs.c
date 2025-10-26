@@ -20,7 +20,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->width  = settings->width << settings->supersampling;
   device_settings->height = settings->height << settings->supersampling;
 
-  if (settings->region_width == 1.0f && settings->region_height == 1.0f) {
+  if (settings->region_width >= 1.0f && settings->region_height >= 1.0f) {
     device_settings->window_x      = 0;
     device_settings->window_y      = 0;
     device_settings->window_width  = device_settings->width;

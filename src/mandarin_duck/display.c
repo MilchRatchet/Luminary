@@ -25,6 +25,9 @@ static void _display_handle_resize(Display* display) {
   display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
   display->buffer      = display->sdl_surface->pixels;
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
+
+  render_region_handler_set_display_size(display->region, display->width, display->height);
+  display_zoom_handler_set_display_size(display->zoom_handler, display->width, display->height);
 }
 
 static void _display_handle_display_change(Display* display) {
@@ -67,13 +70,35 @@ static void _display_handle_display_change(Display* display) {
 }
 
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
-  uint8_t* buffer = image.buffer;
+  if (display->zoom_handler->scale == 0) {
+    uint8_t* buffer = image.buffer;
 
-  const uint32_t width  = (display->width < image.width) ? display->width : image.width;
-  const uint32_t height = (display->height < image.height) ? display->height : image.height;
+    const uint32_t width  = (display->width < image.width) ? display->width : image.width;
+    const uint32_t height = (display->height < image.height) ? display->height : image.height;
 
-  for (uint32_t y = 0; y < height; y++) {
-    memcpy(display->buffer + y * display->pitch, buffer + y * image.ld * sizeof(LuminaryARGB8), sizeof(LuminaryARGB8) * width);
+    for (uint32_t y = 0; y < height; y++) {
+      memcpy(display->buffer + y * display->pitch, buffer + y * image.ld * sizeof(LuminaryARGB8), sizeof(LuminaryARGB8) * width);
+    }
+
+    return;
+  }
+
+  const uint32_t scale        = display->zoom_handler->scale;
+  const uint32_t src_offset_x = display->zoom_handler->offset_x;
+  const uint32_t src_offset_y = display->zoom_handler->offset_y;
+
+  const LuminaryARGB8* src = (const LuminaryARGB8*) image.buffer;
+
+  for (uint32_t y = 0; y < display->height; y++) {
+    const LuminaryARGB8* src_row = src + ((y >> scale) + src_offset_y) * image.ld;
+    LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
+
+    for (uint32_t x = 0; x < display->width; x++) {
+      const LuminaryARGB8* src_element = src_row + ((x >> scale) + src_offset_x);
+      LuminaryARGB8* dst_element       = dst_row + x;
+
+      *dst_element = *src_element;
+    }
   }
 }
 
@@ -92,12 +117,23 @@ static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const 
   bool mouse_hovers_background = false;
   user_interface_mouse_hovers_background(display->ui, display, &mouse_hovers_background);
 
-  display->mouse_state->x = prev_mouse_x;
-  display->mouse_state->y = prev_mouse_y;
+  if (mouse_hovers_background == false) {
+    display->mouse_state->x = prev_mouse_x;
+    display->mouse_state->y = prev_mouse_y;
+  }
 
-  const bool alt_down = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+  const bool alt_down         = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+  const bool ctrl_down        = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
+  const bool right_mouse_down = display->mouse_state->right_down;
 
-  return (mouse_hovers_background && !alt_down && !display->is_maximized) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+  bool is_draggable = true;
+  is_draggable &= mouse_hovers_background;
+  is_draggable &= alt_down == false;
+  is_draggable &= ctrl_down == false;
+  is_draggable &= right_mouse_down == false;
+  is_draggable &= display->is_maximized == false;
+
+  return (is_draggable) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
 }
 
 static void _display_set_hittest(Display* display, bool enable) {
@@ -149,9 +185,6 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
 
   SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
-  _display_handle_display_change(display);
-  _display_handle_resize(display);
-
   keyboard_state_create(&display->keyboard_state);
   mouse_state_create(&display->mouse_state);
   camera_handler_create(&display->camera_handler);
@@ -159,6 +192,15 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   ui_renderer_create(&display->ui_renderer);
   text_renderer_create(&display->text_renderer);
   render_region_create(&display->region);
+  display_zoom_handler_create(&display->zoom_handler);
+
+  _display_handle_display_change(display);
+  _display_handle_resize(display);
+
+  // We have gathered the screen and window sizes, now pretend that we changed displays again to ensure
+  // that the window is within the bounds and is centered.
+  _display_handle_display_change(display);
+  SDL_SetWindowPosition(display->sdl_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
   display->selected_cursor = SDL_SYSTEM_CURSOR_DEFAULT;
   for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
@@ -352,8 +394,14 @@ static void _display_set_default_cursor(Display* display) {
 static void _display_query_pixel_info(Display* display, LuminaryHost* host, float request_x, float request_y) {
   MD_CHECK_NULL_ARGUMENT(display);
 
-  const float rel_x = request_x / display->width;
-  const float rel_y = request_y / display->height;
+  const uint32_t screen_x = (uint32_t) fmaxf(request_x, 0.0f);
+  const uint32_t screen_y = (uint32_t) fmaxf(request_y, 0.0f);
+
+  uint32_t image_x, image_y;
+  display_zoom_handler_screen_to_image(display->zoom_handler, screen_x, screen_y, &image_x, &image_y);
+
+  const float rel_x = image_x / ((float) display->width);
+  const float rel_y = image_y / ((float) display->height);
 
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
@@ -365,8 +413,8 @@ static void _display_query_pixel_info(Display* display, LuminaryHost* host, floa
 
   LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &result));
 
-  display->reference_x = request_x;
-  display->reference_y = request_y;
+  display->reference_x = screen_x;
+  display->reference_y = screen_y;
 
   display->awaiting_pixel_query_result = !result.pixel_query_is_valid;
 
@@ -490,25 +538,10 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
       if (display->keyboard_state->keys[SDL_SCANCODE_3].phase == KEY_PHASE_PRESSED) {
         display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
       }
-
-      if (display->keyboard_state->keys[SDL_SCANCODE_4].phase == KEY_PHASE_PRESSED) {
-        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_RENDER_REGION);
-      }
     }
 
-    if (ui_status.received_hover || ui_status.received_mouse_action) {
-      switch (display->mouse_mode) {
-        case DISPLAY_MOUSE_MODE_DEFAULT:
-        case DISPLAY_MOUSE_MODE_SELECT:
-        case DISPLAY_MOUSE_MODE_FOCUS:
-        default:
-          break;
-        case DISPLAY_MOUSE_MODE_RENDER_REGION:
-          render_region_remove_focus(display->region, host);
-          break;
-      }
-    }
-    else {
+    if (
+      (ui_status.received_hover == false) && (ui_status.received_mouse_action == false) && (ui_status.received_keyboard_action == false)) {
       switch (display->mouse_mode) {
         case DISPLAY_MOUSE_MODE_DEFAULT:
         default:
@@ -516,8 +549,9 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             const bool left_pressed  = display->mouse_state->phase == MOUSE_PHASE_PRESSED;
             const bool right_pressed = display->mouse_state->right_phase == MOUSE_PHASE_PRESSED;
             const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+            const bool ctrl_down     = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
 
-            if ((left_pressed || right_pressed) && alt_down) {
+            if ((left_pressed || right_pressed) && alt_down && (ctrl_down == false)) {
               _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
 
               if (display->move_pixel_data.pixel_query_is_valid) {
@@ -529,11 +563,12 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
             const bool left_pressed  = display->mouse_state->down;
             const bool right_pressed = display->mouse_state->right_down;
             const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
+            const bool ctrl_down     = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
 
             const bool cond0 = (display->camera_handler->mode == CAMERA_MODE_ORBIT && !left_pressed);
             const bool cond1 = (display->camera_handler->mode == CAMERA_MODE_ZOOM && !right_pressed);
 
-            if (cond0 || cond1 || !alt_down) {
+            if (cond0 || cond1 || !alt_down || ctrl_down) {
               display->active_camera_movement = !display->show_ui;
               display_set_mouse_visible(display, true);
 
@@ -546,9 +581,6 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
           if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
             _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
           }
-          break;
-        case DISPLAY_MOUSE_MODE_RENDER_REGION:
-          render_region_handle_inputs(display->region, display, host, display->mouse_state);
           break;
       }
     }
@@ -570,6 +602,11 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
 
   if (display->active_camera_movement) {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
+  }
+
+  if (ui_status.received_keyboard_action == false) {
+    display_zoom_handler_update(display->zoom_handler, display->mouse_state);
+    render_region_handle_inputs(display->region, display, host, display->mouse_state, display->keyboard_state);
   }
 }
 
@@ -750,6 +787,7 @@ void display_destroy(Display** display) {
   ui_renderer_destroy(&(*display)->ui_renderer);
   text_renderer_destroy(&(*display)->text_renderer);
   render_region_destroy(&(*display)->region);
+  display_zoom_handler_destroy(&(*display)->zoom_handler);
 
   LUM_FAILURE_HANDLE(host_free(display));
 

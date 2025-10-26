@@ -286,6 +286,9 @@ static void _ui_renderer_render_rounded_box(
 
   const uint32_t shape_mask_half_cols = shape_mask_half_size >> UIRendererWorkSizeStrideLog[work_size];
 
+  if (cols < shape_mask_half_cols)
+    return;
+
   UIRendererRoundedBoxArgs args = {
     .dst                  = dst + sizeof(LuminaryARGB8) * dst_x + dst_y * dst_ld,
     .src                  = src + sizeof(LuminaryARGB8) * src_x + src_y * src_ld,

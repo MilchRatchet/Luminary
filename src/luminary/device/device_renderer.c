@@ -637,7 +637,7 @@ LuminaryResult device_renderer_get_tile_count(
 
   uint32_t width;
   uint32_t height;
-  __FAILURE_HANDLE(device_get_internal_resolution(device, &width, &height));
+  __FAILURE_HANDLE(device_get_internal_render_resolution(device, &width, &height));
 
   const uint32_t internal_width_this_sample  = (width + (1 << undersampling_stage) - 1) >> undersampling_stage;
   const uint32_t internal_height_this_sample = (height + (1 << undersampling_stage) - 1) >> undersampling_stage;

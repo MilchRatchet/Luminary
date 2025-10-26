@@ -198,9 +198,7 @@ void user_interface_render(UserInterface* ui, Display* display, WindowVisibility
     ui_renderer_render_crosshair(display->ui_renderer, display, display->reference_x, display->reference_y);
   }
 
-  if (display->mouse_mode == DISPLAY_MOUSE_MODE_RENDER_REGION) {
-    render_region_render(display->region, display, display->ui_renderer);
-  }
+  render_region_render(display->region, display, display->ui_renderer);
 
   uint32_t num_windows;
   LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &num_windows));

@@ -52,10 +52,13 @@ LUMINARY_KERNEL void tasks_create() {
 
   const uint32_t undersampling_scale = 1 << undersampling_stage;
 
-  const uint32_t undersampling_width  = (device.settings.width + (1 << undersampling_stage) - 1) >> undersampling_stage;
-  const uint32_t undersampling_height = (device.settings.height + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t undersampling_width  = (device.settings.window_width + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t undersampling_height = (device.settings.window_height + (1 << undersampling_stage) - 1) >> undersampling_stage;
 
   const uint32_t amount = undersampling_width * undersampling_height;
+
+  const uint32_t window_offset_x = (device.settings.window_x >> undersampling_stage) << undersampling_stage;
+  const uint32_t window_offset_y = (device.settings.window_y >> undersampling_stage) << undersampling_stage;
 
   const uint32_t num_threads    = NUM_THREADS;
   const uint32_t tasks_per_tile = device.config.num_tasks_per_thread * num_threads;
@@ -63,24 +66,27 @@ LUMINARY_KERNEL void tasks_create() {
   const uint32_t end_pixel      = min(amount, start_pixel + tasks_per_tile);
 
   for (uint32_t undersampling_pixel = start_pixel; undersampling_pixel < end_pixel; undersampling_pixel += num_threads) {
-    uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
-    uint16_t undersampling_x = (uint16_t) (undersampling_pixel - undersampling_y * undersampling_width);
+    uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
+    uint16_t x = (uint16_t) (undersampling_pixel - y * undersampling_width);
 
     if (undersampling_scale > 1) {
-      undersampling_x *= undersampling_scale;
-      undersampling_y *= undersampling_scale;
+      x *= undersampling_scale;
+      y *= undersampling_scale;
 
-      undersampling_x += (undersampling_iteration & 0b01) ? 0 : undersampling_scale >> 1;
-      undersampling_y += (undersampling_iteration & 0b10) ? 0 : undersampling_scale >> 1;
+      x += (undersampling_iteration & 0b01) ? 0 : undersampling_scale >> 1;
+      y += (undersampling_iteration & 0b10) ? 0 : undersampling_scale >> 1;
     }
 
-    if (undersampling_x >= device.settings.width || undersampling_y >= device.settings.height)
+    x += window_offset_x;
+    y += window_offset_y;
+
+    if (x >= device.settings.width || y >= device.settings.height)
       continue;
 
-    if (undersampling_x < device.settings.window_x || undersampling_x >= device.settings.window_x + device.settings.window_width)
+    if (x < device.settings.window_x || x >= device.settings.window_x + device.settings.window_width)
       continue;
 
-    if (undersampling_y < device.settings.window_y || undersampling_y >= device.settings.window_y + device.settings.window_height)
+    if (y < device.settings.window_y || y >= device.settings.window_y + device.settings.window_height)
       continue;
 
     ////////////////////////////////////////////////////////////////////
@@ -89,8 +95,8 @@ LUMINARY_KERNEL void tasks_create() {
 
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
-    task.index.x = undersampling_x;
-    task.index.y = undersampling_y;
+    task.index.x = x;
+    task.index.y = y;
 
     CameraSampleResult camera_result = camera_sample(task.index);
 
