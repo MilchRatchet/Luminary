@@ -162,7 +162,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
 // Light Processing
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION float lights_integrate_emission(
+LUMINARY_FUNCTION float lights_get_max_emission(
   const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2, const uint32_t microtriangle_id) {
   const DeviceTextureObject tex = load_texture_object(material.luminance_tex);
 
@@ -188,8 +188,7 @@ LUMINARY_FUNCTION float lights_integrate_emission(
 
   const float step_size = 1.0f / steps;
 
-  RGBF accumulator     = get_color(0.0f, 0.0f, 0.0f);
-  uint32_t texel_count = 0;
+  RGBF max_emission = get_color(0.0f, 0.0f, 0.0f);
 
   for (float a = 0.0f; a < 1.0f; a += step_size) {
     for (float b = 0.0f; a + b < 1.0f; b += step_size) {
@@ -200,15 +199,11 @@ LUMINARY_FUNCTION float lights_integrate_emission(
 
       const RGBF color = get_color(texel.x, texel.y, texel.z);
 
-      accumulator = add_color(accumulator, color);
-      texel_count++;
+      max_emission = max_color(max_emission, color);
     }
   }
 
-  if (texel_count == 0)
-    return 1.0f;
-
-  return color_importance(accumulator) / texel_count;
+  return color_importance(max_emission);
 }
 
 LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensity args) {
@@ -238,17 +233,15 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
 
-  const float microtriangle_intensity1 =
-    lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);
-  const float microtriangle_intensity2 =
-    lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 1);
+  const float microtriangle_max1 = lights_get_max_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);
+  const float microtriangle_max2 = lights_get_max_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 1);
 
-  const float sum_microtriangle_intensity = microtriangle_intensity1 + microtriangle_intensity2;
+  const float microtriangle_max = fmaxf(microtriangle_max1, microtriangle_max2);
 
-  const float sum_intensity = warp_reduce_sum(sum_microtriangle_intensity);
+  const float max_intensity = warp_reduce_max(microtriangle_max);
 
   if (microtriangle_id == 0) {
-    args.dst_intensities[light_id] = sum_intensity / LIGHT_NUM_MICROTRIANGLES;
+    args.dst_intensities[light_id] = max_intensity;
   }
 }
 
