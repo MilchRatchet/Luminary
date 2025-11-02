@@ -33,10 +33,12 @@ LUMINARY_KERNEL void particle_process_tasks() {
     // Direct Lighting Geometry
     ////////////////////////////////////////////////////////////////////
 
-    const uint32_t task_direct_lighting_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+    const uint32_t task_direct_lighting_base_address =
+      task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
     if (direct_lighting_geometry_is_allowed(task)) {
-      const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.index);
+      float light_tree_root_sum;
+      const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.index, light_tree_root_sum);
 
       task_direct_light_geo_store(task_direct_lighting_base_address, direct_light_geo_task);
     }

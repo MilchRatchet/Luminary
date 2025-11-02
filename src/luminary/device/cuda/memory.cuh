@@ -103,9 +103,10 @@ LUMINARY_FUNCTION DATA_TYPE load_generic(const void* src, uint32_t offset) {
 // Task State IO
 ////////////////////////////////////////////////////////////////////
 
+template <typename TYPE>
 LUMINARY_FUNCTION uint32_t
   task_address_impl(const uint32_t thread_id_in_warp, const uint32_t warp_id, const uint32_t task_id, const TaskStateBufferIndex index) {
-  constexpr uint32_t num_chunks = sizeof(DeviceTaskState) / sizeof(float4);
+  constexpr uint32_t num_chunks = sizeof(TYPE) / sizeof(float4);
 
   uint32_t base_address = 0;
   base_address += thread_id_in_warp;
@@ -117,19 +118,21 @@ LUMINARY_FUNCTION uint32_t
   return base_address;
 }
 
+template <typename TYPE = DeviceTaskState>
 LUMINARY_FUNCTION uint32_t task_arbitrary_warp_address(const uint32_t warp_offset, const TaskStateBufferIndex index) {
   const uint32_t thread_id_in_warp = warp_offset & WARP_SIZE_MASK;
   const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
   const uint32_t task_id           = warp_offset >> WARP_SIZE_LOG;
 
-  return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
+  return task_address_impl<TYPE>(thread_id_in_warp, warp_id, task_id, index);
 }
 
+template <typename TYPE = DeviceTaskState>
 LUMINARY_FUNCTION uint32_t task_get_base_address(const uint32_t task_id, const TaskStateBufferIndex index) {
   const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
   const uint32_t warp_id           = THREAD_ID >> WARP_SIZE_LOG;
 
-  return task_address_impl(thread_id_in_warp, warp_id, task_id, index);
+  return task_address_impl<TYPE>(thread_id_in_warp, warp_id, task_id, index);
 }
 
 template <typename DATA_TYPE, typename LOAD_TYPE>
@@ -197,6 +200,10 @@ LUMINARY_FUNCTION DeviceTaskThroughput task_throughput_load(const uint32_t base_
   return load_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput));
 }
 
+LUMINARY_FUNCTION DeviceTaskMIS task_mis_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskMIS, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, mis));
+}
+
 // DeviceTask
 
 LUMINARY_FUNCTION void task_store(const uint32_t base_address, const DeviceTask data) {
@@ -231,8 +238,10 @@ LUMINARY_FUNCTION void task_throughput_record_store(const uint32_t base_address,
   store_task_state<PackedRecord, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.record), data);
 }
 
-LUMINARY_FUNCTION void task_throughput_mis_payload_store(const uint32_t base_address, const PackedMISPayload data) {
-  store_task_state<PackedMISPayload, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.payload), data);
+// DeviceTaskMIS
+
+LUMINARY_FUNCTION void task_mis_store(const uint32_t base_address, const DeviceTaskMIS data) {
+  store_task_state<DeviceTaskMIS, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, mis), data);
 }
 
 // DeviceTaskDirectLight
@@ -323,32 +332,36 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
 // Beauty Buffer IO
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, const bool mode_set, RGBF* buffer) {
+template <bool MODE_SET>
+LUMINARY_FUNCTION void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, RGBF* buffer) {
   RGBF output = beauty;
-  if (!mode_set) {
+  if constexpr (MODE_SET == false) {
     output = add_color(beauty, load_RGBF(buffer + pixel));
   }
   store_RGBF(buffer, pixel, output);
 }
 
-LUMINARY_FUNCTION void write_beauty_buffer_direct(const RGBF beauty, const uint32_t pixel, const bool mode_set = false) {
-  write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_direct_buffer);
+template <bool MODE_SET = false>
+LUMINARY_FUNCTION void write_beauty_buffer_direct(const RGBF beauty, const uint32_t pixel) {
+  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, device.ptrs.frame_direct_buffer);
 }
 
-LUMINARY_FUNCTION void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t pixel, const bool mode_set = false) {
-  write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_indirect_buffer);
+template <bool MODE_SET = false>
+LUMINARY_FUNCTION void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t pixel) {
+  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, device.ptrs.frame_indirect_buffer);
 }
 
-LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state, const bool mode_set = false) {
+template <bool MODE_SET = false>
+LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state) {
   const bool is_direct = state & STATE_FLAG_DELTA_PATH;
 
   RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
 
-  write_beauty_buffer_impl(beauty, pixel, mode_set, buffer);
+  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, buffer);
 }
 
 LUMINARY_FUNCTION void write_beauty_buffer_forced(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer(beauty, pixel, STATE_FLAG_DELTA_PATH, true);
+  write_beauty_buffer<true>(beauty, pixel, STATE_FLAG_DELTA_PATH);
 }
 
 #ifndef NO_LUMINARY_BVH

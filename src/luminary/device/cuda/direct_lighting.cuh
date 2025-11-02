@@ -337,8 +337,14 @@ LUMINARY_FUNCTION bool direct_lighting_bridges_is_allowed(const MaterialContextV
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION DeviceTaskDirectLightGeo
+  direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel, float& light_tree_root_sum) {
   LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
+
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    light_tree_root_sum = sample.light_tree_root_sum;
+  else
+    light_tree_root_sum = 0.0f;
 
   ////////////////////////////////////////////////////////////////////
   // Volume transmittance

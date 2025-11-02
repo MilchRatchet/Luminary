@@ -162,10 +162,20 @@ struct float4 {
 typedef uint16_t BFloat16;
 typedef uint16_t UnsignedBFloat16;
 typedef uint2 PackedRecord;
-typedef uint2 PackedMISPayload;
 typedef uint2 PackedRayDirection;
+typedef uint2 PackedPosition;
+typedef uint32_t PackedNormal;
+typedef uint32_t PackedUV;
 
 #define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
+
+struct PackedMISPayload {
+  PackedPosition origin;
+  UnsignedBFloat16 sampling_probability;
+  UnsignedBFloat16 light_tree_root_sum;
+  uint32_t padding;
+} typedef PackedMISPayload;
+LUM_STATIC_SIZE_ASSERT(PackedMISPayload, 0x10);
 
 struct Mat3x3 {
   float f11;
@@ -298,8 +308,9 @@ struct DeviceLightTreeRootSection {
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
 struct MISPayload {
-  float sampling_probability;
   vec3 origin;
+  float light_tree_root_sum;
+  float sampling_probability;
 } typedef MISPayload;
 
 struct DeviceLightSceneData {
@@ -345,16 +356,22 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 
 struct DeviceTaskThroughput {
   PackedRecord record;
-  PackedMISPayload payload;
+  uint2 padding;
 } typedef DeviceTaskThroughput;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
+
+struct DeviceTaskMIS {
+  PackedMISPayload payload;
+} typedef DeviceTaskMIS;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskMIS, 0x10);
 
 struct DeviceTaskState {
   DeviceTask task;
   DeviceTaskTrace trace_result;
   DeviceTaskThroughput throughput;
+  DeviceTaskMIS mis;
 } typedef DeviceTaskState;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
+LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x50);
 
 ////////////////////////////////////////////////////////////////////
 // Task Direct Lighting

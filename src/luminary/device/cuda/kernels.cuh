@@ -143,8 +143,12 @@ LUMINARY_KERNEL void tasks_create() {
     // Task Throughput
     ////////////////////////////////////////////////////////////////////
 
-    // MISPayload does not need to be initialized because we allow emission directly.
     task_throughput_record_store(task_base_address, record_pack(camera_result.weight));
+
+    ////////////////////////////////////////////////////////////////////
+    // Task MIS
+    ////////////////////////////////////////////////////////////////////
+    // MISPayload does not need to be initialized because we allow emission directly.
   }
 
   device.ptrs.trace_counts[THREAD_ID] = task_count;
@@ -242,6 +246,7 @@ LUMINARY_KERNEL void tasks_sort() {
     DeviceTask task;
     DeviceTaskTrace trace;
     DeviceTaskThroughput throughput;
+    DeviceTaskMIS mis;
     ShadingTaskIndex index = SHADING_TASK_INDEX_INVALID;
 
     if (thread_predicate) {
@@ -250,6 +255,7 @@ LUMINARY_KERNEL void tasks_sort() {
       task       = task_load(src_task_base_address);
       trace      = task_trace_load(src_task_base_address);
       throughput = task_throughput_load(src_task_base_address);
+      mis        = task_mis_load(src_task_base_address);
 
       index = shading_task_index_from_instance_id(trace.handle.instance_id);
     }
@@ -270,6 +276,7 @@ LUMINARY_KERNEL void tasks_sort() {
     task_store(dst_task_base_address, task);
     task_trace_store(dst_task_base_address, trace);
     task_throughput_store(dst_task_base_address, throughput);
+    task_mis_store(dst_task_base_address, mis);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = 0;

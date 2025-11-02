@@ -44,31 +44,32 @@ LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContextGeometry ctx, co
   return gi_pdf;
 }
 
-LUMINARY_FUNCTION float mis_compute_weight_base(const float gi_pdf, const float solid_angle, const float power, const float dist_sq) {
-  const float dl_pdf =
-    LIGHT_GEO_MAX_SAMPLES * (1.0f / solid_angle) * (power / dist_sq) * (1.0f / device.ptrs.light_scene_data->total_power);
+LUMINARY_FUNCTION float mis_compute_weight_base(
+  const float gi_pdf, const float solid_angle, const float power, const float dist_sq, const float light_tree_root_sum) {
+  const float dl_pdf = LIGHT_GEO_MAX_SAMPLES * (1.0f / solid_angle) * (power / dist_sq) * (1.0f / light_tree_root_sum);
 
   return gi_pdf / (gi_pdf + dl_pdf);
 }
 
-LUMINARY_FUNCTION float mis_compute_weight_gi(const float gi_pdf, const float solid_angle, const float power, const float dist_sq) {
+LUMINARY_FUNCTION float mis_compute_weight_gi(
+  const float gi_pdf, const float solid_angle, const float power, const float dist_sq, const float light_tree_root_sum) {
   if (gi_pdf == MIS_FORCE_FULL_GI)
     return 1.0f;
 
-  return mis_compute_weight_base(gi_pdf, solid_angle, power, dist_sq);
+  return mis_compute_weight_base(gi_pdf, solid_angle, power, dist_sq, light_tree_root_sum);
 }
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION float mis_compute_weight_dl(
-  const MaterialContext<TYPE> ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angl,
-  const bool is_refractione) {
+  const MaterialContext<TYPE> ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angle,
+  const bool is_refraction, const float light_tree_root_sum) {
   return 1.0f;
 }
 
 template <>
 LUMINARY_FUNCTION float mis_compute_weight_dl(
   const MaterialContextGeometry ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angle,
-  const bool is_refraction) {
+  const bool is_refraction, const float light_tree_root_sum) {
   if (device.state.depth == device.settings.max_ray_depth)
     return 1.0f;
 
@@ -80,12 +81,14 @@ LUMINARY_FUNCTION float mis_compute_weight_dl(
   const float dist_sq       = dot_product(diff_to_center, diff_to_center);
   const float gi_pdf        = mis_compute_gi_pdf(ctx, L, is_refraction);
 
-  return 1.0f - mis_compute_weight_base(gi_pdf, solid_angle, power, dist_sq);
+  return 1.0f - mis_compute_weight_base(gi_pdf, solid_angle, power, dist_sq, light_tree_root_sum);
 }
 
-LUMINARY_FUNCTION MISPayload mis_get_payload(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
+LUMINARY_FUNCTION MISPayload
+  mis_get_payload(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction, const float light_tree_root_sum) {
   MISPayload mis_data;
   mis_data.origin               = ctx.position;
+  mis_data.light_tree_root_sum  = light_tree_root_sum;
   mis_data.sampling_probability = mis_compute_gi_pdf(ctx, L, is_refraction);
 
   return mis_data;

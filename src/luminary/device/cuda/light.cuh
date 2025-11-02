@@ -48,7 +48,8 @@ LUMINARY_FUNCTION TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(con
 template <MaterialType TYPE>
 LUMINARY_FUNCTION void light_evaluate_candidate(
   const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
-  const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<TYPE>& result) {
+  const float tree_sampling_weight, const uint32_t output_id, const float tree_root_sum, RISReservoir& reservoir,
+  LightSampleResult<TYPE>& result) {
   const float2 ray_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_GEO::RAY + output_id, pixel);
 
   vec3 ray;
@@ -64,7 +65,7 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction);
+  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction, tree_root_sum);
   light_color            = scale_color(mul_color(light_color, bsdf_weight), mis_weight);
   const float target     = color_importance(light_color);
 
@@ -81,7 +82,8 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
 template <>
 LUMINARY_FUNCTION void light_evaluate_candidate<MATERIAL_VOLUME>(
   const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
-  const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<MATERIAL_VOLUME>& result) {
+  const float tree_sampling_weight, const uint32_t output_id, const float tree_root_sum, RISReservoir& reservoir,
+  LightSampleResult<MATERIAL_VOLUME>& result) {
   float2 target_and_weight;
   LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, light_id, light_uv_packed, pixel, output_id, target_and_weight);
 
@@ -119,12 +121,16 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    light_evaluate_candidate(ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, reservoir, result);
+    light_evaluate_candidate(
+      ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, light_tree_work.root_sum, reservoir, result);
   }
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
   result.light_color = scale_color(result.light_color, sampling_weight);
+
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    result.light_tree_root_sum = light_tree_work.root_sum;
 
   return result;
 }

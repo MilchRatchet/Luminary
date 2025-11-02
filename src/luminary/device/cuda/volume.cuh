@@ -53,7 +53,8 @@ LUMINARY_KERNEL void volume_process_inscattering() {
     // Direct Lighting Geometry
     ////////////////////////////////////////////////////////////////////
 
-    const uint32_t task_direct_lighting_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+    const uint32_t task_direct_lighting_base_address =
+      task_get_base_address<DeviceTaskDirectLight>(i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
     if (direct_lighting_bridges_is_allowed(ctx)) {
       const DeviceTaskDirectLightBridges direct_light_bridges_task = direct_lighting_bridges_create_task(ctx, task.index);

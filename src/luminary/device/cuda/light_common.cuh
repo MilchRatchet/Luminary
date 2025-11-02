@@ -40,6 +40,15 @@ struct LightSampleResult {
 };
 
 template <>
+struct LightSampleResult<MATERIAL_GEOMETRY> {
+  uint32_t light_id;
+  vec3 ray;
+  RGBF light_color;
+  float dist;
+  float light_tree_root_sum;
+};
+
+template <>
 struct LightSampleResult<MATERIAL_VOLUME> {
   uint32_t light_id;
   RGBF light_color;

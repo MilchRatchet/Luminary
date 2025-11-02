@@ -270,60 +270,6 @@ LUMINARY_FUNCTION UV uv_scale(const UV a, const float b) {
   return uv;
 }
 
-LUMINARY_FUNCTION UV uv_unpack(const uint32_t data) {
-  UV uv;
-
-  uv.u = __uint_as_float(data & 0xFFFF0000);
-  uv.v = __uint_as_float(data << 16);
-
-  return uv;
-}
-
-// Octahedron decoding, for example: https://www.shadertoy.com/view/clXXD8
-LUMINARY_FUNCTION vec3 normal_unpack(const uint32_t data) {
-  float x = (data & 0xFFFF) * (1.0f / 0xFFFF);
-  float y = (data >> 16) * (1.0f / 0xFFFF);
-
-  x = (x * 2.0f) - 1.0f;
-  y = (y * 2.0f) - 1.0f;
-
-  vec3 normal   = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
-  const float t = __saturatef(-normal.z);
-
-  normal.x += (normal.x >= 0.0f) ? -t : t;
-  normal.y += (normal.y >= 0.0f) ? -t : t;
-
-  return normalize_vector(normal);
-}
-
-LUMINARY_FUNCTION uint32_t normal_pack(const vec3 normal) {
-  float x = normal.x;
-  float y = normal.y;
-  float z = normal.z;
-
-  const float recip_norm = 1.0f / (fabsf(x) + fabsf(y) + fabsf(z));
-
-  x *= recip_norm;
-  y *= recip_norm;
-  z *= recip_norm;
-
-  const float t = fmaxf(fminf(-z, 1.0f), 0.0f);
-
-  x += (x >= 0.0f) ? t : -t;
-  y += (y >= 0.0f) ? t : -t;
-
-  x = fmaxf(fminf(x, 1.0f), -1.0f);
-  y = fmaxf(fminf(y, 1.0f), -1.0f);
-
-  x = (x + 1.0f) * 0.5f;
-  y = (y + 1.0f) * 0.5f;
-
-  const uint32_t x_u16 = (uint32_t) (x * 0xFFFF + 0.5f);
-  const uint32_t y_u16 = (uint32_t) (y * 0xFFFF + 0.5f);
-
-  return (y_u16 << 16) | x_u16;
-}
-
 /*
  * Uses a orthonormal basis which is built as described in
  * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
@@ -1662,26 +1608,6 @@ LUMINARY_FUNCTION PackedRecord record_pack(const RGBF record) {
   return packed;
 }
 
-LUMINARY_FUNCTION MISPayload mis_payload_unpack(const PackedMISPayload packed) {
-  MISPayload payload;
-  payload.origin.x             = bfloat_unpack(packed.x & 0xFFFF);
-  payload.origin.y             = bfloat_unpack(packed.x >> 16);
-  payload.origin.z             = bfloat_unpack(packed.y & 0xFFFF);
-  payload.sampling_probability = unsigned_bfloat_unpack(packed.y >> 16);
-
-  return payload;
-}
-
-LUMINARY_FUNCTION PackedMISPayload mis_payload_pack(const MISPayload payload) {
-  PackedMISPayload packed;
-  packed.x = (uint32_t) bfloat_pack(payload.origin.x);
-  packed.x |= ((uint32_t) bfloat_pack(payload.origin.y)) << 16;
-  packed.y = (uint32_t) bfloat_pack(payload.origin.z);
-  packed.y |= ((uint32_t) unsigned_bfloat_pack(payload.sampling_probability)) << 16;
-
-  return packed;
-}
-
 LUMINARY_FUNCTION vec3 ray_unpack(const PackedRayDirection packed) {
   float x = packed.x * (1.0f / 0xFFFFFFFF);
   float y = packed.y * (1.0f / 0xFFFFFFFF);
@@ -1727,6 +1653,27 @@ LUMINARY_FUNCTION PackedRayDirection ray_pack(const vec3 ray) {
   return packed;
 }
 
+LUMINARY_FUNCTION vec3 position_unpack(const PackedPosition packed) {
+  const float x = __uint_as_float((packed.x & 0x1FFFFF) << 11);
+  const float z = __uint_as_float((packed.y & 0x1FFFFF) << 11);
+
+  const float y = __uint_as_float(((packed.x & 0xFFE00000) >> 11) | (packed.y & 0xFFE00000));
+
+  return get_vector(x, y, z);
+}
+
+LUMINARY_FUNCTION PackedPosition position_pack(const vec3 pos) {
+  const uint32_t x = __float_as_uint(pos.x) >> 11;
+  const uint32_t y = __float_as_uint(pos.y) >> 10;
+  const uint32_t z = __float_as_uint(pos.z) >> 11;
+
+  PackedPosition packed;
+  packed.x = x | ((y & 0x0007FF) << 21);
+  packed.y = z | ((y & 0x3FF800) << 10);
+
+  return packed;
+}
+
 LUMINARY_FUNCTION Quaternion16 quaternion_pack(const Quaternion q) {
   // We use the inverse of the quaternion so that it matches with our Quaternion to Matrix conversion for the OptiX BVH.
   Quaternion16 dst;
@@ -1744,6 +1691,78 @@ LUMINARY_FUNCTION float normed_float_unpack(const uint16_t data) {
 
 LUMINARY_FUNCTION float unsigned_float_unpack(const uint16_t data) {
   return __uint_as_float(data << 15);
+}
+
+LUMINARY_FUNCTION UV uv_unpack(const PackedUV data) {
+  UV uv;
+
+  uv.u = __uint_as_float(data & 0xFFFF0000);
+  uv.v = __uint_as_float(data << 16);
+
+  return uv;
+}
+
+// Octahedron decoding, for example: https://www.shadertoy.com/view/clXXD8
+LUMINARY_FUNCTION vec3 normal_unpack(const PackedNormal data) {
+  float x = (data & 0xFFFF) * (1.0f / 0xFFFF);
+  float y = (data >> 16) * (1.0f / 0xFFFF);
+
+  x = (x * 2.0f) - 1.0f;
+  y = (y * 2.0f) - 1.0f;
+
+  vec3 normal   = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
+  const float t = __saturatef(-normal.z);
+
+  normal.x += (normal.x >= 0.0f) ? -t : t;
+  normal.y += (normal.y >= 0.0f) ? -t : t;
+
+  return normalize_vector(normal);
+}
+
+LUMINARY_FUNCTION PackedNormal normal_pack(const vec3 normal) {
+  float x = normal.x;
+  float y = normal.y;
+  float z = normal.z;
+
+  const float recip_norm = 1.0f / (fabsf(x) + fabsf(y) + fabsf(z));
+
+  x *= recip_norm;
+  y *= recip_norm;
+  z *= recip_norm;
+
+  const float t = fmaxf(fminf(-z, 1.0f), 0.0f);
+
+  x += (x >= 0.0f) ? t : -t;
+  y += (y >= 0.0f) ? t : -t;
+
+  x = fmaxf(fminf(x, 1.0f), -1.0f);
+  y = fmaxf(fminf(y, 1.0f), -1.0f);
+
+  x = (x + 1.0f) * 0.5f;
+  y = (y + 1.0f) * 0.5f;
+
+  const uint32_t x_u16 = (uint32_t) (x * 0xFFFF + 0.5f);
+  const uint32_t y_u16 = (uint32_t) (y * 0xFFFF + 0.5f);
+
+  return (y_u16 << 16) | x_u16;
+}
+
+LUMINARY_FUNCTION MISPayload mis_payload_unpack(const PackedMISPayload packed) {
+  MISPayload payload;
+  payload.origin               = position_unpack(packed.origin);
+  payload.light_tree_root_sum  = unsigned_bfloat_unpack(packed.light_tree_root_sum);
+  payload.sampling_probability = bfloat_unpack(packed.sampling_probability);
+
+  return payload;
+}
+
+LUMINARY_FUNCTION PackedMISPayload mis_payload_pack(const MISPayload payload) {
+  PackedMISPayload packed;
+  packed.origin               = position_pack(payload.origin);
+  packed.light_tree_root_sum  = unsigned_bfloat_pack(payload.light_tree_root_sum);
+  packed.sampling_probability = bfloat_pack(payload.sampling_probability);
+
+  return packed;
 }
 
 #endif /* CU_MATH_H */

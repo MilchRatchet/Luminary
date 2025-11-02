@@ -154,7 +154,12 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(GeometryContextCr
       const vec3 diff_to_center = sub_vector(mis_payload.origin, light_center);
       const float dist_sq       = dot_product(diff_to_center, diff_to_center);
 
-      emission = scale_color(emission, mis_compute_weight_gi(mis_payload.sampling_probability, solid_angle, power, dist_sq));
+      const float gi_pdf              = mis_payload.sampling_probability;
+      const float light_tree_root_sum = mis_payload.light_tree_root_sum;
+
+      const float mis_weight = mis_compute_weight_gi(gi_pdf, solid_angle, power, dist_sq, light_tree_root_sum);
+
+      emission = scale_color(emission, mis_weight);
     }
   }
 

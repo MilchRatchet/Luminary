@@ -32,7 +32,8 @@ extern "C" __global__ void __raygen__optix() {
 
   MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
 
-  const uint32_t direct_light_task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+  const uint32_t direct_light_task_base_address =
+    task_get_base_address<DeviceTaskDirectLight>(task_id, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
   RGBF accumulated_light = splat_color(0.0f);
 
