@@ -251,7 +251,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   }
 
   LightTreeWork work;
-  work.root_sum = sum * (1.0f / 0xFFFF);
+  work.root_sum = sum * (bfloat_unpack(header.power_normalization) / 0xFFFF);
 
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {

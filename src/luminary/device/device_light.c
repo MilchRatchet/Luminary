@@ -913,8 +913,9 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
   const float compression_z = 1.0f / exp2f(header.exp_z);
   const float compression_v = 1.0f / exp2f(header.exp_std_dev);
 
-  header.num_sections    = (child_count + LIGHT_TREE_MAX_CHILDREN_PER_SECTION - 1) / LIGHT_TREE_MAX_CHILDREN_PER_SECTION;
-  header.num_root_lights = num_lights;
+  header.num_sections        = (child_count + LIGHT_TREE_MAX_CHILDREN_PER_SECTION - 1) / LIGHT_TREE_MAX_CHILDREN_PER_SECTION;
+  header.num_root_lights     = num_lights;
+  header.power_normalization = device_pack_float(max_power, DEVICE_PACK_FLOAT_ROUNDING_MODE_CEIL);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   info_message("======= ROOT =======");
