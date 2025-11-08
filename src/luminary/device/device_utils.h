@@ -299,11 +299,6 @@ struct DeviceLightTreeRootSection {
 } typedef DeviceLightTreeRootSection;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
-struct DeviceLightSceneData {
-  float total_power;
-  uint32_t num_lights;
-} typedef DeviceLightSceneData;
-
 #define MAX_NUM_INDIRECT_BUCKETS 3
 
 ////////////////////////////////////////////////////////////////////
@@ -443,7 +438,6 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
-  DEVICE const DeviceLightSceneData* LUM_RESTRICT light_scene_data;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;

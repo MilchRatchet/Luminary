@@ -112,7 +112,6 @@ struct LightTree {
   void* bvh_vertex_buffer_data;
   size_t bvh_vertex_buffer_size;
   uint32_t light_count;
-  DeviceLightSceneData scene_data;
 } typedef LightTree;
 
 LuminaryResult light_tree_create(LightTree** tree);

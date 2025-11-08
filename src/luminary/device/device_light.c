@@ -2193,7 +2193,6 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(LightTreeFragment) * work->fragments_count));
 
   uint32_t fragment_offset = 0;
-  float total_power        = 0.0f;
 
   for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
     LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
@@ -2204,38 +2203,10 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
     uint32_t num_fragments;
     __FAILURE_HANDLE(array_get_num_elements(instance->fragments, &num_fragments));
 
-    for (uint32_t fragment_id = 0; fragment_id < num_fragments; fragment_id++) {
-      const LightTreeFragment fragment = instance->fragments[fragment_id];
-
-      total_power += fragment.power;
-
-      work->fragments[fragment_offset + fragment_id] = fragment;
-    }
+    memcpy(work->fragments + fragment_offset, instance->fragments, num_fragments * sizeof(LightTreeFragment));
 
     fragment_offset += num_fragments;
   }
-
-  Vec128 mean = vec128_set_1(0.0f);
-
-  for (uint32_t fragment_id = 0; fragment_id < total_fragments; fragment_id++) {
-    const LightTreeFragment fragment = work->fragments[fragment_id];
-
-    mean = vec128_add(mean, vec128_scale(fragment.middle, fragment.power / total_power));
-  }
-
-  float sum_one_over_distance_sq = 0.0f;
-
-  for (uint32_t fragment_id = 0; fragment_id < total_fragments; fragment_id++) {
-    const LightTreeFragment fragment = work->fragments[fragment_id];
-
-    const Vec128 diff   = vec128_sub(fragment.middle, mean);
-    const float dist_sq = vec128_dot(diff, diff);
-
-    sum_one_over_distance_sq += (1.0f / dist_sq) * (fragment.power / total_power);
-  }
-
-  tree->scene_data.total_power = total_power * sum_one_over_distance_sq;
-  tree->scene_data.num_lights  = total_fragments;
 
   return LUMINARY_SUCCESS;
 }
