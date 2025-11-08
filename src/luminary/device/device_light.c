@@ -1583,12 +1583,6 @@ LuminaryResult light_tree_create(LightTree** tree) {
 
   __FAILURE_HANDLE(array_create(&(*tree)->integrator.tasks, sizeof(LightTreeIntegratorTask), 1024));
 
-  ////////////////////////////////////////////////////////////////////
-  // Optix BVH
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(optix_bvh_create(&(*tree)->optix_bvh));
-
   return LUMINARY_SUCCESS;
 }
 
@@ -2298,8 +2292,6 @@ LuminaryResult light_tree_build(LightTree* tree, Device* device) {
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
   __FAILURE_HANDLE(_light_tree_clear_work(&work));
 
-  __FAILURE_HANDLE(optix_bvh_light_build(tree->optix_bvh, device, tree));
-
   tree->build_id++;
 
   return LUMINARY_SUCCESS;
@@ -2365,8 +2357,6 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
       __FAILURE_HANDLE(array_destroy(&instance->fragments));
     }
   }
-
-  __FAILURE_HANDLE(optix_bvh_destroy(&(*tree)->optix_bvh));
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
 
