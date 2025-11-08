@@ -1234,6 +1234,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   TriangleHandle* tri_handle_map;
   __FAILURE_HANDLE(host_malloc(&tri_handle_map, sizeof(TriangleHandle) * work->fragments_count));
 
+  LightTreeBVHTriangle* bvh_triangles;
+  __FAILURE_HANDLE(host_malloc(&bvh_triangles, sizeof(LightTreeBVHTriangle) * work->fragments_count));
+
   for (uint32_t id = 0; id < work->fragments_count; id++) {
     const LightTreeFragment frag = work->fragments[id];
 
@@ -1245,6 +1248,7 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
     const TriangleHandle handle = (TriangleHandle) {.instance_id = frag.instance_id, .tri_id = triangle->tri_id};
 
     tri_handle_map[id] = handle;
+    bvh_triangles[id]  = instance->bvh_triangles[frag.instance_cache_tri_id];
   }
 
   // TODO: This is inefficient, I take the array data and turn it into generic memory.
@@ -1276,6 +1280,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
   tree->tri_handle_map_size = sizeof(TriangleHandle) * work->fragments_count;
   tree->tri_handle_map_data = (void*) tri_handle_map;
+
+  tree->bvh_vertex_buffer_size = sizeof(LightTreeBVHTriangle) * work->fragments_count;
+  tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
 
   tree->light_count = work->fragments_count;
 
@@ -1575,6 +1582,12 @@ LuminaryResult light_tree_create(LightTree** tree) {
   ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(array_create(&(*tree)->integrator.tasks, sizeof(LightTreeIntegratorTask), 1024));
+
+  ////////////////////////////////////////////////////////////////////
+  // Optix BVH
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(optix_bvh_create(&(*tree)->optix_bvh));
 
   return LUMINARY_SUCCESS;
 }
@@ -2023,6 +2036,10 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
     __FAILURE_HANDLE(array_destroy(&instance->fragments));
   }
 
+  if (instance->bvh_triangles) {
+    __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
+  }
+
   if (instance->mesh_id == MESH_ID_INVALID)
     return LUMINARY_SUCCESS;
 
@@ -2085,6 +2102,13 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.material_tri_id   = tri_id;
 
       __FAILURE_HANDLE(array_push(&instance->fragments, &fragment));
+
+      LightTreeBVHTriangle bvh_triangle;
+      bvh_triangle.vertex  = vertex;
+      bvh_triangle.vertex1 = vertex1;
+      bvh_triangle.vertex2 = vertex2;
+
+      __FAILURE_HANDLE(array_push(&instance->bvh_triangles, &bvh_triangle));
     }
   }
 
@@ -2237,6 +2261,11 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
     tree->tri_handle_map_size = 0;
   }
 
+  if (tree->bvh_vertex_buffer_data) {
+    __FAILURE_HANDLE(host_free(&tree->bvh_vertex_buffer_data));
+    tree->bvh_vertex_buffer_size = 0;
+  }
+
   return LUMINARY_SUCCESS;
 }
 
@@ -2265,6 +2294,8 @@ LuminaryResult light_tree_build(LightTree* tree, Device* device) {
   __FAILURE_HANDLE(_light_tree_debug_output(&work));
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
   __FAILURE_HANDLE(_light_tree_clear_work(&work));
+
+  __FAILURE_HANDLE(optix_bvh_light_build(tree->optix_bvh, device, tree));
 
   tree->build_id++;
 
@@ -2331,6 +2362,8 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
       __FAILURE_HANDLE(array_destroy(&instance->fragments));
     }
   }
+
+  __FAILURE_HANDLE(optix_bvh_destroy(&(*tree)->optix_bvh));
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
 

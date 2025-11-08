@@ -2,46 +2,20 @@
 #define CU_LUMINARY_MIS_H
 
 #include "bsdf_utils.cuh"
+#include "light_bsdf.cuh"
 #include "material.cuh"
 #include "utils.cuh"
 
 #define MIS_FORCE_FULL_GI (-1.0f)
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContext<TYPE> ctx, const vec3 L, const bool is_refraction) {
+LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContext<TYPE> ctx, const vec3 L) {
   return 0.0f;
 }
 
 template <>
-LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec3 L, const bool is_refraction) {
-  float gi_pdf;
-  if (is_refraction) {
-    const float refraction_index = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
-
-    const vec3 H = bsdf_normal_from_pair(L, ctx.V, refraction_index);
-
-    const float NdotH = dot_product(ctx.normal, H);
-    const float NdotV = dot_product(ctx.normal, ctx.V);
-    const float NdotL = dot_product(ctx.normal, L);
-    const float HdotV = dot_product(H, ctx.V);
-    const float HdotL = dot_product(H, L);
-
-    const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx);
-    const float roughness2 = roughness * roughness;
-    const float roughness4 = roughness2 * roughness2;
-
-    gi_pdf = bsdf_microfacet_refraction_pdf(ctx, roughness4, NdotH, NdotV, NdotL, HdotV, HdotL, refraction_index);
-  }
-  else {
-    const vec3 H = normalize_vector(add_vector(L, ctx.V));
-
-    const float NdotH = dot_product(ctx.normal, H);
-    const float NdotV = dot_product(ctx.normal, ctx.V);
-
-    gi_pdf = bsdf_microfacet_pdf(ctx, NdotH, NdotV);
-  }
-
-  return gi_pdf;
+LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContextGeometry ctx, const vec3 L) {
+  return light_bsdf_get_probability(ctx, L);
 }
 
 LUMINARY_FUNCTION float mis_compute_weight_base(
@@ -62,14 +36,14 @@ LUMINARY_FUNCTION float mis_compute_weight_gi(
 template <MaterialType TYPE>
 LUMINARY_FUNCTION float mis_compute_weight_dl(
   const MaterialContext<TYPE> ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angle,
-  const bool is_refraction, const float light_tree_root_sum) {
+  const float light_tree_root_sum) {
   return 1.0f;
 }
 
 template <>
 LUMINARY_FUNCTION float mis_compute_weight_dl(
   const MaterialContextGeometry ctx, const vec3 L, const TriangleLight light, const RGBF light_color, const float solid_angle,
-  const bool is_refraction, const float light_tree_root_sum) {
+  const float light_tree_root_sum) {
   if (device.state.depth == device.settings.max_ray_depth)
     return 1.0f;
 
@@ -79,7 +53,7 @@ LUMINARY_FUNCTION float mis_compute_weight_dl(
     add_vector(light.vertex, add_vector(scale_vector(light.edge1, 1.0f / 3.0f), scale_vector(light.edge2, 1.0f / 3.0f)));
   const vec3 diff_to_center = sub_vector(ctx.position, light_center);
   const float dist_sq       = dot_product(diff_to_center, diff_to_center);
-  const float gi_pdf        = mis_compute_gi_pdf(ctx, L, is_refraction);
+  const float gi_pdf        = mis_compute_gi_pdf(ctx, L);
 
   return 1.0f - mis_compute_weight_base(gi_pdf, solid_angle, power, dist_sq, light_tree_root_sum);
 }
@@ -89,7 +63,7 @@ LUMINARY_FUNCTION MISPayload
   MISPayload mis_data;
   mis_data.origin               = ctx.position;
   mis_data.light_tree_root_sum  = light_tree_root_sum;
-  mis_data.sampling_probability = mis_compute_gi_pdf(ctx, L, is_refraction);
+  mis_data.sampling_probability = mis_compute_gi_pdf(ctx, L);
 
   return mis_data;
 }

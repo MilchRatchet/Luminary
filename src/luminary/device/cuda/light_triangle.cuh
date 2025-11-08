@@ -135,6 +135,10 @@ LUMINARY_FUNCTION float light_triangle_get_solid_angle(const TriangleLight trian
   return light_triangle_get_solid_angle_generic(triangle.vertex, triangle.edge1, triangle.edge2, origin);
 }
 
+LUMINARY_FUNCTION float light_triangle_get_area(const TriangleLight triangle) {
+  return get_length(cross_product(triangle.edge1, triangle.edge2)) * 0.5f;
+}
+
 LUMINARY_FUNCTION bool light_triangle_sample_solid_angle(
   const vec3 origin, const vec3 vertex, const vec3 edge1, const vec3 edge2, const float2 random, const bool bidirectional, vec3& ray,
   float& solid_angle) {

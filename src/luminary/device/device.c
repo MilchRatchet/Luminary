@@ -1334,6 +1334,8 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, &tree->scene_data, (DEVICE void*) device->buffers.light_scene_data, 0, sizeof(DeviceLightSceneData)));
 
+  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_light, tree->optix_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
+
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;

@@ -38,11 +38,25 @@ extern "C" __global__ void __raygen__optix() {
   // Shadow Geometry
   ////////////////////////////////////////////////////////////////////
 
+  // TODO: Dont load if not allowed
   {
     const DeviceTaskDirectLightGeo direct_light_task = task_direct_light_geo_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_geometry_is_allowed(task);
     const RGBF direct_light_result = direct_lighting_geometry_evaluate_task(task, trace, direct_light_task, is_allowed);
+
+    accumulated_light = add_color(accumulated_light, direct_light_result);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Shadow BSDF
+  ////////////////////////////////////////////////////////////////////
+
+  {
+    const DeviceTaskDirectLightBSDF direct_light_task = task_direct_light_bsdf_load(direct_light_task_base_address);
+
+    const bool is_allowed          = direct_lighting_bsdf_is_allowed(task, trace);
+    const RGBF direct_light_result = direct_lighting_bsdf_evaluate_task(task, trace, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
   }

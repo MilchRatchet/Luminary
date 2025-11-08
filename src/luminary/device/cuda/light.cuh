@@ -5,6 +5,7 @@
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
 #include "light_bridges.cuh"
+#include "light_bsdf.cuh"
 #include "light_common.cuh"
 #include "light_microtriangle.cuh"
 #include "light_tree.cuh"
@@ -65,7 +66,7 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction, tree_root_sum);
+  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, tree_root_sum);
   light_color            = scale_color(mul_color(light_color, bsdf_weight), mis_weight);
   const float target     = color_importance(light_color);
 
@@ -109,7 +110,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
 
     const uint32_t light_id = output.light_id;
 
-    if (light_id == 0xFFFFFFFF)
+    if (light_id == LIGHT_ID_INVALID)
       continue;
 
     DeviceTransform trans;
@@ -155,6 +156,25 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
   UTILS_CHECK_NANS(pixel, result.light_color);
 
   return result;
+}
+
+////////////////////////////////////////////////////////////////////
+// BSDF sampling
+////////////////////////////////////////////////////////////////////
+
+template <MaterialType TYPE>
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+  LightBSDFSampleResult result;
+  result.light_color          = splat_color(0.0f);
+  result.ray                  = get_vector(0.0f, 0.0f, 1.0f);
+  result.sampling_probability = 0.0f;
+
+  return result;
+}
+
+template <>
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx, const ushort2 pixel) {
+  return light_bsdf_get_sample(ctx, pixel);
 }
 
 #ifndef OPTIX_KERNEL

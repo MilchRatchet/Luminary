@@ -53,6 +53,16 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     }
 
     ////////////////////////////////////////////////////////////////////
+    // Direct Lighting BSDF
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_bsdf_is_allowed(task, trace)) {
+      const DeviceTaskDirectLightBSDF direct_light_bsdf_task = direct_lighting_bsdf_create_task(ctx, task.index, light_tree_root_sum);
+
+      task_direct_light_bsdf_store(task_direct_lighting_base_address, direct_light_bsdf_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
     // Direct Lighting Sun
     ////////////////////////////////////////////////////////////////////
 

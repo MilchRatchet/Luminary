@@ -57,6 +57,13 @@ struct LightSampleResult<MATERIAL_VOLUME> {
   float scale;
 };
 
+struct LightBSDFSampleResult {
+  vec3 ray;
+  RGBF weight;
+  float sampling_probability;
+  bool is_refraction;
+} typedef LightBSDFSampleResult;
+
 /*
  * This struct is computed on the device when needed, it is not stored in memory.
  * The expectation is that the vertex positions are already transformed and the UV

@@ -397,6 +397,14 @@ struct DeviceTaskDirectLightAmbient {
 } typedef DeviceTaskDirectLightAmbient;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightAmbient, 0x10);
 
+struct DeviceTaskDirectLightBSDF {
+  RGBF weight;
+  vec3 ray;
+  float light_tree_root_sum;
+  float sampling_probability;
+} typedef DeviceTaskDirectLightBSDF;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightBSDF, 0x20);
+
 struct DeviceTaskDirectLightBridges {
   uint32_t light_id;
   RGBF light_color;
@@ -408,13 +416,21 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightBridges, 0x20);
 
 struct DeviceTaskDirectLight {
   union {
-    DeviceTaskDirectLightGeo geo;
-    DeviceTaskDirectLightBridges bridges;
+    // Geometry, Particle
+    struct {
+      DeviceTaskDirectLightGeo geo;
+      DeviceTaskDirectLightBSDF bsdf;
+    };
+    // Volume
+    struct {
+      DeviceTaskDirectLightBridges bridges;
+    };
   };
   DeviceTaskDirectLightSun sun;
+  // TODO: Do this only for underwater in the future, the rest does not need it.
   DeviceTaskDirectLightAmbient ambient;
 } typedef DeviceTaskDirectLight;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x40);
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x60);
 
 ////////////////////////////////////////////////////////////////////
 // Globals
@@ -516,6 +532,7 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_particles;
+  OptixTraversableHandle optix_bvh_light;
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   DeviceTextureObject moon_albedo_tex;
   DeviceTextureObject moon_normal_tex;
