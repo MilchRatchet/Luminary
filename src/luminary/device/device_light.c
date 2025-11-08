@@ -2356,6 +2356,10 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
     if (instance->fragments) {
       __FAILURE_HANDLE(array_destroy(&instance->fragments));
     }
+
+    if (instance->bvh_triangles) {
+      __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
+    }
   }
 
   __FAILURE_HANDLE(array_destroy(&(*tree)->integrator.tasks));
