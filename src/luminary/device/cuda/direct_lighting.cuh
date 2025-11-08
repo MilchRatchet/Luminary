@@ -657,7 +657,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
 
       const float mis_weight = mis_compute_weight_gi(gi_pdf, solid_angle, power, dist_sq, light_tree_root_sum);
 
-      light_color = scale_color(light_color, mis_weight);
+      light_color = scale_color(light_color, mis_weight / payload.num_hit_lights);
       light_color = mul_color(light_color, direct_light_task.weight);
     }
     else {

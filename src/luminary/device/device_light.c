@@ -2055,6 +2055,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_cached_materials));
 
   __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), 16));
+  __FAILURE_HANDLE(array_create(&instance->bvh_triangles, sizeof(LightTreeBVHTriangle), 16));
 
   for (uint32_t material_slot_id = 0; material_slot_id < num_materials; material_slot_id++) {
     const uint16_t material_id = mesh->materials[material_slot_id];
@@ -2100,6 +2101,8 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.instance_id       = instance_id;
       fragment.material_slot_id  = material_slot_id;
       fragment.material_tri_id   = tri_id;
+
+      __FAILURE_HANDLE(array_get_num_elements(instance->bvh_triangles, &fragment.instance_cache_tri_id));
 
       __FAILURE_HANDLE(array_push(&instance->fragments, &fragment));
 
