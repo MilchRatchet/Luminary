@@ -647,17 +647,10 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
     if (light_triangle_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, task.origin, direct_light_task.ray, dist)) {
       light_color = light_get_color(triangle_light);
 
-      const float area        = light_triangle_get_area(triangle_light);
-      const float solid_angle = light_triangle_get_solid_angle(triangle_light, task.origin);
-      const float power       = color_importance(light_color) * area;
-      const float dist_sq     = dist * dist;
+      const float mis_weight = mis_compute_weight_gi(
+        task.origin, triangle_light, light_color, dist, direct_light_task.sampling_probability, direct_light_task.light_tree_root_sum);
 
-      const float gi_pdf              = direct_light_task.sampling_probability;
-      const float light_tree_root_sum = direct_light_task.light_tree_root_sum;
-
-      const float mis_weight = mis_compute_weight_gi(gi_pdf, solid_angle, power, dist_sq, light_tree_root_sum);
-
-      light_color = scale_color(light_color, mis_weight / payload.num_hit_lights);
+      light_color = scale_color(light_color, mis_weight * payload.num_hit_lights);
       light_color = mul_color(light_color, direct_light_task.weight);
     }
     else {

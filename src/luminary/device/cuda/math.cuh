@@ -1747,22 +1747,4 @@ LUMINARY_FUNCTION PackedNormal normal_pack(const vec3 normal) {
   return (y_u16 << 16) | x_u16;
 }
 
-LUMINARY_FUNCTION MISPayload mis_payload_unpack(const PackedMISPayload packed) {
-  MISPayload payload;
-  payload.origin               = position_unpack(packed.origin);
-  payload.light_tree_root_sum  = unsigned_bfloat_unpack(packed.light_tree_root_sum);
-  payload.sampling_probability = bfloat_unpack(packed.sampling_probability);
-
-  return payload;
-}
-
-LUMINARY_FUNCTION PackedMISPayload mis_payload_pack(const MISPayload payload) {
-  PackedMISPayload packed;
-  packed.origin               = position_pack(payload.origin);
-  packed.light_tree_root_sum  = unsigned_bfloat_pack(payload.light_tree_root_sum);
-  packed.sampling_probability = bfloat_pack(payload.sampling_probability);
-
-  return packed;
-}
-
 #endif /* CU_MATH_H */

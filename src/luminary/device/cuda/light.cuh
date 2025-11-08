@@ -66,7 +66,7 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, tree_root_sum);
+  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, dist, solid_angle, tree_root_sum);
   light_color            = scale_color(mul_color(light_color, bsdf_weight), mis_weight);
   const float target     = color_importance(light_color);
 

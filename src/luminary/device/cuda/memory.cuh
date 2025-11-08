@@ -200,10 +200,6 @@ LUMINARY_FUNCTION DeviceTaskThroughput task_throughput_load(const uint32_t base_
   return load_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput));
 }
 
-LUMINARY_FUNCTION DeviceTaskMIS task_mis_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskMIS, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, mis));
-}
-
 // DeviceTask
 
 LUMINARY_FUNCTION void task_store(const uint32_t base_address, const DeviceTask data) {
@@ -236,12 +232,6 @@ LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const 
 
 LUMINARY_FUNCTION void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
   store_task_state<PackedRecord, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.record), data);
-}
-
-// DeviceTaskMIS
-
-LUMINARY_FUNCTION void task_mis_store(const uint32_t base_address, const DeviceTaskMIS data) {
-  store_task_state<DeviceTaskMIS, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, mis), data);
 }
 
 // DeviceTaskDirectLight

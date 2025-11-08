@@ -102,9 +102,6 @@ enum ShadingTaskIndex {
 // STATE_FLAG_ALLOW_EMISSION: This flag is set for rays that are allowed to include emission in bounce rays.
 //                            This flag is used on the ocean surface because there is no DL on it.
 //
-// STATE_FLAG_MIS_EMISSION: This flag is set for rays that are allowed to include emission through MIS weighting.
-//                          This flag is overruled by STATE_FLAG_ALLOW_EMISSION.
-//
 // STATE_FLAG_ALLOW_AMBIENT: This flag is set for rays that are allowed to include sky contribution
 //
 // STATE_FLAG_USE_IGNORE_HANDLE: This flag is set for rays that need to ignore a triangle in the next trace.
@@ -118,9 +115,8 @@ enum StateFlag {
   STATE_FLAG_CAMERA_DIRECTION  = 0b00000010u,
   STATE_FLAG_VOLUME_SCATTERED  = 0b00000100u,
   STATE_FLAG_ALLOW_EMISSION    = 0b00001000u,
-  STATE_FLAG_MIS_EMISSION      = 0b00010000u,
-  STATE_FLAG_ALLOW_AMBIENT     = 0b00100000u,
-  STATE_FLAG_USE_IGNORE_HANDLE = 0b01000000u
+  STATE_FLAG_ALLOW_AMBIENT     = 0b00010000u,
+  STATE_FLAG_USE_IGNORE_HANDLE = 0b00100000u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {

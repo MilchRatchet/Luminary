@@ -22,21 +22,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
     DeviceTask task                  = task_load(task_base_address);
-    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
-    const DeviceTaskMIS mis          = task_mis_load(task_base_address);
+    DeviceTaskTrace trace            = task_trace_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    DeviceIORStack ior_stack     = trace.ior_stack;
-    PackedMISPayload mis_payload = mis.payload;
-
-    GeometryContextCreationInfo ctx_creation_info;
-    ctx_creation_info.task               = task;
-    ctx_creation_info.trace              = trace;
-    ctx_creation_info.packed_mis_payload = mis_payload;
-    ctx_creation_info.hints              = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
-
-    const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+    const MaterialContextGeometry ctx = geometry_get_context(task, trace);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
@@ -128,14 +118,14 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       const bool refraction_is_inside = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
 
       const IORStackMethod ior_get_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-      const float ray_ior                 = ior_stack_interact(ior_stack, 1.0f, ior_get_method);
+      const float ray_ior                 = ior_stack_interact(trace.ior_stack, 1.0f, ior_get_method);
 
       const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
 
       const float new_ior = (refraction_is_inside) ? 1.0f : ray_ior / ior;
 
       const IORStackMethod ior_set_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ior_stack, new_ior, ior_set_method);
+      ior_stack_interact(trace.ior_stack, new_ior, ior_set_method);
     }
 
     uint16_t new_state = task.state | STATE_FLAG_USE_IGNORE_HANDLE;
@@ -152,10 +142,6 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     if (is_pass_through == false) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
       new_state &= ~STATE_FLAG_ALLOW_EMISSION;
-
-      // We want to keep the old payload around if we are passthrough.
-      new_state |= STATE_FLAG_MIS_EMISSION;
-      mis_payload = mis_payload_pack(mis_get_payload(ctx, bounce_info.ray, bounce_info.is_transparent_pass, light_tree_root_sum));
     }
 
     DeviceTask bounce_task;
@@ -171,7 +157,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskTrace bounce_trace;
-      bounce_trace.ior_stack = ior_stack;
+      bounce_trace.ior_stack = trace.ior_stack;
       bounce_trace.handle    = triangle_handle_get(ctx.instance_id, ctx.tri_id);
       bounce_trace.depth     = FLT_MAX;
 
@@ -181,11 +167,6 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       bounce_throughput.record = record_pack(record);
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
-
-      DeviceTaskMIS bounce_mis;
-      bounce_mis.payload = mis_payload;
-
-      task_mis_store(dst_task_base_address, bounce_mis);
     }
   }
 
@@ -204,19 +185,14 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
 
     const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
     DeviceTask task                  = task_load(task_base_address);
-    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+    DeviceTaskTrace trace            = task_trace_load(task_base_address);
     const uint32_t pixel             = get_pixel_id(task.index);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        GeometryContextCreationInfo ctx_creation_info;
-        ctx_creation_info.task  = task;
-        ctx_creation_info.trace = trace;
-        ctx_creation_info.hints = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
-
-        const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
 
@@ -226,12 +202,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        GeometryContextCreationInfo ctx_creation_info;
-        ctx_creation_info.task  = task;
-        ctx_creation_info.trace = trace;
-        ctx_creation_info.hints = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
-
-        const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace);
 
         const vec3 normal = ctx.normal;
 
@@ -253,12 +224,7 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         write_beauty_buffer_forced(color, pixel);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        GeometryContextCreationInfo ctx_creation_info;
-        ctx_creation_info.task  = task;
-        ctx_creation_info.trace = trace;
-        ctx_creation_info.hints = GEOMETRY_CONTEXT_CREATION_HINT_NONE;
-
-        const MaterialContextGeometry ctx = geometry_get_context(ctx_creation_info);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
         const RGBF color                  = add_color(scale_color(albedo, 0.025f), emission);
