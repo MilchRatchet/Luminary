@@ -173,12 +173,15 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
   }
 
   uint32_t num_hits = optixGetPayloadGeneric(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS);
-  float random      = optixGetPayloadFloat(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM);
 
   num_hits++;
 
+  optixSetPayloadGeneric(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS, num_hits);
+
   bool sample_accepted = true;
   if (num_hits > 1) {
+    float random = optixGetPayloadFloat(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM);
+
     const float resampling_probability = 1.0f / num_hits;
 
     sample_accepted = (random < resampling_probability);
@@ -187,12 +190,12 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
     const float random_scale = (sample_accepted) ? resampling_probability : 1.0f - resampling_probability;
 
     random = random_saturate((random - random_shift) / random_scale);
+
+    optixSetPayloadFloat(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM, random);
   }
 
   if (sample_accepted) {
     optixSetPayloadGeneric(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_SELECTED_LIGHT_ID, light_id);
-    optixSetPayloadGeneric(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS, num_hits);
-    optixSetPayloadGeneric(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM, random);
   }
 
   // Cull lights that are further away if this light is opaque

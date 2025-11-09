@@ -14,7 +14,7 @@ enum LightBSDFSampleTechnique {
 } typedef LightBSDFSampleTechnique;
 
 LUMINARY_FUNCTION float light_bsdf_get_sampling_roughness(const float roughness) {
-  return lerp(roughness, 1.0f, 0.05f);
+  return lerp(roughness, 1.0f, 0.04f);
 }
 
 LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialContextGeometry& mat_ctx, const ushort2 pixel) {
