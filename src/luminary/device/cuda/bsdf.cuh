@@ -21,31 +21,28 @@ LUMINARY_FUNCTION BSDFRayContext bsdf_evaluate_analyze(const MaterialContextGeom
 
   vec3 refraction_vector;
   bool total_reflection;
+  vec3 H;
   if (context.is_refraction) {
     total_reflection  = false;  // TODO: Correctly check if this refraction is possible.
-    context.H         = bsdf_normal_from_pair(L, mat_ctx.V, ior);
+    H                 = bsdf_normal_from_pair(L, mat_ctx.V, ior);
     refraction_vector = L;
   }
   else {
-    context.H         = bsdf_normal_from_pair(L, mat_ctx.V, 1.0f);
-    refraction_vector = refract_vector(mat_ctx.V, context.H, ior, total_reflection);
+    H                 = bsdf_normal_from_pair(L, mat_ctx.V, 1.0f);
+    refraction_vector = refract_vector(mat_ctx.V, H, ior, total_reflection);
   }
 
-  context.NdotH = dot_product(mat_ctx.normal, context.H);
+  context.NdotH = dot_product(mat_ctx.normal, H);
 
   if (context.NdotH < 0.0f) {
-    context.H     = scale_vector(context.H, -1.0f);
+    H             = scale_vector(H, -1.0f);
     context.NdotH = -context.NdotH;
   }
 
-  context.HdotV = fabsf(dot_product(context.H, mat_ctx.V));
-  context.HdotL = fabsf(dot_product(context.H, L));
+  context.HdotV = fabsf(dot_product(H, mat_ctx.V));
+  context.HdotL = fabsf(dot_product(H, L));
 
-  context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(context.H, mat_ctx.V, refraction_vector, ior);
-
-  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
-  const float roughness2 = roughness * roughness;
-  context.roughness4     = roughness2 * roughness2;
+  context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(H, mat_ctx.V, refraction_vector, ior);
 
   return context;
 }
@@ -111,26 +108,20 @@ LUMINARY_FUNCTION BSDFRayContext
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx);
 
-  context.H = H;
-
   bool total_reflection        = false;
-  const vec3 refraction_vector = (context.is_refraction) ? L : refract_vector(mat_ctx.V, context.H, ior, total_reflection);
+  const vec3 refraction_vector = (context.is_refraction) ? L : refract_vector(mat_ctx.V, H, ior, total_reflection);
 
-  context.NdotH = dot_product(mat_ctx.normal, context.H);
+  context.NdotH = dot_product(mat_ctx.normal, H);
+  context.HdotV = fabsf(dot_product(H, mat_ctx.V));
+  context.HdotL = fabsf(dot_product(H, L));
 
+  float flipH = 1.0f;
   if (context.NdotH < 0.0f) {
-    context.H     = scale_vector(context.H, -1.0f);
+    flipH         = -1.0f;
     context.NdotH = -context.NdotH;
   }
 
-  context.HdotV = fabsf(dot_product(context.H, mat_ctx.V));
-  context.HdotL = fabsf(dot_product(context.H, L));
-
-  context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(context.H, mat_ctx.V, refraction_vector, ior);
-
-  const float roughness  = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
-  const float roughness2 = roughness * roughness;
-  context.roughness4     = roughness2 * roughness2;
+  context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(scale_vector(H, flipH), mat_ctx.V, refraction_vector, ior);
 
   return context;
 }
@@ -192,16 +183,17 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
   // Microfacet based sample
   if (true) {
-    const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel, RANDOM_SET::REFLECTION);
+    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
+    const vec3 microfacet    = bsdf_microfacet_sample(V_local, roughness, pixel, RANDOM_SET::REFLECTION);
     const vec3 ray           = reflect_vector(mat_ctx_local.V, microfacet);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
     const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET, ray, face_normal_local);
-    const float pdf          = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
-    const float diffuse_pdf  = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
+    const float pdf          = bsdf_microfacet_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV);
+    const float diffuse_pdf  = (include_diffuse) ? bsdf_diffuse_pdf(ctx.NdotL) : 0.0f;
     const float refraction_pdf =
-      (include_refraction)
-        ? bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior)
-        : 0.0f;
+      (include_refraction) ? bsdf_microfacet_refraction_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior)
+                           : 0.0f;
 
     const float sum_pdf    = pdf + diffuse_pdf + refraction_pdf;
     const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
@@ -219,16 +211,17 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
   // Diffuse based sample
   if (include_diffuse) {
+    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
     const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_SET::DIFFUSE, pixel));
     const vec3 microfacet      = normalize_vector(add_vector(mat_ctx_local.V, ray));
     const BSDFRayContext ctx   = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
     const RGBF eval            = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_DIFFUSE, ray, face_normal_local);
-    const float pdf            = bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL);
-    const float microfacet_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
+    const float pdf            = bsdf_diffuse_pdf(ctx.NdotL);
+    const float microfacet_pdf = bsdf_microfacet_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV);
     const float refraction_pdf =
-      (include_refraction)
-        ? bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior)
-        : 0.0f;
+      (include_refraction) ? bsdf_microfacet_refraction_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior)
+                           : 0.0f;
 
     const float sum_pdf    = pdf + microfacet_pdf + refraction_pdf;
     const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
@@ -255,8 +248,10 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
   // Microfacet refraction based sample
   if (include_refraction) {
+    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+
     bool total_reflection;
-    const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel, RANDOM_SET::REFRACTION);
+    const vec3 microfacet    = bsdf_microfacet_refraction_sample(V_local, roughness, pixel, RANDOM_SET::REFRACTION);
     const vec3 ray           = refract_vector(mat_ctx_local.V, microfacet, ior, total_reflection);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, !total_reflection);
     const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, ray, face_normal_local);
@@ -266,10 +261,9 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
     // If it is a reflection, then the direction could have been sampled from a microfacet reflection,
     // hence we need to compute its MIS weight.
     if (total_reflection) {
-      const float pdf =
-        bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
-      const float reflection_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
-      const float diffuse_pdf    = (include_diffuse) ? bsdf_diffuse_pdf(mat_ctx_local, ctx.NdotL) : 0.0f;
+      const float pdf = bsdf_microfacet_refraction_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+      const float reflection_pdf = bsdf_microfacet_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV);
+      const float diffuse_pdf    = (include_diffuse) ? bsdf_diffuse_pdf(ctx.NdotL) : 0.0f;
 
       const float sum_pdf = pdf + reflection_pdf + diffuse_pdf;
       mis_weight          = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
@@ -338,14 +332,16 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICL
 
 LUMINARY_FUNCTION vec3
   bsdf_sample_microfacet_reflection(const MaterialContextGeometry mat_ctx, const ushort2 pixel, const RandomTarget random_target_ray) {
-  const vec3 sampled_microfacet = bsdf_microfacet_sample(mat_ctx, pixel, random_target_ray);
+  const float roughness         = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const vec3 sampled_microfacet = bsdf_microfacet_sample(mat_ctx.V, roughness, pixel, random_target_ray);
 
   return reflect_vector(mat_ctx.V, sampled_microfacet);
 }
 
 LUMINARY_FUNCTION vec3
   bsdf_sample_microfacet_refraction(const MaterialContextGeometry mat_ctx, const ushort2 pixel, const RandomTarget random_target_ray) {
-  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(mat_ctx, pixel, random_target_ray);
+  const float roughness         = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(mat_ctx.V, roughness, pixel, random_target_ray);
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx);
 
@@ -464,17 +460,18 @@ LUMINARY_FUNCTION float bsdf_sample_for_sun_pdf<MATERIAL_GEOMETRY>(const Materia
   bsdf_sample_for_light_probabilities(mat_ctx, reflection_probability, refraction_probability, diffuse_probability);
 
   const BSDFRayContext ctx = bsdf_evaluate_analyze(mat_ctx, L);
+  const float roughness    = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
 
   if (ctx.is_refraction) {
     const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx);
     const float microfacet_refraction_pdf =
-      bsdf_microfacet_refraction_pdf(mat_ctx, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+      bsdf_microfacet_refraction_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
 
     return refraction_probability * microfacet_refraction_pdf;
   }
   else {
-    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(mat_ctx, ctx.NdotH, ctx.NdotV);
-    const float diffuse_pdf               = bsdf_diffuse_pdf(mat_ctx, ctx.NdotL);
+    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV);
+    const float diffuse_pdf               = bsdf_diffuse_pdf(ctx.NdotL);
 
     return reflection_probability * microfacet_reflection_pdf + diffuse_probability * diffuse_pdf;
   }

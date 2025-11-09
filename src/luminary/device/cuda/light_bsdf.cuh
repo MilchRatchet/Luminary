@@ -13,6 +13,10 @@ enum LightBSDFSampleTechnique {
   LIGHT_BSDF_SAMPLE_TECHNIQUE_MICROFACET_REFRACTION
 } typedef LightBSDFSampleTechnique;
 
+LUMINARY_FUNCTION float light_bsdf_get_sampling_roughness(const float roughness) {
+  return lerp(roughness, 1.0f, 0.05f);
+}
+
 LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialContextGeometry& mat_ctx, const ushort2 pixel) {
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
@@ -22,9 +26,8 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
   // Material Context (+Z-Up)
   // TODO: Fuck this, don't do that.
   MaterialContextGeometry mat_ctx_local = mat_ctx;
-
-  mat_ctx_local.V      = V_local;
-  mat_ctx_local.normal = get_vector(0.0f, 0.0f, 1.0f);
+  mat_ctx_local.V                       = V_local;
+  mat_ctx_local.normal                  = get_vector(0.0f, 0.0f, 1.0f);
 
   const uint32_t base_substrate = mat_ctx_local.flags & MATERIAL_FLAG_BASE_SUBSTRATE_MASK;
 
@@ -45,15 +48,17 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
   if (technique_id == 1 && include_refraction)
     technique = LIGHT_BSDF_SAMPLE_TECHNIQUE_MICROFACET_REFRACTION;
 
-  LightBSDFSampleResult result;
+  const float roughness          = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float sampling_roughness = light_bsdf_get_sampling_roughness(roughness);
 
+  LightBSDFSampleResult result;
   switch (technique) {
     case LIGHT_BSDF_SAMPLE_TECHNIQUE_MICROFACET_REFLECTION: {
       // TODO: Move things like bsdf_evaluate_core outside the switch
-      const vec3 microfacet    = bsdf_microfacet_sample(mat_ctx_local, pixel, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
+      const vec3 microfacet    = bsdf_microfacet_sample(V_local, sampling_roughness, pixel, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
       const vec3 ray           = reflect_vector(mat_ctx_local.V, microfacet);
       const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, false);
-      const float pdf          = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
+      const float pdf          = bsdf_microfacet_pdf(V_local, sampling_roughness, ctx.NdotH, ctx.NdotV);
       const RGBF eval          = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_GENERAL, ray, face_normal_local, 1.0f / pdf);
 
       result.ray                  = ray;
@@ -65,11 +70,11 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
       const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx_local);
 
       bool total_reflection;
-      const vec3 microfacet    = bsdf_microfacet_refraction_sample(mat_ctx_local, pixel, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
+      const vec3 microfacet    = bsdf_microfacet_refraction_sample(V_local, sampling_roughness, pixel, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
       const vec3 ray           = refract_vector(mat_ctx_local.V, microfacet, ior, total_reflection);
       const BSDFRayContext ctx = bsdf_sample_context(mat_ctx_local, microfacet, ray, !total_reflection);
       const float pdf =
-        bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+        bsdf_microfacet_refraction_pdf(V_local, sampling_roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       const RGBF eval = bsdf_evaluate_core(mat_ctx_local, ctx, BSDF_SAMPLING_GENERAL, ray, face_normal_local, 1.0f / pdf);
 
       result.ray                  = ray;
@@ -109,16 +114,19 @@ LUMINARY_FUNCTION float light_bsdf_get_probability(const MaterialContextGeometry
 
   const BSDFRayContext ctx = bsdf_evaluate_analyze(mat_ctx_local, L_local);
 
+  const float roughness          = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float sampling_roughness = light_bsdf_get_sampling_roughness(roughness);
+
   float sampling_probability;
   if (ctx.is_refraction) {
     const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx_local);
     const float microfacet_refraction_pdf =
-      bsdf_microfacet_refraction_pdf(mat_ctx_local, ctx.roughness4, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+      bsdf_microfacet_refraction_pdf(V_local, sampling_roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
 
     sampling_probability = refraction_probability * microfacet_refraction_pdf;
   }
   else {
-    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(mat_ctx_local, ctx.NdotH, ctx.NdotV);
+    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(V_local, sampling_roughness, ctx.NdotH, ctx.NdotV);
 
     sampling_probability = (1.0f - refraction_probability) * microfacet_reflection_pdf;
   }
