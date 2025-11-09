@@ -6,6 +6,7 @@
 #include "utils.cuh"
 
 struct BSDFRayContext {
+  vec3 V;
   float fresnel_dielectric;
   float NdotH;
   float NdotL;
@@ -67,7 +68,7 @@ LUMINARY_FUNCTION bool bsdf_is_pass_through_ray(const MaterialContext<TYPE> ctx,
 template <>
 LUMINARY_FUNCTION bool bsdf_is_pass_through_ray<MATERIAL_GEOMETRY>(
   const MaterialContextGeometry ctx, const BSDFSampleInfo<MATERIAL_GEOMETRY> info) {
-  const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+  const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params);
   return info.is_transparent_pass && ((ior == 1.0f) || (info.is_microfacet_based == false));
 }
 
@@ -383,22 +384,21 @@ LUMINARY_FUNCTION float bsdf_conductor_directional_albedo(const float NdotV, con
 }
 
 LUMINARY_FUNCTION RGBF bsdf_conductor(
-  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
-  const float one_over_sampling_pdf) {
+  const MaterialParams& params, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return splat_color(0.0f);
 
-  if (MATERIAL_IS_SUBSTRATE_OPAQUE(mat_ctx.flags) == false)
+  if (MATERIAL_IS_SUBSTRATE_OPAQUE(params.flags) == false)
     return splat_color(0.0f);
 
-  if ((mat_ctx.flags & MATERIAL_FLAG_METALLIC) == 0)
+  if ((params.flags & MATERIAL_FLAG_METALLIC) == 0)
     return splat_color(0.0f);
 
   float ior = 1.0f;
   if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
-    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
-  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
   float ss_term;
   switch (sampling_hint) {
@@ -406,18 +406,18 @@ LUMINARY_FUNCTION RGBF bsdf_conductor(
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_MICROFACET:
-      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(mat_ctx.V, roughness, ctx.NdotL, ctx.NdotV);
+      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_DIFFUSE:
       ss_term = bsdf_microfacet_evaluate_sampled_diffuse(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+                / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
-  const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+  const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(params);
 
   const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
 
@@ -435,22 +435,21 @@ LUMINARY_FUNCTION float bsdf_glossy_directional_albedo(const float NdotV, const 
 }
 
 LUMINARY_FUNCTION RGBF bsdf_glossy(
-  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
-  const float one_over_sampling_pdf) {
+  const MaterialParams& params, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return splat_color(0.0f);
 
-  if (MATERIAL_IS_SUBSTRATE_OPAQUE(mat_ctx.flags) == false)
+  if (MATERIAL_IS_SUBSTRATE_OPAQUE(params.flags) == false)
     return splat_color(0.0f);
 
-  if ((mat_ctx.flags & MATERIAL_FLAG_METALLIC) != 0)
+  if ((params.flags & MATERIAL_FLAG_METALLIC) != 0)
     return splat_color(0.0f);
 
   float ior = 1.0f;
   if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
-    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
-  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
   float ss_term;
   switch (sampling_hint) {
@@ -458,14 +457,14 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_MICROFACET:
-      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(mat_ctx.V, roughness, ctx.NdotL, ctx.NdotV);
+      ss_term = bsdf_microfacet_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_DIFFUSE:
       ss_term = bsdf_microfacet_evaluate_sampled_diffuse(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+                / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
@@ -478,15 +477,15 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
       diff_term = 1.0f;
       break;
     case BSDF_SAMPLING_MICROFACET:
-      diff_term = bsdf_diffuse_evaluate_sampled_microfacet(mat_ctx.V, roughness, ctx.NdotL, ctx.NdotH, ctx.NdotV);
+      diff_term = bsdf_diffuse_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotH, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       diff_term = bsdf_diffuse_evaluate(ctx.NdotL)
-                  / bsdf_microfacet_refraction_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+                  / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
   };
 
-  const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+  const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(params);
 
   const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, roughness);
   const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, roughness);
@@ -511,16 +510,15 @@ LUMINARY_FUNCTION float bsdf_dielectric_directional_albedo(const float NdotV, co
 }
 
 LUMINARY_FUNCTION RGBF bsdf_dielectric(
-  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
-  const float one_over_sampling_pdf) {
+  const MaterialParams& params, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return splat_color(0.0f);
 
-  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(mat_ctx.flags) == false)
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(params.flags) == false)
     return splat_color(0.0f);
 
-  const float ior       = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
-  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx);
+  const float ior       = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
   float term;
   if (ctx.is_refraction) {
@@ -547,20 +545,20 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV) * one_over_sampling_pdf;
         break;
       case BSDF_SAMPLING_MICROFACET:
-        term = bsdf_microfacet_evaluate_sampled_microfacet(mat_ctx.V, roughness, ctx.NdotL, ctx.NdotV);
+        term = bsdf_microfacet_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotV);
         break;
       case BSDF_SAMPLING_DIFFUSE:
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(ctx.NdotL);
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-               / bsdf_microfacet_refraction_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+               / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
         break;
     };
 
     term *= ctx.fresnel_dielectric;
   }
 
-  const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx);
+  const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(params);
 
   const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, roughness, ior);
   term /= dielectric_directional_albedo;
@@ -578,16 +576,15 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
 ///////////////////////////////////////////////////
 
 LUMINARY_FUNCTION RGBF bsdf_multiscattering_evaluate(
-  const MaterialContextGeometry mat_ctx, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint,
-  const float one_over_sampling_pdf) {
-  const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx);
+  const MaterialParams& params, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(params);
 
   if (ctx.is_refraction)
-    return scale_color(bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf), opacity);
+    return scale_color(bsdf_dielectric(params, ctx, sampling_hint, one_over_sampling_pdf), opacity);
 
-  RGBF conductor  = bsdf_conductor(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
-  RGBF glossy     = bsdf_glossy(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
-  RGBF dielectric = bsdf_dielectric(mat_ctx, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF conductor  = bsdf_conductor(params, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF glossy     = bsdf_glossy(params, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF dielectric = bsdf_dielectric(params, ctx, sampling_hint, one_over_sampling_pdf);
 
   return scale_color(add_color(add_color(conductor, glossy), dielectric), opacity);
 }

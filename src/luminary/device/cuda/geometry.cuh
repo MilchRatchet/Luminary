@@ -82,11 +82,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Update delta path state
     ////////////////////////////////////////////////////////////////////
 
-    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx);
+    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params);
 
     bool is_delta_distribution;
     if (bounce_info.is_transparent_pass) {
-      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params);
 
       const float refraction_scale = (ior >= 1.0f) ? ior : 1.0f / ior;
       is_delta_distribution        = roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
@@ -105,7 +105,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     RGBF record = record_unpack(throughput.record);
 
-    const RGBF emission = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
+    const RGBF emission = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
     if (color_any(emission)) {
       const uint32_t pixel = get_pixel_id(task.index);
@@ -115,12 +115,12 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     record = mul_color(record, bounce_info.weight);
 
     if (bounce_info.is_transparent_pass) {
-      const bool refraction_is_inside = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+      const bool refraction_is_inside = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
 
       const IORStackMethod ior_get_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
       const float ray_ior                 = ior_stack_interact(trace.ior_stack, 1.0f, ior_get_method);
 
-      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx);
+      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params);
 
       const float new_ior = (refraction_is_inside) ? 1.0f : ray_ior / ior;
 
@@ -193,8 +193,8 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
         const MaterialContextGeometry ctx = geometry_get_context(task, trace);
-        const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx);
-        const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
+        const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
+        const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
         write_beauty_buffer_forced(add_color(albedo, emission), pixel);
       } break;
@@ -225,8 +225,8 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
         const MaterialContextGeometry ctx = geometry_get_context(task, trace);
-        const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx);
-        const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx);
+        const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
+        const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
         const RGBF color                  = add_color(scale_color(albedo, 0.025f), emission);
 
         write_beauty_buffer_forced(color, pixel);

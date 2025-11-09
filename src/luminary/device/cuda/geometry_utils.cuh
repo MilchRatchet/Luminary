@@ -156,7 +156,7 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
-  uint32_t flags = (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
+  MaterialFlags flags = (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
 
   if (mat.metallic_tex != TEXTURE_NONE) {
     // TODO: Stochastic filtering of metallic texture.
@@ -167,10 +167,6 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
     flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
-  }
-
-  if (task.state & STATE_FLAG_VOLUME_SCATTERED) {
-    flags |= MATERIAL_FLAG_VOLUME_SCATTERED;
   }
 
   if (is_inside) {
@@ -201,18 +197,19 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
   ctx.instance_id = trace.handle.instance_id;
   ctx.tri_id      = trace.handle.tri_id;
   ctx.normal      = transform_apply_rotation(trans, normal);
+  ctx.face_normal = normal_pack(face_normal);
   ctx.position    = position;
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
-  ctx.flags       = flags;
   ctx.volume_type = VolumeType(task.volume_id);
 
-  material_set_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx, face_normal);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, opaque_color(albedo));
-  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, albedo.a);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, roughness);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, emission);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, ior_in / ior_out);
+  ctx.params.flags = flags;
+
+  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, opaque_color(albedo));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, albedo.a);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
+  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params, emission);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, ior_in / ior_out);
 
   return ctx;
 }

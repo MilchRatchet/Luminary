@@ -34,17 +34,23 @@ enum MaterialParamType {
 #define MATERIAL_PARAM_TYPE_PACKED_NORMAL_SIZE 32
 
 enum MaterialGeometryParam : uint32_t {
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(FACE_NORMAL, MATERIAL_PARAM_TYPE_PACKED_NORMAL, MATERIAL_PARAM_TYPE_PACKED_NORMAL_SIZE)  //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(EMISSION, MATERIAL_PARAM_TYPE_COLOR, MATERIAL_PARAM_TYPE_COLOR_SIZE)                     //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ALBEDO, MATERIAL_PARAM_TYPE_NORM_COLOR, MATERIAL_PARAM_TYPE_NORM_COLOR_SIZE)             //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(OPACITY, MATERIAL_PARAM_TYPE_NORM_FLOAT, 8)                                              //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ROUGHNESS, MATERIAL_PARAM_TYPE_NORM_FLOAT, 10)                                           //
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR, MATERIAL_PARAM_TYPE_IOR, 8)                                                         //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(EMISSION, MATERIAL_PARAM_TYPE_COLOR, MATERIAL_PARAM_TYPE_COLOR_SIZE)          //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ALBEDO, MATERIAL_PARAM_TYPE_NORM_COLOR, MATERIAL_PARAM_TYPE_NORM_COLOR_SIZE)  //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(OPACITY, MATERIAL_PARAM_TYPE_NORM_FLOAT, 8)                                   //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(ROUGHNESS, MATERIAL_PARAM_TYPE_NORM_FLOAT, 10)                                //
+  MATERIAL_GEOMETRY_PARAM_ALLOCATE(IOR, MATERIAL_PARAM_TYPE_IOR, 8)                                              //
 
   MATERIAL_GEOMETRY_PARAM_BITS_COUNT
 } typedef MaterialGeometryParam;
 
 #define MATERIAL_GEOM_NUM_UINTS ((MATERIAL_GEOMETRY_PARAM_BITS_COUNT + ((1 << 5) - 1)) >> 5)
+
+typedef uint32_t MaterialFlags;
+
+struct MaterialParams {
+  uint32_t data[MATERIAL_GEOM_NUM_UINTS];
+  MaterialFlags flags;
+} typedef MaterialParams;
 
 template <MaterialType TYPE>
 struct MaterialContext {};
@@ -61,15 +67,10 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   vec3 position;
   vec3 V;
   vec3 normal;
+  PackedNormal face_normal;
   uint16_t state;
-  uint8_t flags;
   VolumeType volume_type;
-
-  uint32_t data[MATERIAL_GEOM_NUM_UINTS];
-
-  LUMINARY_FUNCTION TriangleHandle get_handle() const {
-    return triangle_handle_get(instance_id, tri_id);
-  }
+  MaterialParams params;
 };
 
 template <>
@@ -85,10 +86,6 @@ struct MaterialContext<MATERIAL_VOLUME> {
   uint16_t state;
   VolumeType volume_type;
   float max_dist;
-
-  LUMINARY_FUNCTION TriangleHandle get_handle() const {
-    return triangle_handle_get(VOLUME_TYPE_TO_HIT(descriptor.type), 0);
-  }
 };
 
 template <>
@@ -103,12 +100,7 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   vec3 V;
   vec3 normal;
   uint16_t state;
-  uint8_t flags;
   VolumeType volume_type;
-
-  LUMINARY_FUNCTION TriangleHandle get_handle() const {
-    return triangle_handle_get(particle_id, 0);
-  }
 };
 
 typedef MaterialContext<MATERIAL_GEOMETRY> MaterialContextGeometry;
@@ -116,7 +108,7 @@ typedef MaterialContext<MATERIAL_VOLUME> MaterialContextVolume;
 typedef MaterialContext<MATERIAL_PARTICLE> MaterialContextParticle;
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION uint32_t material_param_get_data(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {
+LUMINARY_FUNCTION uint32_t material_param_get_data(const MaterialParams& param) {
   constexpr uint32_t OFFSET = MATERIAL_GEOMETRY_PARAM_GET_OFFSET(PARAM);
   constexpr uint32_t SIZE   = MATERIAL_GEOMETRY_PARAM_GET_SIZE(PARAM);
 
@@ -124,21 +116,21 @@ LUMINARY_FUNCTION uint32_t material_param_get_data(const MaterialContext<MATERIA
   constexpr uint32_t first_mask  = (SIZE < 32u) ? ((1u << SIZE) - 1u) : 0xFFFFFFFFu;
   constexpr uint32_t first_shift = OFFSET & 0x1Fu;
 
-  uint32_t result = (ctx.data[first_index] >> first_shift) & first_mask;
+  uint32_t result = (param.data[first_index] >> first_shift) & first_mask;
 
   if constexpr (((OFFSET & 0x1Fu) + SIZE) > 32u) {
     constexpr uint32_t second_index = first_index + 1u;
     constexpr uint32_t second_mask  = (1u << (((OFFSET & 0x1Fu) + SIZE) - 32u)) - 1u;
     constexpr uint32_t second_shift = 32u - (OFFSET & 0x1Fu);
 
-    result |= (ctx.data[second_index] & second_mask) << second_shift;
+    result |= (param.data[second_index] & second_mask) << second_shift;
   }
 
   return result;
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION void material_param_set_data(MaterialContext<MATERIAL_GEOMETRY>& ctx, const uint32_t value) {
+LUMINARY_FUNCTION void material_param_set_data(MaterialParams& param, const uint32_t value) {
   constexpr uint32_t OFFSET = MATERIAL_GEOMETRY_PARAM_GET_OFFSET(PARAM);
   constexpr uint32_t SIZE   = MATERIAL_GEOMETRY_PARAM_GET_SIZE(PARAM);
 
@@ -146,18 +138,18 @@ LUMINARY_FUNCTION void material_param_set_data(MaterialContext<MATERIAL_GEOMETRY
   constexpr uint32_t first_src_mask = (SIZE < 32u) ? ((1u << SIZE) - 1u) : 0xFFFFFFFFu;
   constexpr uint32_t first_shift    = OFFSET & 0x1Fu;
 
-  ctx.data[first_index] = (ctx.data[first_index] & ~(first_src_mask << first_shift)) | ((value & first_src_mask) << first_shift);
+  param.data[first_index] = (param.data[first_index] & ~(first_src_mask << first_shift)) | ((value & first_src_mask) << first_shift);
 
   if constexpr (((OFFSET & 0x1Fu) + SIZE) > 32u) {
     constexpr uint32_t second_index = first_index + 1u;
     constexpr uint32_t second_shift = 32u - (OFFSET & 0x1Fu);
 
-    ctx.data[second_index] = (ctx.data[second_index] & ~(first_src_mask >> second_shift)) | ((value & first_src_mask) >> second_shift);
+    param.data[second_index] = (param.data[second_index] & ~(first_src_mask >> second_shift)) | ((value & first_src_mask) >> second_shift);
   }
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION float material_get_float(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {
+LUMINARY_FUNCTION float material_get_float(const MaterialParams& param) {
   static_assert(
     MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_NORM_COLOR
       && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_COLOR
@@ -167,7 +159,7 @@ LUMINARY_FUNCTION float material_get_float(const MaterialContext<MATERIAL_GEOMET
   constexpr uint32_t SIZE          = MATERIAL_GEOMETRY_PARAM_GET_SIZE(PARAM);
   constexpr MaterialParamType TYPE = MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM);
 
-  const uint32_t data = material_param_get_data<PARAM>(ctx);
+  const uint32_t data = material_param_get_data<PARAM>(param);
 
   float result = data * (1.0f / ((1u << SIZE) - 1));
 
@@ -188,13 +180,13 @@ LUMINARY_FUNCTION float material_get_float(const MaterialContext<MATERIAL_GEOMET
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION RGBF material_get_color(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {
+LUMINARY_FUNCTION RGBF material_get_color(const MaterialParams& param) {
   static_assert(
     MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_NORM_COLOR
       || MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_COLOR,
     "PARAM must be color type.");
 
-  const uint32_t data = material_param_get_data<PARAM>(ctx);
+  const uint32_t data = material_param_get_data<PARAM>(param);
 
   RGBF result;
   if constexpr (MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_NORM_COLOR) {
@@ -237,7 +229,7 @@ LUMINARY_FUNCTION RGBF material_get_color(const MaterialContext<MATERIAL_GEOMETR
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION vec3 material_get_normal(const MaterialContext<MATERIAL_GEOMETRY>& ctx) {
+LUMINARY_FUNCTION vec3 material_get_normal(const MaterialParams& param) {
   static_assert(MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_PACKED_NORMAL, "PARAM must be packed normal type.");
 
   const uint32_t data = material_param_get_data<PARAM>(ctx);
@@ -246,7 +238,7 @@ LUMINARY_FUNCTION vec3 material_get_normal(const MaterialContext<MATERIAL_GEOMET
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION void material_set_float(MaterialContext<MATERIAL_GEOMETRY>& ctx, const float value) {
+LUMINARY_FUNCTION void material_set_float(MaterialParams& param, const float value) {
   static_assert(
     MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_NORM_COLOR
       && MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) != MATERIAL_PARAM_TYPE_COLOR
@@ -275,11 +267,11 @@ LUMINARY_FUNCTION void material_set_float(MaterialContext<MATERIAL_GEOMETRY>& ct
 
   const uint32_t data = (uint32_t) value_remapped;
 
-  material_param_set_data<PARAM>(ctx, data);
+  material_param_set_data<PARAM>(param, data);
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION void material_set_color(MaterialContext<MATERIAL_GEOMETRY>& ctx, const RGBF value) {
+LUMINARY_FUNCTION void material_set_color(MaterialParams& param, const RGBF value) {
   static_assert(
     MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_NORM_COLOR
       || MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_COLOR,
@@ -329,16 +321,26 @@ LUMINARY_FUNCTION void material_set_color(MaterialContext<MATERIAL_GEOMETRY>& ct
     data = data_max_value | (data_lower_relative << 14) | (data_higher_relative << 22) | (max_component << 30);
   }
 
-  material_param_set_data<PARAM>(ctx, data);
+  material_param_set_data<PARAM>(param, data);
 }
 
 template <MaterialGeometryParam PARAM>
-LUMINARY_FUNCTION void material_set_normal(MaterialContext<MATERIAL_GEOMETRY>& ctx, const vec3 value) {
+LUMINARY_FUNCTION void material_set_normal(MaterialParams& param, const vec3 value) {
   static_assert(MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_PACKED_NORMAL, "PARAM must be packed normal type.");
 
   const uint32_t data = normal_pack(value);
 
-  material_param_set_data<PARAM>(ctx, data);
+  material_param_set_data<PARAM>(param, data);
+}
+
+LUMINARY_FUNCTION void material_params_get_set_default(MaterialParams& params) {
+  params.flags = 0;
+
+  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(params, splat_color(1.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(params, 1.0f);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params, 0.5f);
+  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(params, splat_color(0.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(params, 1.0f);
 }
 
 LUMINARY_FUNCTION MaterialContextGeometry material_get_default_context() {
@@ -350,14 +352,8 @@ LUMINARY_FUNCTION MaterialContextGeometry material_get_default_context() {
   ctx.position    = get_vector(0.0f, 0.0f, 0.0f);
   ctx.V           = get_vector(0.0f, 0.0f, 1.0f);
   ctx.state       = 0;
-  ctx.flags       = 0;
 
-  material_set_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx, get_vector(0.0f, 0.0f, 1.0f));
-  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
-  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, 0.5f);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
-  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, 1.0f);
+  material_params_get_set_default(ctx.params);
 
   return ctx;
 }

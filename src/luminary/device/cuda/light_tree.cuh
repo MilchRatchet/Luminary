@@ -78,7 +78,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
   const float inv_dist_sq = 1.0f / (dist_sq + variance);
 
   float result = power * inv_dist_sq;
-  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.flags))
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.params.flags))
     return result;
 
   const float t     = variance * inv_dist_sq;

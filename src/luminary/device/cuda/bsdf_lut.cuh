@@ -30,11 +30,11 @@ LUMINARY_KERNEL void bsdf_generate_ss_lut(KernelArgsBSDFGenerateSSLUT args) {
   const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
 
   MaterialContextGeometry ctx = material_get_default_context();
-  ctx.flags                   = MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE | MATERIAL_FLAG_METALLIC;
+  ctx.params.flags            = MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE | MATERIAL_FLAG_METALLIC;
   ctx.normal                  = get_vector(0.0f, 0.0f, 1.0f);
   ctx.V                       = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
 
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, roughness);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
 
   float sum = 0.0f;
 
@@ -67,11 +67,11 @@ LUMINARY_KERNEL void bsdf_generate_glossy_lut(KernelArgsBSDFGenerateGlossyLUT ar
   const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
 
   MaterialContextGeometry ctx = material_get_default_context();
-  ctx.flags                   = MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE | MATERIAL_FLAG_METALLIC;
+  ctx.params.flags            = MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE | MATERIAL_FLAG_METALLIC;
   ctx.normal                  = get_vector(0.0f, 0.0f, 1.0f);
   ctx.V                       = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
 
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, roughness);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
 
   const RGBF f0 = get_color(0.04f, 0.04f, 0.04f);
 
@@ -115,12 +115,12 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
   const float ior       = 1.0f + z * (1.0f / (BSDF_LUT_SIZE - 1)) * 2.0f;
 
   MaterialContextGeometry ctx = material_get_default_context();
-  ctx.flags                   = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
+  ctx.params.flags            = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
   ctx.normal                  = get_vector(0.0f, 0.0f, 1.0f);
   ctx.V                       = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
 
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, roughness);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, 1.0f / ior);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, 1.0f / ior);
 
   float sum = 0.0f;
   bool total_reflection;
@@ -160,7 +160,7 @@ LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectr
   // Ceil because underestimating energy causes excessive energy.
   args.dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 
-  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, ior);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, ior);
 
   sum = 0.0f;
 
