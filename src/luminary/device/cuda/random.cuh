@@ -60,6 +60,7 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(LIGHT_BSDF_CHOICE, 1, 1)                                                              //
   RANDOM_ALLOCATE(LIGHT_BSDF_DIRECTION, 1, 1)                                                           //
   RANDOM_ALLOCATE(LIGHT_BSDF_TRACE, 1, 1)                                                               //
+  RANDOM_ALLOCATE(LIGHT_BSDF_RR, 1, 1)                                                                  //
 
   RANDOM_TARGET_COUNT
 } typedef RandomTarget;

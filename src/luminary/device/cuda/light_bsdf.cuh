@@ -17,6 +17,10 @@ LUMINARY_FUNCTION float light_bsdf_get_sampling_roughness(const float roughness)
   return lerp(roughness, 1.0f, 0.04f);
 }
 
+LUMINARY_FUNCTION float light_bsdf_get_russian_roulette_probability(const float roughness) {
+  return remap01(roughness, 0.5f, 0.1f);
+}
+
 LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialContextGeometry& mat_ctx, const ushort2 pixel) {
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
@@ -42,7 +46,18 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
   if (technique_id == 1 && include_refraction)
     technique = LIGHT_BSDF_SAMPLE_TECHNIQUE_MICROFACET_REFRACTION;
 
-  const float roughness          = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
+  const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
+
+  const float randomRR                     = random_1D(RANDOM_TARGET_LIGHT_BSDF_RR, pixel);
+  const float russian_roulette_probability = light_bsdf_get_russian_roulette_probability(roughness);
+
+  if (randomRR >= russian_roulette_probability) {
+    LightBSDFSampleResult result;
+    result.sampling_probability = 0.0f;
+
+    return result;
+  }
+
   const float sampling_roughness = light_bsdf_get_sampling_roughness(roughness);
 
   LightBSDFSampleResult result;
@@ -82,6 +97,9 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
       break;
   }
 
+  result.weight = scale_color(result.weight, 1.0f / russian_roulette_probability);
+  result.sampling_probability *= russian_roulette_probability;
+
   result.ray = normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), result.ray));
 
   return result;
@@ -120,6 +138,9 @@ LUMINARY_FUNCTION float light_bsdf_get_probability(const MaterialContextGeometry
 
     sampling_probability = (1.0f - refraction_probability) * microfacet_reflection_pdf;
   }
+
+  const float russian_roulette_probability = light_bsdf_get_russian_roulette_probability(roughness);
+  sampling_probability *= russian_roulette_probability;
 
   return sampling_probability;
 }
