@@ -14,7 +14,8 @@ enum OptixKernelFunctionPayloadTypeID {
   OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_GEOMETRY_TRACE   = (1u << OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE),
   OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_PARTICLE_TRACE   = (1u << OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE),
   OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_TRACE     = (1u << OPTIX_KERNEL_FUNCTION_SHADOW_TRACE),
-  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_SUN_TRACE = (1u << OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE)
+  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_SHADOW_SUN_TRACE = (1u << OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE),
+  OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_LIGHT_BSDF_TRACE = (1u << OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE)
 } typedef OptixKernelFunctionPayloadTypeID;
 
 #define OPTIX_TRACE_PAYLOAD_ID(__macro_optix_kernel_function_name) \
@@ -28,7 +29,8 @@ enum OptixKernelFunctionSBTOffset {
   OPTIX_KERNEL_FUNCTION_SBT_OFFSET_GEOMETRY_TRACE   = OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE,
   OPTIX_KERNEL_FUNCTION_SBT_OFFSET_PARTICLE_TRACE   = OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE,
   OPTIX_KERNEL_FUNCTION_SBT_OFFSET_SHADOW_TRACE     = OPTIX_KERNEL_FUNCTION_SHADOW_TRACE,
-  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_SHADOW_SUN_TRACE = OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE
+  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_SHADOW_SUN_TRACE = OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE,
+  OPTIX_KERNEL_FUNCTION_SBT_OFFSET_LIGHT_BSDF_TRACE = OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE
 } typedef OptixKernelFunctionSBTOffset;
 
 #define OPTIX_TRACE_SBT_OFFSET(__macro_optix_kernel_function_name) \
@@ -77,6 +79,17 @@ static LUMINARY_FUNCTION void optixKernelFunctionShadowSunTrace(
   optixTrace(
     OPTIX_TRACE_PAYLOAD_ID(SHADOW_SUN_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
     actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
+    payload.v3, payload.v4);
+}
+
+static LUMINARY_FUNCTION void optixKernelFunctionLightBSDFTrace(
+  const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
+  const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, const OptixTraceStatus status,
+  OptixKernelFunctionLightBSDFTracePayload& payload) {
+  const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
+  optixTrace(
+    OPTIX_TRACE_PAYLOAD_ID(LIGHT_BSDF_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
+    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(LIGHT_BSDF_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
     payload.v3, payload.v4);
 }
 
@@ -165,12 +178,12 @@ LUMINARY_FUNCTION void optixSetPayloadColor(const uint32_t kernel_function_color
   optixSetPayloadGeneric(kernel_function_color_index + 2, __float_as_uint(color.b));
 }
 
-LUMINARY_FUNCTION float optixGetPayloadDepth(const uint32_t kernel_function_depth_index) {
-  return __uint_as_float(optixGetPayloadGeneric(kernel_function_depth_index));
+LUMINARY_FUNCTION float optixGetPayloadFloat(const uint32_t kernel_function_payload_index) {
+  return __uint_as_float(optixGetPayloadGeneric(kernel_function_payload_index));
 }
 
-LUMINARY_FUNCTION void optixSetPayloadDepth(const uint32_t kernel_function_depth_index, const float depth) {
-  optixSetPayloadGeneric(kernel_function_depth_index, __float_as_uint(depth));
+LUMINARY_FUNCTION void optixSetPayloadFloat(const uint32_t kernel_function_payload_index, const float value) {
+  optixSetPayloadGeneric(kernel_function_payload_index, __float_as_uint(value));
 }
 
 #endif

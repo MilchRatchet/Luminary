@@ -40,6 +40,15 @@ struct LightSampleResult {
 };
 
 template <>
+struct LightSampleResult<MATERIAL_GEOMETRY> {
+  uint32_t light_id;
+  vec3 ray;
+  RGBF light_color;
+  float dist;
+  float light_tree_root_sum;
+};
+
+template <>
 struct LightSampleResult<MATERIAL_VOLUME> {
   uint32_t light_id;
   RGBF light_color;
@@ -47,6 +56,13 @@ struct LightSampleResult<MATERIAL_VOLUME> {
   Quaternion rotation;
   float scale;
 };
+
+struct LightBSDFSampleResult {
+  vec3 ray;
+  RGBF weight;
+  float sampling_probability;
+  bool is_refraction;
+} typedef LightBSDFSampleResult;
 
 /*
  * This struct is computed on the device when needed, it is not stored in memory.

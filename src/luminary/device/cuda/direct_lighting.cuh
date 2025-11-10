@@ -9,6 +9,7 @@
 #include "material.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "particle_utils.cuh"
 #include "random.cuh"
 #include "sky.cuh"
 #include "utils.cuh"
@@ -332,13 +333,29 @@ LUMINARY_FUNCTION bool direct_lighting_bridges_is_allowed(const MaterialContextV
   return allow_geometry_lighting;
 }
 
+LUMINARY_FUNCTION bool direct_lighting_bsdf_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
+  bool allow_geometry_lighting = true;
+
+  allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
+  allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
+  allow_geometry_lighting &= particle_is_hit(trace.handle) == false;
+
+  return allow_geometry_lighting;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Main functions
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION DeviceTaskDirectLightGeo direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION DeviceTaskDirectLightGeo
+  direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel, float& light_tree_root_sum) {
   LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
+
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    light_tree_root_sum = sample.light_tree_root_sum;
+  else
+    light_tree_root_sum = 0.0f;
 
   ////////////////////////////////////////////////////////////////////
   // Volume transmittance
@@ -423,6 +440,24 @@ LUMINARY_FUNCTION DeviceTaskDirectLightBridges direct_lighting_bridges_create_ta
   task.rotation    = quaternion_pack(sample.rotation);
   task.scale       = sample.scale;
   task.seed        = sample.seed;
+
+  return task;
+}
+
+template <MaterialType TYPE>
+LUMINARY_FUNCTION DeviceTaskDirectLightBSDF
+  direct_lighting_bsdf_create_task(const MaterialContext<TYPE>& ctx, const ushort2 index, const float light_tree_root_sum) {
+  LightBSDFSampleResult sample = light_bsdf_sample(ctx, index);
+
+  ////////////////////////////////////////////////////////////////////
+  // Create task
+  ////////////////////////////////////////////////////////////////////
+
+  DeviceTaskDirectLightBSDF task;
+  task.weight               = sample.weight;
+  task.ray                  = sample.ray;
+  task.sampling_probability = sample.sampling_probability;
+  task.light_tree_root_sum  = light_tree_root_sum;
 
   return task;
 }
@@ -575,6 +610,66 @@ LUMINARY_FUNCTION RGBF direct_lighting_bridges_evaluate_task(
   const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
 
   return bridges_sample_apply_shadowing(ctx, direct_light_task, index, sample_is_valid);
+}
+
+LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightBSDF& direct_light_task, const bool is_allowed) {
+  const TriangleHandle blocked_handle = trace.handle;
+
+  bool sample_is_valid = is_allowed && direct_light_task.sampling_probability != 0.0f;
+
+  OptixTraceStatus trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+
+  OptixKernelFunctionLightBSDFTracePayload payload;
+  payload.ignore_handle     = blocked_handle;
+  payload.random            = random_1D(RANDOM_TARGET_LIGHT_BSDF_TRACE, task.index);
+  payload.num_hit_lights    = 0;
+  payload.selected_light_id = LIGHT_ID_INVALID;
+
+  optixKernelFunctionLightBSDFTrace(
+    device.optix_bvh_light, task.origin, direct_light_task.ray, eps, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF),
+    OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT, trace_status, payload);
+
+  const uint32_t light_id = payload.selected_light_id;
+
+  sample_is_valid &= light_id != LIGHT_ID_INVALID;
+
+  float dist                  = FLT_MAX;
+  TriangleHandle light_handle = TRIANGLE_HANDLE_INVALID;
+  RGBF light_color            = splat_color(0.0f);
+  if (light_id != LIGHT_ID_INVALID) {
+    DeviceTransform trans;
+    light_handle = light_tree_get_light(light_id, trans);
+
+    uint3 light_uv_packed;
+    TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
+
+    if (light_triangle_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, task.origin, direct_light_task.ray, dist)) {
+      light_color = light_get_color(triangle_light);
+
+      const float mis_weight = mis_compute_weight_gi(
+        task.origin, triangle_light, light_color, dist, direct_light_task.sampling_probability, direct_light_task.light_tree_root_sum);
+
+      light_color = scale_color(light_color, mis_weight * payload.num_hit_lights);
+      light_color = mul_color(light_color, direct_light_task.weight);
+    }
+    else {
+      sample_is_valid = false;
+    }
+  }
+
+  ShadowTraceTask shadow_task;
+  shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
+  shadow_task.origin       = task.origin;
+  shadow_task.ray          = direct_light_task.ray;
+  shadow_task.limit        = dist;
+  shadow_task.target_light = light_handle;
+
+  const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
+
+  light_color = mul_color(light_color, visibility);
+
+  return light_color;
 }
 
 #endif /* OPTIX_KERNEL */

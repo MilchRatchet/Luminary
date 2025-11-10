@@ -22,14 +22,16 @@ struct OptixKernelConfig {
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
   [OPTIX_KERNEL_TYPE_RAYTRACE]      = {.name = "optix_kernel_raytrace", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADOW]        = {.name = "optix_kernel_shadow", .register_count = 40, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADOW]        = {.name = "optix_kernel_shadow", .register_count = 40, .allow_gas = true},
   [OPTIX_KERNEL_TYPE_SHADOW_VOLUME] = {.name = "optix_kernel_shadow_volume", .register_count = 40, .allow_gas = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
-  "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__shadow_trace", "__anyhit__shadow_sun_trace"};
+  "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__shadow_trace", "__anyhit__shadow_sun_trace",
+  "__anyhit__light_bsdf_trace"};
 
 static const char* optix_closesthit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
-  "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__shadow_trace", "__closesthit__shadow_sun_trace"};
+  "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__shadow_trace", "__closesthit__shadow_sun_trace",
+  "__closesthit__light_bsdf_trace"};
 
 static const uint32_t optix_kernel_function_payload_semantics_geometry_trace[OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_COUNT] = {
   [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_DEPTH] =
@@ -73,6 +75,18 @@ static const uint32_t optix_kernel_function_payload_semantics_shadow_sun_trace[O
    [OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT3] =
      OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE};
 
+static const uint32_t optix_kernel_function_payload_semantics_light_bsdf_trace[OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT] =
+  {[OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE] =
+     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_NONE | OPTIX_PAYLOAD_SEMANTICS_AH_READ,
+   [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2] =
+     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_NONE | OPTIX_PAYLOAD_SEMANTICS_AH_READ,
+   [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_SELECTED_LIGHT_ID] =
+     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_NONE | OPTIX_PAYLOAD_SEMANTICS_AH_WRITE,
+   [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS] =
+     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_NONE | OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE,
+   [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM] =
+     OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_NONE | OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE};
+
 static const OptixPayloadType optix_kernel_function_payload_types[OPTIX_KERNEL_FUNCTION_COUNT] = {
   [OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE] =
     {.numPayloadValues = OPTIX_KERNEL_FUNCTION_GEOMETRY_TRACE_PAYLOAD_VALUE_COUNT,
@@ -83,9 +97,12 @@ static const OptixPayloadType optix_kernel_function_payload_types[OPTIX_KERNEL_F
   [OPTIX_KERNEL_FUNCTION_SHADOW_TRACE] =
     {.numPayloadValues = OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_COUNT,
      .payloadSemantics = optix_kernel_function_payload_semantics_shadow_trace},
-  [OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE] = {
-    .numPayloadValues = OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_COUNT,
-    .payloadSemantics = optix_kernel_function_payload_semantics_shadow_sun_trace}};
+  [OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE] =
+    {.numPayloadValues = OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_COUNT,
+     .payloadSemantics = optix_kernel_function_payload_semantics_shadow_sun_trace},
+  [OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE] = {
+    .numPayloadValues = OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT,
+    .payloadSemantics = optix_kernel_function_payload_semantics_light_bsdf_trace}};
 
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type) {
   __CHECK_NULL_ARGUMENT(kernel);

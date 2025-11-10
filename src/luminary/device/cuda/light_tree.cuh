@@ -29,6 +29,7 @@ LUM_STATIC_SIZE_ASSERT(LightTreeResult, 0x08);
 
 struct LightTreeWork {
   LightTreeContinuation data[LIGHT_TREE_NUM_OUTPUTS];
+  float root_sum;
 } typedef LightTreeWork;
 
 #ifdef LIGHT_TREE_DEBUG_TRAVERSAL
@@ -77,7 +78,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
   const float inv_dist_sq = 1.0f / (dist_sq + variance);
 
   float result = power * inv_dist_sq;
-  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.flags))
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.params.flags))
     return result;
 
   const float t     = variance * inv_dist_sq;
@@ -215,12 +216,17 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   const float exp_v = exp2f(header.exp_std_dev);
 
   uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
+  float sum = 0.0f;
 
   LUMINARY_ASSUME(header.num_sections <= LIGHT_TREE_ROOT_MAX_NUM_SECTIONS);
 
 #pragma nounroll
   for (uint32_t section_id = 0; section_id < header.num_sections; section_id++) {
     const DeviceLightTreeRootSection section = load_light_tree_root_section(section_id);
+
+    static_assert(
+      sizeof(section.rel_power[0]) == 2,
+      "The root sum is normalized based on the rel_power because we don't do it in the importance function.");
 
 #pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
@@ -229,6 +235,9 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
       if (ris_sample.resampling_probability == 0.0f)
         continue;
+
+      if constexpr (TYPE == MATERIAL_GEOMETRY)
+        sum += target;
 
 #pragma unroll
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
@@ -242,6 +251,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   }
 
   LightTreeWork work;
+  work.root_sum = sum * (bfloat_unpack(header.power_normalization) / 0xFFFF);
 
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {

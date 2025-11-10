@@ -7,6 +7,16 @@
 #include "host_intrinsics.h"
 #include "mesh.h"
 
+struct Device typedef Device;
+struct OptixBVH typedef OptixBVH;
+
+struct LightTreeBVHTriangle {
+  Vec128 vertex;
+  Vec128 vertex1;
+  Vec128 vertex2;
+} typedef LightTreeBVHTriangle;
+LUM_STATIC_SIZE_ASSERT(LightTreeBVHTriangle, 3 * sizeof(Vec128));
+
 struct LightTreeFragment {
   Vec128 high;
   Vec128 low;
@@ -41,7 +51,7 @@ struct LightTreeCacheMesh {
   uint32_t instance_count;
   bool has_emission;
   ARRAY uint16_t* materials;
-  ARRAY LightTreeCacheTriangle* ARRAY* material_triangles;
+  ARRAY LightTreeCacheTriangle * ARRAY * material_triangles;
 } typedef LightTreeCacheMesh;
 
 struct LightTreeCacheInstance {
@@ -51,7 +61,8 @@ struct LightTreeCacheInstance {
   vec3 scale;
   vec3 translation;
   bool is_dirty;
-  ARRAY LightTreeFragment* fragments; /* Computed during build step */
+  ARRAY LightTreeFragment* fragments;        /* Computed during build step */
+  ARRAY LightTreeBVHTriangle* bvh_triangles; /* Computed during build step */
 } typedef LightTreeCacheInstance;
 
 struct LightTreeCacheMaterial {
@@ -98,11 +109,10 @@ struct LightTree {
   size_t nodes_size;
   void* tri_handle_map_data;
   size_t tri_handle_map_size;
+  void* bvh_vertex_buffer_data;
+  size_t bvh_vertex_buffer_size;
   uint32_t light_count;
-  DeviceLightSceneData scene_data;
 } typedef LightTree;
-
-struct Device typedef Device;
 
 LuminaryResult light_tree_create(LightTree** tree);
 

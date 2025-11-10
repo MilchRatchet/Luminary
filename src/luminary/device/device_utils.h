@@ -162,8 +162,10 @@ struct float4 {
 typedef uint16_t BFloat16;
 typedef uint16_t UnsignedBFloat16;
 typedef uint2 PackedRecord;
-typedef uint2 PackedMISPayload;
 typedef uint2 PackedRayDirection;
+typedef uint2 PackedPosition;
+typedef uint32_t PackedNormal;
+typedef uint32_t PackedUV;
 
 #define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
 
@@ -228,8 +230,7 @@ enum MaterialFlag {
   MATERIAL_FLAG_BASE_SUBSTRATE_MASK        = 1,
   MATERIAL_FLAG_REFRACTION_IS_INSIDE       = 0b10,
   MATERIAL_FLAG_METALLIC                   = 0b100,
-  MATERIAL_FLAG_COLORED_TRANSPARENCY       = 0b1000,
-  MATERIAL_FLAG_VOLUME_SCATTERED           = 0b10000
+  MATERIAL_FLAG_COLORED_TRANSPARENCY       = 0b1000
 } typedef MaterialFlag;
 
 #define MATERIAL_IS_SUBSTRATE_OPAQUE(__internal_macro_flags) \
@@ -278,7 +279,7 @@ struct DeviceLightTreeRootHeader {
   uint16_t y;
   uint16_t z;
   uint16_t num_root_lights;
-  uint16_t padding;
+  uint16_t power_normalization;
   uint8_t num_sections;
   uint8_t padding1;
   int8_t exp_x;
@@ -296,16 +297,6 @@ struct DeviceLightTreeRootSection {
   uint16_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
 } typedef DeviceLightTreeRootSection;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
-
-struct MISPayload {
-  float sampling_probability;
-  vec3 origin;
-} typedef MISPayload;
-
-struct DeviceLightSceneData {
-  float total_power;
-  uint32_t num_lights;
-} typedef DeviceLightSceneData;
 
 #define MAX_NUM_INDIRECT_BUCKETS 3
 
@@ -345,7 +336,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 
 struct DeviceTaskThroughput {
   PackedRecord record;
-  PackedMISPayload payload;
+  uint2 padding;
 } typedef DeviceTaskThroughput;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
 
@@ -380,6 +371,14 @@ struct DeviceTaskDirectLightAmbient {
 } typedef DeviceTaskDirectLightAmbient;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightAmbient, 0x10);
 
+struct DeviceTaskDirectLightBSDF {
+  RGBF weight;
+  vec3 ray;
+  float light_tree_root_sum;
+  float sampling_probability;
+} typedef DeviceTaskDirectLightBSDF;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightBSDF, 0x20);
+
 struct DeviceTaskDirectLightBridges {
   uint32_t light_id;
   RGBF light_color;
@@ -391,13 +390,21 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightBridges, 0x20);
 
 struct DeviceTaskDirectLight {
   union {
-    DeviceTaskDirectLightGeo geo;
-    DeviceTaskDirectLightBridges bridges;
+    // Geometry, Particle
+    struct {
+      DeviceTaskDirectLightGeo geo;
+      DeviceTaskDirectLightBSDF bsdf;
+    };
+    // Volume
+    struct {
+      DeviceTaskDirectLightBridges bridges;
+    };
   };
   DeviceTaskDirectLightSun sun;
+  // TODO: Do this only for underwater in the future, the rest does not need it.
   DeviceTaskDirectLightAmbient ambient;
 } typedef DeviceTaskDirectLight;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x40);
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x60);
 
 ////////////////////////////////////////////////////////////////////
 // Globals
@@ -430,7 +437,6 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
-  DEVICE const DeviceLightSceneData* LUM_RESTRICT light_scene_data;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
@@ -499,6 +505,7 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_particles;
+  OptixTraversableHandle optix_bvh_light;
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   DeviceTextureObject moon_albedo_tex;
   DeviceTextureObject moon_normal_tex;

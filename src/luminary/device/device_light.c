@@ -913,8 +913,9 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
   const float compression_z = 1.0f / exp2f(header.exp_z);
   const float compression_v = 1.0f / exp2f(header.exp_std_dev);
 
-  header.num_sections    = (child_count + LIGHT_TREE_MAX_CHILDREN_PER_SECTION - 1) / LIGHT_TREE_MAX_CHILDREN_PER_SECTION;
-  header.num_root_lights = num_lights;
+  header.num_sections        = (child_count + LIGHT_TREE_MAX_CHILDREN_PER_SECTION - 1) / LIGHT_TREE_MAX_CHILDREN_PER_SECTION;
+  header.num_root_lights     = num_lights;
+  header.power_normalization = device_pack_float(max_power, DEVICE_PACK_FLOAT_ROUNDING_MODE_CEIL);
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   info_message("======= ROOT =======");
@@ -1233,6 +1234,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   TriangleHandle* tri_handle_map;
   __FAILURE_HANDLE(host_malloc(&tri_handle_map, sizeof(TriangleHandle) * work->fragments_count));
 
+  LightTreeBVHTriangle* bvh_triangles;
+  __FAILURE_HANDLE(host_malloc(&bvh_triangles, sizeof(LightTreeBVHTriangle) * work->fragments_count));
+
   for (uint32_t id = 0; id < work->fragments_count; id++) {
     const LightTreeFragment frag = work->fragments[id];
 
@@ -1244,6 +1248,7 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
     const TriangleHandle handle = (TriangleHandle) {.instance_id = frag.instance_id, .tri_id = triangle->tri_id};
 
     tri_handle_map[id] = handle;
+    bvh_triangles[id]  = instance->bvh_triangles[frag.instance_cache_tri_id];
   }
 
   // TODO: This is inefficient, I take the array data and turn it into generic memory.
@@ -1275,6 +1280,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
   tree->tri_handle_map_size = sizeof(TriangleHandle) * work->fragments_count;
   tree->tri_handle_map_data = (void*) tri_handle_map;
+
+  tree->bvh_vertex_buffer_size = sizeof(LightTreeBVHTriangle) * work->fragments_count;
+  tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
 
   tree->light_count = work->fragments_count;
 
@@ -2022,6 +2030,10 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
     __FAILURE_HANDLE(array_destroy(&instance->fragments));
   }
 
+  if (instance->bvh_triangles) {
+    __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
+  }
+
   if (instance->mesh_id == MESH_ID_INVALID)
     return LUMINARY_SUCCESS;
 
@@ -2037,6 +2049,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_cached_materials));
 
   __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), 16));
+  __FAILURE_HANDLE(array_create(&instance->bvh_triangles, sizeof(LightTreeBVHTriangle), 16));
 
   for (uint32_t material_slot_id = 0; material_slot_id < num_materials; material_slot_id++) {
     const uint16_t material_id = mesh->materials[material_slot_id];
@@ -2083,7 +2096,16 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       fragment.material_slot_id  = material_slot_id;
       fragment.material_tri_id   = tri_id;
 
+      __FAILURE_HANDLE(array_get_num_elements(instance->bvh_triangles, &fragment.instance_cache_tri_id));
+
       __FAILURE_HANDLE(array_push(&instance->fragments, &fragment));
+
+      LightTreeBVHTriangle bvh_triangle;
+      bvh_triangle.vertex  = vertex;
+      bvh_triangle.vertex1 = vertex1;
+      bvh_triangle.vertex2 = vertex2;
+
+      __FAILURE_HANDLE(array_push(&instance->bvh_triangles, &bvh_triangle));
     }
   }
 
@@ -2171,7 +2193,6 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(LightTreeFragment) * work->fragments_count));
 
   uint32_t fragment_offset = 0;
-  float total_power        = 0.0f;
 
   for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
     LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
@@ -2182,38 +2203,10 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
     uint32_t num_fragments;
     __FAILURE_HANDLE(array_get_num_elements(instance->fragments, &num_fragments));
 
-    for (uint32_t fragment_id = 0; fragment_id < num_fragments; fragment_id++) {
-      const LightTreeFragment fragment = instance->fragments[fragment_id];
-
-      total_power += fragment.power;
-
-      work->fragments[fragment_offset + fragment_id] = fragment;
-    }
+    memcpy(work->fragments + fragment_offset, instance->fragments, num_fragments * sizeof(LightTreeFragment));
 
     fragment_offset += num_fragments;
   }
-
-  Vec128 mean = vec128_set_1(0.0f);
-
-  for (uint32_t fragment_id = 0; fragment_id < total_fragments; fragment_id++) {
-    const LightTreeFragment fragment = work->fragments[fragment_id];
-
-    mean = vec128_add(mean, vec128_scale(fragment.middle, fragment.power / total_power));
-  }
-
-  float sum_one_over_distance_sq = 0.0f;
-
-  for (uint32_t fragment_id = 0; fragment_id < total_fragments; fragment_id++) {
-    const LightTreeFragment fragment = work->fragments[fragment_id];
-
-    const Vec128 diff   = vec128_sub(fragment.middle, mean);
-    const float dist_sq = vec128_dot(diff, diff);
-
-    sum_one_over_distance_sq += (1.0f / dist_sq) * (fragment.power / total_power);
-  }
-
-  tree->scene_data.total_power = total_power * sum_one_over_distance_sq;
-  tree->scene_data.num_lights  = total_fragments;
 
   return LUMINARY_SUCCESS;
 }
@@ -2234,6 +2227,11 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
   if (tree->tri_handle_map_data) {
     __FAILURE_HANDLE(host_free(&tree->tri_handle_map_data));
     tree->tri_handle_map_size = 0;
+  }
+
+  if (tree->bvh_vertex_buffer_data) {
+    __FAILURE_HANDLE(host_free(&tree->bvh_vertex_buffer_data));
+    tree->bvh_vertex_buffer_size = 0;
   }
 
   return LUMINARY_SUCCESS;
@@ -2328,6 +2326,10 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
 
     if (instance->fragments) {
       __FAILURE_HANDLE(array_destroy(&instance->fragments));
+    }
+
+    if (instance->bvh_triangles) {
+      __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
     }
   }
 

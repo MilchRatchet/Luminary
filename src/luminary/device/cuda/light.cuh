@@ -5,6 +5,7 @@
 #include "hashmap.cuh"
 #include "intrinsics.cuh"
 #include "light_bridges.cuh"
+#include "light_bsdf.cuh"
 #include "light_common.cuh"
 #include "light_microtriangle.cuh"
 #include "light_tree.cuh"
@@ -48,7 +49,8 @@ LUMINARY_FUNCTION TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(con
 template <MaterialType TYPE>
 LUMINARY_FUNCTION void light_evaluate_candidate(
   const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
-  const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<TYPE>& result) {
+  const float tree_sampling_weight, const uint32_t output_id, const float tree_root_sum, RISReservoir& reservoir,
+  LightSampleResult<TYPE>& result) {
   const float2 ray_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_GEO::RAY + output_id, pixel);
 
   vec3 ray;
@@ -64,7 +66,7 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
   bool is_refraction;
   const RGBF bsdf_weight = bsdf_evaluate(ctx, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
 
-  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, solid_angle, is_refraction);
+  const float mis_weight = mis_compute_weight_dl(ctx, ray, light, light_color, dist, solid_angle, tree_root_sum);
   light_color            = scale_color(mul_color(light_color, bsdf_weight), mis_weight);
   const float target     = color_importance(light_color);
 
@@ -81,7 +83,8 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
 template <>
 LUMINARY_FUNCTION void light_evaluate_candidate<MATERIAL_VOLUME>(
   const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
-  const float tree_sampling_weight, const uint32_t output_id, RISReservoir& reservoir, LightSampleResult<MATERIAL_VOLUME>& result) {
+  const float tree_sampling_weight, const uint32_t output_id, const float tree_root_sum, RISReservoir& reservoir,
+  LightSampleResult<MATERIAL_VOLUME>& result) {
   float2 target_and_weight;
   LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, light_id, light_uv_packed, pixel, output_id, target_and_weight);
 
@@ -107,7 +110,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
 
     const uint32_t light_id = output.light_id;
 
-    if (light_id == 0xFFFFFFFF)
+    if (light_id == LIGHT_ID_INVALID)
       continue;
 
     DeviceTransform trans;
@@ -119,12 +122,16 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    light_evaluate_candidate(ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, reservoir, result);
+    light_evaluate_candidate(
+      ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, light_tree_work.root_sum, reservoir, result);
   }
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
   result.light_color = scale_color(result.light_color, sampling_weight);
+
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    result.light_tree_root_sum = light_tree_work.root_sum;
 
   return result;
 }
@@ -151,6 +158,25 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
   return result;
 }
 
+////////////////////////////////////////////////////////////////////
+// BSDF sampling
+////////////////////////////////////////////////////////////////////
+
+template <MaterialType TYPE>
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+  LightBSDFSampleResult result;
+  result.light_color          = splat_color(0.0f);
+  result.ray                  = get_vector(0.0f, 0.0f, 1.0f);
+  result.sampling_probability = 0.0f;
+
+  return result;
+}
+
+template <>
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx, const ushort2 pixel) {
+  return light_bsdf_get_sample(ctx, pixel);
+}
+
 #ifndef OPTIX_KERNEL
 
 #include "light_microtriangle.cuh"
@@ -162,7 +188,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
 // Light Processing
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION float lights_integrate_emission(
+LUMINARY_FUNCTION float lights_get_max_emission(
   const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2, const uint32_t microtriangle_id) {
   const DeviceTextureObject tex = load_texture_object(material.luminance_tex);
 
@@ -188,8 +214,7 @@ LUMINARY_FUNCTION float lights_integrate_emission(
 
   const float step_size = 1.0f / steps;
 
-  RGBF accumulator     = get_color(0.0f, 0.0f, 0.0f);
-  uint32_t texel_count = 0;
+  RGBF max_emission = get_color(0.0f, 0.0f, 0.0f);
 
   for (float a = 0.0f; a < 1.0f; a += step_size) {
     for (float b = 0.0f; a + b < 1.0f; b += step_size) {
@@ -200,15 +225,11 @@ LUMINARY_FUNCTION float lights_integrate_emission(
 
       const RGBF color = get_color(texel.x, texel.y, texel.z);
 
-      accumulator = add_color(accumulator, color);
-      texel_count++;
+      max_emission = max_color(max_emission, color);
     }
   }
 
-  if (texel_count == 0)
-    return 1.0f;
-
-  return color_importance(accumulator) / texel_count;
+  return color_importance(max_emission);
 }
 
 LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensity args) {
@@ -238,17 +259,15 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
 
-  const float microtriangle_intensity1 =
-    lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);
-  const float microtriangle_intensity2 =
-    lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 1);
+  const float microtriangle_max1 = lights_get_max_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);
+  const float microtriangle_max2 = lights_get_max_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 1);
 
-  const float sum_microtriangle_intensity = microtriangle_intensity1 + microtriangle_intensity2;
+  const float microtriangle_max = fmaxf(microtriangle_max1, microtriangle_max2);
 
-  const float sum_intensity = warp_reduce_sum(sum_microtriangle_intensity);
+  const float max_intensity = warp_reduce_max(microtriangle_max);
 
   if (microtriangle_id == 0) {
-    args.dst_intensities[light_id] = sum_intensity / LIGHT_NUM_MICROTRIANGLES;
+    args.dst_intensities[light_id] = max_intensity;
   }
 }
 

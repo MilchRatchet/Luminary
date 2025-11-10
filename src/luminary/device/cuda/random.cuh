@@ -23,7 +23,6 @@
 
 enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(LENS_METHOD, RANDOM_LENS_MAX_INTERSECTIONS, 1)                                        //
-  RANDOM_ALLOCATE(LENS_RAY, RANDOM_LENS_MAX_INTERSECTIONS, 1)                                           //
   RANDOM_ALLOCATE(LENS, 1, 1)                                                                           //
   RANDOM_ALLOCATE(LENS_BLADE, 1, 1)                                                                     //
   RANDOM_ALLOCATE(LENS_WAVELENGTH, 1, 1)                                                                //
@@ -58,6 +57,10 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_PHASE, (LIGHT_GEO_MAX_SAMPLES * LIGHT_GEO_MAX_BRIDGE_LENGTH), 1)     //
   RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_LIGHT_POINT, LIGHT_GEO_MAX_SAMPLES, 1)                               //
   RANDOM_ALLOCATE(LIGHT_GEO_BRIDGE_VERTEX_COUNT, LIGHT_GEO_MAX_SAMPLES, 1)                              //
+  RANDOM_ALLOCATE(LIGHT_BSDF_CHOICE, 1, 1)                                                              //
+  RANDOM_ALLOCATE(LIGHT_BSDF_DIRECTION, 1, 1)                                                           //
+  RANDOM_ALLOCATE(LIGHT_BSDF_TRACE, 1, 1)                                                               //
+  RANDOM_ALLOCATE(LIGHT_BSDF_RR, 1, 1)                                                                  //
 
   RANDOM_TARGET_COUNT
 } typedef RandomTarget;

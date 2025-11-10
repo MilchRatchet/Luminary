@@ -487,20 +487,20 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
 
   MaterialContextGeometry ctx;
 
-  ctx.instance_id = HIT_TYPE_OCEAN;
-  ctx.tri_id      = 0;
-  ctx.normal      = normal;
-  ctx.position    = task.origin;
-  ctx.V           = scale_vector(task.ray, -1.0f);
-  ctx.state       = task.state;
-  ctx.flags       = flags;
+  ctx.instance_id  = HIT_TYPE_OCEAN;
+  ctx.tri_id       = 0;
+  ctx.normal       = normal;
+  ctx.face_normal  = normal_pack(normal);
+  ctx.position     = task.origin;
+  ctx.V            = scale_vector(task.ray, -1.0f);
+  ctx.state        = task.state;
+  ctx.params.flags = flags;
 
-  material_set_normal<MATERIAL_GEOMETRY_PARAM_FACE_NORMAL>(ctx, normal);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx, splat_color(1.0f));
-  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx, 1.0f);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx, BSDF_ROUGHNESS_CLAMP);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx, splat_color(0.0f));
-  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx, ior_ratio);
+  material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, splat_color(1.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, 1.0f);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, BSDF_ROUGHNESS_CLAMP);
+  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params, splat_color(0.0f));
+  material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, ior_ratio);
 
   return ctx;
 }

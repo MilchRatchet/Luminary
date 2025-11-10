@@ -143,7 +143,6 @@ LUMINARY_KERNEL void tasks_create() {
     // Task Throughput
     ////////////////////////////////////////////////////////////////////
 
-    // MISPayload does not need to be initialized because we allow emission directly.
     task_throughput_record_store(task_base_address, record_pack(camera_result.weight));
   }
 

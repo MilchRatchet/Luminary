@@ -38,7 +38,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     uint16_t volume_id = task.volume_id;
 
     if (bounce_info.is_transparent_pass) {
-      const bool refraction_is_inside       = ctx.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+      const bool refraction_is_inside       = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
       const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
 
@@ -53,7 +53,6 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     uint16_t new_state = task.state;
 
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    new_state &= ~STATE_FLAG_MIS_EMISSION;
     new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
     DeviceTask bounce_task;

@@ -6,6 +6,7 @@ enum OptixKernelFunction {
   OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE,
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE,
   OPTIX_KERNEL_FUNCTION_COUNT
 } typedef OptixKernelFunction;
 
@@ -110,5 +111,43 @@ enum OptixKernelFunctionShadowSunTracePayloadValue {
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_COUNT
 } typedef OptixKernelFunctionShadowSunTracePayloadValue;
+
+struct OptixKernelFunctionLightBSDFTracePayload {
+  union {
+    TriangleHandle ignore_handle;
+
+    struct {
+      unsigned int v0;
+      unsigned int v1;
+    };
+  };
+  union {
+    uint32_t selected_light_id;
+    struct {
+      unsigned int v2;
+    };
+  };
+  union {
+    uint32_t num_hit_lights;
+    struct {
+      unsigned int v3;
+    };
+  };
+  union {
+    float random;
+    struct {
+      unsigned int v4;
+    };
+  };
+} typedef OptixKernelFunctionLightBSDFTracePayload;
+
+enum OptixKernelFunctionLightBSDFTracePayloadValue {
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_SELECTED_LIGHT_ID,
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS,
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM,
+  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_COUNT
+} typedef OptixKernelFunctionLightBSDFTracePayloadValue;
 
 #endif /* LUMINARY_OPTIX_SHARED_H */

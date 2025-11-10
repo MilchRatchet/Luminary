@@ -688,7 +688,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(light_tree_root);
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
-  __DEVICE_BUFFER_FREE(light_scene_data);
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
@@ -795,6 +794,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(array_create(&device->omms, sizeof(OpacityMicromap*), 4));
   __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
+  __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
 
   ////////////////////////////////////////////////////////////////////
   // Initialize processing objects
@@ -1322,7 +1322,6 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __DEVICE_BUFFER_ALLOCATE(light_tree_root, tree->root_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_nodes, tree->nodes_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_tri_handle_map, tree->tri_handle_map_size);
-  __DEVICE_BUFFER_ALLOCATE(light_scene_data, sizeof(DeviceLightSceneData));
 
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->root_data, (DEVICE void*) device->buffers.light_tree_root, 0, tree->root_size));
@@ -1331,8 +1330,10 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->tri_handle_map_data, (DEVICE void*) device->buffers.light_tree_tri_handle_map, 0,
     tree->tri_handle_map_size));
-  __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, &tree->scene_data, (DEVICE void*) device->buffers.light_scene_data, 0, sizeof(DeviceLightSceneData)));
+
+  __FAILURE_HANDLE(optix_bvh_light_build(device->optix_bvh_light, device, tree));
+
+  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_light, device->optix_bvh_light->traversable[OPTIX_BVH_TYPE_DEFAULT]);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -2005,6 +2006,7 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
+  __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_light));
 
   __FAILURE_HANDLE(device_post_destroy(&(*device)->post));
 
