@@ -6,7 +6,7 @@
 #include "camera.cuh"
 #include "camera_post_common.cuh"
 #include "cloud.cuh"
-#include "ior_stack.cuh"
+#include "medium_stack.cuh"
 #include "ocean_utils.cuh"
 #include "purkinje.cuh"
 #include "sky.cuh"
@@ -95,10 +95,9 @@ LUMINARY_KERNEL void tasks_create() {
 
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
-    task.index.x = x;
-    task.index.y = y;
+    task.path_id = path_id_get(x, y, device.state.sample_id);
 
-    CameraSampleResult camera_result = camera_sample(task.index);
+    CameraSampleResult camera_result = camera_sample(task.path_id);
 
     // Skip rays that haven't managed to leave the camera.
     if (color_any(camera_result.weight) == false)
@@ -107,21 +106,12 @@ LUMINARY_KERNEL void tasks_create() {
     task.origin = camera_result.origin;
     task.ray    = camera_result.ray;
 
-    task.volume_id = uint16_t(VOLUME_TYPE_NONE);
+    const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
 
-    if (device.fog.active) {
-      task.volume_id = VOLUME_TYPE_FOG;
-    }
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
 
-    if (device.ocean.active) {
-      const bool camera_is_underwater = ocean_is_underwater(task.origin);
-
-      task.volume_id = (camera_is_underwater) ? VOLUME_TYPE_OCEAN : task.volume_id;
-    }
-
-    const uint32_t pixel                     = get_pixel_id(task.index);
-    device.ptrs.frame_direct_buffer[pixel]   = {};
-    device.ptrs.frame_indirect_buffer[pixel] = {};
+    device.ptrs.frame_direct_buffer[index]   = splat_color(0.0f);
+    device.ptrs.frame_indirect_buffer[index] = splat_color(0.0f);
 
     const uint32_t task_base_address = task_get_base_address(task_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
@@ -131,19 +121,34 @@ LUMINARY_KERNEL void tasks_create() {
     // Task Trace Result
     ////////////////////////////////////////////////////////////////////
 
-    DeviceIORStack ior_stack = {};
-
-    const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
-    ior_stack_interact(ior_stack, ambient_ior, IOR_STACK_METHOD_RESET);
-
-    // Handle and depth are initialized during the tracing so we don't need to initialize it here.
-    task_trace_ior_stack_store(task_base_address, ior_stack);
+    // Trace result does not need to be initialized
 
     ////////////////////////////////////////////////////////////////////
     // Task Throughput
     ////////////////////////////////////////////////////////////////////
 
     task_throughput_record_store(task_base_address, record_pack(camera_result.weight));
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Medium Stack
+    ////////////////////////////////////////////////////////////////////
+
+    DeviceTaskMediumStack medium = {};
+
+    medium_stack_ior_modify(medium, ambient_ior, true);
+
+    if (device.fog.active) {
+      medium_stack_volume_modify(medium, VOLUME_TYPE_FOG, true);
+    }
+
+    if (device.ocean.active) {
+      const bool camera_is_underwater = ocean_is_underwater(task.origin);
+
+      if (camera_is_underwater)
+        medium_stack_volume_modify(medium, VOLUME_TYPE_OCEAN, true);
+    }
+
+    task_medium_store(task_base_address, medium);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = task_count;
@@ -166,8 +171,6 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
     if (trace.handle.instance_id == HIT_TYPE_SKY)
       continue;
 
-    const uint32_t pixel = get_pixel_id(task.index);
-
     const vec3 sky_origin          = world_to_sky_transform(task.origin);
     const float inscattering_limit = world_to_sky_scale(trace.depth);
 
@@ -175,12 +178,14 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
 
     RGBF record = record_unpack(throughput.record);
 
-    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
+    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.path_id);
 
     throughput.record = record_pack(record);
 
     task_throughput_store(task_base_address, throughput);
-    write_beauty_buffer(inscattering, pixel, task.state);
+
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
+    write_beauty_buffer(inscattering, index, task.state);
   }
 }
 
@@ -241,6 +246,7 @@ LUMINARY_KERNEL void tasks_sort() {
     DeviceTask task;
     DeviceTaskTrace trace;
     DeviceTaskThroughput throughput;
+    DeviceTaskMediumStack medium;
     ShadingTaskIndex index = SHADING_TASK_INDEX_INVALID;
 
     if (thread_predicate) {
@@ -249,6 +255,7 @@ LUMINARY_KERNEL void tasks_sort() {
       task       = task_load(src_task_base_address);
       trace      = task_trace_load(src_task_base_address);
       throughput = task_throughput_load(src_task_base_address);
+      medium     = task_medium_load(src_task_base_address);
 
       index = shading_task_index_from_instance_id(trace.handle.instance_id);
     }
@@ -269,6 +276,7 @@ LUMINARY_KERNEL void tasks_sort() {
     task_store(dst_task_base_address, task);
     task_trace_store(dst_task_base_address, trace);
     task_throughput_store(dst_task_base_address, throughput);
+    task_medium_store(dst_task_base_address, medium);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = 0;

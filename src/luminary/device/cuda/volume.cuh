@@ -38,10 +38,11 @@ LUMINARY_KERNEL void volume_process_inscattering() {
   for (uint32_t i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
-    const DeviceTask task            = task_load(task_base_address);
+    const uint32_t task_base_address   = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_PRESORT);
+    const DeviceTask task              = task_load(task_base_address);
+    const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
-    const VolumeType volume_type = VolumeType(task.volume_id);
+    const VolumeType volume_type = VolumeType(medium_stack_volume_peek(medium, false));
 
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
@@ -57,7 +58,7 @@ LUMINARY_KERNEL void volume_process_inscattering() {
       task_get_base_address<DeviceTaskDirectLight>(i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
     if (direct_lighting_bridges_is_allowed(ctx)) {
-      const DeviceTaskDirectLightBridges direct_light_bridges_task = direct_lighting_bridges_create_task(ctx, task.index);
+      const DeviceTaskDirectLightBridges direct_light_bridges_task = direct_lighting_bridges_create_task(ctx, task.path_id);
 
       task_direct_light_bridges_store(task_direct_lighting_base_address, direct_light_bridges_task);
     }
@@ -66,14 +67,14 @@ LUMINARY_KERNEL void volume_process_inscattering() {
     // Initial vertex sampling for Sun and Ambient
     ////////////////////////////////////////////////////////////////////
 
-    volume_sample_sky_dl_initial_vertex_dist(ctx, task.index);
+    volume_sample_sky_dl_initial_vertex_dist(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Sun
     ////////////////////////////////////////////////////////////////////
 
     if (direct_lighting_sun_is_allowed(ctx)) {
-      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
+      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
 
       task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
     }
@@ -82,14 +83,14 @@ LUMINARY_KERNEL void volume_process_inscattering() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_DL_AMBIENT>(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_DL_AMBIENT>(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Ambient
     ////////////////////////////////////////////////////////////////////
 
     if (direct_lighting_ambient_is_allowed(ctx)) {
-      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
+      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
 
       task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
     }
@@ -116,8 +117,8 @@ LUMINARY_KERNEL void volume_process_events() {
     DeviceTask task                       = task_load(task_base_address);
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
-
-    const uint32_t pixel = get_pixel_id(task.index);
+    const DeviceTaskMediumStack medium    = task_medium_load(task_base_address);
+    const uint32_t index                  = path_id_get_pixel_index(task.path_id);
 
     TriangleHandle handle = trace.handle;
     float depth           = trace.depth;
@@ -125,7 +126,7 @@ LUMINARY_KERNEL void volume_process_events() {
     RGBF record = record_unpack(throughput.record);
 
     VolumeDescriptor volume;
-    volume.type = VolumeType(task.volume_id);
+    volume.type = VolumeType(medium_stack_volume_peek(medium, false));
 
     if (volume.type != VOLUME_TYPE_NONE) {
       volume          = volume_get_descriptor_preset(volume.type);
@@ -143,10 +144,10 @@ LUMINARY_KERNEL void volume_process_events() {
         sky_color = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.length));
 
         if (device.state.depth <= 1) {
-          write_beauty_buffer_direct(sky_color, pixel);
+          write_beauty_buffer_direct(sky_color, index);
         }
         else {
-          write_beauty_buffer(sky_color, pixel, task.state);
+          write_beauty_buffer(sky_color, index, task.state);
         }
 
         handle.instance_id = HIT_TYPE_INVALID;
@@ -165,7 +166,7 @@ LUMINARY_KERNEL void volume_process_events() {
         volume_intersection_probability = 0.0f;
       }
 
-      const float2 randoms = random_2D(RANDOM_TARGET_VOLUME_INTERSECTION, task.index);
+      const float2 randoms = random_2D(RANDOM_TARGET_VOLUME_INTERSECTION, task.path_id);
 
       bool sampled_volume_intersection = false;
 
@@ -177,7 +178,7 @@ LUMINARY_KERNEL void volume_process_events() {
           const float sample_pdf = volume_sample_intersection_pdf(volume, path.start, volume_dist);
 
           depth              = volume_dist;
-          handle.instance_id = VOLUME_TYPE_TO_HIT(volume.type);
+          handle.instance_id = VOLUME_ID_TO_HIT_ID(volume.type);
           handle.tri_id      = 0;
 
           record = mul_color(record, volume.scattering);
@@ -215,7 +216,7 @@ LUMINARY_KERNEL void volume_process_events() {
     else if (handle.instance_id == HIT_TYPE_OCEAN) {
       ocean_task_count++;
     }
-    else if (VOLUME_HIT_CHECK(handle.instance_id)) {
+    else if (VOLUME_HIT_ID_CHECK(handle.instance_id)) {
       volume_task_count++;
     }
     else if (particle_is_hit(handle)) {
@@ -249,17 +250,16 @@ LUMINARY_KERNEL void volume_process_tasks() {
     DeviceTask task                       = task_load(task_base_address);
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
-
-    const uint32_t pixel = get_pixel_id(task.index);
+    const DeviceTaskMediumStack medium    = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const VolumeType volume_type  = VOLUME_HIT_TYPE(trace.handle.instance_id);
+    const VolumeType volume_type  = (VolumeType) medium_stack_volume_peek(medium, false);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
     MaterialContextVolume ctx = volume_get_context(task, volume, 0.0f);
 
-    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_GI>(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_GI>(ctx, task.path_id);
 
     uint16_t new_state = task.state;
 
@@ -277,17 +277,16 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
-    task_trace_ior_stack_store(dst_task_base_address, trace.ior_stack);
-    task_throughput_record_store(dst_task_base_address, throughput.record);
-
     DeviceTask bounce_task;
-    bounce_task.state     = new_state;
-    bounce_task.origin    = ctx.position;
-    bounce_task.ray       = bounce_info.ray;
-    bounce_task.index     = task.index;
-    bounce_task.volume_id = task.volume_id;
+    bounce_task.state   = new_state;
+    bounce_task.origin  = ctx.position;
+    bounce_task.ray     = bounce_info.ray;
+    bounce_task.path_id = task.path_id;
 
     task_store(dst_task_base_address, bounce_task);
+
+    task_throughput_record_store(dst_task_base_address, throughput.record);
+    task_medium_store(dst_task_base_address, medium);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;

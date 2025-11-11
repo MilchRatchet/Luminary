@@ -24,11 +24,12 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     const int y = id / args.dim;
     const int x = id - y * args.dim;
 
-    const ushort2 pixel_coords  = make_ushort2(x, y);
+    const PathID path_id = path_id_get(x, y, device.state.sample_id);
+
     const uint32_t index_color  = x + y * args.ld_color;
     const uint32_t index_shadow = x + y * args.ld_shadow;
 
-    const float2 jitter = random_2D(RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
+    const float2 jitter = random_2D(RANDOM_TARGET_CAMERA_JITTER, path_id);
 
     const float u = (((float) x) + jitter.x) * step_size;
     const float v = 1.0f - (((float) y) + jitter.y) * step_size;
@@ -44,12 +45,12 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     vec3 sky_origin           = world_to_sky_transform(args.origin);
 
     if (device.cloud.active) {
-      const float offset = clouds_render(sky_origin, ray, FLT_MAX, pixel_coords, color, transmittance, cloud_transmittance);
+      const float offset = clouds_render(sky_origin, ray, FLT_MAX, path_id, color, transmittance, cloud_transmittance);
 
       sky_origin = add_vector(sky_origin, scale_vector(ray, offset));
     }
 
-    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.sky.steps, pixel_coords);
+    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.sky.steps, path_id);
 
     color = add_color(color, mul_color(sky, transmittance));
 

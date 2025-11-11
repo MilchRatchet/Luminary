@@ -22,11 +22,12 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
     DeviceTask task                  = task_load(task_base_address);
-    DeviceTaskTrace trace            = task_trace_load(task_base_address);
+    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+    DeviceTaskMediumStack medium     = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const MaterialContextGeometry ctx = geometry_get_context(task, trace);
+    const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
@@ -37,7 +38,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     float light_tree_root_sum = 0.0f;
     if (direct_lighting_geometry_is_allowed(task)) {
-      const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.index, light_tree_root_sum);
+      const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.path_id, light_tree_root_sum);
 
       task_direct_light_geo_store(task_direct_lighting_base_address, direct_light_geo_task);
     }
@@ -47,7 +48,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     ////////////////////////////////////////////////////////////////////
 
     if (direct_lighting_bsdf_is_allowed(task, trace)) {
-      const DeviceTaskDirectLightBSDF direct_light_bsdf_task = direct_lighting_bsdf_create_task(ctx, task.index, light_tree_root_sum);
+      const DeviceTaskDirectLightBSDF direct_light_bsdf_task = direct_lighting_bsdf_create_task(ctx, task.path_id, light_tree_root_sum);
 
       task_direct_light_bsdf_store(task_direct_lighting_base_address, direct_light_bsdf_task);
     }
@@ -57,7 +58,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     ////////////////////////////////////////////////////////////////////
 
     if (direct_lighting_sun_is_allowed(task)) {
-      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, task.index);
+      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
 
       task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
     }
@@ -66,14 +67,14 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Ambient
     ////////////////////////////////////////////////////////////////////
 
     if (direct_lighting_ambient_is_allowed(task)) {
-      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.index);
+      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
 
       task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
     }
@@ -108,25 +109,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     const RGBF emission = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
     if (color_any(emission)) {
-      const uint32_t pixel = get_pixel_id(task.index);
-      write_beauty_buffer(mul_color(emission, record), pixel, task.state);
+      const uint32_t index = path_id_get_pixel_index(task.path_id);
+      write_beauty_buffer(mul_color(emission, record), index, task.state);
     }
 
     record = mul_color(record, bounce_info.weight);
-
-    if (bounce_info.is_transparent_pass) {
-      const bool refraction_is_inside = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
-
-      const IORStackMethod ior_get_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-      const float ray_ior                 = ior_stack_interact(trace.ior_stack, 1.0f, ior_get_method);
-
-      const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params);
-
-      const float new_ior = (refraction_is_inside) ? 1.0f : ray_ior / ior;
-
-      const IORStackMethod ior_set_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(trace.ior_stack, new_ior, ior_set_method);
-    }
 
     uint16_t new_state = task.state | STATE_FLAG_USE_IGNORE_HANDLE;
 
@@ -145,21 +132,20 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     }
 
     DeviceTask bounce_task;
-    bounce_task.state     = new_state;
-    bounce_task.origin    = ctx.position;
-    bounce_task.ray       = bounce_info.ray;
-    bounce_task.index     = task.index;
-    bounce_task.volume_id = task.volume_id;
+    bounce_task.state   = new_state;
+    bounce_task.origin  = ctx.position;
+    bounce_task.ray     = bounce_info.ray;
+    bounce_task.path_id = task.path_id;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       task_store(dst_task_base_address, bounce_task);
 
+      // We need to store a trace result so the raytracing kernels knows which triangle to ignore.
       DeviceTaskTrace bounce_trace;
-      bounce_trace.ior_stack = trace.ior_stack;
-      bounce_trace.handle    = triangle_handle_get(ctx.instance_id, ctx.tri_id);
-      bounce_trace.depth     = FLT_MAX;
+      bounce_trace.handle = triangle_handle_get(ctx.instance_id, ctx.tri_id);
+      bounce_trace.depth  = FLT_MAX;
 
       task_trace_store(dst_task_base_address, bounce_trace);
 
@@ -167,6 +153,24 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       bounce_throughput.record = record_pack(record);
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
+
+      // Apply medium transition.
+      if (bounce_info.is_transparent_pass) {
+        const bool refraction_is_inside = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+
+        float new_ior = 1.0f;
+        if (refraction_is_inside == false) {
+          // The material only stores the IOR ratio, we mirror what we do during material context construction and compute the materials
+          // actual IOR.
+          const float ray_ior   = medium_stack_ior_peek(medium, refraction_is_inside);
+          const float ior_ratio = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params);
+          new_ior               = ray_ior / ior_ratio;
+        }
+
+        medium_stack_ior_modify(medium, new_ior, refraction_is_inside == false);
+      }
+
+      task_medium_store(dst_task_base_address, medium);
     }
   }
 
@@ -183,30 +187,31 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    DeviceTask task                  = task_load(task_base_address);
-    DeviceTaskTrace trace            = task_trace_load(task_base_address);
-    const uint32_t pixel             = get_pixel_id(task.index);
+    const uint32_t task_base_address   = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                    = task_load(task_base_address);
+    const DeviceTaskTrace trace        = task_trace_load(task_base_address);
+    const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
+    const uint32_t index               = path_id_get_pixel_index(task.path_id);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
-        write_beauty_buffer_forced(add_color(albedo, emission), pixel);
+        write_beauty_buffer_forced(add_color(albedo, emission), index);
       } break;
       case LUMINARY_SHADING_MODE_DEPTH: {
-        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
+        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), index);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
 
         const vec3 normal = ctx.normal;
 
-        write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
+        write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), index);
       } break;
       case LUMINARY_SHADING_MODE_IDENTIFICATION: {
         const uint32_t v = random_uint32_t_base(0x55555555, (trace.handle.instance_id << 16) | trace.handle.tri_id);
@@ -221,15 +226,15 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
 
         const RGBF color = get_color(cr, cg, cb);
 
-        write_beauty_buffer_forced(color, pixel);
+        write_beauty_buffer_forced(color, index);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace);
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
         const RGBF color                  = add_color(scale_color(albedo, 0.025f), emission);
 
-        write_beauty_buffer_forced(color, pixel);
+        write_beauty_buffer_forced(color, index);
       } break;
       default:
         break;

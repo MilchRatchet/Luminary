@@ -81,7 +81,7 @@ LUMINARY_FUNCTION float cloud_extinction(const vec3 origin, const vec3 ray, cons
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
 LUMINARY_FUNCTION CloudRenderResult
-  clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, const ushort2 pixel) {
+  clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, const PathID& path_id) {
   if (dist < 0.0f || start == FLT_MAX) {
     CloudRenderResult result;
 
@@ -120,12 +120,12 @@ LUMINARY_FUNCTION CloudRenderResult
     }
   }
 
-  step_count += 8.0f * random_1D(RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
+  step_count += 8.0f * random_1D(RANDOM_TARGET_CLOUD_STEP_COUNT + layer, path_id);
 
   start = fmaxf(0.0f, start);
 
   const float step_size     = dist / step_count;
-  const float random_offset = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
+  const float random_offset = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, path_id);
   float reach               = start + (0.1f + random_offset * 0.9f) * step_size;
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
@@ -137,7 +137,7 @@ LUMINARY_FUNCTION CloudRenderResult
   float hit_dist       = start;
   bool hit             = false;
 
-  const float2 ambient_r        = random_2D(RANDOM_TARGET_CLOUD_DIR, pixel);
+  const float2 ambient_r        = random_2D(RANDOM_TARGET_CLOUD_DIR, path_id);
   const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
@@ -166,7 +166,7 @@ LUMINARY_FUNCTION CloudRenderResult
     if (density > 0.0f) {
       hit = true;
 
-      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, pixel);
+      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, path_id);
 
       float ambient_extinction = cloud_extinction(pos, ambient_ray, layer);
 
@@ -241,18 +241,19 @@ LUMINARY_FUNCTION CloudRenderResult
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION float clouds_render(
-  vec3 origin, const vec3 ray, const float limit, const ushort2 pixel, RGBF& color, RGBF& transmittance, float& transmittance_cloud_only) {
+  vec3 origin, const vec3 ray, const float limit, const PathID& path_id, RGBF& color, RGBF& transmittance,
+  float& transmittance_cloud_only) {
   float2 intersections[3];
   CloudRenderResult results[3];
 
   intersections[0] = cloud_get_lowlayer_intersection(origin, ray, limit);
-  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW, pixel);
+  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW, path_id);
 
   intersections[1] = cloud_get_midlayer_intersection(origin, ray, limit);
-  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID, pixel);
+  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID, path_id);
 
   intersections[2] = cloud_get_toplayer_intersection(origin, ray, limit);
-  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP, pixel);
+  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP, path_id);
 
   const bool less01 = intersections[0].x <= intersections[1].x;
   const bool less02 = intersections[0].x <= intersections[2].x;
@@ -291,7 +292,7 @@ LUMINARY_FUNCTION float clouds_render(
       break;
 
     if (device.cloud.atmosphere_scattering) {
-      color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, pixel));
+      color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, path_id));
       origin = add_vector(origin, scale_vector(ray, result.hit_dist - prev_start));
     }
 
@@ -327,13 +328,12 @@ LUMINARY_KERNEL void cloud_process_tasks() {
     float depth              = trace.depth;
     const float sky_max_dist = world_to_sky_scale(depth);
     vec3 sky_origin          = world_to_sky_transform(task.origin);
-    const uint32_t pixel     = get_pixel_id(task.index);
 
     RGBF record = record_unpack(throughput.record);
     RGBF color  = get_color(0.0f, 0.0f, 0.0f);
 
     float cloud_transmittance;
-    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.index, color, record, cloud_transmittance);
+    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.path_id, color, record, cloud_transmittance);
 
     if (device.cloud.atmosphere_scattering) {
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
@@ -351,7 +351,9 @@ LUMINARY_KERNEL void cloud_process_tasks() {
     }
 
     task_throughput_record_store(task_base_address, record_pack(record));
-    write_beauty_buffer(color, pixel, task.state);
+
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
+    write_beauty_buffer(color, index, task.state);
   }
 }
 

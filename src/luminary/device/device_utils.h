@@ -142,6 +142,12 @@ struct ushort2 {
   uint16_t y;
 } typedef ushort2;
 
+struct ushort3 {
+  uint16_t x;
+  uint16_t y;
+  uint16_t z;
+} typedef ushort3;
+
 struct uint2 {
   uint32_t x;
   uint32_t y;
@@ -166,6 +172,7 @@ typedef uint2 PackedRayDirection;
 typedef uint2 PackedPosition;
 typedef uint32_t PackedNormal;
 typedef uint32_t PackedUV;
+typedef ushort3 PathID;
 
 #define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
 
@@ -315,13 +322,9 @@ enum TaskStateBufferIndex {
   TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT
 } typedef TaskStateBufferIndex;
 
-// TODO: This needs to change when adding SSS.
-typedef uint32_t DeviceIORStack;
-
 struct DeviceTask {
   uint16_t state;
-  uint16_t volume_id;
-  ushort2 index;
+  PathID path_id;
   vec3 origin;
   vec3 ray;
 } typedef DeviceTask;
@@ -330,7 +333,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
 struct DeviceTaskTrace {
   TriangleHandle handle;
   float depth;
-  DeviceIORStack ior_stack;
+  uint32_t padding;
 } typedef DeviceTaskTrace;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 
@@ -340,12 +343,21 @@ struct DeviceTaskThroughput {
 } typedef DeviceTaskThroughput;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
 
+struct DeviceTaskMediumStack {
+  uint32_t ior;
+  uint32_t volume_id_01;
+  uint32_t volume_id_23;
+  uint8_t padding[4];
+} typedef DeviceTaskMediumStack;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskMediumStack, 0x10);
+
 struct DeviceTaskState {
   DeviceTask task;
   DeviceTaskTrace trace_result;
   DeviceTaskThroughput throughput;
+  DeviceTaskMediumStack medium;
 } typedef DeviceTaskState;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
+LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x50);
 
 ////////////////////////////////////////////////////////////////////
 // Task Direct Lighting

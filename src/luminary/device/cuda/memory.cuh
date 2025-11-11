@@ -200,6 +200,10 @@ LUMINARY_FUNCTION DeviceTaskThroughput task_throughput_load(const uint32_t base_
   return load_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput));
 }
 
+LUMINARY_FUNCTION DeviceTaskMediumStack task_medium_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium));
+}
+
 // DeviceTask
 
 LUMINARY_FUNCTION void task_store(const uint32_t base_address, const DeviceTask data) {
@@ -220,10 +224,6 @@ LUMINARY_FUNCTION void task_trace_depth_store(const uint32_t base_address, const
   store_task_state<float, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.depth), data);
 }
 
-LUMINARY_FUNCTION void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
-  store_task_state<DeviceIORStack, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
-}
-
 // DeviceTaskThroughput
 
 LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
@@ -232,6 +232,12 @@ LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const 
 
 LUMINARY_FUNCTION void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
   store_task_state<PackedRecord, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.record), data);
+}
+
+// DeviceTaskMediumStack
+
+LUMINARY_FUNCTION void task_medium_store(const uint32_t base_address, const DeviceTaskMediumStack data) {
+  store_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium), data);
 }
 
 // DeviceTaskDirectLight

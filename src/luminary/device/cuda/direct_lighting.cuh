@@ -19,13 +19,14 @@
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
+LUMINARY_FUNCTION DeviceTaskDirectLightSun
+  direct_lighting_sun_direct(MaterialContext<TYPE> ctx, const PathID& path_id, const vec3 sky_pos) {
   ////////////////////////////////////////////////////////////////////
   // Sample a direction using BSDF importance sampling
   ////////////////////////////////////////////////////////////////////
 
   bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
-  const vec3 dir_bsdf = bsdf_sample_for_sun(ctx, index, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+  const vec3 dir_bsdf = bsdf_sample_for_sun(ctx, path_id, bsdf_sample_is_refraction, bsdf_sample_is_valid);
 
   RGBF light_bsdf         = get_color(0.0f, 0.0f, 0.0f);
   bool is_refraction_bsdf = false;
@@ -40,7 +41,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialCo
   // Sample a direction in the sun's solid angle
   ////////////////////////////////////////////////////////////////////
 
-  const float2 random = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::RAY, index);
+  const float2 random = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::RAY, path_id);
 
   float solid_angle;
   const vec3 dir_solid_angle = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
@@ -75,7 +76,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialCo
   float target_pdf;
   vec3 dir;
   RGBF light_color;
-  if (random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::RESAMPLING, index) * sum_weights < weight_bsdf) {
+  if (random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::RESAMPLING, path_id) * sum_weights < weight_bsdf) {
     dir         = dir_bsdf;
     target_pdf  = target_pdf_bsdf;
     light_color = light_bsdf;
@@ -118,7 +119,8 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_direct(MaterialCo
 }
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialContext<TYPE> ctx, const ushort2 index, const vec3 sky_pos) {
+LUMINARY_FUNCTION DeviceTaskDirectLightSun
+  direct_lighting_sun_caustic(MaterialContext<TYPE> ctx, const DeviceTaskMediumStack& medium, const PathID& path_id, const vec3 sky_pos) {
   // Caustics are only for underwater starting with v1.2.0
   constexpr bool IS_UNDERWATER = true;
 
@@ -127,7 +129,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialC
   ////////////////////////////////////////////////////////////////////
 
   float solid_angle;
-  const float2 sun_dir_random                  = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_SUN_RAY, index);
+  const float2 sun_dir_random                  = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_SUN_RAY, path_id);
   const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(ctx, sun_dir, IS_UNDERWATER);
 
@@ -144,7 +146,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialC
   if (sampling_domain.fast_path) {
     vec3 sample_point;
     float sample_weight;
-    caustics_find_connection_point(ctx, index, sampling_domain, IS_UNDERWATER, 0, 1, sample_point, sample_weight);
+    caustics_find_connection_point(ctx, path_id, sampling_domain, IS_UNDERWATER, 0, 1, sample_point, sample_weight);
 
     sum_connection_weight = sample_weight;
     connection_point      = sample_point;
@@ -159,7 +161,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialC
     uint32_t index_front = (uint32_t) -1;
     uint32_t index_back  = num_samples;
 
-    const float resampling_random = random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_RESAMPLING, index);
+    const float resampling_random = random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_RESAMPLING, path_id);
 
     for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
       const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
@@ -180,9 +182,9 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialC
         break;
 
       vec3 sample_point;
-      float sample_weight = 0.0f;
-      const bool valid_hit =
-        caustics_find_connection_point(ctx, index, sampling_domain, IS_UNDERWATER, current_index, num_samples, sample_point, sample_weight);
+      float sample_weight  = 0.0f;
+      const bool valid_hit = caustics_find_connection_point(
+        ctx, path_id, sampling_domain, IS_UNDERWATER, current_index, num_samples, sample_point, sample_weight);
 
       if (valid_hit == false || sample_weight == 0.0f)
         continue;
@@ -258,7 +260,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_caustic(MaterialC
   // Volume transmittance
   ////////////////////////////////////////////////////////////////////
 
-  const VolumeType second_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+  const VolumeType second_volume = (VolumeType) medium_stack_volume_peek(medium, true);
 
   light_color = mul_color(light_color, volume_integrate_transmittance(ctx.volume_type, ctx.position, dir, dist));
   light_color = mul_color(light_color, volume_integrate_transmittance(second_volume, connection_point, sun_dir, FLT_MAX));
@@ -349,8 +351,8 @@ LUMINARY_FUNCTION bool direct_lighting_bsdf_is_allowed(const DeviceTask& task, c
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION DeviceTaskDirectLightGeo
-  direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const ushort2 pixel, float& light_tree_root_sum) {
-  LightSampleResult<TYPE> sample = light_sample(ctx, pixel);
+  direct_lighting_geometry_create_task(const MaterialContext<TYPE>& ctx, const PathID& path_id, float& light_tree_root_sum) {
+  LightSampleResult<TYPE> sample = light_sample(ctx, path_id);
 
   if constexpr (TYPE == MATERIAL_GEOMETRY)
     light_tree_root_sum = sample.light_tree_root_sum;
@@ -380,7 +382,8 @@ LUMINARY_FUNCTION DeviceTaskDirectLightGeo
 }
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION DeviceTaskDirectLightSun
+  direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const DeviceTaskMediumStack& medium, const PathID& path_id) {
   const vec3 sky_pos = world_to_sky_transform(ctx.position);
 
   const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -397,10 +400,10 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_create_task(const
 
   DeviceTaskDirectLightSun task;
   if (ctx.volume_type == VOLUME_TYPE_OCEAN) {
-    task = direct_lighting_sun_caustic(ctx, pixel, sky_pos);
+    task = direct_lighting_sun_caustic(ctx, medium, path_id, sky_pos);
   }
   else {
-    task = direct_lighting_sun_direct(ctx, pixel, sky_pos);
+    task = direct_lighting_sun_direct(ctx, path_id, sky_pos);
   }
 
   return task;
@@ -408,7 +411,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun direct_lighting_sun_create_task(const
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION DeviceTaskDirectLightAmbient
-  direct_lighting_ambient_create_task(const MaterialContext<TYPE>& ctx, const BSDFSampleInfo<TYPE>& bounce_sample, const ushort2 index) {
+  direct_lighting_ambient_create_task(const MaterialContext<TYPE>& ctx, const BSDFSampleInfo<TYPE>& bounce_sample, const PathID& path_id) {
   ////////////////////////////////////////////////////////////////////
   // Compute ambient color
   ////////////////////////////////////////////////////////////////////
@@ -427,8 +430,9 @@ LUMINARY_FUNCTION DeviceTaskDirectLightAmbient
   return task;
 }
 
-LUMINARY_FUNCTION DeviceTaskDirectLightBridges direct_lighting_bridges_create_task(const MaterialContextVolume& ctx, const ushort2 index) {
-  LightSampleResult<MATERIAL_VOLUME> sample = light_sample(ctx, index);
+LUMINARY_FUNCTION DeviceTaskDirectLightBridges
+  direct_lighting_bridges_create_task(const MaterialContextVolume& ctx, const PathID& path_id) {
+  LightSampleResult<MATERIAL_VOLUME> sample = light_sample(ctx, path_id);
 
   ////////////////////////////////////////////////////////////////////
   // Create task
@@ -446,8 +450,8 @@ LUMINARY_FUNCTION DeviceTaskDirectLightBridges direct_lighting_bridges_create_ta
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION DeviceTaskDirectLightBSDF
-  direct_lighting_bsdf_create_task(const MaterialContext<TYPE>& ctx, const ushort2 index, const float light_tree_root_sum) {
-  LightBSDFSampleResult sample = light_bsdf_sample(ctx, index);
+  direct_lighting_bsdf_create_task(const MaterialContext<TYPE>& ctx, const PathID& path_id, const float light_tree_root_sum) {
+  LightBSDFSampleResult sample = light_bsdf_sample(ctx, path_id);
 
   ////////////////////////////////////////////////////////////////////
   // Create task
@@ -482,12 +486,15 @@ LUMINARY_FUNCTION RGBF direct_lighting_geometry_evaluate_task(
 }
 
 LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightSun& direct_light_task, const bool is_allowed) {
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium,
+  const DeviceTaskDirectLightSun& direct_light_task, const bool is_allowed) {
   const vec3 ray = ray_unpack(direct_light_task.ray);
 
   float limit = FLT_MAX;
 
-  if (task.volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
+  if (volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
     const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
@@ -507,7 +514,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
   RGBF light_color = record_unpack(direct_light_task.light_color);
   light_color      = mul_color(light_color, visibility);
 
-  if (sample_is_valid && task.volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
+  if (sample_is_valid && volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
     // Volume and particle rendering always use the geometry logic here, this means we get low variance sampling as we use the caustics fast
@@ -544,12 +551,15 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
 }
 
 LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightAmbient& direct_light_task, const bool is_allowed) {
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium,
+  const DeviceTaskDirectLightAmbient& direct_light_task, const bool is_allowed) {
   const vec3 ray = ray_unpack(direct_light_task.ray);
 
   float limit = FLT_MAX;
 
-  if (task.volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
+  if (volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
     const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
@@ -568,9 +578,9 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
 
   RGBF light_color = record_unpack(direct_light_task.light_color);
   light_color      = mul_color(light_color, visibility);
-  light_color      = mul_color(light_color, volume_integrate_transmittance((VolumeType) task.volume_id, task.origin, ray, limit));
+  light_color      = mul_color(light_color, volume_integrate_transmittance((VolumeType) volume_id, task.origin, ray, limit));
 
-  if (sample_is_valid && task.volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
+  if (sample_is_valid && volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
     // Ocean normal points up, we come from below, so flip it
@@ -584,7 +594,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
       shadow_task.trace_status = OPTIX_TRACE_STATUS_ABORT;
     }
 
-    const VolumeType second_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
+    const VolumeType second_volume = (VolumeType) medium_stack_volume_peek(medium, true);
 
     const float fresnel_term = bsdf_fresnel(ocean_normal, ocean_V, refraction, device.ocean.refractive_index);
 
@@ -606,10 +616,10 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
 }
 
 LUMINARY_FUNCTION RGBF direct_lighting_bridges_evaluate_task(
-  const MaterialContextVolume& ctx, const DeviceTaskDirectLightBridges& direct_light_task, const ushort2 index, const bool is_allowed) {
+  const MaterialContextVolume& ctx, const DeviceTaskDirectLightBridges& direct_light_task, const PathID& path_id, const bool is_allowed) {
   const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
 
-  return bridges_sample_apply_shadowing(ctx, direct_light_task, index, sample_is_valid);
+  return bridges_sample_apply_shadowing(ctx, direct_light_task, path_id, sample_is_valid);
 }
 
 LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
@@ -622,7 +632,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
 
   OptixKernelFunctionLightBSDFTracePayload payload;
   payload.ignore_handle     = blocked_handle;
-  payload.random            = random_1D(RANDOM_TARGET_LIGHT_BSDF_TRACE, task.index);
+  payload.random            = random_1D(RANDOM_TARGET_LIGHT_BSDF_TRACE, task.path_id);
   payload.num_hit_lights    = 0;
   payload.selected_light_id = LIGHT_ID_INVALID;
 

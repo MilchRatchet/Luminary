@@ -216,10 +216,8 @@ LUMINARY_FUNCTION float bsdf_microfacet_pdf(const vec3 V, const float roughness,
   return D / (2.0f * (k * NdotV + t));
 }
 
-LUMINARY_FUNCTION vec3 bsdf_microfacet_sample(
-  const vec3 V, const float roughness, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
-  const uint32_t depth = device.state.depth) {
-  const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
+LUMINARY_FUNCTION vec3 bsdf_microfacet_sample(const vec3 V, const float roughness, const PathID& path_id, const uint32_t target) {
+  const float2 random = random_2D(target, path_id);
   return bsdf_microfacet_sample_normal(V, roughness, random);
 }
 
@@ -302,10 +300,9 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_pdf(
   return D * G1 * (HdotV / NdotV) * (HdotL / denominator);
 }
 
-LUMINARY_FUNCTION vec3 bsdf_microfacet_refraction_sample(
-  const vec3 V, const float roughness, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
-  const uint32_t depth = device.state.depth) {
-  const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
+LUMINARY_FUNCTION vec3
+  bsdf_microfacet_refraction_sample(const vec3 V, const float roughness, const PathID& path_id, const uint32_t target) {
+  const float2 random = random_2D(target, path_id);
   return bsdf_microfacet_refraction_sample_normal(V, roughness, random);
 }
 

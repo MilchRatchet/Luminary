@@ -5,7 +5,6 @@
 #include "bsdf.cuh"
 #include "direct_lighting.cuh"
 #include "geometry_utils.cuh"
-#include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "utils.cuh"
@@ -23,9 +22,10 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= task_count)
     return;
 
-  const uint32_t task_base_address = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
-  DeviceTask task                  = task_load(task_base_address);
-  const DeviceTaskTrace trace      = task_trace_load(task_base_address);
+  const uint32_t task_base_address   = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
+  DeviceTask task                    = task_load(task_base_address);
+  const DeviceTaskTrace trace        = task_trace_load(task_base_address);
+  const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
   task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
@@ -69,7 +69,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightSun direct_light_task = task_direct_light_sun_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_sun_is_allowed(task);
-    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, direct_light_task, is_allowed);
+    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
   }
@@ -82,7 +82,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightAmbient direct_light_task = task_direct_light_ambient_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_ambient_is_allowed(task);
-    const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, direct_light_task, is_allowed);
+    const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
   }
@@ -95,6 +95,6 @@ extern "C" __global__ void __raygen__optix() {
 
   accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
-  const uint32_t pixel = get_pixel_id(task.index);
-  write_beauty_buffer(accumulated_light, pixel, task.state);
+  const uint32_t index = path_id_get_pixel_index(task.path_id);
+  write_beauty_buffer(accumulated_light, index, task.state);
 }

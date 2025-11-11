@@ -52,13 +52,14 @@ enum HitType : uint32_t {
   HIT_TYPE_OCEAN             = 0xFFFFFFFDu,
   HIT_TYPE_PARTICLE          = 0xFFFFFFFCu,
   HIT_TYPE_LIGHT_BSDF_HINT   = 0xFFFFFFFBu,
-  HIT_TYPE_VOLUME_OCEAN      = 0xFFFFFFF3u,
-  HIT_TYPE_VOLUME_FOG        = 0xFFFFFFF2u,
   HIT_TYPE_REJECT            = 0xFFFFFFF0u,
   HIT_TYPE_PARTICLE_MAX      = 0xeFFFFFFFu,
   HIT_TYPE_PARTICLE_MIN      = 0x80000000u,
   HIT_TYPE_PARTICLE_MASK     = 0x7FFFFFFFu,
-  HIT_TYPE_TRIANGLE_ID_LIMIT = 0x7FFFFFFFu
+  HIT_TYPE_TRIANGLE_ID_LIMIT = 0x7FFFFFFFu,
+  HIT_TYPE_VOLUME_BASE       = 0xFFFE0000u,
+  HIT_TYPE_VOLUME_MASK       = 0x0000FFFFu,
+  HIT_TYPE_VOLUME_MAX        = 0xFFFEFFFFu
 } typedef HitType;
 
 enum ShadingTaskIndex {
@@ -79,10 +80,9 @@ enum ShadingTaskIndex {
 #define TASK_ADDRESS_OFFSET_VOLUME TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_VOLUME)
 #define TASK_ADDRESS_OFFSET_SKY TASK_ADDRESS_OFFSET_IMPL(SHADING_TASK_INDEX_SKY)
 
-#define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
-#define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
-#define VOLUME_TYPE_TO_HIT(X) ((X == VOLUME_TYPE_FOG || X == VOLUME_TYPE_OCEAN) ? (HIT_TYPE_VOLUME_FOG + X) : HIT_TYPE_INVALID)
-#define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
+#define VOLUME_HIT_ID_CHECK(X) (((X) >= HIT_TYPE_VOLUME_BASE) && ((X) <= HIT_TYPE_VOLUME_MAX))
+#define VOLUME_ID_TO_HIT_ID(X) (HIT_TYPE_VOLUME_BASE | (X))
+#define PARTICLE_HIT_ID_CHECK(X) (((X) <= HIT_TYPE_PARTICLE_MAX) && ((X) >= HIT_TYPE_PARTICLE_MIN))
 #define IS_PRIMARY_RAY (device.state.depth == 0)
 
 //
@@ -135,6 +135,50 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #endif
 
 //===========================================================================================
+// PathID
+//===========================================================================================
+
+#define PATH_ID_SENSOR_BITS 14
+#define PATH_ID_SAMPLE_BITS 20
+#define PATH_ID_EXTRA_BITS (16 - PATH_ID_SENSOR_BITS)
+#define PATH_ID_SENSOR_MASK ((1u << PATH_ID_SENSOR_BITS) - 1)
+#define PATH_ID_SAMPLE_MASK ((1u << PATH_ID_SAMPLE_BITS) - 1)
+#define PATH_ID_EXTRA_MASK ((1u << PATH_ID_EXTRA_BITS) - 1)
+
+LUMINARY_FUNCTION PathID path_id_get(const uint32_t x, const uint32_t y, const uint32_t sample_id) {
+  PathID path_id;
+  path_id.x = (x & PATH_ID_SENSOR_MASK) | ((sample_id >> (16 + PATH_ID_EXTRA_BITS * 0)) & PATH_ID_EXTRA_MASK);
+  path_id.y = (y & PATH_ID_SENSOR_MASK) | ((sample_id >> (16 + PATH_ID_EXTRA_BITS * 1)) & PATH_ID_EXTRA_MASK);
+  path_id.z = sample_id & PATH_ID_SAMPLE_MASK;
+
+  return path_id;
+}
+
+LUMINARY_FUNCTION ushort2 path_id_get_pixel(const PathID& path_id) {
+  return make_ushort2(path_id.x & PATH_ID_SENSOR_MASK, path_id.y & PATH_ID_SENSOR_MASK);
+}
+
+LUMINARY_FUNCTION uint32_t path_id_get_pixel_index(const PathID& path_id) {
+  const ushort2 pixel = path_id_get_pixel(path_id);
+
+  const uint32_t x = pixel.x;
+  const uint32_t y = pixel.y;
+
+  return x + device.settings.width * y;
+}
+
+LUMINARY_FUNCTION uint32_t path_id_get_sample_id(const PathID& path_id) {
+  const uint32_t x = path_id.x;
+  const uint32_t y = path_id.y;
+
+  uint32_t sample_id = path_id.z;
+  sample_id |= (x >> PATH_ID_SENSOR_BITS) << (16 + PATH_ID_EXTRA_BITS * 0);
+  sample_id |= (y >> PATH_ID_SENSOR_BITS) << (16 + PATH_ID_EXTRA_BITS * 1);
+
+  return sample_id;
+}
+
+//===========================================================================================
 // Functions
 //===========================================================================================
 
@@ -161,12 +205,13 @@ LUMINARY_FUNCTION bool is_selected_pixel_lenient(const ushort2 index) {
   return is_selected_pixel(index);
 }
 
-LUMINARY_FUNCTION bool is_center_pixel(const ushort2 index) {
-  return ((index.x == device.settings.width >> 1) && (index.y == device.settings.height >> 1));
-}
+LUMINARY_FUNCTION bool is_center_pixel(const PathID& path_id) {
+  const ushort2 pixel = path_id_get_pixel(path_id);
 
-LUMINARY_FUNCTION uint32_t get_pixel_id(const ushort2 pixel) {
-  return pixel.x + device.settings.width * pixel.y;
+  const uint32_t width  = device.settings.width >> device.settings.supersampling;
+  const uint32_t height = device.settings.height >> device.settings.supersampling;
+
+  return ((pixel.x == width) && (pixel.y == height));
 }
 
 LUMINARY_FUNCTION bool is_non_finite(const float a) {
@@ -194,7 +239,7 @@ LUMINARY_FUNCTION ShadingTaskIndex shading_task_index_from_instance_id(const uin
   else if (instance_id == HIT_TYPE_OCEAN) {
     return SHADING_TASK_INDEX_OCEAN;
   }
-  else if (VOLUME_HIT_CHECK(instance_id)) {
+  else if (VOLUME_HIT_ID_CHECK(instance_id)) {
     return SHADING_TASK_INDEX_VOLUME;
   }
   else if (instance_id <= HIT_TYPE_PARTICLE_MAX) {

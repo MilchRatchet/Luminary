@@ -346,17 +346,29 @@ LUMINARY_FUNCTION float random_1D_base_float(const uint32_t target, const ushort
   return random_uint32_t_to_float(random_1D_base(target, pixel, sequence_id, depth));
 }
 
-LUMINARY_FUNCTION float random_1D(const uint32_t target, const ushort2 pixel) {
-  return random_1D_base_float(target, pixel, device.state.sample_id, device.state.depth);
+LUMINARY_FUNCTION float random_1D(const uint32_t target, const PathID& path_id) {
+  const ushort2 pixel      = path_id_get_pixel(path_id);
+  const uint32_t sample_id = path_id_get_sample_id(path_id);
+
+  return random_1D_base_float(target, pixel, sample_id, device.state.depth);
 }
 
-// This is a global version that is constant within a given frame.
+LUMINARY_FUNCTION float random_1D_consistent(const uint32_t target, const PathID& path_id) {
+  const ushort2 pixel      = path_id_get_pixel(path_id);
+  const uint32_t sample_id = path_id_get_sample_id(path_id);
+
+  return random_1D_base_float(target, pixel, sample_id, 0);
+}
+
 LUMINARY_FUNCTION float random_1D_global(const uint32_t target) {
   return random_1D_base_float(target, make_ushort2(0, 0), device.state.sample_id, 0);
 }
 
-LUMINARY_FUNCTION float2 random_2D(const uint32_t target, const ushort2 pixel) {
-  return random_2D_base_float(target, pixel, device.state.sample_id, device.state.depth);
+LUMINARY_FUNCTION float2 random_2D(const uint32_t target, const PathID& path_id) {
+  const ushort2 pixel      = path_id_get_pixel(path_id);
+  const uint32_t sample_id = path_id_get_sample_id(path_id);
+
+  return random_2D_base_float(target, pixel, sample_id, device.state.depth);
 }
 
 // This is a global version that is constant within a given frame.

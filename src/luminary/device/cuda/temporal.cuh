@@ -64,7 +64,7 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
-    const uint32_t pixel_id = get_pixel_id(make_ushort2(x, y));
+    const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
     const float pixel_x = x + 0.5f;
     const float pixel_y = y + 0.5f;
@@ -76,19 +76,19 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
     RGBF direct_buffer = temporal_gather_pixel(
       device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
 
-    store_RGBF(device.ptrs.frame_direct_accumulate, pixel_id, direct_buffer);
+    store_RGBF(device.ptrs.frame_direct_accumulate, index, direct_buffer);
 
     // Indirect Lighting
     RGBF indirect_buffer = temporal_gather_pixel(
       device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
 
-    __stcs(indirect_bucket_ptr_red + pixel_id, indirect_buffer.r);
-    __stcs(indirect_bucket_ptr_green + pixel_id, indirect_buffer.g);
-    __stcs(indirect_bucket_ptr_blue + pixel_id, indirect_buffer.b);
+    __stcs(indirect_bucket_ptr_red + index, indirect_buffer.r);
+    __stcs(indirect_bucket_ptr_green + index, indirect_buffer.g);
+    __stcs(indirect_bucket_ptr_blue + index, indirect_buffer.b);
 
     RGBF output = add_color(direct_buffer, indirect_buffer);
 
-    store_RGBF(device.ptrs.frame_current_result, pixel_id, output);
+    store_RGBF(device.ptrs.frame_current_result, index, output);
   }
 }
 
@@ -117,7 +117,7 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
-    const uint32_t pixel_id = get_pixel_id(make_ushort2(x, y));
+    const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
     const float pixel_x = x + 0.5f;
     const float pixel_y = y + 0.5f;
@@ -128,11 +128,11 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
     // Direct Lighting
     RGBF direct_buffer = temporal_gather_pixel(
       device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
-    RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + pixel_id);
+    RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + index);
 
     direct_output = add_color(direct_output, direct_buffer);
 
-    store_RGBF(device.ptrs.frame_direct_accumulate, pixel_id, direct_output);
+    store_RGBF(device.ptrs.frame_direct_accumulate, index, direct_output);
 
     // Indirect Lighting
     RGBF indirect_buffer = temporal_gather_pixel(
@@ -140,16 +140,16 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
 
     RGBF indirect_output = splat_color(0.0f);
     if (load_indirect_bucket) {
-      indirect_output.r = __ldcs(indirect_bucket_ptr_red + pixel_id);
-      indirect_output.g = __ldcs(indirect_bucket_ptr_green + pixel_id);
-      indirect_output.b = __ldcs(indirect_bucket_ptr_blue + pixel_id);
+      indirect_output.r = __ldcs(indirect_bucket_ptr_red + index);
+      indirect_output.g = __ldcs(indirect_bucket_ptr_green + index);
+      indirect_output.b = __ldcs(indirect_bucket_ptr_blue + index);
     }
 
     indirect_output = add_color(indirect_output, indirect_buffer);
 
-    __stcs(indirect_bucket_ptr_red + pixel_id, indirect_output.r);
-    __stcs(indirect_bucket_ptr_green + pixel_id, indirect_output.g);
-    __stcs(indirect_bucket_ptr_blue + pixel_id, indirect_output.b);
+    __stcs(indirect_bucket_ptr_red + index, indirect_output.r);
+    __stcs(indirect_bucket_ptr_green + index, indirect_output.g);
+    __stcs(indirect_bucket_ptr_blue + index, indirect_output.b);
   }
 }
 
@@ -321,28 +321,28 @@ LUMINARY_KERNEL void temporal_accumulation_output_raw() {
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
-    const uint32_t pixel_id = get_pixel_id(make_ushort2(x, y));
+    const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
     RGBF output = splat_color(0.0f);
 
     for (uint32_t bucket_id = 0; bucket_id < num_buckets; bucket_id++) {
       RGBF indirect_output;
-      indirect_output.r = __ldcs(device.ptrs.frame_indirect_accumulate_red[bucket_id] + pixel_id);
-      indirect_output.g = __ldcs(device.ptrs.frame_indirect_accumulate_green[bucket_id] + pixel_id);
-      indirect_output.b = __ldcs(device.ptrs.frame_indirect_accumulate_blue[bucket_id] + pixel_id);
+      indirect_output.r = __ldcs(device.ptrs.frame_indirect_accumulate_red[bucket_id] + index);
+      indirect_output.g = __ldcs(device.ptrs.frame_indirect_accumulate_green[bucket_id] + index);
+      indirect_output.b = __ldcs(device.ptrs.frame_indirect_accumulate_blue[bucket_id] + index);
 
       output = add_color(output, indirect_output);
     }
 
     if (device.camera.indirect_only == false) {
-      const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + pixel_id);
+      const RGBF direct = load_RGBF(device.ptrs.frame_direct_accumulate + index);
 
       output = add_color(output, direct);
     }
 
     output = scale_color(output, normalization);
 
-    store_RGBF(device.ptrs.frame_current_result, pixel_id, output);
+    store_RGBF(device.ptrs.frame_current_result, index, output);
   }
 }
 
@@ -365,7 +365,7 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
-    const uint32_t pixel_id = get_pixel_id(make_ushort2(x, y));
+    const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
     const float pixel_x = x + 0.5f;
     const float pixel_y = y + 0.5f;
@@ -376,13 +376,13 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
     // Direct Lighting
     RGBF direct_buffer = temporal_gather_pixel(
       device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
-    RGBF direct_output = load_RGBF(device.ptrs.frame_current_result + pixel_id);
+    RGBF direct_output = load_RGBF(device.ptrs.frame_current_result + index);
 
     direct_output = scale_color(direct_output, prev_scale);
     direct_output = add_color(direct_output, direct_buffer);
     direct_output = scale_color(direct_output, curr_inv_scale);
 
-    store_RGBF(device.ptrs.frame_current_result, pixel_id, direct_output);
+    store_RGBF(device.ptrs.frame_current_result, index, direct_output);
   }
 }
 

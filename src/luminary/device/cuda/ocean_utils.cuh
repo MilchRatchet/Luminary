@@ -1,8 +1,8 @@
 #ifndef CU_OCEAN_UTILS_H
 #define CU_OCEAN_UTILS_H
 
-#include "ior_stack.cuh"
 #include "material.cuh"
+#include "medium_stack.cuh"
 #include "sky_utils.cuh"
 #include "utils.cuh"
 
@@ -464,7 +464,7 @@ LUMINARY_FUNCTION float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceIORStack& ior_stack) {
+LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceTaskMediumStack& medium) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
@@ -478,12 +478,12 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
     flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const bool refraction_is_inside       = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
-  const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior                   = ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
+  const bool refraction_is_inside = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
 
-  const float ior_ratio =
-    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index / ray_ior : ray_ior / device.ocean.refractive_index;
+  const float other_ior    = medium_stack_ior_peek(medium, refraction_is_inside);
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
+  const float ior_ratio = (refraction_is_inside) ? device.ocean.refractive_index / other_ior : other_ior / device.ocean.refractive_index;
 
   MaterialContextGeometry ctx;
 
@@ -494,6 +494,7 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
   ctx.position     = task.origin;
   ctx.V            = scale_vector(task.ray, -1.0f);
   ctx.state        = task.state;
+  ctx.volume_type  = VolumeType(volume_id);
   ctx.params.flags = flags;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, splat_color(1.0f));

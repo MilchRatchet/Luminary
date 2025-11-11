@@ -4,8 +4,6 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-// #define CAMERA_DEBUG_RENDER
-
 // mm to m
 #define CAMERA_COMMON_SCALE (0.001f)
 #define CAMERA_COMMON_INV_SCALE (1.0f / CAMERA_COMMON_SCALE)
@@ -23,14 +21,10 @@ struct CameraSampleResult {
 } typedef CameraSampleResult;
 
 LUMINARY_FUNCTION float2 camera_get_jitter() {
-#ifndef CAMERA_DEBUG_RENDER
   if (device.state.sample_id == 0)
     return make_float2(0.5f, 0.5f);
 
   return random_2D_base_float(RANDOM_TARGET_CAMERA_JITTER, make_ushort2(0, 0), device.state.sample_id, 0);
-#else
-  return make_float2(0.5f, 0.5f);
-#endif
 }
 
 LUMINARY_FUNCTION float camera_get_image_plane() {

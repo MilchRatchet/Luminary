@@ -8,23 +8,23 @@
 #include "spectral.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION CameraSampleResult camera_sample(const ushort2 pixel) {
+LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
   CameraSampleResult result;
   if (device.camera.use_physical_camera) {
     const bool allow_reflections  = device.camera.allow_reflections;
     const bool spectral_rendering = device.camera.use_spectral_rendering;
 
     if (allow_reflections == true && spectral_rendering == true)
-      result = camera_physical_sample<true, true>(pixel);
+      result = camera_physical_sample<true, true>(path_id);
     else if (allow_reflections == true && spectral_rendering == false)
-      result = camera_physical_sample<true, false>(pixel);
+      result = camera_physical_sample<true, false>(path_id);
     else if (allow_reflections == false && spectral_rendering == true)
-      result = camera_physical_sample<false, true>(pixel);
+      result = camera_physical_sample<false, true>(path_id);
     else
-      result = camera_physical_sample<false, false>(pixel);
+      result = camera_physical_sample<false, false>(path_id);
   }
   else {
-    result = camera_thin_lens_sample(pixel);
+    result = camera_thin_lens_sample(path_id);
   }
 
   // Transform result to world space

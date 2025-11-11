@@ -310,8 +310,8 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
   return ctx;
 }
 
-LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const ushort2 pixel) {
-  const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, pixel);
+LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const PathID& path_id) {
+  const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, path_id);
 
   const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
 
@@ -333,8 +333,8 @@ LUMINARY_FUNCTION RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContex
   return weight;
 }
 
-LUMINARY_FUNCTION void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, RGBF& weight) {
-  const float dist = volume_sample_sky_dl_initial_vertex_dist(ctx, pixel);
+LUMINARY_FUNCTION void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const PathID& path_id, RGBF& weight) {
+  const float dist = volume_sample_sky_dl_initial_vertex_dist(ctx, path_id);
   weight           = volume_sample_sky_dl_initial_vertex_weight(ctx, dist);
 }
 

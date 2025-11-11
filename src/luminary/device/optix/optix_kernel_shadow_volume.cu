@@ -5,8 +5,8 @@
 #include "bsdf.cuh"
 #include "direct_lighting.cuh"
 #include "geometry_utils.cuh"
-#include "ior_stack.cuh"
 #include "math.cuh"
+#include "medium_stack.cuh"
 #include "memory.cuh"
 #include "utils.cuh"
 
@@ -19,15 +19,16 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= task_count)
     return;
 
-  const uint32_t task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
-  DeviceTask task                  = task_load(task_base_address);
-  DeviceTaskTrace trace            = task_trace_load(task_base_address);
+  const uint32_t task_base_address   = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+  DeviceTask task                    = task_load(task_base_address);
+  DeviceTaskTrace trace              = task_trace_load(task_base_address);
+  const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
   // The trace handle contains the actual handle of the ray's end point but the direct lighting functions assume that it is
   // the handle of the starting point so we must invalidate it.
   trace.handle = TRIANGLE_HANDLE_INVALID;
 
-  const VolumeType volume_type  = VolumeType(task.volume_id);
+  const VolumeType volume_type  = (VolumeType) medium_stack_volume_peek(medium, false);
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
   MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
@@ -45,7 +46,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightBridges direct_light_task = task_direct_light_bridges_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_bridges_is_allowed(ctx);
-    const RGBF direct_light_result = direct_lighting_bridges_evaluate_task(ctx, direct_light_task, task.index, is_allowed);
+    const RGBF direct_light_result = direct_lighting_bridges_evaluate_task(ctx, direct_light_task, task.path_id, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
   }
@@ -55,7 +56,7 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   RGBF initial_vertex_weight;
-  volume_sample_sky_dl_initial_vertex(ctx, task.index, initial_vertex_weight);
+  volume_sample_sky_dl_initial_vertex(ctx, task.path_id, initial_vertex_weight);
 
   task.origin = ctx.position;
 
@@ -67,7 +68,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightSun direct_light_task = task_direct_light_sun_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_sun_is_allowed(ctx);
-    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, direct_light_task, is_allowed);
+    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
   }
@@ -80,7 +81,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightAmbient direct_light_task = task_direct_light_ambient_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_ambient_is_allowed(ctx);
-    const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, direct_light_task, is_allowed);
+    const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
   }
@@ -93,6 +94,6 @@ extern "C" __global__ void __raygen__optix() {
 
   accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
-  const uint32_t pixel = get_pixel_id(task.index);
-  write_beauty_buffer(accumulated_light, pixel, task.state);
+  const uint32_t index = path_id_get_pixel_index(task.path_id);
+  write_beauty_buffer(accumulated_light, index, task.state);
 }

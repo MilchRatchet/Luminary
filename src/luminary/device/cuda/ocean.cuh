@@ -4,6 +4,7 @@
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "math.cuh"
+#include "medium_stack.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
 #include "utils.cuh"
@@ -24,28 +25,16 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     DeviceTask task                       = task_load(task_base_address);
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    DeviceIORStack ior_stack    = trace.ior_stack;
-    MaterialContextGeometry ctx = ocean_get_context(task, ior_stack);
+    MaterialContextGeometry ctx = ocean_get_context(task, medium);
 
-    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.index);
+    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
 
     RGBF record = record_unpack(throughput.record);
     record      = mul_color(record, bounce_info.weight);
-
-    uint16_t volume_id = task.volume_id;
-
-    if (bounce_info.is_transparent_pass) {
-      const bool refraction_is_inside       = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
-      const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
-
-      const VolumeType above_water_volume = (device.fog.active) ? VOLUME_TYPE_FOG : VOLUME_TYPE_NONE;
-
-      volume_id = (refraction_is_inside) ? above_water_volume : VOLUME_TYPE_OCEAN;
-    }
 
     const float shift_length = 2.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + trace.depth);
     ctx.position             = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, shift_length);
@@ -56,18 +45,25 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
     DeviceTask bounce_task;
-    bounce_task.state     = new_state;
-    bounce_task.origin    = ctx.position;
-    bounce_task.ray       = bounce_info.ray;
-    bounce_task.index     = task.index;
-    bounce_task.volume_id = volume_id;
+    bounce_task.state   = new_state;
+    bounce_task.origin  = ctx.position;
+    bounce_task.ray     = bounce_info.ray;
+    bounce_task.path_id = task.path_id;
 
     if (task_russian_roulette(bounce_task, task.state, record)) {
+      // Apply medium transition.
+      if (bounce_info.is_transparent_pass) {
+        const bool refraction_is_inside = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+
+        medium_stack_ior_modify(medium, device.ocean.refractive_index, refraction_is_inside == false);
+        medium_stack_volume_modify(medium, VOLUME_TYPE_OCEAN, refraction_is_inside == false);
+      }
+
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       task_store(dst_task_base_address, bounce_task);
-      task_trace_ior_stack_store(dst_task_base_address, ior_stack);
       task_throughput_record_store(dst_task_base_address, record_pack(record));
+      task_medium_store(dst_task_base_address, medium);
     }
   }
 
@@ -88,14 +84,13 @@ LUMINARY_KERNEL void ocean_process_tasks_debug() {
     const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
     DeviceTask task                  = task_load(task_base_address);
     const DeviceTaskTrace trace      = task_trace_load(task_base_address);
-
-    const uint32_t pixel = get_pixel_id(task.index);
+    const uint32_t index             = path_id_get_pixel_index(task.path_id);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_DEPTH: {
-        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), pixel);
+        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), index);
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
         vec3 normal = ocean_get_normal(task.origin);
@@ -104,10 +99,10 @@ LUMINARY_KERNEL void ocean_process_tasks_debug() {
         normal.y = 0.5f * normal.y + 0.5f;
         normal.z = 0.5f * normal.z + 0.5f;
 
-        write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
+        write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), index);
       } break;
       case LUMINARY_SHADING_MODE_IDENTIFICATION: {
-        write_beauty_buffer_forced(get_color(0.0f, 0.0f, 1.0f), pixel);
+        write_beauty_buffer_forced(get_color(0.0f, 0.0f, 1.0f), index);
       } break;
       default:
         break;

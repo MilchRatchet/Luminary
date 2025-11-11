@@ -200,7 +200,7 @@ LUMINARY_FUNCTION float _light_tree_continuation_unpack_prob(const LightTreeCont
 }
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE> ctx, const PathID& path_id) {
   const DeviceLightTreeRootHeader header = load_light_tree_root();
 
   RISAggregator ris_aggregator = ris_aggregator_init();
@@ -208,7 +208,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   RISLane ris_lane[LIGHT_TREE_NUM_OUTPUTS];
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    ris_lane[lane_id] = ris_lane_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_PREPASS + lane_id, pixel));
+    ris_lane[lane_id] = ris_lane_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_PREPASS + lane_id, path_id));
   }
 
   const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
@@ -267,7 +267,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION LightTreeResult
-  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork& work) {
+  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const PathID& path_id, const uint32_t lane_id, const LightTreeWork& work) {
   const LightTreeContinuation continuation = work.data[lane_id];
 
   _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(lane_id, continuation);
@@ -288,7 +288,7 @@ LUMINARY_FUNCTION LightTreeResult
 
   DeviceLightTreeNode node = load_light_tree_node(continuation.child_index);
 
-  const float random     = random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_POSTPASS + lane_id, pixel);
+  const float random     = random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_POSTPASS + lane_id, path_id);
   RISReservoir reservoir = ris_reservoir_init(random);
 
 #pragma nounroll

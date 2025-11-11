@@ -1,10 +1,10 @@
 #ifndef CU_GEOMETRY_UTILS_H
 #define CU_GEOMETRY_UTILS_H
 
-#include "ior_stack.cuh"
 #include "light_triangle.cuh"
 #include "material.cuh"
 #include "math.cuh"
+#include "medium_stack.cuh"
 #include "memory.cuh"
 #include "mis.cuh"
 #include "texture_utils.cuh"
@@ -51,7 +51,8 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask& task, DeviceTaskTrace& trace) {
+LUMINARY_FUNCTION MaterialContextGeometry
+  geometry_get_context(const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium) {
   const uint32_t mesh_id      = mesh_id_load(trace.handle.instance_id);
   const DeviceTransform trans = load_transform(trace.handle.instance_id);
 
@@ -173,12 +174,13 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
     flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const IORStackMethod ior_stack_method =
-    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(trace.ior_stack, mat.refraction_index, ior_stack_method);
+  const bool refraction_is_inside = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) != 0;
 
-  const float ior_in  = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
-  const float ior_out = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+  const float other_ior    = medium_stack_ior_peek(medium, refraction_is_inside);
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
+  const float ior_in  = (refraction_is_inside) ? mat.refraction_index : other_ior;
+  const float ior_out = (refraction_is_inside) ? other_ior : mat.refraction_index;
 
   // If we have a translucent substrate and the IOR change is within some small threshold, treat the material as fully transparent.
   if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(flags) && (fabsf(1.0f - ior_in / ior_out) < 1e-4f)) {
@@ -201,7 +203,7 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
   ctx.position    = position;
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
-  ctx.volume_type = VolumeType(task.volume_id);
+  ctx.volume_type = VolumeType(volume_id);
 
   ctx.params.flags = flags;
 

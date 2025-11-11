@@ -5,17 +5,13 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION vec3 camera_physical_sample_sensor(const ushort2 pixel) {
+LUMINARY_FUNCTION vec3 camera_physical_sample_sensor(const PathID& path_id) {
   const float2 jitter = camera_get_jitter();
 
   const float step = 2.0f * (device.camera.physical.sensor_width / device.settings.width);
   const float vfov = step * device.settings.height * 0.5f;
 
-#ifndef CAMERA_DEBUG_RENDER
-  const ushort2 sensor_pixel = pixel;
-#else
-  const ushort2 sensor_pixel = make_ushort2(device.settings.width >> 1, device.settings.height >> 1);
-#endif
+  const ushort2 sensor_pixel = path_id_get_pixel(path_id);
 
   vec3 sensor_point;
   sensor_point.x = device.camera.physical.sensor_width - step * (sensor_pixel.x + jitter.x);
@@ -25,12 +21,8 @@ LUMINARY_FUNCTION vec3 camera_physical_sample_sensor(const ushort2 pixel) {
   return sensor_point;
 }
 
-LUMINARY_FUNCTION vec3 camera_physical_sample_exit_pupil(const vec3 sensor_point, const ushort2 pixel, float& weight) {
-#ifndef CAMERA_DEBUG_RENDER
-  const float2 random = random_2D(RANDOM_TARGET_LENS, pixel);
-#else
-  const float2 random = make_float2(((float) pixel_coords.x) / device.settings.width, ((float) pixel_coords.y) / device.settings.height);
-#endif
+LUMINARY_FUNCTION vec3 camera_physical_sample_exit_pupil(const vec3 sensor_point, const PathID& path_id, float& weight) {
+  const float2 random = random_2D(RANDOM_TARGET_LENS, path_id);
 
   const float alpha = random.x * 2.0f * PI;
   const float beta  = sqrtf(random.y) * device.camera.physical.exit_pupil_radius;
@@ -126,7 +118,7 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_medium_cylinder(
 
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 LUMINARY_FUNCTION int32_t
-  camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const ushort2 pixel) {
+  camera_simulation_step(CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const PathID& path_id) {
   const DeviceCameraInterface interface = device.ptrs.camera_interfaces[interface_id];
 
   const vec3 semi_circle_center = get_vector(0.0f, 0.0f, interface.vertex - interface.radius);
@@ -206,7 +198,7 @@ LUMINARY_FUNCTION int32_t
     const float fresnel = bsdf_fresnel(normal, V, refraction, ior);
 
     if (allow_refraction && allow_reflection) {
-      const float random = random_1D(RANDOM_TARGET_LENS_METHOD + iteration, pixel);
+      const float random = random_1D(RANDOM_TARGET_LENS_METHOD + iteration, path_id);
 
       weight             = 1.0f;
       sampled_refraction = random >= fresnel;
@@ -234,7 +226,7 @@ LUMINARY_FUNCTION int32_t
 
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 LUMINARY_FUNCTION CameraSimulationResult
-  camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const ushort2 pixel) {
+  camera_simulation_trace(const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const PathID& path_id) {
   CameraSimulationState state;
   state.origin             = sensor_point;
   state.ray                = initial_direction;
@@ -252,7 +244,7 @@ LUMINARY_FUNCTION CameraSimulationResult
   int32_t current_interface = 0;
 
   for (; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
-    current_interface += camera_simulation_step<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(state, iteration, current_interface, pixel);
+    current_interface += camera_simulation_step<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(state, iteration, current_interface, path_id);
 
     if (current_interface >= num_interfaces || current_interface < 0 || state.weight == 0.0f)
       break;
@@ -270,17 +262,17 @@ LUMINARY_FUNCTION CameraSimulationResult
 }
 
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
-LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const ushort2 pixel) {
+LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_id) {
   float wavelength_pdf;
-  const float wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, pixel), wavelength_pdf);
+  const float wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, path_id), wavelength_pdf);
 
-  const vec3 sensor_point = camera_physical_sample_sensor(pixel);
+  const vec3 sensor_point = camera_physical_sample_sensor(path_id);
 
   float initial_weight;
-  const vec3 initial_direction = camera_physical_sample_exit_pupil(sensor_point, pixel, initial_weight);
+  const vec3 initial_direction = camera_physical_sample_exit_pupil(sensor_point, path_id, initial_weight);
 
   const CameraSimulationResult simulation_result =
-    camera_simulation_trace<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(sensor_point, initial_direction, wavelength, pixel);
+    camera_simulation_trace<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(sensor_point, initial_direction, wavelength, path_id);
 
   CameraSampleResult result;
   result.origin = simulation_result.origin;

@@ -5,17 +5,13 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION vec3 camera_thin_lens_sample_sensor(const ushort2 pixel) {
+LUMINARY_FUNCTION vec3 camera_thin_lens_sample_sensor(const PathID& path_id) {
   const float2 jitter = camera_get_jitter();
 
   const float step = 2.0f * (device.camera.thin_lens.fov / device.settings.width);
   const float vfov = step * device.settings.height * 0.5f;
 
-#ifndef CAMERA_DEBUG_RENDER
-  const ushort2 sensor_pixel = pixel;
-#else
-  const ushort2 sensor_pixel = make_ushort2(device.settings.width >> 1, device.settings.height >> 1);
-#endif
+  const ushort2 sensor_pixel = path_id_get_pixel(path_id);
 
   vec3 sensor_point;
   sensor_point.x = device.camera.thin_lens.fov - step * (sensor_pixel.x + jitter.x);
@@ -27,15 +23,12 @@ LUMINARY_FUNCTION vec3 camera_thin_lens_sample_sensor(const ushort2 pixel) {
 
 // We force the weight to be 1, else the brightness of the image would depend on aperture size.
 // That would be realistic but not practical.
-LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
+LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const PathID& path_id) {
   if (device.camera.thin_lens.aperture_size == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
-#ifndef CAMERA_DEBUG_RENDER
-  const float2 random = random_2D(RANDOM_TARGET_LENS, pixel);
-#else
-  const float2 random = make_float2(((float) pixel.x) / device.settings.width, ((float) pixel.y) / device.settings.height);
-#endif
+  const float2 random = random_2D(RANDOM_TARGET_LENS, path_id);
+
   float2 sample;
 
   const float aperture_size = device.camera.thin_lens.aperture_size * CAMERA_COMMON_INV_SCALE;
@@ -49,7 +42,7 @@ LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
       sample = make_float2(cosf(alpha) * beta, sinf(alpha) * beta);
     } break;
     case LUMINARY_APERTURE_BLADED: {
-      const int blade   = random_1D(RANDOM_TARGET_LENS_BLADE, pixel) * device.camera.aperture_blade_count;
+      const int blade   = random_1D(RANDOM_TARGET_LENS_BLADE, path_id) * device.camera.aperture_blade_count;
       const float alpha = sqrtf(random.x);
       const float beta  = random.y;
 
@@ -72,8 +65,8 @@ LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const ushort2 pixel) {
   return get_vector(sample.x, sample.y, 0.0f);
 }
 
-LUMINARY_FUNCTION CameraSampleResult camera_thin_lens_sample(const ushort2 pixel) {
-  const vec3 sensor_point = camera_thin_lens_sample_sensor(pixel);
+LUMINARY_FUNCTION CameraSampleResult camera_thin_lens_sample(const PathID& path_id) {
+  const vec3 sensor_point = camera_thin_lens_sample_sensor(path_id);
 
   vec3 sensor_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), sensor_point));
 
@@ -82,7 +75,7 @@ LUMINARY_FUNCTION CameraSampleResult camera_thin_lens_sample(const ushort2 pixel
   // The minus is because we are always looking in -Z direction
   vec3 focal_point = scale_vector(sensor_to_focal_ray, -focal_length / sensor_to_focal_ray.z);
 
-  vec3 aperture_point = camera_thin_lens_sample_aperture(pixel);
+  vec3 aperture_point = camera_thin_lens_sample_aperture(path_id);
 
   CameraSampleResult result;
   result.origin = aperture_point;
