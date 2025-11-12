@@ -251,7 +251,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
     const vec3 microfacet = bsdf_microfacet_refraction_sample(V_local, roughness, path_id, RANDOM_SET::REFRACTION);
     const vec3 ray        = refract_vector(V_local, microfacet, ior, total_reflection);
     const BSDFRayContext ctx =
-      bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), mat_ctx.V, microfacet, ray, !total_reflection);
+      bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, !total_reflection);
     const RGBF eval = bsdf_evaluate_core(mat_ctx.params, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, ray, face_normal_local);
 
     float mis_weight = 1.0f;
