@@ -100,35 +100,27 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float clamped_dist_along_ray = clampf(dist_along_ray, 0.0f, ctx.max_dist);
 
   // This is only perpendicular if we didn't actually clamp
-  const float perpendicular_dist = get_length(sub_vector(mean, add_vector(ctx.position, scale_vector(ctx.V, -clamped_dist_along_ray))));
-
-  const float z = (perpendicular_dist > std_dev) ? std_dev / perpendicular_dist : 1.0f;
+  const vec3 perpendicular_vector   = sub_vector(mean, add_vector(ctx.position, scale_vector(ctx.V, -clamped_dist_along_ray)));
+  const float perpendicular_dist_sq = dot_product(perpendicular_vector, perpendicular_vector);
 
   // This should be pre-computed.
-  const float extinction = color_importance(ctx.descriptor.absorption) + color_importance(ctx.descriptor.scattering);
+  const float max_absorption = color_importance(ctx.descriptor.absorption);
 
-  // Surprisingly simple expession given by the root of the derivative of the transmittance function.
-  const float transmittance_maximizer = 1.0f / extinction;
+  // Account for quadratic falloff
+  const float falloff = 1.0f / (perpendicular_dist_sq + std_dev);
 
-  // Compute the maximizer within the target domain
-  const float dist = clampf(transmittance_maximizer, 0.0f, clamped_dist_along_ray);
+  const float variance = std_dev * std_dev;
 
-  // Integral of the transmittance term using the triangle inequality as an upper bound
-  const float transmittance = expf(-extinction * (dist + perpendicular_dist)) * dist;
+  // Don't use direct path to save on computations by using distances that we already computed.
+  const float transmittance_depth = fmaxf(perpendicular_dist_sq + clamped_dist_along_ray * clamped_dist_along_ray - variance, 0.0f);
 
-  float result = power * transmittance;
+  // Account for energy loss due to absorption
+  const float transmittance = expf(-max_absorption * transmittance_depth);
 
-  // N^TL term is taken out by approximating it using its maximizer
-  const vec3 reference_point = add_vector(ctx.position, scale_vector(ctx.V, -dist));
+  // Account for limited amount of energy that is scattered along the ray before passing the mean
+  const float scattering = 1.0f - expf(-ctx.descriptor.max_scattering * (variance + clamped_dist_along_ray));
 
-  // Compute a favourable L so that N^TL is roughly as large as it gets over the set of directions towards the light cluster
-  const vec3 L = normalize_vector(sub_vector(mean, reference_point));
-
-  // Phase can't be zero as the light cluster is given through a distribution with infinite support
-  const float phase = __saturatef(bridges_phase_function(-dot_product(L, ctx.V)));
-  result            = result * fmaf(phase, 1.0f - z, z);
-
-  return result;
+  return power * falloff * transmittance * scattering;
 }
 
 template <>
