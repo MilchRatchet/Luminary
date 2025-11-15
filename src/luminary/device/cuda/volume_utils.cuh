@@ -14,13 +14,15 @@ LUMINARY_FUNCTION RGBF volume_get_transmittance(const VolumeDescriptor volume) {
 LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_fog() {
   VolumeDescriptor volume;
 
-  volume.type           = VOLUME_TYPE_FOG;
-  volume.absorption     = get_color(0.0f, 0.0f, 0.0f);
-  volume.scattering     = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
+  volume.type       = VOLUME_TYPE_FOG;
+  volume.absorption = get_color(0.0f, 0.0f, 0.0f);
+  volume.scattering = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
+  volume.dist       = device.fog.dist;
+  volume.max_height = device.fog.height;
+  volume.min_height = (device.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
+
+  volume.max_absorption = 0.0f;
   volume.max_scattering = FOG_DENSITY;
-  volume.dist           = device.fog.dist;
-  volume.max_height     = device.fog.height;
-  volume.min_height     = (device.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
 
   return volume;
 }
@@ -35,6 +37,7 @@ LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.max_height = 65535.0f;
   volume.min_height = -65535.0f;
 
+  volume.max_absorption = color_importance(volume.absorption);
   volume.max_scattering = color_importance(volume.scattering);
 
   return volume;

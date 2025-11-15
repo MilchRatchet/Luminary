@@ -100,11 +100,8 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float clamped_dist_along_ray = clampf(dist_along_ray, 0.0f, ctx.max_dist);
 
   // This is only perpendicular if we didn't actually clamp
-  const vec3 perpendicular_vector   = sub_vector(mean, add_vector(ctx.position, scale_vector(ctx.V, -clamped_dist_along_ray)));
+  const vec3 perpendicular_vector   = sub_vector(PO, scale_vector(ctx.V, clamped_dist_along_ray));
   const float perpendicular_dist_sq = dot_product(perpendicular_vector, perpendicular_vector);
-
-  // This should be pre-computed.
-  const float max_absorption = color_importance(ctx.descriptor.absorption);
 
   // Account for quadratic falloff
   const float falloff = 1.0f / (perpendicular_dist_sq + std_dev);
@@ -115,7 +112,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float transmittance_depth = fmaxf(perpendicular_dist_sq + clamped_dist_along_ray * clamped_dist_along_ray - variance, 0.0f);
 
   // Account for energy loss due to absorption
-  const float transmittance = expf(-max_absorption * transmittance_depth);
+  const float transmittance = expf(-ctx.descriptor.max_absorption * transmittance_depth);
 
   // Account for limited amount of energy that is scattered along the ray before passing the mean
   const float scattering = 1.0f - expf(-ctx.descriptor.max_scattering * (variance + clamped_dist_along_ray));
