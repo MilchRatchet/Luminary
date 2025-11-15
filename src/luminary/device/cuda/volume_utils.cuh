@@ -122,7 +122,7 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
   }
 
   // Horizontal intersection
-  const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
+  const float rn = rsqrtf(ray.x * ray.x + ray.z * ray.z);
   const float rx = ray.x * rn;
   const float rz = ray.z * rn;
 

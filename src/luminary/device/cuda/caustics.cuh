@@ -139,7 +139,7 @@ LUMINARY_FUNCTION bool caustics_find_connection_point(
   vec3 V = sub_vector(ctx.position, point);
 
   const float dist_sq = dot_product(V, V);
-  V                   = scale_vector(V, 1.0f / sqrtf(dist_sq));
+  V                   = scale_vector(V, rsqrtf(dist_sq));
 
   const vec3 normal = scale_vector(ocean_get_normal_fast(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_refraction) ? -1.0f : 1.0f);
 

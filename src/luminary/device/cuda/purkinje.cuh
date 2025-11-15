@@ -42,9 +42,9 @@ LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
 
   RGBF signal;
 
-  signal.r = 1.0f / sqrtf(inverse_signal.r);
-  signal.g = 1.0f / sqrtf(inverse_signal.g);
-  signal.b = 1.0f / sqrtf(inverse_signal.b);
+  signal.r = rsqrtf(inverse_signal.r);
+  signal.g = rsqrtf(inverse_signal.g);
+  signal.b = rsqrtf(inverse_signal.b);
 
   const float K  = 45.0f;
   const float S  = 10.0f;

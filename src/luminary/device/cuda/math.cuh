@@ -172,7 +172,7 @@ LUMINARY_FUNCTION vec3 floor_vector(const vec3 x) {
 }
 
 LUMINARY_FUNCTION vec3 normalize_vector(vec3 vector) {
-  const float scale = rnorm3df(vector.x, vector.y, vector.z);
+  const float scale = rsqrtf(dot_product(vector, vector));
 
   vector.x *= scale;
   vector.y *= scale;
@@ -197,7 +197,7 @@ LUMINARY_FUNCTION vec3 reflect_vector(const vec3 V, const vec3 normal) {
 }
 
 LUMINARY_FUNCTION float get_length(const vec3 vector) {
-  return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+  return sqrtf(dot_product(vector, vector));
 }
 
 LUMINARY_FUNCTION float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
@@ -351,14 +351,14 @@ LUMINARY_FUNCTION int trailing_zeros(const unsigned int n) {
 }
 
 LUMINARY_FUNCTION Quaternion normalize_quaternion(const Quaternion q) {
-  const float length = sqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  const float scale = rsqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
 
   Quaternion res;
 
-  res.x = q.x / length;
-  res.y = q.y / length;
-  res.z = q.z / length;
-  res.w = q.w / length;
+  res.x = q.x * scale;
+  res.y = q.y * scale;
+  res.z = q.z * scale;
+  res.w = q.w * scale;
 
   return res;
 }
@@ -386,7 +386,7 @@ LUMINARY_FUNCTION Quaternion quaternion_rotation_to_z_canonical(const vec3 v) {
   res.z = 0.0f;
   res.w = 1.0f + v.z;
 
-  const float norm = rnorm3df(res.x, res.y, res.w);
+  const float norm = rsqrtf(res.x * res.x + res.y * res.y + res.w * res.w);
 
   res.x *= norm;
   res.y *= norm;
