@@ -36,7 +36,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     RGBF record = record_unpack(throughput.record);
     record      = mul_color(record, bounce_info.weight);
 
-    const float shift_length = 2.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + trace.depth);
+    const float shift_length = 2.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + fabsf(device.ocean.height));
     ctx.position             = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, shift_length);
 
     uint16_t new_state = task.state;

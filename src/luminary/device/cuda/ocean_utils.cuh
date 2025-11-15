@@ -116,7 +116,7 @@ LUMINARY_FUNCTION bool ocean_is_underwater(const vec3 p) {
 }
 
 LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
-  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+  const float d = (OCEAN_LIPSCHITZ + get_length(p) + 1.0f) * eps * 16.0f;
 
   // Sobel filter
   const float h_0 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
@@ -137,7 +137,7 @@ LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations 
 }
 
 LUMINARY_FUNCTION vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
-  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+  const float d = (OCEAN_LIPSCHITZ + get_length(p) + 1.0f) * eps * 16.0f;
 
   const float h_0 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
   const float h_1 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
