@@ -603,8 +603,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   if (display->active_camera_movement) {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
   }
-
-  if (ui_status.received_keyboard_action == false) {
+  else if (ui_status.received_keyboard_action == false) {
     display_zoom_handler_update(display->zoom_handler, display->mouse_state);
     render_region_handle_inputs(display->region, display, host, display->mouse_state, display->keyboard_state);
   }
