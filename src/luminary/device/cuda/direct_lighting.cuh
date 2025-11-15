@@ -623,7 +623,8 @@ LUMINARY_FUNCTION RGBF direct_lighting_bridges_evaluate_task(
 }
 
 LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightBSDF& direct_light_task, const bool is_allowed) {
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium,
+  const DeviceTaskDirectLightBSDF& direct_light_task, const bool is_allowed) {
   const TriangleHandle blocked_handle = trace.handle;
 
   bool sample_is_valid = is_allowed && direct_light_task.sampling_probability != 0.0f;
@@ -677,7 +678,10 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
 
   const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
 
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
   light_color = mul_color(light_color, visibility);
+  light_color = mul_color(light_color, volume_integrate_transmittance((VolumeType) volume_id, task.origin, direct_light_task.ray, dist));
 
   return light_color;
 }
