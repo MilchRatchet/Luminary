@@ -280,16 +280,17 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 // Utils
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION bool direct_lighting_geometry_is_allowed(const DeviceTask& task) {
+LUMINARY_FUNCTION bool direct_lighting_geometry_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
   bool allow_geometry_lighting = true;
 
   allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
   allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
+  allow_geometry_lighting &= trace.handle.instance_id != HIT_TYPE_OCEAN;
 
   return allow_geometry_lighting;
 }
 
-LUMINARY_FUNCTION bool direct_lighting_sun_is_allowed(const DeviceTask& task) {
+LUMINARY_FUNCTION bool direct_lighting_sun_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
   bool allow_sun_lighting = true;
 
   allow_sun_lighting &= device.sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
@@ -306,10 +307,11 @@ LUMINARY_FUNCTION bool direct_lighting_sun_is_allowed(const MaterialContextVolum
   return allow_sun_lighting;
 }
 
-LUMINARY_FUNCTION bool direct_lighting_ambient_is_allowed(const DeviceTask& task) {
+LUMINARY_FUNCTION bool direct_lighting_ambient_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
   bool allow_ambient_lighting = true;
 
   allow_ambient_lighting &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
+  allow_ambient_lighting &= trace.handle.instance_id != HIT_TYPE_OCEAN;
 
   return allow_ambient_lighting;
 }
@@ -398,8 +400,14 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
     return task;
   }
 
+  bool is_caustics_path;
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    is_caustics_path = ctx.volume_type == VOLUME_TYPE_OCEAN && ctx.instance_id != HIT_TYPE_OCEAN;
+  else
+    is_caustics_path = ctx.volume_type == VOLUME_TYPE_OCEAN;
+
   DeviceTaskDirectLightSun task;
-  if (ctx.volume_type == VOLUME_TYPE_OCEAN) {
+  if (is_caustics_path) {
     task = direct_lighting_sun_caustic(ctx, medium, path_id, sky_pos);
   }
   else {
@@ -494,7 +502,9 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
 
   const uint16_t volume_id = medium_stack_volume_peek(medium, false);
 
-  if (volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
+  const bool is_caustics_path = volume_id == VOLUME_TYPE_OCEAN && trace.handle.instance_id != HIT_TYPE_OCEAN;
+
+  if (is_caustics_path && ray.y > 0.0f) {
     const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
@@ -514,7 +524,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
   RGBF light_color = record_unpack(direct_light_task.light_color);
   light_color      = mul_color(light_color, visibility);
 
-  if (sample_is_valid && volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
+  if (sample_is_valid && is_caustics_path && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
     // Volume and particle rendering always use the geometry logic here, this means we get low variance sampling as we use the caustics fast
@@ -559,7 +569,9 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
 
   const uint16_t volume_id = medium_stack_volume_peek(medium, false);
 
-  if (volume_id == VOLUME_TYPE_OCEAN && ray.y > 0.0f) {
+  const bool is_caustics_path = volume_id == VOLUME_TYPE_OCEAN && trace.handle.instance_id != HIT_TYPE_OCEAN;
+
+  if (is_caustics_path && ray.y > 0.0f) {
     const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
@@ -580,7 +592,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
   light_color      = mul_color(light_color, visibility);
   light_color      = mul_color(light_color, volume_integrate_transmittance((VolumeType) volume_id, task.origin, ray, limit));
 
-  if (sample_is_valid && volume_id == VOLUME_TYPE_OCEAN && limit != FLT_MAX) {
+  if (sample_is_valid && is_caustics_path && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
     // Ocean normal points up, we come from below, so flip it

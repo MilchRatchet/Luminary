@@ -29,24 +29,51 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    MaterialContextGeometry ctx = ocean_get_context(task, medium);
+    const MaterialContextGeometry ctx = ocean_get_context(task, medium);
+
+    const uint32_t task_direct_lighting_base_address =
+      task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting BSDF
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_bsdf_is_allowed(task, trace)) {
+      const DeviceTaskDirectLightBSDF direct_light_bsdf_task = direct_lighting_bsdf_create_task(ctx, task.path_id, 0.0f);
+
+      task_direct_light_bsdf_store(task_direct_lighting_base_address, direct_light_bsdf_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Direct Lighting Sun
+    ////////////////////////////////////////////////////////////////////
+
+    if (direct_lighting_sun_is_allowed(task, trace)) {
+      const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
+
+      task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Bounce Ray Sampling
+    ////////////////////////////////////////////////////////////////////
 
     const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
 
     RGBF record = record_unpack(throughput.record);
     record      = mul_color(record, bounce_info.weight);
 
-    const float shift_length = 2.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + fabsf(device.ocean.height));
-    ctx.position             = shift_origin_vector(ctx.position, ctx.V, bounce_info.ray, bounce_info.is_transparent_pass, shift_length);
+    const vec3 bounce_pos = ocean_shift_vector(ctx, bounce_info.is_transparent_pass);
 
     uint16_t new_state = task.state;
 
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~STATE_FLAG_ALLOW_EMISSION;
     new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
     DeviceTask bounce_task;
     bounce_task.state   = new_state;
-    bounce_task.origin  = ctx.position;
+    bounce_task.origin  = bounce_pos;
     bounce_task.ray     = bounce_info.ray;
     bounce_task.path_id = task.path_id;
 

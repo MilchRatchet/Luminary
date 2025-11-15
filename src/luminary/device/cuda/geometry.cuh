@@ -37,7 +37,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
     float light_tree_root_sum = 0.0f;
-    if (direct_lighting_geometry_is_allowed(task)) {
+    if (direct_lighting_geometry_is_allowed(task, trace)) {
       const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.path_id, light_tree_root_sum);
 
       task_direct_light_geo_store(task_direct_lighting_base_address, direct_light_geo_task);
@@ -57,7 +57,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting Sun
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_sun_is_allowed(task)) {
+    if (direct_lighting_sun_is_allowed(task, trace)) {
       const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
 
       task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
@@ -73,7 +73,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting Ambient
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_ambient_is_allowed(task)) {
+    if (direct_lighting_ambient_is_allowed(task, trace)) {
       const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
 
       task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);

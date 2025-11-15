@@ -111,15 +111,15 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
-    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-    action.optix_type = OPTIX_KERNEL_TYPE_SHADOW;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (args->render_ocean && depth != args->max_depth) {
+    if (args->render_ocean) {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
       action.cuda_type = CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
+
+    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+    action.optix_type = OPTIX_KERNEL_TYPE_SHADOW;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
     if (args->render_volumes && depth != args->max_depth) {
       action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
