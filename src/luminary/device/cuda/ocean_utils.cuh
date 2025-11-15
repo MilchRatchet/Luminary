@@ -26,8 +26,9 @@
 #define OCEAN_ITERATIONS_NORMAL_CAUSTICS 8
 
 LUMINARY_FUNCTION float ocean_hash(const float2 p) {
-  const float x = p.x + p.y * (311.7f / 127.1f);
-  return (__float_as_uint(x) * 2654435769u) * (1.0f / 0xFFFFFFFFu);
+  const float x = fabsf(p.x + p.y * (311.7f / 127.1f));
+
+  return white_noise_offset((uint32_t) x);
 }
 
 LUMINARY_FUNCTION float ocean_noise(const float2 p) {
