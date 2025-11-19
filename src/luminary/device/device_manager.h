@@ -2,6 +2,7 @@
 #define LUMINARY_DEVICE_MANAGER_H
 
 #include "device.h"
+#include "device_adaptive_sampler.h"
 #include "device_bsdf.h"
 #include "device_library.h"
 #include "device_light.h"
@@ -19,7 +20,6 @@ struct DeviceManager {
   Host* host;
   bool is_shutdown;
   Scene* scene_device;
-  SampleCountSlice sample_count;
   ARRAY Device** devices;
   uint32_t main_device_index;
   DeviceLibrary* library;
@@ -34,6 +34,7 @@ struct DeviceManager {
   PhysicalCamera* physical_camera;
   SampleTime* sample_time;
   DeviceResultInterface* result_interface;
+  DeviceAdaptiveSampler* adaptive_sampler;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host, DeviceManagerCreateInfo info);

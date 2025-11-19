@@ -7,40 +7,6 @@
 // TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid
 // of the legacy naming of "temporal frames".
 
-// Simple tent filter.
-LUMINARY_FUNCTION float temporal_gather_pixel_weight(const float x, const float y) {
-  return (1.0f - x) * (1.0f - y);
-}
-
-LUMINARY_FUNCTION RGBF temporal_gather_pixel_load(
-  const RGBF* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
-  const float sample_y) {
-  const uint32_t index_x = (uint32_t) max(min((int32_t) sample_x, width - 1), 0);
-  const uint32_t index_y = (uint32_t) max(min((int32_t) sample_y, height - 1), 0);
-
-  const uint32_t index = index_x + index_y * width;
-
-  const RGBF pixel = load_RGBF(image + index);
-
-  const float rx = fabsf(pixel_x - sample_x);
-  const float ry = fabsf(pixel_y - sample_y);
-
-  return scale_color(pixel, temporal_gather_pixel_weight(rx, ry));
-}
-
-LUMINARY_FUNCTION RGBF temporal_gather_pixel(
-  const RGBF* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
-  const uint32_t height) {
-  RGBF result = get_color(0.0f, 0.0f, 0.0f);
-
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x, base_y));
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x + 1.0f, base_y));
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x, base_y + 1.0f));
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x + 1.0f, base_y + 1.0f));
-
-  return result;
-}
-
 LUMINARY_KERNEL void temporal_accumulation_first_sample() {
   HANDLE_DEVICE_ABORT();
 
@@ -51,12 +17,9 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const float2 jitter = camera_get_jitter();
 
-  const uint32_t bucket_sample_count = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
-  const uint32_t bucket_id           = device.state.sample_id - bucket_sample_count * MAX_NUM_INDIRECT_BUCKETS;
-
-  float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
-  float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
-  float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
+  float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[0];
+  float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[0];
+  float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[0];
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();
@@ -66,21 +29,13 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
     const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
-    const float pixel_x = x + 0.5f;
-    const float pixel_y = y + 0.5f;
-
-    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
-    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
-
     // Direct Lighting
-    RGBF direct_buffer = temporal_gather_pixel(
-      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+    RGBF direct_buffer = load_RGBF(device.ptrs.frame_direct_buffer + index);
 
     store_RGBF(device.ptrs.frame_direct_accumulate, index, direct_buffer);
 
     // Indirect Lighting
-    RGBF indirect_buffer = temporal_gather_pixel(
-      device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+    RGBF indirect_buffer = load_RGBF(device.ptrs.frame_indirect_buffer + index);
 
     __stcs(indirect_bucket_ptr_red + index, indirect_buffer.r);
     __stcs(indirect_bucket_ptr_green + index, indirect_buffer.g);
@@ -102,32 +57,27 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
 
   const float2 jitter = camera_get_jitter();
 
-  const uint32_t bucket_sample_count = device.state.sample_id / MAX_NUM_INDIRECT_BUCKETS;
-  const uint32_t bucket_id           = device.state.sample_id - bucket_sample_count * MAX_NUM_INDIRECT_BUCKETS;
-
-  const bool load_indirect_bucket = device.state.aggregate_sample_count >= MAX_NUM_INDIRECT_BUCKETS;
-
-  float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
-  float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
-  float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
-
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();
 
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
+    const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
+
+    const uint32_t bucket_sample_count = sample_count / MAX_NUM_INDIRECT_BUCKETS;
+    const uint32_t bucket_id           = sample_count - bucket_sample_count * MAX_NUM_INDIRECT_BUCKETS;
+
+    const bool load_indirect_bucket = sample_count >= MAX_NUM_INDIRECT_BUCKETS;
+
+    float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[bucket_id];
+    float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[bucket_id];
+    float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[bucket_id];
+
     const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
-    const float pixel_x = x + 0.5f;
-    const float pixel_y = y + 0.5f;
-
-    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
-    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
-
     // Direct Lighting
-    RGBF direct_buffer = temporal_gather_pixel(
-      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+    RGBF direct_buffer = load_RGBF(device.ptrs.frame_direct_buffer + index);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + index);
 
     direct_output = add_color(direct_output, direct_buffer);
@@ -135,8 +85,7 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
     store_RGBF(device.ptrs.frame_direct_accumulate, index, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = temporal_gather_pixel(
-      device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+    RGBF indirect_buffer = load_RGBF(device.ptrs.frame_indirect_buffer + index);
 
     RGBF indirect_output = splat_color(0.0f);
     if (load_indirect_bucket) {
@@ -258,15 +207,17 @@ LUMINARY_KERNEL void temporal_accumulation_output() {
   const uint32_t amount = width * height;
 
   float values[9 * MAX_NUM_INDIRECT_BUCKETS];
-  const uint32_t num_buckets_to_load = min(MAX_NUM_INDIRECT_BUCKETS, device.state.aggregate_sample_count + 1);
-
-  const float normalization = 1.0f / (device.state.aggregate_sample_count + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();
 
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
+
+    const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
+
+    const uint32_t num_buckets_to_load = min(MAX_NUM_INDIRECT_BUCKETS, sample_count + 1);
+    const float normalization          = 1.0f / (sample_count + 1);
 
     RGBF output;
     uint32_t num_buckets;
@@ -312,14 +263,16 @@ LUMINARY_KERNEL void temporal_accumulation_output_raw() {
 
   const uint32_t amount = width * height;
 
-  const uint32_t num_buckets = min(MAX_NUM_INDIRECT_BUCKETS, device.state.aggregate_sample_count + 1);
-  const float normalization  = 1.0f / (device.state.aggregate_sample_count + 1);
-
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();
 
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
+
+    const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
+
+    const uint32_t num_buckets = min(MAX_NUM_INDIRECT_BUCKETS, sample_count + 1);
+    const float normalization  = 1.0f / (sample_count + 1);
 
     const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
@@ -356,26 +309,21 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
 
   const float2 jitter = camera_get_jitter();
 
-  const float prev_scale     = device.state.aggregate_sample_count;
-  const float curr_inv_scale = 1.0f / (device.state.aggregate_sample_count + 1.0f);
-
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();
 
     const uint32_t y = device.settings.window_y + offset / width;
     const uint32_t x = device.settings.window_x + offset - (y - device.settings.window_y) * width;
 
+    const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
+
+    const float prev_scale     = sample_count;
+    const float curr_inv_scale = 1.0f / (sample_count + 1.0f);
+
     const uint32_t index = path_id_get_pixel_index(path_id_get(x, y, 0));
 
-    const float pixel_x = x + 0.5f;
-    const float pixel_y = y + 0.5f;
-
-    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
-    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
-
     // Direct Lighting
-    RGBF direct_buffer = temporal_gather_pixel(
-      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.settings.width, device.settings.height);
+    RGBF direct_buffer = load_RGBF(device.ptrs.frame_direct_buffer + index);
     RGBF direct_output = load_RGBF(device.ptrs.frame_current_result + index);
 
     direct_output = scale_color(direct_output, prev_scale);

@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include "device_adaptive_sampler.h"
 #include "device_bsdf.h"
 #include "device_cloud.h"
 #include "device_light.h"
@@ -80,9 +81,7 @@ struct Device {
   uint32_t index;
   DeviceProperties properties;
   DeviceOptixProperties optix_properties;
-  SampleCountSlice sample_count;
   uint32_t undersampling_state;
-  uint32_t aggregate_sample_count;
   bool exit_requested;
   bool optix_callback_error;
   bool is_main_device;
@@ -150,7 +149,7 @@ LuminaryResult device_get_internal_render_resolution(Device* device, uint32_t* w
 LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_count);
 LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pixels_per_thread);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
-LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y);
+LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAllocation sample_allocation);
 LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id);
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
 LuminaryResult device_sync_constant_memory(Device* device);
@@ -176,7 +175,7 @@ LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamer
 LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);
-LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
+LuminaryResult device_setup_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler);
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_set_output_dirty(Device* device);
 LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties);
@@ -184,7 +183,7 @@ LuminaryResult device_update_output_camera_params(Device* device, const Camera* 
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
 LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid);
-LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_finish_render_iteration(Device* device, DeviceAdaptiveSampler* sampler, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);

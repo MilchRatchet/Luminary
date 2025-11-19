@@ -301,8 +301,7 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   args.origin       = hdri->origin;
   args.sample_count = hdri->sample_count.end_sample_count;
 
-  for (uint32_t sample_id = 0; sample_id < hdri->sky.hdri_samples; sample_id++) {
-    __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_id, 0xFFFF, 0xFFFF));
+  for (args.sample_id = 0; args.sample_id < hdri->sky.hdri_samples; args.sample_id++) {
     __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], &args, device->stream_main));
   }
 

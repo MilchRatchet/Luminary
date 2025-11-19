@@ -13,7 +13,6 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->undersampling           = 2;
   settings->supersampling           = 1;
   settings->shading_mode            = LUMINARY_SHADING_MODE_DEFAULT;
-  settings->max_sample_count        = 0xFFFFFFFF;
   settings->region_x                = 0.0f;
   settings->region_y                = 0.0f;
   settings->region_width            = 1.0f;

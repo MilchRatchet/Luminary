@@ -8,7 +8,7 @@
 struct Device typedef Device;
 
 struct DeviceResultEntry {
-  uint32_t sample_count;
+  uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   STAGING void* direct_lighting_results;
   STAGING void* indirect_lighting_results_red[MAX_NUM_INDIRECT_BUCKETS];
   STAGING void* indirect_lighting_results_green[MAX_NUM_INDIRECT_BUCKETS];

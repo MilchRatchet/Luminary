@@ -29,6 +29,9 @@
 #define TASK_ID optixGetLaunchIndex().z
 #endif /* OPTIX_KERNEL */
 
+#define THREAD_ID_IN_WARP (THREAD_ID & WARP_SIZE_MASK)
+#define WARP_ID (THREAD_ID >> WARP_SIZE_LOG)
+
 #define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(THREADS_PER_BLOCK, LUMINARY_MIN_BLOCKS_PER_SM)
 #define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
@@ -138,8 +141,6 @@ extern "C" static __constant__ DeviceConstantMemory device;
 // PathID
 //===========================================================================================
 
-#define PATH_ID_SENSOR_BITS 14
-#define PATH_ID_SAMPLE_BITS 20
 #define PATH_ID_EXTRA_BITS (16 - PATH_ID_SENSOR_BITS)
 #define PATH_ID_SENSOR_MASK ((1u << PATH_ID_SENSOR_BITS) - 1)
 #define PATH_ID_SAMPLE_MASK ((1u << PATH_ID_SAMPLE_BITS) - 1)
@@ -187,23 +188,6 @@ LUMINARY_FUNCTION uint32_t path_id_get_sample_id(const PathID& path_id) {
 #else /* __builtin_assume */
 #define LUMINARY_ASSUME(__internal_macro_expression) __assume(__internal_macro_expression)
 #endif /* !__builtin_assume */
-
-#define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
-
-LUMINARY_FUNCTION bool is_selected_pixel(const ushort2 index) {
-  if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
-    return false;
-
-  // Only the top left subpixel of a pixel can be selected.
-  return (index.x == device.state.user_selected_x && index.y == device.state.user_selected_y);
-}
-
-LUMINARY_FUNCTION bool is_selected_pixel_lenient(const ushort2 index) {
-  if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
-    return true;
-
-  return is_selected_pixel(index);
-}
 
 LUMINARY_FUNCTION bool is_center_pixel(const PathID& path_id) {
   const ushort2 pixel = path_id_get_pixel(path_id);
@@ -283,7 +267,7 @@ LUMINARY_FUNCTION bool _utils_debug_nans(const float value, const char* func, co
   return false;
 }
 
-#define UTILS_CHECK_NANS(pixel, var) (is_selected_pixel_lenient(pixel) && _utils_debug_nans(var, __func__, __LINE__, #var))
+#define UTILS_CHECK_NANS(pixel, var) (_utils_debug_nans(var, __func__, __LINE__, #var))
 
 #else /* UTILS_DEBUG_MODE */
 

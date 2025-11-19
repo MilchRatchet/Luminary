@@ -43,7 +43,8 @@ static LuminaryResult _device_result_interface_entry_allocate(DeviceResultInterf
 
   entry->consumer_event_id = RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID;
   entry->queued            = false;
-  entry->sample_count      = 0;
+
+  memset(entry->stage_sample_counts, 0, sizeof(entry->stage_sample_counts));
 
   return LUMINARY_SUCCESS;
 }
@@ -99,7 +100,10 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
   uint32_t recommended_sample_count;
   __FAILURE_HANDLE(device_get_recommended_sample_queue_counts(device, &recommended_sample_count));
 
-  if (device->aggregate_sample_count < recommended_sample_count)
+  uint32_t aggregate_sample_count;
+  __FAILURE_HANDLE(device_renderer_get_total_executed_samples(device->renderer, &aggregate_sample_count));
+
+  if (aggregate_sample_count < recommended_sample_count)
     return LUMINARY_SUCCESS;
 
   uint32_t currently_allocated_results;
@@ -151,15 +155,13 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
 
   CUDA_FAILURE_HANDLE(cuEventRecord(entry->available_event, device->stream_main));
 
-  entry->sample_count = device->aggregate_sample_count;
+  __FAILURE_HANDLE(device_renderer_externalize_samples(device->renderer, entry->stage_sample_counts));
 
   DeviceResultMap map;
   map.allocation_id = selected_result;
   map.device_id     = device->index;
 
   __FAILURE_HANDLE(array_push(&interface->queued_results, &map));
-
-  device->aggregate_sample_count = 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -272,7 +274,7 @@ LuminaryResult device_result_interface_gather_results(DeviceResultInterface* int
 
     CUDA_FAILURE_HANDLE(cuEventRecord(interface->allocated_events[entry->consumer_event_id].event, device->stream_main));
 
-    device->aggregate_sample_count += entry->sample_count;
+    __FAILURE_HANDLE(device_renderer_register_external_samples(device->renderer, entry->stage_sample_counts));
 
     entry->queued = false;
   }

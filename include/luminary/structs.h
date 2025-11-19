@@ -55,7 +55,6 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t undersampling;
   uint32_t supersampling;
   LuminaryShadingMode shading_mode;
-  uint32_t max_sample_count;
   float region_x;
   float region_y;
   float region_width;

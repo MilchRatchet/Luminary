@@ -142,7 +142,7 @@ static LuminaryResult _device_manager_handle_device_render_continue(DeviceManage
   if (callback_is_valid == false)
     return LUMINARY_SUCCESS;
 
-  __FAILURE_HANDLE(device_finish_render_iteration(device, &device_manager->sample_count, data));
+  __FAILURE_HANDLE(device_finish_render_iteration(device, device_manager->adaptive_sampler, data));
   __FAILURE_HANDLE(device_handle_result_sharing(device, device_manager->result_interface));
   __FAILURE_HANDLE(device_continue_render(device));
 
@@ -275,7 +275,7 @@ static LuminaryResult _device_manager_handle_scene_updates_deferred_work(DeviceM
   uint32_t renderer_status;
   __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
 
-  *defer_execution = (renderer_status & DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE) != 0;
+  *defer_execution = (renderer_status & DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE) != 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -409,9 +409,9 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
     uint32_t width;
     uint32_t height;
-    __FAILURE_HANDLE(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
+    __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
 
-    __FAILURE_HANDLE(device_result_interface_set_pixel_count(device_manager->result_interface, width, height))
+    __FAILURE_HANDLE_CRITICAL(device_result_interface_set_pixel_count(device_manager->result_interface, width, height));
   }
 
   if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
@@ -441,13 +441,17 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       }
     }
 
-    __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
+    uint32_t width;
+    uint32_t height;
+    __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
+
+    __FAILURE_HANDLE_CRITICAL(device_adaptive_sampler_start_sampling(device_manager->adaptive_sampler, width, height));
 
     // Main device always computes the first samples
     __FAILURE_HANDLE_CRITICAL(
       device_setup_undersampling(device_manager->devices[device_manager->main_device_index], scene->settings.undersampling));
-    __FAILURE_HANDLE_CRITICAL(
-      device_update_sample_count(device_manager->devices[device_manager->main_device_index], &device_manager->sample_count));
+    __FAILURE_HANDLE_CRITICAL(device_adaptive_sampler_allocate_sample(
+      device_manager->adaptive_sampler, &device_manager->devices[device_manager->main_device_index]->renderer->sample_allocation, 32));
 
     DeviceRendererQueueArgs render_args;
     render_args.max_depth             = scene->settings.max_ray_depth;
@@ -466,7 +470,12 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       if (device->state != DEVICE_STATE_ENABLED)
         continue;
 
-      __FAILURE_HANDLE_CRITICAL(device_update_sample_count(device, &device_manager->sample_count));
+      if (device->is_main_device == false) {
+        __FAILURE_HANDLE_CRITICAL(
+          device_adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &device->renderer->sample_allocation, 32));
+      }
+
+      __FAILURE_HANDLE_CRITICAL(device_setup_adaptive_sampling(device, device_manager->adaptive_sampler));
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
       __FAILURE_HANDLE_CRITICAL(device_clear_lighting_buffers(device));
       __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
@@ -775,6 +784,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   }
 
   __FAILURE_HANDLE(device_result_interface_create(&device_manager->result_interface));
+  __FAILURE_HANDLE(device_adaptive_sampler_create(&device_manager->adaptive_sampler));
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
   __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
@@ -1086,6 +1096,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
 
   __FAILURE_HANDLE(device_result_interface_destroy(&(*device_manager)->result_interface));
+  __FAILURE_HANDLE(device_adaptive_sampler_destroy(&(*device_manager)->adaptive_sampler));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));

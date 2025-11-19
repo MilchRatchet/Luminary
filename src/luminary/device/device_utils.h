@@ -24,6 +24,12 @@
 #define MINIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD >> 1)
 #define MAXIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD << 1)
 
+#define ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG 3
+
+#define PATH_ID_SENSOR_BITS 14
+#define PATH_ID_SAMPLE_BITS 20
+#define MAX_NUM_GLOBAL_SAMPLES (1u << PATH_ID_SAMPLE_BITS)
+
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
@@ -256,6 +262,10 @@ struct GBufferMetaData {
 } typedef GBufferMetaData;
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
 
+typedef uint8_t DeviceExecutionFlags;
+
+enum DeviceExecutionFlag { DEVICE_EXECUTION_FLAG_INTERACTIVE = 1 << 0 } typedef DeviceExecutionFlag;
+
 ////////////////////////////////////////////////////////////////////
 // Light Importance Sampling Structs
 ////////////////////////////////////////////////////////////////////
@@ -307,6 +317,16 @@ struct DeviceLightTreeRootSection {
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
 #define MAX_NUM_INDIRECT_BUCKETS 3
+
+#define ADAPTIVE_SAMPLER_NUM_STAGES (sizeof(uint32_t) / sizeof(uint8_t))
+
+struct DeviceSampleAllocation {
+  uint32_t stage_sample_offsets[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
+  uint32_t global_sample_id;
+  uint32_t upper_bound_paths_per_sample;
+  uint8_t stage_id;
+  uint8_t num_samples;
+} typedef DeviceSampleAllocation;
 
 ////////////////////////////////////////////////////////////////////
 // Task State
@@ -437,6 +457,7 @@ struct DevicePointers {
   DEVICE float* LUM_RESTRICT frame_indirect_accumulate_green[MAX_NUM_INDIRECT_BUCKETS];
   DEVICE float* LUM_RESTRICT frame_indirect_accumulate_blue[MAX_NUM_INDIRECT_BUCKETS];
   DEVICE RGBF* LUM_RESTRICT frame_final;
+  DEVICE uint32_t* LUM_RESTRICT stage_sample_counts;
   DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
   DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
@@ -460,14 +481,11 @@ struct DevicePointers {
 } typedef DevicePointers;
 
 struct DeviceExecutionState {
-  // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
-  uint32_t sample_id;
   uint32_t tile_id;
-  uint16_t user_selected_x;
-  uint16_t user_selected_y;
   uint8_t depth;
   uint8_t undersampling;
-  uint32_t aggregate_sample_count;
+  DeviceSampleAllocation sample_allocation;
+  DeviceExecutionFlags flags;
 } typedef DeviceExecutionState;
 
 struct DeviceExecutionConfiguration {

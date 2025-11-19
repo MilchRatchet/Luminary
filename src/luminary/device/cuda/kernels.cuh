@@ -1,6 +1,7 @@
 #ifndef CU_KERNELS_H
 #define CU_KERNELS_H
 
+#include "adaptive_sampling.cuh"
 #include "bsdf_utils.cuh"
 #include "bvh.cuh"
 #include "camera.cuh"
@@ -65,9 +66,9 @@ LUMINARY_KERNEL void tasks_create() {
   const uint32_t start_pixel    = THREAD_ID + device.state.tile_id * tasks_per_tile;
   const uint32_t end_pixel      = min(amount, start_pixel + tasks_per_tile);
 
-  for (uint32_t undersampling_pixel = start_pixel; undersampling_pixel < end_pixel; undersampling_pixel += num_threads) {
-    uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
-    uint16_t x = (uint16_t) (undersampling_pixel - y * undersampling_width);
+  for (uint32_t pixel_id = start_pixel; pixel_id < end_pixel; pixel_id += num_threads) {
+    uint16_t y = (uint16_t) (pixel_id / undersampling_width);
+    uint16_t x = (uint16_t) (pixel_id - y * undersampling_width);
 
     if (undersampling_scale > 1) {
       x *= undersampling_scale;
@@ -90,12 +91,19 @@ LUMINARY_KERNEL void tasks_create() {
       continue;
 
     ////////////////////////////////////////////////////////////////////
-    // Task
+    // Sample ID
     ////////////////////////////////////////////////////////////////////
+
+    const uint32_t sample_id = adapative_sampling_get_sample_offset(x, y);
 
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
-    task.path_id = path_id_get(x, y, device.state.sample_id);
+    task.path_id = path_id_get(x, y, sample_id);
+
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
+
+    device.ptrs.frame_direct_buffer[index]   = splat_color(0.0f);
+    device.ptrs.frame_indirect_buffer[index] = splat_color(0.0f);
 
     CameraSampleResult camera_result = camera_sample(task.path_id);
 
@@ -103,15 +111,14 @@ LUMINARY_KERNEL void tasks_create() {
     if (color_any(camera_result.weight) == false)
       continue;
 
+    ////////////////////////////////////////////////////////////////////
+    // Task
+    ////////////////////////////////////////////////////////////////////
+
     task.origin = camera_result.origin;
     task.ray    = camera_result.ray;
 
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
-
-    const uint32_t index = path_id_get_pixel_index(task.path_id);
-
-    device.ptrs.frame_direct_buffer[index]   = splat_color(0.0f);
-    device.ptrs.frame_indirect_buffer[index] = splat_color(0.0f);
 
     const uint32_t task_base_address = task_get_base_address(task_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 

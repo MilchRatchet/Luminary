@@ -24,7 +24,7 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     const int y = id / args.dim;
     const int x = id - y * args.dim;
 
-    const PathID path_id = path_id_get(x, y, device.state.sample_id);
+    const PathID path_id = path_id_get(x, y, args.sample_id);
 
     const uint32_t index_color  = x + y * args.ld_color;
     const uint32_t index_shadow = x + y * args.ld_shadow;
@@ -57,7 +57,7 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     RGBF result;
     float variance;
     float alpha;
-    if (device.state.sample_id != 0) {
+    if (args.sample_id != 0) {
       float4 data = __ldcs(args.dst_color + index_color);
       alpha       = __ldcs(args.dst_shadow + index_shadow);
 
@@ -66,17 +66,17 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
 
       const float deviation = sqrtf(fmaxf(variance, eps));
 
-      variance  = variance * (device.state.sample_id - 1.0f);
+      variance  = variance * (args.sample_id - 1.0f);
       RGBF diff = sub_color(color, result);
       diff      = mul_color(diff, diff);
 
       variance = variance + color_importance(diff);
-      variance = variance * (1.0f / device.state.sample_id);
+      variance = variance * (1.0f / args.sample_id);
 
       // Same as in temporal accumulation
       // Here this trick has no real downside
       // Just got to make sure we don't do this in the case of 2 samples
-      if (device.state.sample_id == 1 && args.sample_count != 2) {
+      if (args.sample_id == 1 && args.sample_count != 2) {
         RGBF min = min_color(color, result);
 
         result = min;
@@ -86,8 +86,8 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
       RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(result, get_color(deviation, deviation, deviation)));
       firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(color, firefly_rejection));
 
-      result = scale_color(result, device.state.sample_id);
-      alpha *= device.state.sample_id;
+      result = scale_color(result, args.sample_id);
+      alpha *= args.sample_id;
 
       color = sub_color(color, firefly_rejection);
     }
@@ -100,8 +100,8 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
     result = add_color(result, color);
     alpha += cloud_transmittance;
 
-    result = scale_color(result, 1.0f / (device.state.sample_id + 1));
-    alpha *= 1.0f / (device.state.sample_id + 1);
+    result = scale_color(result, 1.0f / (args.sample_id + 1));
+    alpha *= 1.0f / (args.sample_id + 1);
 
     __stcs(args.dst_color + index_color, make_float4(result.r, result.g, result.b, variance));
     __stcs(args.dst_shadow + index_shadow, alpha);

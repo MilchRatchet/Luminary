@@ -579,11 +579,17 @@ static LuminaryResult _device_update_get_next_undersampling_state(Device* device
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, (void*) 0);    \
   }
 
-#define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                      \
-  {                                                                                 \
-    __DEVICE_BUFFER_FREE(buffer);                                                   \
-    __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));                 \
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer)); \
+#define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                                  \
+  {                                                                                             \
+    if (device->buffers.buffer) {                                                               \
+      size_t __macro_previous_size;                                                             \
+      __FAILURE_HANDLE(device_memory_get_size(device->buffers.buffer, &__macro_previous_size)); \
+      if (__macro_previous_size != size) {                                                      \
+        __DEVICE_BUFFER_FREE(buffer);                                                           \
+      }                                                                                         \
+    }                                                                                           \
+    __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));                             \
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer));             \
   }
 
 #define __DEVICE_BUFFER_REALLOC(buffer, size)                                                                                             \
@@ -722,9 +728,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   device->state                = DEVICE_STATE_ENABLED;
 
   __FAILURE_HANDLE(_device_reset_constant_memory_dirty(device));
-
-  // Device has no samples queued by default.
-  __FAILURE_HANDLE(sample_count_reset(&device->sample_count, 0));
 
   CUDA_FAILURE_HANDLE(cuDeviceGet(&device->cuda_device, device->index));
 
@@ -998,7 +1001,7 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint16_t x, uint16_t y) {
+LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAllocation sample_allocation) {
   __CHECK_NULL_ARGUMENT(device);
 
   DEVICE_ASSERT_AVAILABLE
@@ -1009,20 +1012,31 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
   // have completed. If the abort flag would use a memset, then that one would stall until all kernels have completed. Hence
   // it is mandatory that the renderer NEVER queues any host to device memcpys.
 
-  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_id), sample_id, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(
     cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), 0, 1, device->stream_main));
-  CUDA_FAILURE_HANDLE(
-    cuMemsetD16Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.user_selected_x), x, 1, device->stream_main));
-  CUDA_FAILURE_HANDLE(
-    cuMemsetD16Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.user_selected_y), y, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.undersampling), device->undersampling_state, 1,
     device->stream_main));
+
+  const CUdeviceptr stage_sample_offsets_ptr =
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.stage_sample_offsets);
+  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
+    const CUdeviceptr dst = stage_sample_offsets_ptr + sizeof(uint32_t) * stage_id;
+    CUDA_FAILURE_HANDLE(cuMemsetD32Async(dst, sample_allocation.stage_sample_offsets[stage_id], 1, device->stream_main));
+  }
+
   CUDA_FAILURE_HANDLE(cuMemsetD32Async(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.aggregate_sample_count), device->aggregate_sample_count, 1,
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.global_sample_id),
+    sample_allocation.global_sample_id, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.upper_bound_paths_per_sample),
+    sample_allocation.upper_bound_paths_per_sample, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD8Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.stage_id), sample_allocation.stage_id, 1,
     device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD8Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.num_samples), sample_allocation.num_samples,
+    1, device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1602,22 +1616,6 @@ LuminaryResult device_clear_lighting_buffers(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count) {
-  __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(sample_count);
-
-  DEVICE_ASSERT_AVAILABLE
-
-  if (device->sample_count.current_sample_count == device->sample_count.end_sample_count) {
-    uint32_t recommended_sample_count;
-    __FAILURE_HANDLE(device_get_recommended_sample_queue_counts(device, &recommended_sample_count));
-
-    __FAILURE_HANDLE(sample_count_get_slice(sample_count, recommended_sample_count, &device->sample_count));
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -1636,6 +1634,26 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
     device->undersampling_state |= 0b11 & UNDERSAMPLING_ITERATION_MASK;
     device->undersampling_state |= (undersampling << 2) & UNDERSAMPLING_STAGE_MASK;
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_setup_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sampler);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  DeviceAdaptiveSamplerBufferSizes buffer_sizes;
+  __FAILURE_HANDLE(device_adaptive_sampler_get_buffer_sizes(sampler, &buffer_sizes));
+
+  __DEVICE_BUFFER_ALLOCATE(stage_sample_counts, buffer_sizes.stage_sample_counts_size);
+
+  // We don't need to zero the buffer because an allocations offsets will all be zero until we populate this buffer with proper data.
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
 }
@@ -1717,13 +1735,11 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
-  device->aggregate_sample_count = 0;
-  device->gbuffer_meta_state     = GBUFFER_META_STATE_NOT_READY;
+  device->gbuffer_meta_state = GBUFFER_META_STATE_NOT_READY;
 
   __FAILURE_HANDLE(device_sync_constant_memory(device));
-  __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
-  __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
-  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device, &device->sample_count));
+  __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer, args));
+  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1752,9 +1768,8 @@ LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallb
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data) {
+LuminaryResult device_finish_render_iteration(Device* device, DeviceAdaptiveSampler* sampler, DeviceRenderCallbackData* callback_data) {
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(sample_count);
   __CHECK_NULL_ARGUMENT(callback_data);
 
   DEVICE_ASSERT_AVAILABLE
@@ -1763,7 +1778,7 @@ LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* 
   __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
 
   // We can only finish the render iteration if we are next up starting a new sample.
-  if ((renderer_status & DEVICE_RENDERER_STATUS_FLAGS_READY) == 0)
+  if ((renderer_status & DEVICE_RENDERER_STATUS_FLAG_FINISHED) == 0)
     return LUMINARY_SUCCESS;
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
@@ -1771,22 +1786,19 @@ LuminaryResult device_finish_render_iteration(Device* device, SampleCountSlice* 
   uint32_t new_undersampling_state;
   __FAILURE_HANDLE(_device_update_get_next_undersampling_state(device, &new_undersampling_state));
 
-  if (new_undersampling_state == 0) {
-    device->sample_count.current_sample_count++;
-    device->aggregate_sample_count++;
-  }
-
-  __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
+  __FAILURE_HANDLE(device_renderer_finish_iteration(device->renderer, new_undersampling_state != 0));
 
   if (device->is_main_device) {
     bool does_output;
-    __FAILURE_HANDLE(device_output_will_output(device->output, device, &does_output));
+    __FAILURE_HANDLE(device_output_will_output(device->output, device->renderer, &does_output));
 
     if (does_output) {
       __FAILURE_HANDLE(device_post_apply(device->post, device));
       __FAILURE_HANDLE(device_output_generate_output(device->output, device, callback_data->render_event_id));
     }
   }
+
+  __FAILURE_HANDLE(device_renderer_allocate_sample(device->renderer, sampler));
 
   device->undersampling_state = new_undersampling_state;
 
@@ -1802,7 +1814,7 @@ LuminaryResult device_continue_render(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device, &device->sample_count));
+  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1834,7 +1846,7 @@ LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterfac
   __FAILURE_HANDLE(device_renderer_get_status(device->renderer, &renderer_status));
 
   // Only gather results between samples.
-  if ((renderer_status & DEVICE_RENDERER_STATUS_FLAGS_READY) == 0)
+  if ((renderer_status & DEVICE_RENDERER_STATUS_FLAG_IN_PROGRESS) != 0)
     return LUMINARY_SUCCESS;
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
@@ -1879,8 +1891,6 @@ LuminaryResult device_set_abort(Device* device) {
 
   device->state_abort = true;
 
-  __FAILURE_HANDLE(sample_count_reset(&device->sample_count, 0));
-
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
@@ -1893,7 +1903,9 @@ LuminaryResult device_unset_abort(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+  // Only main device needs to actually have finished aborting.
+  if (device->is_main_device)
+    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
   *device->abort_flags = 0;
   __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));

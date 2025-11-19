@@ -1,12 +1,12 @@
 #include "device_renderer.h"
 
 #include "device.h"
+#include "device_adaptive_sampler.h"
 #include "internal_error.h"
 
 struct DeviceRendererWork {
   uint32_t event_id;
   uint32_t launch_id;
-  SampleCountSlice* sample_count;
   bool allow_gbuffer_meta_query;
   DeviceRenderCallbackData* shared_callback_data;
 } typedef DeviceRendererWork;
@@ -192,7 +192,7 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+static LuminaryResult _device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
@@ -260,8 +260,10 @@ LuminaryResult device_renderer_register_callback(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
+LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
+
+  memset(renderer->executed_aggregate_sample_counts, 0, sizeof(renderer->executed_aggregate_sample_counts));
 
   renderer->tile_id = 0;
   renderer->render_id++;
@@ -269,6 +271,10 @@ LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     renderer->total_render_time[event_id] = 0.0f;
   }
+
+  __FAILURE_HANDLE(_device_renderer_build_kernel_queue(renderer, args));
+
+  renderer->status_flags = DEVICE_RENDERER_STATUS_FLAG_READY;
 
   return LUMINARY_SUCCESS;
 }
@@ -360,7 +366,7 @@ static LuminaryResult _device_renderer_handle_queue_action(
       __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, action->optix_type, &work->launch_id));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
-      __FAILURE_HANDLE(device_update_dynamic_const_mem(device, work->sample_count->current_sample_count, 0xFFFF, 0xFFFF));
+      __FAILURE_HANDLE(device_update_dynamic_const_mem(device, renderer->sample_allocation));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_TILE_ID:
       __FAILURE_HANDLE(device_update_tile_id_const_mem(device, renderer->tile_id));
@@ -383,8 +389,9 @@ static LuminaryResult _device_renderer_handle_queue_action(
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
+      // TODO: Evaluate what of this can be skipped for secondary devices
       if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-        if (device->aggregate_sample_count == 0) {
+        if ((renderer->status_flags & DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE) != 0) {
           __FAILURE_HANDLE(
             _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE, &work->launch_id));
         }
@@ -444,15 +451,31 @@ static LuminaryResult _device_renderer_execute_queue(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
+LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
 
   if (renderer->shutdown)
     return LUMINARY_SUCCESS;
 
-  if (sample_count->current_sample_count == sample_count->end_sample_count)
+  // Abort render if we exceeded maximum supported sample count
+  if (renderer->sample_allocation.global_sample_id >= MAX_NUM_GLOBAL_SAMPLES)
     return LUMINARY_SUCCESS;
+
+  // Renderer has no samples allocated.
+  if (renderer->sample_allocation.num_samples == 0)
+    return LUMINARY_SUCCESS;
+
+  if ((renderer->status_flags & DEVICE_RENDERER_STATUS_FLAG_FINISHED) != 0)
+    return LUMINARY_SUCCESS;
+
+  if ((renderer->status_flags & DEVICE_RENDERER_STATUS_FLAG_READY) != 0) {
+    renderer->status_flags &= ~DEVICE_RENDERER_STATUS_FLAG_READY;
+    renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_IN_PROGRESS;
+
+    if ((device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0)
+      renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Gather data
@@ -472,10 +495,12 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   uint32_t tile_count;
   __FAILURE_HANDLE(device_renderer_get_tile_count(renderer, device, undersampling_stage, &tile_count));
 
+  // We have already computed all tiles of this iteration.
+  if (renderer->tile_id >= tile_count)
+    return LUMINARY_SUCCESS;
+
   // Query only during the first sample and if enough samples have been computed after this iteration.
   const bool allow_gbuffer_meta_query = undersampling_stage <= (1 + device->constant_memory->settings.supersampling);
-
-  renderer->is_rendering_first_sample = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
 
   ////////////////////////////////////////////////////////////////////
   // Setup work
@@ -484,7 +509,6 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   DeviceRendererWork work;
   work.event_id                 = event_id;
   work.launch_id                = 0;
-  work.sample_count             = sample_count;
   work.allow_gbuffer_meta_query = allow_gbuffer_meta_query;
   work.shared_callback_data     = shared_callback_data;
 
@@ -502,7 +526,8 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   if (renderer->tile_id == tile_count) {
     __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->postpass_queue));
 
-    renderer->tile_id = 0;
+    renderer->status_flags &= ~DEVICE_RENDERER_STATUS_FLAG_IN_PROGRESS;
+    renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_FINISHED;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -512,6 +537,21 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
   renderer->kernel_times[event_id].num_kernel_launches = min(work.launch_id, DEVICE_RENDERER_MAX_TIMED_KERNELS);
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_finish_iteration(DeviceRenderer* renderer, bool is_undersampling) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  renderer->status_flags &= ~(DEVICE_RENDERER_STATUS_FLAG_FINISHED | DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE);
+  renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_READY;
+
+  renderer->executed_aggregate_sample_counts[renderer->sample_allocation.stage_id]++;
+  renderer->tile_id = 0;
+
+  if (is_undersampling == false)
+    __FAILURE_HANDLE(device_sample_allocation_step_next(&renderer->sample_allocation));
 
   return LUMINARY_SUCCESS;
 }
@@ -577,6 +617,39 @@ LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_renderer_allocate_sample(DeviceRenderer* renderer, DeviceAdaptiveSampler* sampler) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  if (renderer->sample_allocation.num_samples == 0)
+    __FAILURE_HANDLE(device_adaptive_sampler_allocate_sample(sampler, &renderer->sample_allocation, 1));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_externalize_samples(
+  DeviceRenderer* renderer, uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1]) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
+    stage_sample_counts[stage_id] = renderer->executed_aggregate_sample_counts[stage_id];
+  }
+
+  memset(renderer->executed_aggregate_sample_counts, 0, sizeof(renderer->executed_aggregate_sample_counts));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_register_external_samples(
+  DeviceRenderer* renderer, uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1]) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
+    renderer->executed_aggregate_sample_counts[stage_id] += stage_sample_counts[stage_id];
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time) {
   __CHECK_NULL_ARGUMENT(renderer);
 
@@ -610,22 +683,11 @@ LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uin
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, uint32_t* status) {
+LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, DeviceRendererStatusFlags* status) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(status);
 
-  *status = DEVICE_RENDERER_STATUS_FLAGS_NONE;
-
-  if (renderer->tile_id == 0) {
-    *status |= DEVICE_RENDERER_STATUS_FLAGS_READY;
-  }
-  else {
-    *status |= DEVICE_RENDERER_STATUS_FLAGS_IN_PROGRESS;
-  }
-
-  if (renderer->is_rendering_first_sample) {
-    *status |= DEVICE_RENDERER_STATUS_FLAGS_FIRST_SAMPLE;
-  }
+  *status = renderer->status_flags;
 
   return LUMINARY_SUCCESS;
 }
@@ -635,18 +697,43 @@ LuminaryResult device_renderer_get_tile_count(
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(tile_count);
 
-  uint32_t width;
-  uint32_t height;
-  __FAILURE_HANDLE(device_get_internal_render_resolution(device, &width, &height));
+  uint32_t upper_bounds_total_tasks;
+  if (undersampling_stage) {
+    __DEBUG_ASSERT(renderer->sample_allocation.stage_id == 0);
 
-  const uint32_t internal_width_this_sample  = (width + (1 << undersampling_stage) - 1) >> undersampling_stage;
-  const uint32_t internal_height_this_sample = (height + (1 << undersampling_stage) - 1) >> undersampling_stage;
-  const uint32_t internal_pixels_this_sample = internal_width_this_sample * internal_height_this_sample;
+    uint32_t width;
+    uint32_t height;
+    __FAILURE_HANDLE(device_get_internal_render_resolution(device, &width, &height));
+
+    const uint32_t internal_width_this_sample  = (width + (1 << undersampling_stage) - 1) >> undersampling_stage;
+    const uint32_t internal_height_this_sample = (height + (1 << undersampling_stage) - 1) >> undersampling_stage;
+    const uint32_t internal_pixels_this_sample = internal_width_this_sample * internal_height_this_sample;
+
+    upper_bounds_total_tasks = internal_pixels_this_sample;
+  }
+  else {
+    upper_bounds_total_tasks = renderer->sample_allocation.upper_bound_paths_per_sample;
+  }
 
   uint32_t allocated_tasks;
   __FAILURE_HANDLE(device_get_allocated_task_count(device, &allocated_tasks));
 
-  *tile_count = (internal_pixels_this_sample + allocated_tasks - 1) / allocated_tasks;
+  *tile_count = (upper_bounds_total_tasks + allocated_tasks - 1) / allocated_tasks;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_get_total_executed_samples(DeviceRenderer* renderer, uint32_t* aggregate_sample_count) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(aggregate_sample_count);
+
+  uint32_t sample_count = 0;
+
+  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
+    sample_count += renderer->executed_aggregate_sample_counts[stage_id];
+  }
+
+  *aggregate_sample_count = sample_count;
 
   return LUMINARY_SUCCESS;
 }
