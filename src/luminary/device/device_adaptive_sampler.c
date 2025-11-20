@@ -34,7 +34,7 @@ LuminaryResult device_adaptive_sampler_start_sampling(DeviceAdaptiveSampler* sam
     __FAILURE_HANDLE(device_adaptive_sampler_get_buffer_sizes(sampler, &buffer_sizes));
 
     if (sampler->stage_sample_counts)
-      __FAILURE_HANDLE(host_free(sampler->stage_sample_counts));
+      __FAILURE_HANDLE(host_free(&sampler->stage_sample_counts));
 
     // We don't need these to be zeroed because they get overwritten whenever any stage becomes available.
     __FAILURE_HANDLE(host_malloc(&sampler->stage_sample_counts, buffer_sizes.stage_sample_counts_size));
@@ -78,6 +78,9 @@ LuminaryResult device_adaptive_sampler_get_task_count_upper_bound(DeviceAdaptive
 
 LuminaryResult device_adaptive_sampler_destroy(DeviceAdaptiveSampler** sampler) {
   __CHECK_NULL_ARGUMENT(sampler);
+
+  if ((*sampler)->stage_sample_counts)
+    __FAILURE_HANDLE(host_free(&(*sampler)->stage_sample_counts));
 
   __FAILURE_HANDLE(host_free(sampler));
 

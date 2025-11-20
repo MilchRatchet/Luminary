@@ -6,7 +6,7 @@
 #include "utils.cuh"
 
 LUMINARY_FUNCTION vec3 camera_thin_lens_sample_sensor(const PathID& path_id) {
-  const float2 jitter = camera_get_jitter();
+  const float2 jitter = camera_get_jitter(path_id);
 
   const float step = 2.0f * (device.camera.thin_lens.fov / device.settings.width);
   const float vfov = step * device.settings.height * 0.5f;

@@ -15,8 +15,6 @@ LUMINARY_KERNEL void temporal_accumulation_first_sample() {
 
   const uint32_t amount = width * height;
 
-  const float2 jitter = camera_get_jitter();
-
   float* indirect_bucket_ptr_red   = device.ptrs.frame_indirect_accumulate_red[0];
   float* indirect_bucket_ptr_green = device.ptrs.frame_indirect_accumulate_green[0];
   float* indirect_bucket_ptr_blue  = device.ptrs.frame_indirect_accumulate_blue[0];
@@ -54,8 +52,6 @@ LUMINARY_KERNEL void temporal_accumulation_update() {
   const uint32_t height = device.settings.window_height;
 
   const uint32_t amount = width * height;
-
-  const float2 jitter = camera_get_jitter();
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();
@@ -306,8 +302,6 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
   const uint32_t height = device.settings.window_height;
 
   const uint32_t amount = width * height;
-
-  const float2 jitter = camera_get_jitter();
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     HANDLE_DEVICE_ABORT();

@@ -581,15 +581,21 @@ static LuminaryResult _device_update_get_next_undersampling_state(Device* device
 
 #define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                                  \
   {                                                                                             \
+    bool __macro_buffer_requires_allocation = true;                                             \
     if (device->buffers.buffer) {                                                               \
       size_t __macro_previous_size;                                                             \
       __FAILURE_HANDLE(device_memory_get_size(device->buffers.buffer, &__macro_previous_size)); \
       if (__macro_previous_size != size) {                                                      \
         __DEVICE_BUFFER_FREE(buffer);                                                           \
       }                                                                                         \
+      else {                                                                                    \
+        __macro_buffer_requires_allocation = false;                                             \
+      }                                                                                         \
     }                                                                                           \
-    __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));                             \
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer));             \
+    if (__macro_buffer_requires_allocation) {                                                   \
+      __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));                           \
+      DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer));           \
+    }                                                                                           \
   }
 
 #define __DEVICE_BUFFER_REALLOC(buffer, size)                                                                                             \
@@ -681,6 +687,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(frame_indirect_buffer);
   __DEVICE_BUFFER_FREE(frame_final);
   __DEVICE_BUFFER_FREE(gbuffer_meta);
+  __DEVICE_BUFFER_FREE(stage_sample_counts);
   __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(spectral_cdf);
   __DEVICE_BUFFER_FREE(bluenoise_1D);

@@ -391,7 +391,10 @@ static LuminaryResult _device_renderer_handle_queue_action(
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
       // TODO: Evaluate what of this can be skipped for secondary devices
       if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-        if ((renderer->status_flags & DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE) != 0) {
+        if (renderer->executed_aggregate_sample_counts[0] == 0) {
+          // We assume that every device will always execute the base adaptive sampling stage first.
+          __DEBUG_ASSERT(renderer->executed_aggregate_sample_counts[1] == 0);
+
           __FAILURE_HANDLE(
             _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE, &work->launch_id));
         }
@@ -547,11 +550,12 @@ LuminaryResult device_renderer_finish_iteration(DeviceRenderer* renderer, bool i
   renderer->status_flags &= ~(DEVICE_RENDERER_STATUS_FLAG_FINISHED | DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE);
   renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_READY;
 
-  renderer->executed_aggregate_sample_counts[renderer->sample_allocation.stage_id]++;
   renderer->tile_id = 0;
 
-  if (is_undersampling == false)
+  if (is_undersampling == false) {
+    renderer->executed_aggregate_sample_counts[renderer->sample_allocation.stage_id]++;
     __FAILURE_HANDLE(device_sample_allocation_step_next(&renderer->sample_allocation));
+  }
 
   return LUMINARY_SUCCESS;
 }

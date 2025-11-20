@@ -291,7 +291,7 @@ LUMINARY_KERNEL void tasks_sort() {
 
 LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
   const KernelArgsGenerateFinalImage args, const uint16_t source_x, const uint16_t source_y, const uint32_t output_scale,
-  const uint32_t undersampling_iteration, const uint32_t undersampling_stage) {
+  const uint32_t undersampling_iteration) {
   const uint32_t offset_x = (undersampling_iteration & 0b01) ? 0 : output_scale >> 1;
   const uint32_t offset_y = (undersampling_iteration & 0b10) ? 0 : output_scale >> 1;
 
@@ -300,13 +300,7 @@ LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
 
   const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
-  RGBF pixel = load_RGBF(args.src + index);
-
-  if (undersampling_stage == 0) {
-    pixel = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
-  }
-
-  return pixel;
+  return load_RGBF(args.src + index);
 }
 
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
@@ -341,9 +335,12 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 
     if (undersampling_stage) {
       for (uint32_t sample_id = undersampling_iteration; sample_id < num_samples; sample_id++) {
-        const RGBF pixel = final_image_get_undersampling_sample(args, source_x, source_y, output_scale, sample_id, undersampling_stage);
+        const RGBF pixel = final_image_get_undersampling_sample(args, source_x, source_y, output_scale, sample_id);
         color            = add_color(color, pixel);
       }
+
+      color = scale_color(color, color_scale);
+      color = tonemap_apply(color, x, y, args.color_correction, args.agx_params);
     }
     else {
       for (uint32_t yi = 0; yi < output_scale; yi++) {
@@ -354,20 +351,13 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
           const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
           RGBF pixel = load_RGBF(args.src + index);
-
-          if (undersampling_stage == 0) {
-            pixel = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
-          }
+          pixel      = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
 
           color = add_color(color, pixel);
         }
       }
-    }
 
-    color = scale_color(color, color_scale);
-
-    if (undersampling_stage != 0) {
-      color = tonemap_apply(color, x, y, args.color_correction, args.agx_params);
+      color = scale_color(color, color_scale);
     }
 
     const uint32_t dst_index = x + y * output_width;
