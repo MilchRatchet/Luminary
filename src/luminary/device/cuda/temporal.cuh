@@ -7,6 +7,7 @@
 // TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid
 // of the legacy naming of "temporal frames".
 
+#if 0
 LUMINARY_KERNEL void temporal_accumulation_first_sample() {
   HANDLE_DEVICE_ABORT();
 
@@ -327,5 +328,6 @@ LUMINARY_KERNEL void temporal_accumulation_aov() {
     store_RGBF(device.ptrs.frame_current_result, index, direct_output);
   }
 }
+#endif
 
 #endif /* CU_TEMPORAL_H */

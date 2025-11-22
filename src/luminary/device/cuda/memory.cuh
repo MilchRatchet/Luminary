@@ -204,6 +204,10 @@ LUMINARY_FUNCTION DeviceTaskMediumStack task_medium_load(const uint32_t base_add
   return load_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium));
 }
 
+LUMINARY_FUNCTION DeviceTaskResult task_result_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0);
+}
+
 // DeviceTask
 
 LUMINARY_FUNCTION void task_store(const uint32_t base_address, const DeviceTask data) {
@@ -238,6 +242,12 @@ LUMINARY_FUNCTION void task_throughput_record_store(const uint32_t base_address,
 
 LUMINARY_FUNCTION void task_medium_store(const uint32_t base_address, const DeviceTaskMediumStack data) {
   store_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium), data);
+}
+
+// DeviceTaskResult
+
+LUMINARY_FUNCTION void task_result_store(const uint32_t base_address, const DeviceTaskResult data) {
+  store_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0, data);
 }
 
 // DeviceTaskDirectLight
@@ -304,7 +314,7 @@ LUMINARY_FUNCTION RGBF load_RGBF(const RGBF* ptr) {
 
 LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color, const char* func, uint32_t line) {
   RGBF sanitized_color = color;
-  if (is_non_finite(luminance(color))) {
+  if (is_non_finite(color_luminance(color))) {
     // Debug code to identify paths that cause NaNs and INFs
     ushort2 pixel;
     pixel.y = (uint16_t) (offset / device.settings.width);
@@ -325,7 +335,7 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
 #else /* UTILS_DEBUG_MODE */
 
 LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color) {
-  const RGBF sanitized_color = is_non_finite(luminance(color)) ? UTILS_DEBUG_NAN_COLOR : color;
+  const RGBF sanitized_color = is_non_finite(color_luminance(color)) ? UTILS_DEBUG_NAN_COLOR : color;
 
   buffer[offset] = sanitized_color;
 }
@@ -338,36 +348,15 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
 // Beauty Buffer IO
 ////////////////////////////////////////////////////////////////////
 
-template <bool MODE_SET>
-LUMINARY_FUNCTION void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, RGBF* buffer) {
-  RGBF output = beauty;
-  if constexpr (MODE_SET == false) {
-    output = add_color(beauty, load_RGBF(buffer + pixel));
-  }
-  store_RGBF(buffer, pixel, output);
-}
+LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t results_index) {
+  if (color_any(beauty) == false)
+    return;
 
-template <bool MODE_SET = false>
-LUMINARY_FUNCTION void write_beauty_buffer_direct(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, device.ptrs.frame_direct_buffer);
-}
+  DeviceTaskResult result = task_result_load(results_index);
 
-template <bool MODE_SET = false>
-LUMINARY_FUNCTION void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, device.ptrs.frame_indirect_buffer);
-}
+  result.color = add_color(result.color, beauty);
 
-template <bool MODE_SET = false>
-LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state) {
-  const bool is_direct = state & STATE_FLAG_DELTA_PATH;
-
-  RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
-
-  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, buffer);
-}
-
-LUMINARY_FUNCTION void write_beauty_buffer_forced(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer<true>(beauty, pixel, STATE_FLAG_DELTA_PATH);
+  task_result_store(results_index, result);
 }
 
 #ifndef NO_LUMINARY_BVH

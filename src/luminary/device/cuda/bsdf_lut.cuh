@@ -90,7 +90,7 @@ LUMINARY_KERNEL void bsdf_generate_glossy_lut(KernelArgsBSDFGenerateGlossyLUT ar
     if (NdotL > 0.0f) {
       const float HdotV  = fabsf(dot_product(H, ctx.V));
       const RGBF fresnel = bsdf_fresnel_schlick(f0, bsdf_shadowed_F90(f0), HdotV);
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx.V, roughness, NdotL, NdotV) * luminance(fresnel);
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(ctx.V, roughness, NdotL, NdotV) * color_luminance(fresnel);
     }
   }
 

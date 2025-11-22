@@ -477,7 +477,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
       __FAILURE_HANDLE_CRITICAL(device_setup_adaptive_sampling(device, device_manager->adaptive_sampler));
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
-      __FAILURE_HANDLE_CRITICAL(device_clear_lighting_buffers(device));
       __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
     }
   }

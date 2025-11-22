@@ -5,10 +5,10 @@
 #include "bsdf_utils.cuh"
 #include "bvh.cuh"
 #include "camera.cuh"
-#include "camera_post_common.cuh"
 #include "cloud.cuh"
 #include "medium_stack.cuh"
 #include "ocean_utils.cuh"
+#include "post_common.cuh"
 #include "purkinje.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
@@ -100,16 +100,13 @@ LUMINARY_KERNEL void tasks_create() {
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
     task.path_id = path_id_get(x, y, sample_id);
 
-    const uint32_t index = path_id_get_pixel_index(task.path_id);
-
-    device.ptrs.frame_direct_buffer[index]   = splat_color(0.0f);
-    device.ptrs.frame_indirect_buffer[index] = splat_color(0.0f);
-
     CameraSampleResult camera_result = camera_sample(task.path_id);
 
     // Skip rays that haven't managed to leave the camera.
     if (color_any(camera_result.weight) == false)
       continue;
+
+    const uint32_t thread_task_id = task_count++;
 
     ////////////////////////////////////////////////////////////////////
     // Task
@@ -120,7 +117,7 @@ LUMINARY_KERNEL void tasks_create() {
 
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
 
-    const uint32_t task_base_address = task_get_base_address(task_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+    const uint32_t task_base_address = task_get_base_address(thread_task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
 
     task_store(task_base_address, task);
 
@@ -134,7 +131,14 @@ LUMINARY_KERNEL void tasks_create() {
     // Task Throughput
     ////////////////////////////////////////////////////////////////////
 
-    task_throughput_record_store(task_base_address, record_pack(camera_result.weight));
+    const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(thread_task_id, TASK_STATE_BUFFER_INDEX_RESULT);
+
+    DeviceTaskThroughput throughput;
+
+    throughput.record        = record_pack(camera_result.weight);
+    throughput.results_index = task_result_base_address;
+
+    task_throughput_store(task_base_address, throughput);
 
     ////////////////////////////////////////////////////////////////////
     // Task Medium Stack
@@ -156,9 +160,23 @@ LUMINARY_KERNEL void tasks_create() {
     }
 
     task_medium_store(task_base_address, medium);
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Result
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
+
+    DeviceTaskResult result;
+
+    result.color = splat_color(0.0f);
+    result.index = index;
+
+    task_result_store(throughput.results_index, result);
   }
 
-  device.ptrs.trace_counts[THREAD_ID] = task_count;
+  device.ptrs.trace_counts[THREAD_ID]   = task_count;
+  device.ptrs.results_counts[THREAD_ID] = task_count;
 }
 
 LUMINARY_KERNEL void sky_process_inscattering_events() {
@@ -187,12 +205,11 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
 
     const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.path_id);
 
+    write_beauty_buffer(inscattering, throughput.results_index);
+
     throughput.record = record_pack(record);
 
     task_throughput_store(task_base_address, throughput);
-
-    const uint32_t index = path_id_get_pixel_index(task.path_id);
-    write_beauty_buffer(inscattering, index, task.state);
   }
 }
 
@@ -290,8 +307,7 @@ LUMINARY_KERNEL void tasks_sort() {
 }
 
 LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
-  const KernelArgsGenerateFinalImage args, const uint16_t source_x, const uint16_t source_y, const uint32_t output_scale,
-  const uint32_t undersampling_iteration) {
+  const uint16_t source_x, const uint16_t source_y, const uint32_t output_scale, const uint32_t undersampling_iteration) {
   const uint32_t offset_x = (undersampling_iteration & 0b01) ? 0 : output_scale >> 1;
   const uint32_t offset_y = (undersampling_iteration & 0b10) ? 0 : output_scale >> 1;
 
@@ -300,7 +316,11 @@ LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
 
   const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
-  return load_RGBF(args.src + index);
+  const float red   = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index);
+  const float green = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index);
+  const float blue  = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index);
+
+  return get_color(red, green, blue);
 }
 
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
@@ -335,7 +355,7 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 
     if (undersampling_stage) {
       for (uint32_t sample_id = undersampling_iteration; sample_id < num_samples; sample_id++) {
-        const RGBF pixel = final_image_get_undersampling_sample(args, source_x, source_y, output_scale, sample_id);
+        const RGBF pixel = final_image_get_undersampling_sample(source_x, source_y, output_scale, sample_id);
         color            = add_color(color, pixel);
       }
 
@@ -350,7 +370,11 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 
           const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
-          RGBF pixel = load_RGBF(args.src + index);
+          const float red   = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index);
+          const float green = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index);
+          const float blue  = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index);
+
+          RGBF pixel = get_color(red, green, blue);
           pixel      = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
 
           color = add_color(color, pixel);
@@ -361,7 +385,10 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
     }
 
     const uint32_t dst_index = x + y * output_width;
-    store_RGBF(device.ptrs.frame_final, dst_index, color);
+
+    __stcs(device.ptrs.frame_output[FRAME_CHANNEL_RED] + dst_index, color.r);
+    __stcs(device.ptrs.frame_output[FRAME_CHANNEL_GREEN] + dst_index, color.g);
+    __stcs(device.ptrs.frame_output[FRAME_CHANNEL_BLUE] + dst_index, color.b);
   }
 }
 
@@ -378,15 +405,15 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
 
   const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
 
-  const uint32_t final_image_width  = device.settings.width >> device.settings.supersampling;
-  const uint32_t final_image_height = device.settings.height >> device.settings.supersampling;
+  const uint32_t dst_width  = device.settings.width >> device.settings.supersampling;
+  const uint32_t dst_height = device.settings.height >> device.settings.supersampling;
 
-  const uint32_t output_width = device.settings.width >> undersampling_output;
+  const uint32_t src_width = device.settings.width >> undersampling_output;
 
   const uint32_t undersampling_mem = undersampling_output - device.settings.supersampling;
 
   const float mem_scale    = 1.0f / (1 << undersampling_mem);
-  const bool scaled_output = (args.width != final_image_width) || (args.height != final_image_height);
+  const bool scaled_output = (args.width != dst_width) || (args.height != dst_height);
 
   while (id < amount) {
     const uint32_t y = id / args.width;
@@ -397,13 +424,21 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
       const float sx = x * scale_x;
       const float sy = y * scale_y;
 
-      pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, final_image_width, final_image_height, mem_scale);
+      const float red   = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_RED], sx, sy, dst_width, dst_height, mem_scale);
+      const float green = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_GREEN], sx, sy, dst_width, dst_height, mem_scale);
+      const float blue  = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_BLUE], sx, sy, dst_width, dst_height, mem_scale);
+
+      pixel = get_color(red, green, blue);
     }
     else {
       const uint32_t src_x = x >> undersampling_mem;
       const uint32_t src_y = y >> undersampling_mem;
 
-      pixel = load_RGBF(device.ptrs.frame_final + src_x + src_y * output_width);
+      const uint32_t src_index = src_x + src_y * src_width;
+
+      const float red   = __ldg(device.ptrs.frame_output[FRAME_CHANNEL_RED] + src_index);
+      const float green = __ldg(device.ptrs.frame_output[FRAME_CHANNEL_GREEN] + src_index);
+      const float blue  = __ldg(device.ptrs.frame_output[FRAME_CHANNEL_BLUE] + src_index);
     }
 
     switch (args.filter) {

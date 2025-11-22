@@ -109,8 +109,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     const RGBF emission = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
     if (color_any(emission)) {
-      const uint32_t index = path_id_get_pixel_index(task.path_id);
-      write_beauty_buffer(mul_color(emission, record), index, task.state);
+      const RGBF result_color = mul_color(emission, record);
+
+      write_beauty_buffer(result_color, throughput.results_index);
     }
 
     record = mul_color(record, bounce_info.weight);
@@ -150,7 +151,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_trace_store(dst_task_base_address, bounce_trace);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record = record_pack(record);
+      bounce_throughput.record        = record_pack(record);
+      bounce_throughput.results_index = throughput.results_index;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
 
@@ -187,31 +189,32 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address   = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    DeviceTask task                    = task_load(task_base_address);
-    const DeviceTaskTrace trace        = task_trace_load(task_base_address);
-    const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
-    const uint32_t index               = path_id_get_pixel_index(task.path_id);
+    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const DeviceTaskMediumStack medium    = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
+    RGBF result;
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
         const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
-        write_beauty_buffer_forced(add_color(albedo, emission), index);
+        result = add_color(albedo, emission);
       } break;
       case LUMINARY_SHADING_MODE_DEPTH: {
-        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), index);
+        result = splat_color(__saturatef((1.0f / trace.depth) * 2.0f));
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
         const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
 
         const vec3 normal = ctx.normal;
 
-        write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), index);
+        result = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
       } break;
       case LUMINARY_SHADING_MODE_IDENTIFICATION: {
         const uint32_t v = random_uint32_t_base(0x55555555, (trace.handle.instance_id << 16) | trace.handle.tri_id);
@@ -224,21 +227,21 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         const float cg = ((float) g) / 0x7ff;
         const float cb = ((float) b) / 0x7ff;
 
-        const RGBF color = get_color(cr, cg, cb);
-
-        write_beauty_buffer_forced(color, index);
+        result = get_color(cr, cg, cb);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
         const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
         const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
-        const RGBF color                  = add_color(scale_color(albedo, 0.025f), emission);
 
-        write_beauty_buffer_forced(color, index);
+        result = add_color(scale_color(albedo, 0.025f), emission);
       } break;
       default:
+        result = splat_color(0.0f);
         break;
     }
+
+    write_beauty_buffer(result, throughput.results_index);
   }
 }
 

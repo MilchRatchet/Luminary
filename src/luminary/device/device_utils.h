@@ -25,6 +25,7 @@
 #define MAXIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD << 1)
 
 #define ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG 3
+#define ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK ((1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)
 
 #define PATH_ID_SENSOR_BITS 14
 #define PATH_ID_SAMPLE_BITS 20
@@ -54,6 +55,8 @@ static_assert(
 #define UNDERSAMPLING_STAGE_MASK 0x7C
 #define UNDERSAMPLING_STAGE_SHIFT 2
 #define UNDERSAMPLING_ITERATION_MASK 0x03
+
+#define RESULTS_INDEX_INVALID (0xFFFFFFFF)
 
 #define SPECTRAL_MIN_WAVELENGTH 360
 #define SPECTRAL_MAX_WAVELENGTH 830
@@ -340,7 +343,11 @@ enum TaskStateBufferIndex {
 
   TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT = TASK_STATE_BUFFER_INDEX_PRESORT,
 
-  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT
+  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT,
+
+  TASK_STATE_BUFFER_INDEX_RESULT = TASK_STATE_BUFFER_INDEX_PRESORT,
+
+  TASK_STATE_BUFFER_INDEX_RESULT_COUNT
 } typedef TaskStateBufferIndex;
 
 struct DeviceTask {
@@ -360,7 +367,8 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 
 struct DeviceTaskThroughput {
   PackedRecord record;
-  uint2 padding;
+  uint32_t results_index;
+  uint32_t padding;
 } typedef DeviceTaskThroughput;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
 
@@ -379,6 +387,12 @@ struct DeviceTaskState {
   DeviceTaskMediumStack medium;
 } typedef DeviceTaskState;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x50);
+
+struct DeviceTaskResult {
+  RGBF color;
+  uint32_t index;
+} typedef DeviceTaskResult;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskResult, 0x10);
 
 ////////////////////////////////////////////////////////////////////
 // Task Direct Lighting
@@ -443,20 +457,27 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x60);
 // Globals
 ////////////////////////////////////////////////////////////////////
 
+enum FrameChannel {
+  FRAME_CHANNEL_RED,
+  FRAME_CHANNEL_GREEN,
+  FRAME_CHANNEL_BLUE,
+
+  FRAME_CHANNEL_COUNT
+} typedef FrameChannel;
+
 struct DevicePointers {
   DEVICE DeviceTaskState* LUM_RESTRICT task_states;
   DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
+  DEVICE DeviceTaskResult* LUM_RESTRICT task_results;
+  DEVICE uint16_t* LUM_RESTRICT results_counts;
   DEVICE uint16_t* LUM_RESTRICT trace_counts;
   DEVICE uint16_t* LUM_RESTRICT task_counts;
   DEVICE uint16_t* LUM_RESTRICT task_offsets;
-  DEVICE RGBF* LUM_RESTRICT frame_current_result;
-  DEVICE RGBF* LUM_RESTRICT frame_direct_buffer;
-  DEVICE RGBF* LUM_RESTRICT frame_direct_accumulate;
-  DEVICE RGBF* LUM_RESTRICT frame_indirect_buffer;
-  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_red[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_green[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_blue[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE RGBF* LUM_RESTRICT frame_final;
+  DEVICE float* LUM_RESTRICT frame_first_moment[FRAME_CHANNEL_COUNT];
+  DEVICE float* LUM_RESTRICT frame_second_moment[FRAME_CHANNEL_COUNT];
+  DEVICE float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
+  DEVICE float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
+  DEVICE float* LUM_RESTRICT frame_swap;
   DEVICE uint32_t* LUM_RESTRICT stage_sample_counts;
   DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;

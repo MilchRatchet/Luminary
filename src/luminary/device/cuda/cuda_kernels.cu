@@ -1,7 +1,6 @@
 
+#include "accumulation.cuh"
 #include "bsdf_lut.cuh"
-#include "camera_post_common.cuh"
-#include "camera_post_lens_flare.cuh"
 #include "cloud.cuh"
 #include "cloud_noise.cuh"
 #include "geometry.cuh"
@@ -11,8 +10,8 @@
 #include "mipmap.cuh"
 #include "ocean.cuh"
 #include "particle.cuh"
+#include "post_common.cuh"
 #include "sky.cuh"
 #include "sky_hdri.cuh"
-#include "temporal.cuh"
 #include "utils.cuh"
 #include "volume.cuh"

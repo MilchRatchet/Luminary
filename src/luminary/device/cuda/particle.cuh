@@ -112,45 +112,48 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address   = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    DeviceTask task                    = task_load(task_base_address);
-    const DeviceTaskTrace trace        = task_trace_load(task_base_address);
-    const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
-    const uint32_t index               = path_id_get_pixel_index(task.path_id);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const DeviceTaskMediumStack medium    = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      write_beauty_buffer_forced(device.particles.albedo, index);
+    RGBF result;
+    switch (device.settings.shading_mode) {
+      case LUMINARY_SHADING_MODE_ALBEDO:
+        result = device.particles.albedo;
+        break;
+      case LUMINARY_SHADING_MODE_DEPTH:
+        result = splat_color(__saturatef((1.0f / trace.depth) * 2.0f));
+        break;
+      case LUMINARY_SHADING_MODE_NORMAL: {
+        const MaterialContextParticle data = particle_get_context(task, medium, trace.handle.instance_id);
+
+        const vec3 normal = data.normal;
+
+        result = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+      } break;
+      case LUMINARY_SHADING_MODE_IDENTIFICATION: {
+        const uint32_t v = random_uint32_t_base(0x55555555, trace.handle.instance_id);
+
+        const uint16_t r = v & 0x7ff;
+        const uint16_t g = (v >> 10) & 0x7ff;
+        const uint16_t b = (v >> 20) & 0x7ff;
+
+        const float cr = ((float) r) / 0x7ff;
+        const float cg = ((float) g) / 0x7ff;
+        const float cb = ((float) b) / 0x7ff;
+
+        result = get_color(cr, cg, cb);
+      } break;
+      default:
+        result = splat_color(0.0f);
+        break;
     }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), index);
-    }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_NORMAL) {
-      const MaterialContextParticle data = particle_get_context(task, medium, trace.handle.instance_id);
 
-      const vec3 normal = data.normal;
-
-      write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), index);
-    }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      const uint32_t v = random_uint32_t_base(0x55555555, trace.handle.instance_id);
-
-      const uint16_t r = v & 0x7ff;
-      const uint16_t g = (v >> 10) & 0x7ff;
-      const uint16_t b = (v >> 20) & 0x7ff;
-
-      const float cr = ((float) r) / 0x7ff;
-      const float cg = ((float) g) / 0x7ff;
-      const float cb = ((float) b) / 0x7ff;
-
-      const RGBF color = get_color(cr, cg, cb);
-
-      write_beauty_buffer_forced(color, index);
-    }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_LIGHTS) {
-      write_beauty_buffer_forced(device.particles.albedo, index);
-    }
+    write_beauty_buffer(result, throughput.results_index);
   }
 }
 

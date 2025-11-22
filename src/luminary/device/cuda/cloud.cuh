@@ -352,8 +352,7 @@ LUMINARY_KERNEL void cloud_process_tasks() {
 
     task_throughput_record_store(task_base_address, record_pack(record));
 
-    const uint32_t index = path_id_get_pixel_index(task.path_id);
-    write_beauty_buffer(color, index, task.state);
+    write_beauty_buffer(color, throughput.results_index);
   }
 }
 

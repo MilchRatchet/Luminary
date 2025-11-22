@@ -310,9 +310,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
-  update_data |= _window_entity_properties_add_checkbox(data, "Lens Flare", &camera.lens_flare);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Lens Flare Threshold", &camera.lens_flare_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
 
   if (camera.use_physical_camera == false) {
     update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);

@@ -389,34 +389,20 @@ static LuminaryResult _device_renderer_handle_queue_action(
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-      // TODO: Evaluate what of this can be skipped for secondary devices
-      if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-        if (renderer->executed_aggregate_sample_counts[0] == 0) {
-          // We assume that every device will always execute the base adaptive sampling stage first.
-          __DEBUG_ASSERT(renderer->executed_aggregate_sample_counts[1] == 0);
+      if (renderer->executed_aggregate_sample_counts[0] == 0) {
+        // We assume that every device will always execute the base adaptive sampling stage first.
+        __DEBUG_ASSERT(renderer->executed_aggregate_sample_counts[1] == 0);
 
-          __FAILURE_HANDLE(
-            _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE, &work->launch_id));
-        }
-        else {
-          __FAILURE_HANDLE(
-            _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE, &work->launch_id));
-
-          // TODO: This is only needed when outputting
-          if (device->constant_memory->camera.do_firefly_rejection) {
-            __FAILURE_HANDLE(
-              _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT, &work->launch_id));
-          }
-          else {
-            __FAILURE_HANDLE(
-              _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_RAW, &work->launch_id));
-          }
-        }
+        __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(
+          renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE, &work->launch_id));
       }
       else {
         __FAILURE_HANDLE(
-          _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV, &work->launch_id));
+          _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS, &work->launch_id));
       }
+
+      __FAILURE_HANDLE(
+        _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT, &work->launch_id));
 
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[work->event_id], device->stream_main));
       CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[work->event_id], CU_EVENT_WAIT_DEFAULT));

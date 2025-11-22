@@ -617,24 +617,18 @@ LUMINARY_KERNEL void sky_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    const DeviceTask task                 = task_load(task_base_address);
-    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task            = task_load(task_base_address);
 
     if ((task.state & STATE_FLAG_ALLOW_AMBIENT) == 0)
       continue;
 
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
     RGBF sky = sky_color_main(task.origin, task.ray, task.state, task.path_id);
     sky      = mul_color(sky, record_unpack(throughput.record));
 
-    const uint32_t index = path_id_get_pixel_index(task.path_id);
-
-    if (device.state.depth <= 1) {
-      write_beauty_buffer_direct(sky, index);
-    }
-    else {
-      write_beauty_buffer(sky, index, task.state);
-    }
+    write_beauty_buffer(sky, throughput.results_index);
   }
 }
 
@@ -649,20 +643,24 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    const DeviceTask task            = task_load(task_base_address);
-    const uint32_t index             = path_id_get_pixel_index(task.path_id);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task                 = task_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      const RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, task.path_id);
-      write_beauty_buffer_forced(sky, index);
+    RGBF result;
+    switch (device.settings.shading_mode) {
+      case LUMINARY_SHADING_MODE_ALBEDO:
+        result = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, task.path_id);
+        break;
+      case LUMINARY_SHADING_MODE_IDENTIFICATION:
+        result = get_color(0.0f, 0.63f, 1.0f);
+        break;
+      default:
+        result = splat_color(0.0f);
+        break;
     }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), index);
-    }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), index);
-    }
+
+    write_beauty_buffer(result, throughput.results_index);
   }
 }
 

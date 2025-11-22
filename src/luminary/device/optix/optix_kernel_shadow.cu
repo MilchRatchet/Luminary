@@ -96,6 +96,5 @@ extern "C" __global__ void __raygen__optix() {
 
   accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
 
-  const uint32_t index = path_id_get_pixel_index(task.path_id);
-  write_beauty_buffer(accumulated_light, index, task.state);
+  write_beauty_buffer(accumulated_light, throughput.results_index);
 }

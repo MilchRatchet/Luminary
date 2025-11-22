@@ -45,7 +45,7 @@ static LuminaryResult _device_post_bloom_create(DevicePost* post) {
 
   post->bloom_mip_count = _device_post_bloom_mip_count(post->width, post->height);
 
-  __FAILURE_HANDLE(host_malloc(&post->bloom_mips, sizeof(RGBF*) * post->bloom_mip_count));
+  __FAILURE_HANDLE(host_malloc(&post->bloom_mips, sizeof(float*) * post->bloom_mip_count));
 
   uint32_t width  = post->width;
   uint32_t height = post->height;
@@ -53,7 +53,7 @@ static LuminaryResult _device_post_bloom_create(DevicePost* post) {
   for (uint32_t i = 0; i < post->bloom_mip_count; i++) {
     width  = width >> 1;
     height = height >> 1;
-    __FAILURE_HANDLE(device_malloc((void**) &post->bloom_mips[i], sizeof(RGBF) * width * height));
+    __FAILURE_HANDLE(device_malloc((void**) &post->bloom_mips[i], sizeof(float) * width * height));
   }
 
   return LUMINARY_SUCCESS;
@@ -66,66 +66,64 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
   const uint32_t width  = post->width;
   const uint32_t height = post->height;
 
-  {
-    KernelArgsCameraPostImageDownsample args;
+  for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+    {
+      KernelArgsPostImageDownsample args;
 
-    args.src = DEVICE_PTR(device->buffers.frame_current_result);
-    args.sw  = width;
-    args.sh  = height;
-    args.dst = DEVICE_PTR(post->bloom_mips[0]);
-    args.tw  = width >> 1;
-    args.th  = height >> 1;
+      args.src = DEVICE_PTR(device->buffers.frame_result[channel_id]);
+      args.sw  = width;
+      args.sh  = height;
+      args.dst = DEVICE_PTR(post->bloom_mips[0]);
+      args.tw  = width >> 1;
+      args.th  = height >> 1;
 
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
-  }
+      __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
+    }
 
-  for (uint32_t i = 0; i < post->bloom_mip_count - 1; i++) {
-    KernelArgsCameraPostImageDownsample args;
+    for (uint32_t i = 0; i < post->bloom_mip_count - 1; i++) {
+      KernelArgsPostImageDownsample args;
 
-    args.src = DEVICE_PTR(post->bloom_mips[i]);
-    args.sw  = width >> (i + 1);
-    args.sh  = height >> (i + 1);
-    args.dst = DEVICE_PTR(post->bloom_mips[i + 1]);
-    args.tw  = width >> (i + 2);
-    args.th  = height >> (i + 2);
+      args.src = DEVICE_PTR(post->bloom_mips[i]);
+      args.sw  = width >> (i + 1);
+      args.sh  = height >> (i + 1);
+      args.dst = DEVICE_PTR(post->bloom_mips[i + 1]);
+      args.tw  = width >> (i + 2);
+      args.th  = height >> (i + 2);
 
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
-  }
+      __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
+    }
 
-  for (uint32_t i = post->bloom_mip_count - 1; i > 0; i--) {
-    KernelArgsCameraPostImageUpsample args;
+    for (uint32_t i = post->bloom_mip_count - 1; i > 0; i--) {
+      KernelArgsPostImageUpsample args;
 
-    args.src  = DEVICE_PTR(post->bloom_mips[i]);
-    args.sw   = width >> (i + 1);
-    args.sh   = height >> (i + 1);
-    args.dst  = DEVICE_PTR(post->bloom_mips[i - 1]);
-    args.base = DEVICE_PTR(post->bloom_mips[i - 1]);
-    args.tw   = width >> i;
-    args.th   = height >> i;
-    args.sa   = 1.0f;
-    args.sb   = 1.0f;
+      args.src  = DEVICE_PTR(post->bloom_mips[i]);
+      args.sw   = width >> (i + 1);
+      args.sh   = height >> (i + 1);
+      args.dst  = DEVICE_PTR(post->bloom_mips[i - 1]);
+      args.base = DEVICE_PTR(post->bloom_mips[i - 1]);
+      args.tw   = width >> i;
+      args.th   = height >> i;
+      args.sa   = 1.0f;
+      args.sb   = 1.0f;
 
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
-  }
+      __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+    }
 
-  {
-    KernelArgsCameraPostImageUpsample args;
+    {
+      KernelArgsPostImageUpsample args;
 
-    args.src  = DEVICE_PTR(post->bloom_mips[0]);
-    args.sw   = width >> 1;
-    args.sh   = height >> 1;
-    args.dst  = DEVICE_PTR(device->buffers.frame_current_result);
-    args.base = DEVICE_PTR(device->buffers.frame_current_result);
-    args.tw   = width;
-    args.th   = height;
-    args.sa   = post->bloom_blend / post->bloom_mip_count;
-    args.sb   = 1.0f - post->bloom_blend;
+      args.src  = DEVICE_PTR(post->bloom_mips[0]);
+      args.sw   = width >> 1;
+      args.sh   = height >> 1;
+      args.dst  = DEVICE_PTR(device->buffers.frame_result[channel_id]);
+      args.base = DEVICE_PTR(device->buffers.frame_result[channel_id]);
+      args.tw   = width;
+      args.th   = height;
+      args.sa   = post->bloom_blend / post->bloom_mip_count;
+      args.sb   = 1.0f - post->bloom_blend;
 
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+      __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
+    }
   }
 
   return LUMINARY_SUCCESS;
@@ -143,138 +141,6 @@ static LuminaryResult _device_post_bloom_destroy(DevicePost* post) {
 
   __FAILURE_HANDLE(host_free(&post->bloom_mips));
   post->bloom_mip_count = 0;
-
-  return LUMINARY_SUCCESS;
-}
-
-////////////////////////////////////////////////////////////////////
-// Lens Flare
-////////////////////////////////////////////////////////////////////
-
-#define LENS_FLARE_NUM_BUFFERS 2
-
-static LuminaryResult _device_post_lens_flare_create(DevicePost* post) {
-  __CHECK_NULL_ARGUMENT(post);
-
-  __FAILURE_HANDLE(host_malloc(&post->lens_flare_buffers, sizeof(RGBF*) * LENS_FLARE_NUM_BUFFERS));
-
-  __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[0], sizeof(RGBF) * (post->width >> 1) * (post->height >> 1)));
-  __FAILURE_HANDLE(device_malloc((void**) &post->lens_flare_buffers[1], sizeof(RGBF) * (post->width >> 1) * (post->height >> 1)));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_post_lens_flare_apply(DevicePost* post, Device* device) {
-  __CHECK_NULL_ARGUMENT(post);
-  __CHECK_NULL_ARGUMENT(device);
-
-  const uint32_t width  = post->width;
-  const uint32_t height = post->height;
-
-  {
-    KernelArgsCameraPostImageDownsampleThreshold args;
-
-    args.src       = DEVICE_PTR(device->buffers.frame_current_result);
-    args.sw        = width;
-    args.sh        = height;
-    args.dst       = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.tw        = width >> 1;
-    args.th        = height >> 1;
-    args.threshold = post->lens_flare_threshold;
-
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD], &args, device->stream_main));
-  }
-
-  {
-    KernelArgsCameraPostImageDownsample args;
-
-    args.src = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.sw  = width >> 1;
-    args.sh  = height >> 1;
-    args.dst = DEVICE_PTR(post->lens_flare_buffers[1]);
-    args.tw  = width >> 2;
-    args.th  = height >> 2;
-
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
-  }
-
-  {
-    KernelArgsCameraPostImageUpsample args;
-
-    args.src  = DEVICE_PTR(post->lens_flare_buffers[1]);
-    args.sw   = width >> 2;
-    args.sh   = height >> 2;
-    args.base = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.dst  = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.tw   = width >> 1;
-    args.th   = height >> 1;
-    args.sa   = 0.5f;
-    args.sb   = 0.5f;
-
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
-  }
-
-  {
-    KernelArgsCameraPostLensFlareGhosts args;
-
-    args.src = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.sw  = width >> 1;
-    args.sh  = height >> 1;
-    args.dst = DEVICE_PTR(post->lens_flare_buffers[1]);
-    args.tw  = width >> 1;
-    args.th  = height >> 1;
-
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS], &args, device->stream_main));
-  }
-
-  {
-    KernelArgsCameraPostLensFlareHalo args;
-
-    args.src = DEVICE_PTR(post->lens_flare_buffers[1]);
-    args.sw  = width >> 1;
-    args.sh  = height >> 1;
-    args.dst = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.tw  = width >> 1;
-    args.th  = height >> 1;
-
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO], &args, device->stream_main));
-  }
-
-  {
-    KernelArgsCameraPostImageUpsample args;
-
-    args.src  = DEVICE_PTR(post->lens_flare_buffers[0]);
-    args.sw   = width >> 1;
-    args.sh   = height >> 1;
-    args.base = DEVICE_PTR(device->buffers.frame_current_result);
-    args.dst  = DEVICE_PTR(device->buffers.frame_current_result);
-    args.tw   = width;
-    args.th   = height;
-    args.sa   = 1.0f;
-    args.sb   = 1.0f;
-
-    __FAILURE_HANDLE(
-      kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_post_lens_flare_destroy(DevicePost* post) {
-  __CHECK_NULL_ARGUMENT(post);
-
-  if (!post->lens_flare_buffers)
-    return LUMINARY_SUCCESS;
-
-  __FAILURE_HANDLE(device_free((void**) &post->lens_flare_buffers[0]));
-  __FAILURE_HANDLE(device_free((void**) &post->lens_flare_buffers[1]));
-
-  __FAILURE_HANDLE(host_free(&post->lens_flare_buffers));
 
   return LUMINARY_SUCCESS;
 }
@@ -303,11 +169,6 @@ DEVICE_CTX_FUNC LuminaryResult device_post_allocate(DevicePost* post, uint32_t w
       __FAILURE_HANDLE(_device_post_bloom_destroy(post));
       __FAILURE_HANDLE(_device_post_bloom_create(post));
     }
-
-    if (post->lens_flare) {
-      __FAILURE_HANDLE(_device_post_lens_flare_destroy(post));
-      __FAILURE_HANDLE(_device_post_lens_flare_create(post));
-    }
   }
 
   return LUMINARY_SUCCESS;
@@ -319,8 +180,7 @@ DEVICE_CTX_FUNC LuminaryResult device_post_update(DevicePost* post, const Camera
 
   const bool camera_bloom = camera->bloom_blend > 0.0f;
 
-  post->bloom_blend          = camera->bloom_blend;
-  post->lens_flare_threshold = camera->lens_flare_threshold;
+  post->bloom_blend = camera->bloom_blend;
 
   if (post->bloom != camera_bloom) {
     post->bloom = camera_bloom;
@@ -331,18 +191,6 @@ DEVICE_CTX_FUNC LuminaryResult device_post_update(DevicePost* post, const Camera
 
     if (!post->bloom) {
       __FAILURE_HANDLE(_device_post_bloom_destroy(post));
-    }
-  }
-
-  if (post->lens_flare != camera->lens_flare) {
-    post->lens_flare = camera->lens_flare;
-
-    if (post->lens_flare) {
-      __FAILURE_HANDLE(_device_post_lens_flare_create(post));
-    }
-
-    if (!post->lens_flare) {
-      __FAILURE_HANDLE(_device_post_lens_flare_destroy(post));
     }
   }
 
@@ -366,10 +214,6 @@ DEVICE_CTX_FUNC LuminaryResult device_post_apply(DevicePost* post, Device* devic
     __FAILURE_HANDLE(_device_post_bloom_apply(post, device));
   }
 
-  if (post->lens_flare) {
-    __FAILURE_HANDLE(_device_post_lens_flare_apply(post, device));
-  }
-
   return LUMINARY_SUCCESS;
 }
 
@@ -378,7 +222,6 @@ DEVICE_CTX_FUNC LuminaryResult device_post_destroy(DevicePost** post) {
   __CHECK_NULL_ARGUMENT(*post);
 
   __FAILURE_HANDLE(_device_post_bloom_destroy(*post));
-  __FAILURE_HANDLE(_device_post_lens_flare_destroy(*post));
 
   __FAILURE_HANDLE(host_free(post));
 

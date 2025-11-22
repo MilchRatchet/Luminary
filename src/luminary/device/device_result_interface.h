@@ -9,10 +9,8 @@ struct Device typedef Device;
 
 struct DeviceResultEntry {
   uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
-  STAGING void* direct_lighting_results;
-  STAGING void* indirect_lighting_results_red[MAX_NUM_INDIRECT_BUCKETS];
-  STAGING void* indirect_lighting_results_green[MAX_NUM_INDIRECT_BUCKETS];
-  STAGING void* indirect_lighting_results_blue[MAX_NUM_INDIRECT_BUCKETS];
+  STAGING float* frame_first_moment[FRAME_CHANNEL_COUNT];
+  STAGING float* frame_second_moment[FRAME_CHANNEL_COUNT];
   CUevent available_event;
   uint32_t consumer_event_id;
   bool queued;

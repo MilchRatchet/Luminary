@@ -17,8 +17,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->aperture_blade_count       = 7;
   camera->exposure                   = 0.0f;
   camera->bloom_blend                = 0.01f;
-  camera->lens_flare                 = 0;
-  camera->lens_flare_threshold       = 1.0f;
   camera->dithering                  = 1;
   camera->tonemap                    = LUMINARY_TONEMAP_AGX;
   camera->agx_custom_slope           = 1.0f;
@@ -124,8 +122,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
 
   __CAMERA_CHECK_DIRTY(exposure, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(bloom_blend, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(lens_flare, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(lens_flare_threshold, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(dithering, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(tonemap, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(filter, SCENE_DIRTY_FLAG_OUTPUT);

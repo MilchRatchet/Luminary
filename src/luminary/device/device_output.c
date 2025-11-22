@@ -270,7 +270,6 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   KernelArgsGenerateFinalImage generate_final_image_args;
 
-  generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_current_result);
   generate_final_image_args.color_correction = output->color_correction;
   generate_final_image_args.agx_params       = output->agx_params;
   generate_final_image_args.undersampling    = device->undersampling_state;

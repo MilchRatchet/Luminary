@@ -140,15 +140,9 @@ LUMINARY_KERNEL void volume_process_events() {
       if (sky_fast_path) {
         RGBF sky_color = sky_color_no_compute(task.origin, task.ray, task.state);
         sky_color      = mul_color(sky_color, record);
+        sky_color      = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.length));
 
-        sky_color = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.length));
-
-        if (device.state.depth <= 1) {
-          write_beauty_buffer_direct(sky_color, index);
-        }
-        else {
-          write_beauty_buffer(sky_color, index, task.state);
-        }
+        write_beauty_buffer(sky_color, throughput.results_index);
 
         handle.instance_id = HIT_TYPE_INVALID;
       }

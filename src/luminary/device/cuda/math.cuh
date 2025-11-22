@@ -1049,7 +1049,7 @@ LUMINARY_FUNCTION float SRGB_to_linearRGB(const float value) {
   }
 }
 
-LUMINARY_FUNCTION float luminance(const RGBF v) {
+LUMINARY_FUNCTION float color_luminance(const RGBF v) {
   return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
 }
 
@@ -1069,7 +1069,7 @@ LUMINARY_FUNCTION RGBAF saturate_albedo(RGBAF color, float change) {
 }
 
 LUMINARY_FUNCTION RGBF filter_gray(const RGBF color) {
-  const float value = luminance(color);
+  const float value = color_luminance(color);
 
   return get_color(value, value, value);
 }
@@ -1081,7 +1081,7 @@ LUMINARY_FUNCTION RGBF filter_sepia(const RGBF color) {
 }
 
 LUMINARY_FUNCTION RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 4.0f * luminance(color);
+  const float value  = 4.0f * color_luminance(color);
   const float dither = random_dither_mask(x, y);
 
   const int tone = (int) (value + dither);
@@ -1100,7 +1100,7 @@ LUMINARY_FUNCTION RGBF filter_gameboy(const RGBF color, const uint32_t x, const 
 }
 
 LUMINARY_FUNCTION RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 4.0f * luminance(color);
+  const float value  = 4.0f * color_luminance(color);
   const float dither = random_dither_mask(x, y);
 
   const int tone = (int) (value + dither);
@@ -1142,7 +1142,7 @@ LUMINARY_FUNCTION RGBF filter_crt(RGBF color, int x, int y) {
 }
 
 LUMINARY_FUNCTION RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 2.0f * luminance(color);
+  const float value  = 2.0f * color_luminance(color);
   const float dither = random_dither_mask(x, y);
 
   const int tone = (int) (value + dither);

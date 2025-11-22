@@ -649,20 +649,18 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   __DEVICE_BUFFER_ALLOCATE(task_states, sizeof(DeviceTaskState) * allocated_tasks * TASK_STATE_BUFFER_INDEX_COUNT);
   __DEVICE_BUFFER_ALLOCATE(task_direct_light, sizeof(DeviceTaskDirectLight) * allocated_tasks * TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT);
+  __DEVICE_BUFFER_ALLOCATE(task_results, sizeof(DeviceTaskResult) * allocated_tasks);
+  __DEVICE_BUFFER_ALLOCATE(results_counts, sizeof(uint16_t) * thread_count);
   __DEVICE_BUFFER_ALLOCATE(trace_counts, sizeof(uint16_t) * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 5 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 5 * thread_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_current_result, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_direct_buffer, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_direct_accumulate, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_indirect_buffer, sizeof(RGBF) * internal_pixel_count);
-  __DEVICE_BUFFER_ALLOCATE(frame_final, sizeof(RGBF) * external_pixel_count);
   __DEVICE_BUFFER_ALLOCATE(gbuffer_meta, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
 
-  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_red[bucket_id], sizeof(float) * internal_pixel_count);
-    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_green[bucket_id], sizeof(float) * internal_pixel_count);
-    __DEVICE_BUFFER_ALLOCATE(frame_indirect_accumulate_blue[bucket_id], sizeof(float) * internal_pixel_count);
+  for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+    __DEVICE_BUFFER_ALLOCATE(frame_first_moment[channel_id], sizeof(float) * internal_pixel_count);
+    __DEVICE_BUFFER_ALLOCATE(frame_second_moment[channel_id], sizeof(float) * internal_pixel_count);
+    __DEVICE_BUFFER_ALLOCATE(frame_result[channel_id], sizeof(float) * internal_pixel_count);
+    __DEVICE_BUFFER_ALLOCATE(frame_output[channel_id], sizeof(float) * external_pixel_count);
   }
 
   __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
@@ -678,14 +676,11 @@ static LuminaryResult _device_free_buffers(Device* device) {
 
   __DEVICE_BUFFER_FREE(task_states);
   __DEVICE_BUFFER_FREE(task_direct_light);
+  __DEVICE_BUFFER_FREE(task_results);
+  __DEVICE_BUFFER_FREE(results_counts);
   __DEVICE_BUFFER_FREE(trace_counts);
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
-  __DEVICE_BUFFER_FREE(frame_current_result);
-  __DEVICE_BUFFER_FREE(frame_direct_buffer);
-  __DEVICE_BUFFER_FREE(frame_direct_accumulate);
-  __DEVICE_BUFFER_FREE(frame_indirect_buffer);
-  __DEVICE_BUFFER_FREE(frame_final);
   __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(stage_sample_counts);
   __DEVICE_BUFFER_FREE(textures);
@@ -708,10 +703,11 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(camera_media);
   __DEVICE_BUFFER_FREE(abort_flag);
 
-  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __DEVICE_BUFFER_FREE(frame_indirect_accumulate_red[bucket_id]);
-    __DEVICE_BUFFER_FREE(frame_indirect_accumulate_green[bucket_id]);
-    __DEVICE_BUFFER_FREE(frame_indirect_accumulate_blue[bucket_id]);
+  for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+    __DEVICE_BUFFER_FREE(frame_first_moment[channel_id]);
+    __DEVICE_BUFFER_FREE(frame_second_moment[channel_id]);
+    __DEVICE_BUFFER_FREE(frame_result[channel_id]);
+    __DEVICE_BUFFER_FREE(frame_output[channel_id]);
   }
 
   return LUMINARY_SUCCESS;
@@ -1595,28 +1591,6 @@ LuminaryResult device_update_post(Device* device, const Camera* camera) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_post_update(device->post, camera));
-
-  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult device_clear_lighting_buffers(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  DEVICE_ASSERT_AVAILABLE
-
-  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
-  const uint32_t internal_pixel_count = device->constant_memory->settings.width * device->constant_memory->settings.height;
-
-  CUDA_FAILURE_HANDLE(
-    cuMemsetD32Async(DEVICE_CUPTR(device->buffers.frame_direct_buffer), 0, internal_pixel_count * 3, device->stream_main));
-
-  if (device->constant_memory->settings.shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-    CUDA_FAILURE_HANDLE(
-      cuMemsetD32Async(DEVICE_CUPTR(device->buffers.frame_indirect_buffer), 0, internal_pixel_count * 3, device->stream_main));
-  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

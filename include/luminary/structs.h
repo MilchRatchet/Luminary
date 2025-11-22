@@ -152,8 +152,6 @@ LUMINARY_API struct LuminaryCamera {
   float agx_custom_saturation;
   LuminaryFilter filter;
   float bloom_blend;
-  bool lens_flare;
-  float lens_flare_threshold;
   bool dithering;
   bool purkinje;
   float purkinje_kappa1;

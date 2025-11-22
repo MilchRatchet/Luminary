@@ -118,7 +118,7 @@ LUMINARY_FUNCTION RGBF bsdf_fresnel_schlick(const RGBF f0, const float f90, cons
 
 LUMINARY_FUNCTION float bsdf_shadowed_F90(const RGBF specular_f0) {
   const float t = 1.0f / 0.04f;
-  return fminf(1.0f, t * luminance(specular_f0));
+  return fminf(1.0f, t * color_luminance(specular_f0));
 }
 
 ///////////////////////////////////////////////////

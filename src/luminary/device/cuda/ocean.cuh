@@ -108,16 +108,17 @@ LUMINARY_KERNEL void ocean_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    DeviceTask task                  = task_load(task_base_address);
-    const DeviceTaskTrace trace      = task_trace_load(task_base_address);
-    const uint32_t index             = path_id_get_pixel_index(task.path_id);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                       = task_load(task_base_address);
+    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
+    RGBF result;
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_DEPTH: {
-        write_beauty_buffer_forced(splat_color(__saturatef((1.0f / trace.depth) * 2.0f)), index);
+        result = splat_color(__saturatef((1.0f / trace.depth) * 2.0f));
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
         vec3 normal = ocean_get_normal(task.origin);
@@ -126,14 +127,17 @@ LUMINARY_KERNEL void ocean_process_tasks_debug() {
         normal.y = 0.5f * normal.y + 0.5f;
         normal.z = 0.5f * normal.z + 0.5f;
 
-        write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), index);
+        result = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
       } break;
       case LUMINARY_SHADING_MODE_IDENTIFICATION: {
-        write_beauty_buffer_forced(get_color(0.0f, 0.0f, 1.0f), index);
+        result = get_color(0.0f, 0.0f, 1.0f);
       } break;
       default:
+        result = splat_color(0.0f);
         break;
     }
+
+    write_beauty_buffer(result, throughput.results_index);
   }
 }
 

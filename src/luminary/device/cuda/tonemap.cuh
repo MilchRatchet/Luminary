@@ -57,7 +57,7 @@ LUMINARY_FUNCTION RGBF tonemap_uncharted2(RGBF pixel) {
 }
 
 LUMINARY_FUNCTION RGBF tonemap_reinhard(RGBF pixel) {
-  const float factor = 1.0f / (1.0f + luminance(pixel));
+  const float factor = 1.0f / (1.0f + color_luminance(pixel));
   pixel.r *= factor;
   pixel.g *= factor;
   pixel.b *= factor;
@@ -129,7 +129,7 @@ LUMINARY_FUNCTION RGBF agx_inv_conversion(RGBF pixel) {
 }
 
 LUMINARY_FUNCTION RGBF agx_look(RGBF pixel, const RGBF slope, const RGBF power, const float saturation) {
-  const float lum = luminance(pixel);
+  const float lum = color_luminance(pixel);
 
   pixel = mul_color(pixel, slope);
 
