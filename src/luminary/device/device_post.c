@@ -70,12 +70,13 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
     {
       KernelArgsPostImageDownsample args;
 
-      args.src = DEVICE_PTR(device->buffers.frame_result[channel_id]);
-      args.sw  = width;
-      args.sh  = height;
-      args.dst = DEVICE_PTR(post->bloom_mips[0]);
-      args.tw  = width >> 1;
-      args.th  = height >> 1;
+      args.src       = DEVICE_PTR(device->buffers.frame_result[channel_id]);
+      args.sw        = width;
+      args.sh        = height;
+      args.dst       = DEVICE_PTR(post->bloom_mips[0]);
+      args.tw        = width >> 1;
+      args.th        = height >> 1;
+      args.threshold = 0.0f;
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
     }
@@ -83,12 +84,13 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
     for (uint32_t i = 0; i < post->bloom_mip_count - 1; i++) {
       KernelArgsPostImageDownsample args;
 
-      args.src = DEVICE_PTR(post->bloom_mips[i]);
-      args.sw  = width >> (i + 1);
-      args.sh  = height >> (i + 1);
-      args.dst = DEVICE_PTR(post->bloom_mips[i + 1]);
-      args.tw  = width >> (i + 2);
-      args.th  = height >> (i + 2);
+      args.src       = DEVICE_PTR(post->bloom_mips[i]);
+      args.sw        = width >> (i + 1);
+      args.sh        = height >> (i + 1);
+      args.dst       = DEVICE_PTR(post->bloom_mips[i + 1]);
+      args.tw        = width >> (i + 2);
+      args.th        = height >> (i + 2);
+      args.threshold = 0.0f;
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
     }

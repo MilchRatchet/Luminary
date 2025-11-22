@@ -31,16 +31,25 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count_from_block_index(c
 
   const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
-  uint32_t sample_id = device.state.sample_allocation.stage_sample_offsets[0];
+  uint32_t count = device.state.sample_allocation.stage_sample_offsets[0];
 
   for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
     const uint32_t stage_sample_offset = device.state.sample_allocation.stage_sample_offsets[stage_id + 1];
     const uint32_t stage_sample_count  = ((adaptive_sampling_counts >> (stage_id * 8)) & 0xFF) + 1;
 
-    sample_id += stage_sample_offset * stage_sample_count;
+    count += stage_sample_offset * stage_sample_count;
   }
 
-  return sample_id;
+  const uint32_t this_stage_id = device.state.sample_allocation.stage_id;
+
+  if (this_stage_id != 0) {
+    count += ((adaptive_sampling_counts >> (this_stage_id * 8)) & 0xFF) + 1;
+  }
+  else {
+    count++;
+  }
+
+  return count;
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count(const uint32_t x, const uint32_t y) {

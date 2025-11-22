@@ -439,6 +439,8 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
       const float red   = __ldg(device.ptrs.frame_output[FRAME_CHANNEL_RED] + src_index);
       const float green = __ldg(device.ptrs.frame_output[FRAME_CHANNEL_GREEN] + src_index);
       const float blue  = __ldg(device.ptrs.frame_output[FRAME_CHANNEL_BLUE] + src_index);
+
+      pixel = get_color(red, green, blue);
     }
 
     switch (args.filter) {

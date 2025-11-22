@@ -69,16 +69,16 @@ LUMINARY_FUNCTION float post_sample_buffer_border(
 }
 
 LUMINARY_KERNEL void post_image_downsample(const KernelArgsPostImageDownsample args) {
-  uint32_t id = THREAD_ID;
-
   const float scale_x = 1.0f / (args.tw - 1);
   const float scale_y = 1.0f / (args.th - 1);
   const float step_x  = 1.0f / (args.sw - 1);
   const float step_y  = 1.0f / (args.sh - 1);
 
-  while (id < args.tw * args.th) {
-    const uint32_t y = id / args.tw;
-    const uint32_t x = id - y * args.tw;
+  const uint32_t amount = args.tw * args.th;
+
+  for (uint32_t index = THREAD_ID; index < amount; index += NUM_THREADS) {
+    const uint32_t y = index / args.tw;
+    const uint32_t x = index - y * args.tw;
 
     const float sx = scale_x * x;
     const float sy = scale_y * y;
@@ -100,25 +100,25 @@ LUMINARY_KERNEL void post_image_downsample(const KernelArgsPostImageDownsample a
     pixel += post_sample_buffer_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh, 0.25f);
     pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh, 0.25f);
 
+    pixel *= 1.0f / 8.0f;
+
     pixel = fmaxf(pixel - args.threshold, 0.0f);
 
     __stcs(args.dst + x + y * args.tw, pixel);
-
-    id += blockDim.x * gridDim.x;
   }
 }
 
 LUMINARY_KERNEL void post_image_upsample(const KernelArgsPostImageUpsample args) {
-  uint32_t id = THREAD_ID;
-
   const float scale_x = 1.0f / (args.tw - 1);
   const float scale_y = 1.0f / (args.th - 1);
   const float step_x  = 1.0f / (args.sw - 1);
   const float step_y  = 1.0f / (args.sh - 1);
 
-  while (id < args.tw * args.th) {
-    const uint32_t y = id / args.tw;
-    const uint32_t x = id - y * args.tw;
+  const uint32_t amount = args.tw * args.th;
+
+  for (uint32_t index = THREAD_ID; index < amount; index += NUM_THREADS) {
+    const uint32_t y = index / args.tw;
+    const uint32_t x = index - y * args.tw;
 
     const float sx = scale_x * x;
     const float sy = scale_y * y;
@@ -134,6 +134,7 @@ LUMINARY_KERNEL void post_image_upsample(const KernelArgsPostImageUpsample args)
     pixel += post_sample_buffer_border(args.src, sx, sy + step_y, args.sw, args.sh, 2.0f);
     pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh);
 
+    pixel *= 1.0f / 20.0f;
     pixel *= args.sa;
 
     float base_pixel = __ldcs(args.base + x + y * args.tw);
@@ -142,8 +143,6 @@ LUMINARY_KERNEL void post_image_upsample(const KernelArgsPostImageUpsample args)
     pixel += base_pixel;
 
     __stcs(args.dst + x + y * args.tw, pixel);
-
-    id += blockDim.x * gridDim.x;
   }
 }
 
