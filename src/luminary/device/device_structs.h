@@ -42,12 +42,10 @@ struct DeviceCamera {
   uint32_t dithering : 1;
   uint32_t purkinje : 1;
   uint32_t use_color_correction : 1;
-  uint32_t do_firefly_rejection : 1;
-  uint32_t indirect_only : 1;
   uint32_t allow_reflections : 1;
   uint32_t use_spectral_rendering : 1;
   uint32_t use_physical_camera : 1;
-  // 17 bits spare
+  // 19 bits spare
 
   vec3 pos;
   Quaternion rotation;

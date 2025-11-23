@@ -46,8 +46,6 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->dithering              = camera->dithering;
   device_camera->purkinje               = camera->purkinje && (camera->use_physical_camera == false);
   device_camera->use_color_correction   = camera->use_color_correction;
-  device_camera->do_firefly_rejection   = camera->do_firefly_rejection;
-  device_camera->indirect_only          = camera->indirect_only;
   device_camera->allow_reflections      = camera->physical.allow_reflections;
   device_camera->use_spectral_rendering = camera->physical.use_spectral_rendering;
   device_camera->use_physical_camera    = camera->use_physical_camera;

@@ -163,9 +163,7 @@ LUMINARY_API struct LuminaryCamera {
   float russian_roulette_threshold;
   bool use_color_correction;
   LuminaryRGBF color_correction;
-  bool do_firefly_rejection;
   float film_grain;
-  bool indirect_only;
   float camera_scale;
   float object_distance;
   bool use_physical_camera;

@@ -249,8 +249,9 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FIREFLYC */
     case 4852993938162862406u:
-      sscanf(value, "%u\n", &bool_uint);
-      camera->do_firefly_rejection = bool_uint;
+      // Legacy
+      // sscanf(value, "%u\n", &bool_uint);
+      // camera->do_firefly_rejection = bool_uint;
       break;
     /* FILMGRAI */
     case 5278590704447932742u:

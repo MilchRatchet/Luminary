@@ -35,8 +35,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->color_correction.r         = 0.0f;
   camera->color_correction.g         = 0.0f;
   camera->color_correction.b         = 0.0f;
-  camera->do_firefly_rejection       = false;
-  camera->indirect_only              = false;
   camera->film_grain                 = 0.0f;
   camera->camera_scale               = 1.0f;
   camera->object_distance            = 1.0f;
@@ -130,8 +128,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(purkinje_kappa2, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(use_color_correction, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(film_grain, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(do_firefly_rejection, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(indirect_only, SCENE_DIRTY_FLAG_OUTPUT);
 
   if (input->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
     __CAMERA_CHECK_DIRTY(agx_custom_slope, SCENE_DIRTY_FLAG_OUTPUT);
