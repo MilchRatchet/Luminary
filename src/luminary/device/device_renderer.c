@@ -389,10 +389,7 @@ static LuminaryResult _device_renderer_handle_queue_action(
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-      if (renderer->executed_aggregate_sample_counts[0] == 0) {
-        // We assume that every device will always execute the base adaptive sampling stage first.
-        __DEBUG_ASSERT(renderer->executed_aggregate_sample_counts[1] == 0);
-
+      if ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) != 0) {
         __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(
           renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT_UNDERSAMPLING, &work->launch_id));
       }

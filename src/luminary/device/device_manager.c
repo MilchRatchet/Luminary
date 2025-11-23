@@ -448,8 +448,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     __FAILURE_HANDLE_CRITICAL(device_adaptive_sampler_start_sampling(device_manager->adaptive_sampler, width, height));
 
     // Main device always computes the first samples
-    __FAILURE_HANDLE_CRITICAL(
-      device_setup_undersampling(device_manager->devices[device_manager->main_device_index], scene->settings.undersampling));
+    __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(device_manager->devices[device_manager->main_device_index], &scene->settings));
     __FAILURE_HANDLE_CRITICAL(device_adaptive_sampler_allocate_sample(
       device_manager->adaptive_sampler, &device_manager->devices[device_manager->main_device_index]->renderer->sample_allocation, 32));
 

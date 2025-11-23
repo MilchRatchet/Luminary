@@ -42,7 +42,7 @@ LUMINARY_KERNEL void accumulation_collect_results() {
   for (int result_id = 0; result_id < results_count; result_id++) {
     const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(result_id, TASK_STATE_BUFFER_INDEX_RESULT);
 
-    DeviceTaskResult result = task_result_load(task_result_base_address);
+    const DeviceTaskResult result = task_result_load(task_result_base_address);
 
     RGBF first_moment, second_moment;
     const bool is_first_thread = accumulation_reduce_sample(result.color, result.index, first_moment, second_moment);
@@ -88,27 +88,21 @@ LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
 LUMINARY_KERNEL void accumulation_generate_result() {
   HANDLE_DEVICE_ABORT();
 
-  // Undersampling uses dynamic memory layout for the result buffer.
-  // Undersampling with render regions is not a real use case so we ignore render regions
-  // in this step during undersampling. After undersampling, we want to only copy the
-  // render region, however, since undersampling destroyed the results outside the render region,
-  // we must do a full copy on the second sample. For multi-GPU purposes, we assume the main
-  // device computes the second sample.
-  const bool copy_out_of_frame = device.state.sample_allocation.global_sample_id <= 1;
+  const uint32_t width  = device.settings.window_width;
+  const uint32_t height = device.settings.window_height;
 
-  const uint32_t width  = copy_out_of_frame ? device.settings.width : device.settings.window_width;
-  const uint32_t height = copy_out_of_frame ? device.settings.height : device.settings.window_height;
-
-  const uint32_t offset_x = copy_out_of_frame ? 0 : device.settings.window_x;
-  const uint32_t offset_y = copy_out_of_frame ? 0 : device.settings.window_y;
+  const uint32_t offset_x = device.settings.window_x;
+  const uint32_t offset_y = device.settings.window_y;
 
   const uint32_t amount = width * height;
 
-  for (uint32_t index = THREAD_ID; index < amount; index += NUM_THREADS) {
+  for (uint32_t window_index = THREAD_ID; window_index < amount; window_index += NUM_THREADS) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t y = offset_y + index / width;
-    const uint32_t x = offset_x + index - (y - offset_y) * width;
+    const uint32_t y = offset_y + window_index / width;
+    const uint32_t x = offset_x + window_index - (y - offset_y) * width;
+
+    const uint32_t index = x + y * device.settings.width;
 
     const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
 

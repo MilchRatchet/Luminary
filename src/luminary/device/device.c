@@ -1597,13 +1597,22 @@ LuminaryResult device_update_post(Device* device, const Camera* camera) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling) {
+LuminaryResult device_setup_undersampling(Device* device, const RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(device);
 
   DEVICE_ASSERT_AVAILABLE
 
   bool recurring_enabled;
   __FAILURE_HANDLE(device_output_get_recurring_enabled(device->output, &recurring_enabled));
+
+  uint32_t undersampling;
+  if (settings->region_width >= 1.0f && settings->region_height >= 1.0f) {
+    undersampling = settings->undersampling;
+  }
+  else {
+    // No undersampling when using render regions.
+    undersampling = 0;
+  }
 
   device->undersampling_state = 0;
 
