@@ -108,9 +108,21 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
     const float normalization = 1.0f / sample_count;
 
+#if 1
     const float red   = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
     const float green = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
     const float blue  = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
+#else
+    // TODO: Turn this into an option to visualize variance.
+    float luminance;
+    const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, luminance);
+
+    const float relMSE = (luminance > 0.0f) ? variance / luminance : 0.0f;
+
+    const float red   = relMSE;
+    const float green = relMSE;
+    const float blue  = relMSE;
+#endif
 
     __stcs(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index, red);
     __stcs(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index, green);
