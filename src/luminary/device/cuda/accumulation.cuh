@@ -70,7 +70,7 @@ LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
   for (int result_id = 0; result_id < results_count; result_id++) {
     const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(result_id, TASK_STATE_BUFFER_INDEX_RESULT);
 
-    DeviceTaskResult result = task_result_load(task_result_base_address);
+    const DeviceTaskResult result = task_result_load(task_result_base_address);
 
     const RGBF first_moment  = result.color;
     const RGBF second_moment = mul_color(result.color, result.color);
@@ -88,16 +88,27 @@ LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
 LUMINARY_KERNEL void accumulation_generate_result() {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t width  = device.settings.window_width;
-  const uint32_t height = device.settings.window_height;
+  // Undersampling uses dynamic memory layout for the result buffer.
+  // Undersampling with render regions is not a real use case so we ignore render regions
+  // in this step during undersampling. After undersampling, we want to only copy the
+  // render region, however, since undersampling destroyed the results outside the render region,
+  // we must do a full copy on the second sample. For multi-GPU purposes, we assume the main
+  // device computes the second sample.
+  const bool copy_out_of_frame = device.state.sample_allocation.global_sample_id <= 1;
+
+  const uint32_t width  = copy_out_of_frame ? device.settings.width : device.settings.window_width;
+  const uint32_t height = copy_out_of_frame ? device.settings.height : device.settings.window_height;
+
+  const uint32_t offset_x = copy_out_of_frame ? 0 : device.settings.window_x;
+  const uint32_t offset_y = copy_out_of_frame ? 0 : device.settings.window_y;
 
   const uint32_t amount = width * height;
 
   for (uint32_t index = THREAD_ID; index < amount; index += NUM_THREADS) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t y = device.settings.window_y + index / width;
-    const uint32_t x = device.settings.window_x + index - (y - device.settings.window_y) * width;
+    const uint32_t y = offset_y + index / width;
+    const uint32_t x = offset_x + index - (y - offset_y) * width;
 
     const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
 
@@ -110,6 +121,66 @@ LUMINARY_KERNEL void accumulation_generate_result() {
     __stcs(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index, red);
     __stcs(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index, green);
     __stcs(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index, blue);
+  }
+}
+
+LUMINARY_FUNCTION RGBF
+  accumulation_load_undersampling_pixel(const uint16_t base_x, const uint16_t base_y, const uint32_t scale, const uint32_t sample_id) {
+  const uint32_t offset_x = (sample_id & 0b01) ? 0 : scale >> 1;
+  const uint32_t offset_y = (sample_id & 0b10) ? 0 : scale >> 1;
+
+  const uint32_t pixel_x = min(base_x + offset_x, device.settings.width - 1);
+  const uint32_t pixel_y = min(base_y + offset_y, device.settings.height - 1);
+
+  const uint32_t index = pixel_x + pixel_y * device.settings.width;
+
+  const float red   = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index);
+  const float green = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index);
+  const float blue  = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index);
+
+  return get_color(red, green, blue);
+}
+
+LUMINARY_KERNEL void accumulation_generate_result_undersampling() {
+  HANDLE_DEVICE_ABORT();
+
+  const uint32_t undersampling_stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  const uint32_t undersampling_iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
+
+  LUMINARY_ASSUME(undersampling_stage > 0);
+
+  const uint32_t scale = 1u << undersampling_stage;
+
+  // During undersampling we always copy the whole screen because
+  // we dynamically change the memory layout based on undersampling stage.
+  // We ignore render regions because they are not of interest here.
+  const uint32_t width  = device.settings.width >> undersampling_stage;
+  const uint32_t height = device.settings.height >> undersampling_stage;
+
+  const uint32_t amount = width * height;
+
+  const float color_scale = 1.0f / (4 - undersampling_iteration);
+
+  for (uint32_t index = THREAD_ID; index < amount; index += NUM_THREADS) {
+    HANDLE_DEVICE_ABORT();
+
+    const uint32_t dst_y = index / width;
+    const uint32_t dst_x = index - dst_y * width;
+
+    const uint32_t base_x = dst_x << undersampling_stage;
+    const uint32_t base_y = dst_y << undersampling_stage;
+
+    RGBF result = splat_color(0.0f);
+    for (uint32_t sample_id = undersampling_iteration; sample_id < 4; sample_id++) {
+      const RGBF pixel = accumulation_load_undersampling_pixel(base_x, base_y, scale, sample_id);
+      result           = add_color(result, pixel);
+    }
+
+    result = scale_color(result, color_scale);
+
+    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index, result.r);
+    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index, result.g);
+    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index, result.b);
   }
 }
 

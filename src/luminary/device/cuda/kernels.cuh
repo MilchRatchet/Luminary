@@ -12,7 +12,6 @@
 #include "purkinje.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
-#include "temporal.cuh"
 #include "tonemap.cuh"
 #include "utils.cuh"
 #include "volume.cuh"
@@ -326,63 +325,49 @@ LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t undersampling_stage     = (args.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
-  const uint32_t undersampling_iteration = args.undersampling & UNDERSAMPLING_ITERATION_MASK;
+  const uint32_t undersampling_stage = (args.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
   const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
+  const uint32_t undersampling_input  = undersampling_stage;
 
-  const uint32_t output_scale = 1 << undersampling_output;
+  const uint32_t output_scale = 1u << (undersampling_output - undersampling_input);
 
   const uint32_t output_width  = device.settings.width >> undersampling_output;
   const uint32_t output_height = device.settings.height >> undersampling_output;
 
-  const uint32_t supersampling_scale = max(device.settings.supersampling, undersampling_stage) - undersampling_stage;
+  const uint32_t input_width  = device.settings.width >> undersampling_input;
+  const uint32_t input_height = device.settings.height >> undersampling_input;
 
   const uint32_t output_amount = output_width * output_height;
-
-  const uint32_t num_samples = (undersampling_stage) ? 4 : (1 << device.settings.supersampling);
-
-  const float color_scale = (undersampling_stage) ? (1.0f / (num_samples - undersampling_iteration)) : 1.0f / (output_scale * output_scale);
 
   for (uint32_t output_pixel = THREAD_ID; output_pixel < output_amount; output_pixel += blockDim.x * gridDim.x) {
     const uint16_t y = (uint16_t) (output_pixel / output_width);
     const uint16_t x = (uint16_t) (output_pixel - y * output_width);
 
+    RGBF color = get_color(0.0f, 0.0f, 0.0f);
+
     const uint16_t source_x = x * output_scale;
     const uint16_t source_y = y * output_scale;
 
-    RGBF color = get_color(0.0f, 0.0f, 0.0f);
+    for (uint32_t yi = 0; yi < output_scale; yi++) {
+      for (uint32_t xi = 0; xi < output_scale; xi++) {
+        const uint32_t pixel_x = min(source_x + xi, input_width - 1);
+        const uint32_t pixel_y = min(source_y + yi, input_height - 1);
 
-    if (undersampling_stage) {
-      for (uint32_t sample_id = undersampling_iteration; sample_id < num_samples; sample_id++) {
-        const RGBF pixel = final_image_get_undersampling_sample(source_x, source_y, output_scale, sample_id);
-        color            = add_color(color, pixel);
+        const uint32_t index = pixel_x + pixel_y * input_width;
+
+        const float red   = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index);
+        const float green = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index);
+        const float blue  = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index);
+
+        RGBF pixel = get_color(red, green, blue);
+        pixel      = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
+
+        color = add_color(color, pixel);
       }
-
-      color = scale_color(color, color_scale);
-      color = tonemap_apply(color, x, y, args.color_correction, args.agx_params);
     }
-    else {
-      for (uint32_t yi = 0; yi < output_scale; yi++) {
-        for (uint32_t xi = 0; xi < output_scale; xi++) {
-          const uint32_t pixel_x = min(source_x + xi, device.settings.width - 1);
-          const uint32_t pixel_y = min(source_y + yi, device.settings.height - 1);
 
-          const uint32_t index = pixel_x + pixel_y * device.settings.width;
-
-          const float red   = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index);
-          const float green = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index);
-          const float blue  = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index);
-
-          RGBF pixel = get_color(red, green, blue);
-          pixel      = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
-
-          color = add_color(color, pixel);
-        }
-      }
-
-      color = scale_color(color, color_scale);
-    }
+    color = scale_color(color, 1.0f / (output_scale * output_scale));
 
     const uint32_t dst_index = x + y * output_width;
 

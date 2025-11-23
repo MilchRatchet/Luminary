@@ -63,8 +63,16 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(device);
 
-  const uint32_t width  = post->width;
-  const uint32_t height = post->height;
+  const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+
+  // If we are undersampling too much we can't properly do mip-chain based bloom.
+  if (undersampling_stage + 1 >= post->bloom_mip_count)
+    return LUMINARY_SUCCESS;
+
+  const uint32_t width  = post->width >> undersampling_stage;
+  const uint32_t height = post->height >> undersampling_stage;
+
+  const uint32_t mip_count = post->bloom_mip_count - undersampling_stage;
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
     {
@@ -81,7 +89,7 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
     }
 
-    for (uint32_t i = 0; i < post->bloom_mip_count - 1; i++) {
+    for (uint32_t i = 0; i < mip_count - 1; i++) {
       KernelArgsPostImageDownsample args;
 
       args.src       = DEVICE_PTR(post->bloom_mips[i]);
@@ -95,7 +103,7 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE], &args, device->stream_main));
     }
 
-    for (uint32_t i = post->bloom_mip_count - 1; i > 0; i--) {
+    for (uint32_t i = mip_count - 1; i > 0; i--) {
       KernelArgsPostImageUpsample args;
 
       args.src  = DEVICE_PTR(post->bloom_mips[i]);
@@ -121,7 +129,7 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
       args.base = DEVICE_PTR(device->buffers.frame_result[channel_id]);
       args.tw   = width;
       args.th   = height;
-      args.sa   = post->bloom_blend / post->bloom_mip_count;
+      args.sa   = post->bloom_blend / mip_count;
       args.sb   = 1.0f - post->bloom_blend;
 
       __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_POST_IMAGE_UPSAMPLE], &args, device->stream_main));
