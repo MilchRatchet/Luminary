@@ -48,7 +48,6 @@ struct KernelArgsSkyComputeHDRI {
   uint32_t ld_color;
   uint32_t ld_shadow;
   vec3 origin;
-  uint32_t sample_id;
   uint32_t sample_count;
 } typedef KernelArgsSkyComputeHDRI;
 

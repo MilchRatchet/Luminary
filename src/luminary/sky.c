@@ -60,9 +60,6 @@ LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, uint32_t* d
 
   __SKY_CHECK_DIRTY(mode, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_HDRI);
 
-  __SKY_CHECK_DIRTY(hdri_dim, SCENE_DIRTY_FLAG_PASSIVE);
-  __SKY_CHECK_DIRTY(hdri_samples, SCENE_DIRTY_FLAG_PASSIVE);
-
   switch (input->mode) {
     case LUMINARY_SKY_MODE_DEFAULT:
       __SKY_CHECK_DIRTY(geometry_offset.x, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
@@ -98,6 +95,9 @@ LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, uint32_t* d
       __SKY_CHECK_DIRTY(azimuth, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
       __SKY_CHECK_DIRTY(sun_strength, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
       __SKY_CHECK_DIRTY(aerial_perspective, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
+      __SKY_CHECK_DIRTY(hdri_dim, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_PASSIVE);
+      __SKY_CHECK_DIRTY(hdri_samples, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_PASSIVE);
+
       break;
     case LUMINARY_SKY_MODE_CONSTANT_COLOR:
       __SKY_CHECK_DIRTY(constant_color.r, SCENE_DIRTY_FLAG_SKY | SCENE_DIRTY_FLAG_INTEGRATION);
