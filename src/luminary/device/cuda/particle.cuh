@@ -92,7 +92,12 @@ LUMINARY_KERNEL void particle_process_tasks() {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       task_store(dst_task_base_address, bounce_task);
-      task_throughput_record_store(dst_task_base_address, record_pack(record));
+
+      DeviceTaskThroughput bounce_throughput;
+      bounce_throughput.record        = record_pack(record);
+      bounce_throughput.results_index = throughput.results_index;
+
+      task_throughput_store(dst_task_base_address, bounce_throughput);
 
       task_medium_store(dst_task_base_address, medium);
     }

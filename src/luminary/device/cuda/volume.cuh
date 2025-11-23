@@ -194,11 +194,11 @@ LUMINARY_KERNEL void volume_process_events() {
 
       record = mul_color(record, volume_integrate_transmittance_precomputed(volume, path.length));
       record = scale_color(record, 1.0f / pdf);
-    }
 
-    task_trace_handle_store(task_base_address, handle);
-    task_trace_depth_store(task_base_address, depth);
-    task_throughput_record_store(task_base_address, record_pack(record));
+      task_trace_handle_store(task_base_address, handle);
+      task_trace_depth_store(task_base_address, depth);
+      task_throughput_record_store(task_base_address, record_pack(record));
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Increment counts
@@ -278,8 +278,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     bounce_task.path_id = task.path_id;
 
     task_store(dst_task_base_address, bounce_task);
-
-    task_throughput_record_store(dst_task_base_address, throughput.record);
+    task_throughput_store(dst_task_base_address, throughput);
     task_medium_store(dst_task_base_address, medium);
   }
 
