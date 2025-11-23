@@ -29,7 +29,7 @@ LuminaryResult sky_get_default(Sky* sky) {
   sky->ozone_absorption       = true;
   sky->aerial_perspective     = false;
   sky->hdri_dim               = 2048;
-  sky->hdri_samples           = 50;
+  sky->hdri_samples           = 32;
   sky->stars_seed             = 0;
   sky->stars_count            = 10000;
   sky->stars_intensity        = 1.0f;

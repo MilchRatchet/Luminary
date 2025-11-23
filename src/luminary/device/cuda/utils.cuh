@@ -21,8 +21,10 @@
 
 #ifndef OPTIX_KERNEL
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
+#define THREAD_ID_IN_BLOCK (threadIdx.x)
 #else /* !OPTIX_KERNEL */
 #define THREAD_ID (optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
+#define THREAD_ID_IN_BLOCK (optixGetLaunchIndex().x)
 #endif /* OPTIX_KERNEL */
 
 #ifdef OPTIX_KERNEL
