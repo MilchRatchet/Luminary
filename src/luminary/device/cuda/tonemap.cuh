@@ -173,7 +173,7 @@ LUMINARY_FUNCTION RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_
 
 LUMINARY_FUNCTION RGBF
   tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const RGBF color_correction, const AGXCustomParams agx_params) {
-  if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
+  if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT || device.settings.output_variance)
     return pixel;
 
   if (device.camera.purkinje) {

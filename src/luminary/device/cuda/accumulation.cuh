@@ -108,25 +108,26 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
     const float normalization = 1.0f / sample_count;
 
-#if 1
-    const float red   = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
-    const float green = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
-    const float blue  = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
-#else
-    // TODO: Turn this into an option to visualize variance.
-    float luminance;
-    const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, luminance);
+    RGBF result;
+    if (device.settings.output_variance) {
+      float max_value;
+      const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
 
-    const float relMSE = (luminance > 0.0f) ? variance / luminance : 0.0f;
+      const float relMSE = (max_value > 0.0f) ? variance / max_value : 0.0f;
 
-    const float red   = relMSE;
-    const float green = relMSE;
-    const float blue  = relMSE;
-#endif
+      result.r = relMSE;
+      result.g = relMSE;
+      result.b = relMSE;
+    }
+    else {
+      result.r = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
+      result.g = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
+      result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
+    }
 
-    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index, red);
-    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index, green);
-    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index, blue);
+    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index, result.r);
+    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index, result.g);
+    __stcs(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index, result.b);
   }
 }
 

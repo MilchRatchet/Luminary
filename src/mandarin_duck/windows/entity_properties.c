@@ -215,6 +215,7 @@ static void _window_entity_properties_renderer_settings_action(
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
+  update_data |= _window_entity_properties_add_checkbox(data, "Show Variance", &settings.output_variance);
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 

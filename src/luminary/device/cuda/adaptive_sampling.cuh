@@ -62,10 +62,10 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count(const uint32_t x, 
   return adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
 }
 
-LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t x, const uint32_t y, const float inv_n, float& luminance) {
+LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t x, const uint32_t y, const float inv_n, float& max_value) {
   const bool pixel_in_frame = (x < device.settings.width) && (y < device.settings.height);
   if (pixel_in_frame == false) {
-    luminance = 0.0f;
+    max_value = 0.0f;
     return 0.0f;
   }
 
@@ -75,7 +75,7 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t 
   const float green1 = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * inv_n;
   const float blue1  = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * inv_n;
 
-  luminance = color_luminance(get_color(red1, green1, blue1));
+  max_value = fmaxf(red1, fmaxf(green1, blue1));
 
   const float red2   = __ldg(device.ptrs.frame_second_moment[FRAME_CHANNEL_RED] + index) * inv_n;
   const float green2 = __ldg(device.ptrs.frame_second_moment[FRAME_CHANNEL_GREEN] + index) * inv_n;
@@ -102,22 +102,22 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts() {
   const uint32_t x0 = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + (THREAD_ID_IN_WARP & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK);
   const uint32_t y0 = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + (THREAD_ID_IN_WARP >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
-  float luminance0;
-  float max_variance = adaptive_sampling_get_pixel_max_variance(x0, y0, denominator, luminance0);
+  float max_value0;
+  float max_variance = adaptive_sampling_get_pixel_max_variance(x0, y0, denominator, max_value0);
 
   const uint32_t x1 = x0;
   const uint32_t y1 = y0 + (1u << (ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG - 1));
 
-  float luminance1;
-  max_variance = fmaxf(max_variance, adaptive_sampling_get_pixel_max_variance(x1, y1, denominator, luminance1));
+  float max_value1;
+  max_variance = fmaxf(max_variance, adaptive_sampling_get_pixel_max_variance(x1, y1, denominator, max_value1));
 
-  const float luminance01 = luminance0 + luminance1;
+  const float max_value = fmaxf(max_value0, max_value1);
 
-  const float max_variance_block  = warp_reduce_max(max_variance);
-  const float sum_luminance_block = warp_reduce_sum(luminance01) * (1.0f / (1 << (ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG * 2)));
+  const float max_variance_block = warp_reduce_max(max_variance);
+  const float max_value_block    = warp_reduce_max(max_value);
 
   if (THREAD_ID_IN_WARP == 0) {
-    const float rel_variance = max_variance_block / sum_luminance_block;
+    const float rel_variance = max_variance_block / max_value_block;
 
     // TODO
   }
