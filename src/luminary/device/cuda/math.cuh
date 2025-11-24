@@ -23,9 +23,9 @@ LUMINARY_FUNCTION float difference_of_products(const float a, const float b, con
 LUMINARY_FUNCTION vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
-  result.x = difference_of_products(a.y, b.z, a.z, b.y);
-  result.y = difference_of_products(a.z, b.x, a.x, b.z);
-  result.z = difference_of_products(a.x, b.y, a.y, b.x);
+  result.x = a.y * b.z - a.z * b.y;
+  result.y = a.z * b.x - a.x * b.z;
+  result.z = a.x * b.y - a.y * b.x;
 
   return result;
 }

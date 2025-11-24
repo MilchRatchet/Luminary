@@ -83,7 +83,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
 
   const float t     = variance * inv_dist_sq;
   const float NdotL = __saturatef(dot_product(PO, ctx.normal) * sqrtf(inv_dist_sq));
-  result            = result * fmaf(NdotL, 1.0f - t, t);
+  result            = result * (NdotL * (1.0f - t) + t);
 
   return result;
 }
