@@ -96,6 +96,8 @@ struct DeviceRenderer {
   float last_time;
   bool shutdown;
 
+  bool enable_adaptive_sampling;
+
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
   DeviceRendererPerKernelTimings kernel_times[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
@@ -103,6 +105,7 @@ struct DeviceRenderer {
 
 struct DeviceRendererQueueArgs {
   uint32_t max_depth;
+  bool enable_adaptive_sampling;
   bool render_particles;
   bool render_volumes;
   bool render_clouds;

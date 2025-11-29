@@ -270,6 +270,7 @@ LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, DeviceR
 
   renderer->tile_id = 0;
   renderer->render_id++;
+  renderer->enable_adaptive_sampling = args->enable_adaptive_sampling;
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     renderer->total_render_time[event_id] = 0.0f;
@@ -362,6 +363,9 @@ static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRend
 
   // Only main device can compute adaptive sampling counts
   if (device->is_main_device == false)
+    return LUMINARY_SUCCESS;
+
+  if (renderer->enable_adaptive_sampling == false)
     return LUMINARY_SUCCESS;
 
   // We have reached the last stage, there is nothing left to do.

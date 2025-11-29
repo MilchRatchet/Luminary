@@ -54,6 +54,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t bridge_max_num_vertices;
   uint32_t undersampling;
   uint32_t supersampling;
+  bool enable_adaptive_sampling;
   bool output_variance;
   LuminaryShadingMode shading_mode;
   float region_x;

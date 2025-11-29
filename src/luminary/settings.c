@@ -6,18 +6,19 @@
 LuminaryResult settings_get_default(RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(settings);
 
-  settings->width                   = 2560;
-  settings->height                  = 1440;
-  settings->max_ray_depth           = 4;
-  settings->bridge_max_num_vertices = 15;
-  settings->undersampling           = 2;
-  settings->supersampling           = 1;
-  settings->output_variance         = false;
-  settings->shading_mode            = LUMINARY_SHADING_MODE_DEFAULT;
-  settings->region_x                = 0.0f;
-  settings->region_y                = 0.0f;
-  settings->region_width            = 1.0f;
-  settings->region_height           = 1.0f;
+  settings->width                    = 2560;
+  settings->height                   = 1440;
+  settings->max_ray_depth            = 4;
+  settings->bridge_max_num_vertices  = 15;
+  settings->undersampling            = 2;
+  settings->supersampling            = 1;
+  settings->enable_adaptive_sampling = false;
+  settings->output_variance          = false;
+  settings->shading_mode             = LUMINARY_SHADING_MODE_DEFAULT;
+  settings->region_x                 = 0.0f;
+  settings->region_y                 = 0.0f;
+  settings->region_width             = 1.0f;
+  settings->region_height            = 1.0f;
 
   return LUMINARY_SUCCESS;
 }
@@ -45,7 +46,11 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
   __SETTINGS_CHECK_DIRTY(bridge_max_num_vertices, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(undersampling, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(shading_mode, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __SETTINGS_CHECK_DIRTY(output_variance, SCENE_DIRTY_FLAG_OUTPUT);
+  __SETTINGS_CHECK_DIRTY(enable_adaptive_sampling, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS | SCENE_DIRTY_FLAG_OUTPUT);
+
+  if (input->enable_adaptive_sampling) {
+    __SETTINGS_CHECK_DIRTY(output_variance, SCENE_DIRTY_FLAG_OUTPUT);
+  }
 
   if (input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
     __SETTINGS_CHECK_DIRTY(max_ray_depth, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
