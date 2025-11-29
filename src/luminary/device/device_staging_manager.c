@@ -24,7 +24,7 @@ LuminaryResult device_staging_manager_create(DeviceStagingManager** staging_mana
 
   (*staging_manager)->device = device;
 
-  __FAILURE_HANDLE(device_malloc_staging(&(*staging_manager)->buffer, STAGING_BUFFER_SIZE, true));
+  __FAILURE_HANDLE(device_malloc_staging(&(*staging_manager)->buffer, STAGING_BUFFER_SIZE, DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
   (*staging_manager)->buffer_write_offset = 0;
   (*staging_manager)->buffer_size_in_use  = 0;
 

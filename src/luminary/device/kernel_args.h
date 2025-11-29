@@ -194,4 +194,12 @@ struct KernelArgsMipmapGenerateLevel2DRGBAF {
   uint16_t height;
 } typedef KernelArgsMipmapGenerateLevel2DRGBAF;
 
+struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
+  uint32_t current_stage_id;
+} typedef KernelArgsAdaptiveSamplingComputeStageSampleCounts;
+
+struct KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts {
+  uint32_t stage_id;
+} typedef KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts;
+
 #endif /* LUMINARY_KERNEL_ARGS_H */

@@ -1,7 +1,7 @@
 #ifndef CU_UTILS_H
 #define CU_UTILS_H
 
-#include <cuda_fp16.h>
+#include <cuda_runtime.h>
 
 #include "../device_utils.h"
 #include "../kernel_args.h"
@@ -12,10 +12,6 @@
 #endif /* LUMINARY_MIN_BLOCKS_PER_SM */
 
 #define NUM_THREADS (THREADS_PER_BLOCK * device.config.num_blocks)
-
-#define WARP_SIZE_LOG 5
-#define WARP_SIZE (1 << WARP_SIZE_LOG)
-#define WARP_SIZE_MASK (WARP_SIZE - 1)
 
 #define NUM_WARPS (NUM_THREADS >> WARP_SIZE_LOG)
 

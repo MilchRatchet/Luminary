@@ -142,6 +142,10 @@ static LuminaryResult _device_manager_handle_device_render_continue(DeviceManage
   if (callback_is_valid == false)
     return LUMINARY_SUCCESS;
 
+  if (data->adaptive_sampling_build_stage_id != ADAPTIVE_SAMPLING_STAGE_INVALID)
+    __FAILURE_HANDLE(
+      device_build_adaptive_sampling_stage(device, device_manager->adaptive_sampler, data->adaptive_sampling_build_stage_id));
+
   __FAILURE_HANDLE(device_finish_render_iteration(device, device_manager->adaptive_sampler, data));
   __FAILURE_HANDLE(device_handle_result_sharing(device, device_manager->result_interface));
   __FAILURE_HANDLE(device_continue_render(device));
@@ -1089,12 +1093,14 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(queue_worker_destroy(&(*device_manager)->queue_worker_main));
 
   const uint32_t main_device_index = (*device_manager)->main_device_index;
-  __FAILURE_HANDLE(device_unload_light_tree((*device_manager)->devices[main_device_index], (*device_manager)->light_tree));
 
+  __FAILURE_HANDLE(device_unload_light_tree((*device_manager)->devices[main_device_index], (*device_manager)->light_tree));
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
 
-  __FAILURE_HANDLE(device_result_interface_destroy(&(*device_manager)->result_interface));
+  __FAILURE_HANDLE(device_unload_adaptive_sampling((*device_manager)->devices[main_device_index], (*device_manager)->adaptive_sampler));
   __FAILURE_HANDLE(device_adaptive_sampler_destroy(&(*device_manager)->adaptive_sampler));
+
+  __FAILURE_HANDLE(device_result_interface_destroy(&(*device_manager)->result_interface));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));

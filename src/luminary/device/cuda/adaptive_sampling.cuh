@@ -88,8 +88,9 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t 
   return fmaxf(variance_red, fmaxf(variance_green, variance_blue));
 }
 
-LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts() {
-  const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelArgsAdaptiveSamplingComputeStageSampleCounts args) {
+  const uint32_t adaptive_sampling_width =
+    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
   const uint32_t adaptive_sampling_block = WARP_ID;
 
@@ -117,10 +118,44 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts() {
   const float max_value_block    = warp_reduce_max(max_value);
 
   if (THREAD_ID_IN_WARP == 0) {
-    const float rel_variance = max_variance_block / max_value_block;
+    const float rel_variance = (max_value_block > 0.0f) ? max_variance_block / max_value_block : 0.0f;
 
-    // TODO
+    uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+
+    // Zero out all the bits not currently occupied by valid data.
+    adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
+
+    uint32_t new_sample_count = floorf(rel_variance * 16.0f) * (1.0f / 32.0f);
+
+    new_sample_count = max(new_sample_count, 1);
+    new_sample_count = min(new_sample_count, 128);
+
+    adaptive_sampling_counts |= new_sample_count << (args.current_stage_id * 8);
+
+    device.ptrs.stage_sample_counts[adaptive_sampling_block] = adaptive_sampling_counts;
   }
+}
+
+LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts args) {
+  const uint32_t adaptive_sampling_width =
+    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_height =
+    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+  const uint32_t adaptive_sampling_amount = adaptive_sampling_width * adaptive_sampling_height;
+
+  const uint32_t adaptive_sampling_block = THREAD_ID;
+
+  uint32_t tasks_per_pixel = 0;
+  if (adaptive_sampling_block < adaptive_sampling_amount) {
+    tasks_per_pixel = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+  }
+
+  tasks_per_pixel *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+
+  const uint32_t total_tasks_warp = warp_reduce_sum(tasks_per_pixel);
+
+  atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id], total_tasks_warp);
 }
 
 #endif /* CU_LUMINARY_ADAPTIVE_SAMPLING_H */

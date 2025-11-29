@@ -34,10 +34,20 @@ LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, siz
 LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char* func, uint32_t line);
 LuminaryResult device_memory_get_total_allocation_size(CUdevice device, size_t* size);
 
-#define device_malloc_staging(ptr, size, upload_only) _device_malloc_staging((void**) ptr, size, upload_only)
+enum DeviceMemoryStagingFlag {
+  DEVICE_MEMORY_STAGING_FLAG_NONE = 0,
+  // Memory supports fast transfer over PCIE but is slow for usage on the host.
+  DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY = 1u << 0,
+  // Memory is accessible by all devices.
+  DEVICE_MEMORY_STAGING_FLAG_SHARED = 1u << 1
+} typedef DeviceMemoryStagingFlag;
+
+typedef uint32_t DeviceMemoryStagingFlags;
+
+#define device_malloc_staging(ptr, size, flags) _device_malloc_staging((void**) ptr, size, flags)
 #define device_free_staging(ptr) _device_free_staging((void**) ptr)
 
-LuminaryResult _device_malloc_staging(STAGING void** ptr, size_t size, bool upload_only);
+LuminaryResult _device_malloc_staging(STAGING void** ptr, size_t size, DeviceMemoryStagingFlags flags);
 LuminaryResult _device_free_staging(STAGING void** ptr);
 
 #endif /* LUMINARY_DEVICE_MEMORY_H */

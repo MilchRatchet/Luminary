@@ -101,7 +101,8 @@ LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutput
         __FAILURE_HANDLE_CRITICAL(device_free_staging(&output->buffers[buffer_id]));
       }
 
-      __FAILURE_HANDLE_CRITICAL(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
+      __FAILURE_HANDLE_CRITICAL(
+        device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), DEVICE_MEMORY_STAGING_FLAG_NONE));
 
       __FAILURE_HANDLE_CRITICAL(
         vault_object_set(output->buffer_objects[buffer_id], output->buffer_allocation_count, output->buffers[buffer_id]));
@@ -138,7 +139,8 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
   DeviceOutputRequest output_request;
 
   output_request.queued = false;
-  __FAILURE_HANDLE(device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, false));
+  __FAILURE_HANDLE(
+    device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, DEVICE_MEMORY_STAGING_FLAG_NONE));
   __FAILURE_HANDLE(vault_object_create(&output_request.buffer_object));
   output_request.props = props;
 

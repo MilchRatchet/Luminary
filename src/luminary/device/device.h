@@ -175,6 +175,8 @@ LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamer
 LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_setup_undersampling(Device* device, const RendererSettings* settings);
 LuminaryResult device_setup_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler);
+LuminaryResult device_build_adaptive_sampling_stage(Device* device, DeviceAdaptiveSampler* sampler, uint8_t stage_id);
+LuminaryResult device_unload_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler);
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_set_output_dirty(Device* device);
 LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties);

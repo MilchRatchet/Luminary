@@ -32,8 +32,12 @@ static LuminaryResult _device_result_interface_entry_allocate(DeviceResultInterf
   const uint32_t pixel_count = interface->pixel_count;
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
-    __FAILURE_HANDLE(device_malloc_staging(&entry->frame_first_moment[channel_id], pixel_count * sizeof(float), true));
-    __FAILURE_HANDLE(device_malloc_staging(&entry->frame_second_moment[channel_id], pixel_count * sizeof(float), true));
+    __FAILURE_HANDLE(device_malloc_staging(
+      &entry->frame_first_moment[channel_id], pixel_count * sizeof(float),
+      DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
+    __FAILURE_HANDLE(device_malloc_staging(
+      &entry->frame_second_moment[channel_id], pixel_count * sizeof(float),
+      DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
   }
 
   CUDA_FAILURE_HANDLE(cuEventCreate(&entry->available_event, CU_EVENT_DISABLE_TIMING));

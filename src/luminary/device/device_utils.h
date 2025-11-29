@@ -7,6 +7,10 @@
 #define LUMINARY_MAX_NUM_DEVICES 4
 #define THREADS_PER_BLOCK 128
 
+#define WARP_SIZE_LOG 5
+#define WARP_SIZE (1 << WARP_SIZE_LOG)
+#define WARP_SIZE_MASK (WARP_SIZE - 1)
+
 // #define OPTIX_VALIDATION
 #define NO_LUMINARY_BVH
 
@@ -26,6 +30,7 @@
 
 #define ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG 3
 #define ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK ((1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)
+#define ADAPTIVE_SAMPLING_STAGE_INVALID 0xFF
 
 #define PATH_ID_SENSOR_BITS 14
 #define PATH_ID_SAMPLE_BITS 20
@@ -326,7 +331,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 struct DeviceSampleAllocation {
   uint32_t stage_sample_offsets[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   uint32_t global_sample_id;
-  uint32_t upper_bound_paths_per_sample;
+  uint32_t upper_bound_tasks_per_sample;
   uint8_t stage_id;
   uint8_t num_samples;
 } typedef DeviceSampleAllocation;
@@ -479,6 +484,7 @@ struct DevicePointers {
   DEVICE float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
   DEVICE float* LUM_RESTRICT frame_swap;
   DEVICE uint32_t* LUM_RESTRICT stage_sample_counts;
+  DEVICE uint32_t* LUM_RESTRICT stage_total_task_counts;
   DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
   DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;

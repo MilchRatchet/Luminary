@@ -113,7 +113,9 @@ LUMINARY_KERNEL void accumulation_generate_result() {
       float max_value;
       const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
 
-      const float relMSE = (max_value > 0.0f) ? variance / max_value : 0.0f;
+      float relMSE = (max_value > 0.0f) ? variance / max_value : 0.0f;
+
+      relMSE = floorf(relMSE * 16.0f) / 32.0f;
 
       result.r = relMSE;
       result.g = relMSE;

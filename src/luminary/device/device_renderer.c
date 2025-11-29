@@ -356,6 +356,26 @@ static LuminaryResult _device_renderer_queue_optix_kernel(
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRenderer* renderer, Device* device, DeviceRendererWork* work) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(device);
+
+  // Only main device can compute adaptive sampling counts
+  if (device->is_main_device == false)
+    return LUMINARY_SUCCESS;
+
+  // We have reached the last stage, there is nothing left to do.
+  if (renderer->sample_allocation.stage_id >= ADAPTIVE_SAMPLER_NUM_STAGES)
+    return LUMINARY_SUCCESS;
+
+  if (renderer->executed_aggregate_sample_counts[renderer->sample_allocation.stage_id] < 64)
+    return LUMINARY_SUCCESS;
+
+  work->shared_callback_data->adaptive_sampling_build_stage_id = renderer->sample_allocation.stage_id + 1;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_renderer_handle_queue_action(
   DeviceRenderer* renderer, Device* device, DeviceRendererWork* work, const DeviceRendererQueueAction* action) {
   __CHECK_NULL_ARGUMENT(renderer);
@@ -485,9 +505,10 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   // Same callback data is used for continue and finished callbacks
   DeviceRenderCallbackData* shared_callback_data = renderer->callback_data + event_id;
 
-  shared_callback_data->common          = renderer->common_callback_data;
-  shared_callback_data->render_id       = renderer->render_id;
-  shared_callback_data->render_event_id = renderer->event_id;
+  shared_callback_data->common                           = renderer->common_callback_data;
+  shared_callback_data->render_id                        = renderer->render_id;
+  shared_callback_data->render_event_id                  = renderer->event_id;
+  shared_callback_data->adaptive_sampling_build_stage_id = ADAPTIVE_SAMPLING_STAGE_INVALID;
 
   const uint32_t undersampling_stage = (device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
@@ -510,6 +531,8 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   work.launch_id                = 0;
   work.allow_gbuffer_meta_query = allow_gbuffer_meta_query;
   work.shared_callback_data     = shared_callback_data;
+
+  __FAILURE_HANDLE(_device_renderer_queue_adaptive_sampling_update(renderer, device, &work));
 
   ////////////////////////////////////////////////////////////////////
   // Execute
@@ -712,7 +735,7 @@ LuminaryResult device_renderer_get_tile_count(
     upper_bounds_total_tasks = internal_pixels_this_sample;
   }
   else {
-    upper_bounds_total_tasks = renderer->sample_allocation.upper_bound_paths_per_sample;
+    upper_bounds_total_tasks = renderer->sample_allocation.upper_bound_tasks_per_sample;
   }
 
   uint32_t allocated_tasks;

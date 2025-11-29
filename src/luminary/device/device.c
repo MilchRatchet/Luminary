@@ -663,8 +663,10 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     __DEVICE_BUFFER_ALLOCATE(frame_output[channel_id], sizeof(float) * external_pixel_count);
   }
 
-  __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count, false));
-  memset(device->gbuffer_meta_dst, 0, sizeof(GBufferMetaData) * gbuffer_meta_pixel_count);
+  const size_t gbuffer_size = sizeof(GBufferMetaData) * gbuffer_meta_pixel_count;
+
+  __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, gbuffer_size, DEVICE_MEMORY_STAGING_FLAG_NONE));
+  memset(device->gbuffer_meta_dst, 0, gbuffer_size);
 
   DEVICE_UPDATE_CONSTANT_MEMORY(config.num_tasks_per_thread, tasks_per_thread);
 
@@ -683,6 +685,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(task_offsets);
   __DEVICE_BUFFER_FREE(gbuffer_meta);
   __DEVICE_BUFFER_FREE(stage_sample_counts);
+  __DEVICE_BUFFER_FREE(stage_total_task_counts);
   __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(spectral_cdf);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
@@ -784,7 +787,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Constant memory initialization
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(device_malloc_staging(&device->constant_memory, sizeof(DeviceConstantMemory), true));
+  __FAILURE_HANDLE(
+    device_malloc_staging(&device->constant_memory, sizeof(DeviceConstantMemory), DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
   memset(device->constant_memory, 0, sizeof(DeviceConstantMemory));
 
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
@@ -826,7 +830,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   ////////////////////////////////////////////////////////////////////
 
   __DEVICE_BUFFER_ALLOCATE(abort_flag, sizeof(uint32_t));
-  __FAILURE_HANDLE(device_malloc_staging(&device->abort_flags, sizeof(uint32_t), true));
+  __FAILURE_HANDLE(device_malloc_staging(&device->abort_flags, sizeof(uint32_t), DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
 
   *device->abort_flags = 0;
   __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
@@ -1032,8 +1036,8 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAlloc
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.global_sample_id),
     sample_allocation.global_sample_id, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(cuMemsetD32Async(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.upper_bound_paths_per_sample),
-    sample_allocation.upper_bound_paths_per_sample, 1, device->stream_main));
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.upper_bound_tasks_per_sample),
+    sample_allocation.upper_bound_tasks_per_sample, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.stage_id), sample_allocation.stage_id, 1,
     device->stream_main));
@@ -1640,8 +1644,43 @@ LuminaryResult device_setup_adaptive_sampling(Device* device, DeviceAdaptiveSamp
   __FAILURE_HANDLE(device_adaptive_sampler_get_buffer_sizes(sampler, &buffer_sizes));
 
   __DEVICE_BUFFER_ALLOCATE(stage_sample_counts, buffer_sizes.stage_sample_counts_size);
+  __DEVICE_BUFFER_ALLOCATE(stage_total_task_counts, buffer_sizes.stage_total_task_counts_size);
 
   // We don't need to zero the buffer because an allocations offsets will all be zero until we populate this buffer with proper data.
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_build_adaptive_sampling_stage(Device* device, DeviceAdaptiveSampler* sampler, uint8_t stage_id) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sampler);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __DEBUG_ASSERT(device->is_main_device);
+
+  __FAILURE_HANDLE(device_adaptive_sampler_compute_next_stage(sampler, device, stage_id));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_unload_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sampler);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __DEBUG_ASSERT(device->is_main_device);
+
+  __FAILURE_HANDLE(device_adaptive_sampler_unload(sampler));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
