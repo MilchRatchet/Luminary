@@ -146,16 +146,109 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const Ker
 
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
-  uint32_t tasks_per_pixel = 0;
+  uint32_t tasks_per_block = 0;
   if (adaptive_sampling_block < adaptive_sampling_amount) {
-    tasks_per_pixel = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+    const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+
+    uint32_t tasks_per_block = (stage_sample_counts >> ((args.stage_id - 1) * 8)) & 0xFF;
+
+    tasks_per_block *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
   }
 
-  tasks_per_pixel *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  const uint32_t total_tasks_warp = warp_reduce_sum(tasks_per_block);
 
-  const uint32_t total_tasks_warp = warp_reduce_sum(tasks_per_pixel);
+  if (THREAD_ID_IN_WARP == 0 && total_tasks_warp > 0) {
+    atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id], total_tasks_warp);
+  }
+}
 
-  atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id], total_tasks_warp);
+LUMINARY_KERNEL void adaptive_sampling_compute_tasks_per_block(const KernelArgsAdaptiveSamplingComputeTasksPerBlock args) {
+  const uint32_t adaptive_sampling_width =
+    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_height =
+    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+  const uint32_t adaptive_sampling_amount = adaptive_sampling_width * adaptive_sampling_height;
+
+  const uint32_t adaptive_sampling_block = THREAD_ID;
+
+  if (adaptive_sampling_block >= adaptive_sampling_amount)
+    return;
+
+  const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+
+  uint32_t tasks_per_block = (stage_sample_counts >> ((args.stage_id - 1) * 8)) & 0xFF;
+
+  tasks_per_block *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+
+  args.dst[adaptive_sampling_block] = tasks_per_block;
+}
+
+LUMINARY_KERNEL void adaptive_sampling_compute_block_sum(const KernelArgsAdaptiveSamplingComputeBlockSum args) {
+  uint32_t thread_value = 0;
+  if (THREAD_ID < args.thread_count)
+    thread_value = args.thread_prefix_sum[THREAD_ID];
+
+  const uint32_t warp_value = warp_reduce_sum(thread_value);
+
+  if (THREAD_ID_IN_WARP == 0 && (WARP_ID < args.warp_count))
+    args.warp_prefix_sum[WARP_ID] = warp_value;
+}
+
+LUMINARY_KERNEL void adaptive_sampling_compute_prefix_sum(const KernelArgsAdaptiveSamplingComputePrefixSum args) {
+  uint32_t thread_value = 0;
+  if (THREAD_ID < args.thread_count)
+    thread_value = args.thread_prefix_sum[THREAD_ID];
+
+  uint32_t thread_prefix_sum = warp_reduce_prefixsum(thread_value);
+
+  uint32_t warp_prefix_sum = 0;
+  if (WARP_ID < args.warp_count)
+    warp_prefix_sum = args.warp_prefix_sum[WARP_ID];
+
+  thread_prefix_sum += warp_prefix_sum;
+
+  if (THREAD_ID < args.thread_count)
+    args.thread_prefix_sum[THREAD_ID] = thread_prefix_sum;
+}
+
+LUMINARY_KERNEL void adaptive_sampling_compute_tile_block_ranges(const KernelArgsAdaptiveSamplingComputeTileBlockRanges args) {
+  const uint32_t tile_id = WARP_ID;
+
+  if (tile_id >= args.tile_count)
+    return;
+
+  const uint32_t subtile_id = THREAD_ID_IN_WARP;
+
+  const uint32_t tasks_per_subtile = (args.tasks_per_tile + WARP_SIZE - 1) >> WARP_SIZE_LOG;
+
+  uint32_t last_task_id;
+  if (subtile_id < WARP_SIZE - 1) {
+    last_task_id = tile_id * args.tasks_per_tile + tasks_per_subtile * (subtile_id + 1);
+  }
+  else {
+    last_task_id = (tile_id + 1) * args.tasks_per_tile;
+  }
+
+  uint32_t left  = 0;
+  uint32_t right = args.block_count - 1;
+
+  while (left < right) {
+    const uint32_t mid = (left + right) >> 1;
+
+    const uint32_t block_offset = args.block_prefix_sum[mid];
+
+    if (last_task_id < block_offset) {
+      right = mid;
+    }
+    else {
+      left = mid;
+    }
+  }
+
+  const uint32_t tile_end_block = left;
+
+  args.dst[THREAD_ID] = tile_end_block;
 }
 
 #endif /* CU_LUMINARY_ADAPTIVE_SAMPLING_H */

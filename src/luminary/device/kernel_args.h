@@ -199,7 +199,35 @@ struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
 } typedef KernelArgsAdaptiveSamplingComputeStageSampleCounts;
 
 struct KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts {
-  uint32_t stage_id;
+  uint8_t stage_id;
+  uint32_t* dst_block_task_count;
 } typedef KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts;
+
+struct KernelArgsAdaptiveSamplingComputeTasksPerBlock {
+  uint8_t stage_id;
+  uint32_t* dst;
+} typedef KernelArgsAdaptiveSamplingComputeTasksPerBlock;
+
+struct KernelArgsAdaptiveSamplingComputeBlockSum {
+  uint32_t* thread_prefix_sum;
+  uint32_t* warp_prefix_sum;
+  uint32_t thread_count;
+  uint32_t warp_count;
+} typedef KernelArgsAdaptiveSamplingComputeBlockSum;
+
+struct KernelArgsAdaptiveSamplingComputePrefixSum {
+  uint32_t* thread_prefix_sum;
+  uint32_t* warp_prefix_sum;
+  uint32_t thread_count;
+  uint32_t warp_count;
+} typedef KernelArgsAdaptiveSamplingComputePrefixSum;
+
+struct KernelArgsAdaptiveSamplingComputeTileBlockRanges {
+  uint32_t* block_prefix_sum;
+  uint32_t* dst;
+  uint32_t block_count;
+  uint32_t tasks_per_tile;
+  uint32_t tile_count;
+} typedef KernelArgsAdaptiveSamplingComputeTileBlockRanges;
 
 #endif /* LUMINARY_KERNEL_ARGS_H */

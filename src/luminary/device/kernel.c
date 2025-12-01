@@ -72,6 +72,14 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_TOTAL_TASK_COUNTS] =
     {.name       = "adaptive_sampling_compute_stage_total_task_counts",
      .param_size = sizeof(KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TASKS_PER_BLOCK] =
+    {.name = "adaptive_sampling_compute_tasks_per_block", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeTasksPerBlock)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_BLOCK_SUM] =
+    {.name = "adaptive_sampling_compute_block_sum", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeBlockSum)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_PREFIX_SUM] =
+    {.name = "adaptive_sampling_compute_prefix_sum", .param_size = sizeof(KernelArgsAdaptiveSamplingComputePrefixSum)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TILE_BLOCK_RANGES] =
+    {.name = "adaptive_sampling_compute_tile_block_ranges", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeTileBlockRanges)},
 };
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 

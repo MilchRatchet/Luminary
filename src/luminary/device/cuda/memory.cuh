@@ -69,6 +69,11 @@ LUMINARY_FUNCTION T warp_reduce_prefixsum(T value) {
   return value;
 }
 
+template <typename T>
+LUMINARY_FUNCTION T warp_reduce_broadcast(const T value, const uint32_t src_thread_id_in_warp) {
+  return __shfl_sync(0xFFFFFFFF, value, src_thread_id_in_warp);
+}
+
 ////////////////////////////////////////////////////////////////////
 // Generic Scene Data IO
 ////////////////////////////////////////////////////////////////////

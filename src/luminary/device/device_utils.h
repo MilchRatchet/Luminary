@@ -485,6 +485,8 @@ struct DevicePointers {
   DEVICE float* LUM_RESTRICT frame_swap;
   DEVICE uint32_t* LUM_RESTRICT stage_sample_counts;
   DEVICE uint32_t* LUM_RESTRICT stage_total_task_counts;
+  DEVICE uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
+  DEVICE uint32_t* LUM_RESTRICT tile_last_adaptive_sampling_block_index;
   DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
   DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;

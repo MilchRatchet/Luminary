@@ -127,6 +127,7 @@ struct Device {
   GBufferMetaState gbuffer_meta_state;
   DeviceCloudNoise* cloud_noise;
   DeviceParticlesHandle* particles_handle;
+  DeviceAdaptiveSampler* adaptive_sampler;
 } typedef Device;
 
 struct DeviceRegisterCallbackFuncs {
@@ -174,9 +175,10 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
 LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamera* physical_camera);
 LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_setup_undersampling(Device* device, const RendererSettings* settings);
-LuminaryResult device_setup_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler);
-LuminaryResult device_build_adaptive_sampling_stage(Device* device, DeviceAdaptiveSampler* sampler, uint8_t stage_id);
-LuminaryResult device_unload_adaptive_sampling(Device* device, DeviceAdaptiveSampler* sampler);
+LuminaryResult device_build_adaptive_sampling_stage(Device* device, AdaptiveSampler* sampler, uint8_t stage_id);
+LuminaryResult device_update_adaptive_sampling(Device* device, AdaptiveSampler* sampler);
+LuminaryResult device_ensure_adaptive_sampling_stage(Device* device);
+LuminaryResult device_unload_adaptive_sampling(Device* device, AdaptiveSampler* sampler);
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_set_output_dirty(Device* device);
 LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties);
@@ -184,7 +186,7 @@ LuminaryResult device_update_output_camera_params(Device* device, const Camera* 
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
 LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid);
-LuminaryResult device_finish_render_iteration(Device* device, DeviceAdaptiveSampler* sampler, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_finish_render_iteration(Device* device, AdaptiveSampler* sampler, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);

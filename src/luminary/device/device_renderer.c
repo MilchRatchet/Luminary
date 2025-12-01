@@ -410,6 +410,10 @@ static LuminaryResult _device_renderer_handle_queue_action(
         cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, work->shared_callback_data));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE:
+      if (renderer->enable_adaptive_sampling) {
+        __FAILURE_HANDLE(device_ensure_adaptive_sampling_stage(device));
+      }
+
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
@@ -644,11 +648,11 @@ LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_allocate_sample(DeviceRenderer* renderer, DeviceAdaptiveSampler* sampler) {
+LuminaryResult device_renderer_allocate_sample(DeviceRenderer* renderer, AdaptiveSampler* sampler) {
   __CHECK_NULL_ARGUMENT(renderer);
 
   if (renderer->sample_allocation.num_samples == 0)
-    __FAILURE_HANDLE(device_adaptive_sampler_allocate_sample(sampler, &renderer->sample_allocation, 1));
+    __FAILURE_HANDLE(adaptive_sampler_allocate_sample(sampler, &renderer->sample_allocation, 1));
 
   return LUMINARY_SUCCESS;
 }

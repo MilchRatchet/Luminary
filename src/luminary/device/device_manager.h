@@ -34,7 +34,7 @@ struct DeviceManager {
   PhysicalCamera* physical_camera;
   SampleTime* sample_time;
   DeviceResultInterface* result_interface;
-  DeviceAdaptiveSampler* adaptive_sampler;
+  AdaptiveSampler* adaptive_sampler;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host, DeviceManagerCreateInfo info);
