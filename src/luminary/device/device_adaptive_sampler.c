@@ -201,7 +201,7 @@ static uint32_t _device_adaptive_sampler_compute_prefix_mip_count(const uint32_t
   uint32_t count = width * height;
 
   if (count == 0)
-    return 0;
+    return 1;
 
   uint32_t i = 0;
 
@@ -210,7 +210,7 @@ static uint32_t _device_adaptive_sampler_compute_prefix_mip_count(const uint32_t
     count = count >> WARP_SIZE_LOG;
   }
 
-  return i;
+  return i + 1;
 }
 
 static LuminaryResult _device_adaptive_sampler_reset(DeviceAdaptiveSampler* sampler) {

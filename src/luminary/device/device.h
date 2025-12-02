@@ -17,6 +17,7 @@
 #include "device_sky.h"
 #include "device_staging_manager.h"
 #include "device_utils.h"
+#include "device_work_buffers.h"
 #include "kernel.h"
 #include "optix_bvh.h"
 #include "optix_kernel.h"
@@ -121,6 +122,7 @@ struct Device {
   DeviceSkyHDRI* sky_hdri;
   DeviceSkyStars* sky_stars;
   DeviceBSDFLUT* bsdf_lut;
+  DeviceWorkBuffers* work_buffers;
   DevicePost* post;
   DeviceRenderer* renderer;
   DeviceOutput* output;

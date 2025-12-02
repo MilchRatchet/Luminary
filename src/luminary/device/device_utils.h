@@ -471,6 +471,7 @@ enum FrameChannel {
 } typedef FrameChannel;
 
 struct DevicePointers {
+  // DeviceWorkBuffers
   DEVICE DeviceTaskState* LUM_RESTRICT task_states;
   DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
   DEVICE DeviceTaskResult* LUM_RESTRICT task_results;
@@ -483,11 +484,12 @@ struct DevicePointers {
   DEVICE float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
   DEVICE float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
   DEVICE float* LUM_RESTRICT frame_swap;
+  DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
+  // DeviceAdaptiveSampler
   DEVICE uint32_t* LUM_RESTRICT stage_sample_counts;
   DEVICE uint32_t* LUM_RESTRICT stage_total_task_counts;
   DEVICE uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
   DEVICE uint32_t* LUM_RESTRICT tile_last_adaptive_sampling_block_index;
-  DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
   DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
   DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
