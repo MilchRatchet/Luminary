@@ -707,7 +707,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
   __DEVICE_BUFFER_FREE(camera_interfaces);
   __DEVICE_BUFFER_FREE(camera_media);
-  __DEVICE_BUFFER_FREE(abort_flag);
 
   return LUMINARY_SUCCESS;
 }
@@ -810,6 +809,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_renderer_create(&device->renderer));
   __FAILURE_HANDLE(device_output_create(&device->output));
   __FAILURE_HANDLE(device_post_create(&device->post));
+  __FAILURE_HANDLE(device_abort_create(&device->abort));
 
   ////////////////////////////////////////////////////////////////////
   // Initialize scene entity LUT objects
@@ -827,11 +827,12 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Initialize abort flag
   ////////////////////////////////////////////////////////////////////
 
-  __DEVICE_BUFFER_ALLOCATE(abort_flag, sizeof(uint32_t));
-  __FAILURE_HANDLE(device_malloc_staging(&device->abort_flags, sizeof(uint32_t), DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
+  DeviceAbortDeviceBufferPtrs abort_buffer_ptrs;
+  __FAILURE_HANDLE(device_abort_get_ptrs(device->abort, &abort_buffer_ptrs));
 
-  *device->abort_flags = 0;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
+  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.abort_flag, (void*) abort_buffer_ptrs.abort_flag);
+
+  __FAILURE_HANDLE(device_abort_set(device->abort, device, false));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1938,8 +1939,7 @@ LuminaryResult device_set_abort(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  *device->abort_flags = 0xFFFFFFFF;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_abort));
+  __FAILURE_HANDLE(device_abort_set(device->abort, device, true));
 
   // We have to wait for the upload to finish, otherwise it is in theory possible that the unset abort upload happens before the set abort
   // upload.
@@ -1963,8 +1963,7 @@ LuminaryResult device_unset_abort(Device* device) {
   if (device->is_main_device)
     CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
-  *device->abort_flags = 0;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
+  __FAILURE_HANDLE(device_abort_set(device->abort, device, false));
 
   device->state_abort = false;
 
@@ -2062,6 +2061,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
   __FAILURE_HANDLE(array_destroy(&(*device)->omms));
 
+  __FAILURE_HANDLE(device_abort_destroy(&(*device)->abort));
   __FAILURE_HANDLE(device_output_destroy(&(*device)->output));
   __FAILURE_HANDLE(device_renderer_destroy(&(*device)->renderer));
   __FAILURE_HANDLE(device_work_buffers_destroy(&(*device)->work_buffers));
@@ -2098,7 +2098,6 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
-  __FAILURE_HANDLE(device_free_staging(&(*device)->abort_flags));
 
   if ((*device)->gbuffer_meta_dst != (GBufferMetaData*) 0) {
     __FAILURE_HANDLE(device_free_staging(&(*device)->gbuffer_meta_dst));

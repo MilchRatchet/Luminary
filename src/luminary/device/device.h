@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include "device_abort.h"
 #include "device_adaptive_sampler.h"
 #include "device_bsdf.h"
 #include "device_cloud.h"
@@ -102,7 +103,6 @@ struct Device {
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
-  STAGING uint32_t* abort_flags;
   STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
@@ -126,6 +126,7 @@ struct Device {
   DevicePost* post;
   DeviceRenderer* renderer;
   DeviceOutput* output;
+  DeviceAbort* abort;
   GBufferMetaState gbuffer_meta_state;
   DeviceCloudNoise* cloud_noise;
   DeviceParticlesHandle* particles_handle;

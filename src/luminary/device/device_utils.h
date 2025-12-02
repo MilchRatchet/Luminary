@@ -508,6 +508,7 @@ struct DevicePointers {
   DEVICE const float* LUM_RESTRICT spectral_cdf;
   DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
   DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
+  // DeviceAbort
   DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
