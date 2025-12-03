@@ -1941,10 +1941,6 @@ LuminaryResult device_set_abort(Device* device) {
 
   __FAILURE_HANDLE(device_abort_set(device->abort, device, true));
 
-  // We have to wait for the upload to finish, otherwise it is in theory possible that the unset abort upload happens before the set abort
-  // upload.
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_abort));
-
   device->state_abort = true;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1958,10 +1954,6 @@ LuminaryResult device_unset_abort(Device* device) {
   DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
-  // Only main device needs to actually have finished aborting.
-  if (device->is_main_device)
-    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
   __FAILURE_HANDLE(device_abort_set(device->abort, device, false));
 
