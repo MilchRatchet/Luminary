@@ -1441,14 +1441,15 @@ LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  bool hdri_has_changed = false;
-  __FAILURE_HANDLE(device_sky_hdri_update(device->sky_hdri, device, sky_hdri, &hdri_has_changed));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_sky_hdri_update(device->sky_hdri, device, sky_hdri, &buffers_have_changed));
 
-  if (hdri_has_changed) {
-    __FAILURE_HANDLE(device_struct_texture_object_convert(device->sky_hdri->color_tex, &device->constant_memory->sky_hdri_color_tex));
-    __FAILURE_HANDLE(device_struct_texture_object_convert(device->sky_hdri->shadow_tex, &device->constant_memory->sky_hdri_shadow_tex));
+  if (buffers_have_changed) {
+    DeviceSkyHDRIPtrs ptrs;
+    __FAILURE_HANDLE(device_sky_hdri_get_ptrs(device->sky_hdri, &ptrs));
 
-    __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX));
+    DEVICE_UPDATE_CONSTANT_MEMORY(sky_hdri_color_tex, ptrs.color_tex_obj);
+    DEVICE_UPDATE_CONSTANT_MEMORY(sky_hdri_shadow_tex, ptrs.shadow_tex_obj);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1464,12 +1465,15 @@ LuminaryResult device_update_sky_stars(Device* device, const SkyStars* sky_stars
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  bool stars_has_changed = false;
-  __FAILURE_HANDLE(device_sky_stars_update(device->sky_stars, device, sky_stars, &stars_has_changed));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_sky_stars_update(device->sky_stars, device, sky_stars, &buffers_have_changed));
 
-  if (stars_has_changed) {
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stars, DEVICE_PTR(device->sky_stars->data));
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stars_offsets, DEVICE_PTR(device->sky_stars->offsets));
+  if (buffers_have_changed) {
+    DeviceSkyStarsPtrs ptrs;
+    __FAILURE_HANDLE(device_sky_stars_get_ptrs(device->sky_stars, &ptrs));
+
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stars, (void*) ptrs.data);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stars_offsets, (void*) ptrs.offsets);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));

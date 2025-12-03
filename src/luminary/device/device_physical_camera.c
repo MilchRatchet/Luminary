@@ -105,10 +105,10 @@ LuminaryResult device_physical_camera_update(
   }
 
   __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, physical_camera->camera_interfaces, (DEVICE void*) physical_camera->camera_interfaces, 0,
+    device->staging_manager, shared_camera->camera_interfaces, (DEVICE void*) physical_camera->camera_interfaces, 0,
     physical_camera->allocated_num_interfaces * sizeof(DeviceCameraInterface)));
   __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, physical_camera->camera_media, (DEVICE void*) physical_camera->camera_media, 0,
+    device->staging_manager, shared_camera->camera_media, (DEVICE void*) physical_camera->camera_media, 0,
     (physical_camera->allocated_num_interfaces + 1) * sizeof(DeviceCameraMedium)));
 
   return LUMINARY_SUCCESS;

@@ -53,6 +53,8 @@ struct DeviceSkyHDRI {
   uint32_t reference_id;
   DeviceTexture* color_tex;
   DeviceTexture* shadow_tex;
+  DeviceTextureObject color_tex_obj;
+  DeviceTextureObject shadow_tex_obj;
 } typedef DeviceSkyHDRI;
 
 LuminaryResult sky_hdri_create(SkyHDRI** hdri);
@@ -60,8 +62,15 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
 DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device);
 LuminaryResult sky_hdri_destroy(SkyHDRI** hdri);
 
+struct DeviceSkyHDRIPtrs {
+  DeviceTextureObject color_tex_obj;
+  DeviceTextureObject shadow_tex_obj;
+} typedef DeviceSkyHDRIPtrs;
+
 DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_create(DeviceSkyHDRI** hdri);
-DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Device* device, const SkyHDRI* source_hdri, bool* has_changed);
+DEVICE_CTX_FUNC LuminaryResult
+  device_sky_hdri_update(DeviceSkyHDRI* hdri, Device* device, const SkyHDRI* shared_hdri, bool* buffers_have_changed);
+DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_get_ptrs(DeviceSkyHDRI* hdri, DeviceSkyHDRIPtrs* ptrs);
 DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_destroy(DeviceSkyHDRI** hdri);
 
 struct SkyStars {
@@ -82,9 +91,15 @@ LuminaryResult sky_stars_create(SkyStars** stars);
 LuminaryResult sky_stars_update(SkyStars* stars, const Sky* sky);
 LuminaryResult sky_stars_destroy(SkyStars** stars);
 
+struct DeviceSkyStarsPtrs {
+  CUdeviceptr data;
+  CUdeviceptr offsets;
+} typedef DeviceSkyStarsPtrs;
+
 DEVICE_CTX_FUNC LuminaryResult device_sky_stars_create(DeviceSkyStars** stars);
 DEVICE_CTX_FUNC LuminaryResult
-  device_sky_stars_update(DeviceSkyStars* stars, Device* device, const SkyStars* source_stars, bool* has_changed);
+  device_sky_stars_update(DeviceSkyStars* stars, Device* device, const SkyStars* source_stars, bool* buffers_have_changed);
+DEVICE_CTX_FUNC LuminaryResult device_sky_stars_get_ptrs(DeviceSkyStars* stars, DeviceSkyStarsPtrs* ptrs);
 DEVICE_CTX_FUNC LuminaryResult device_sky_stars_destroy(DeviceSkyStars** stars);
 
 #endif /* LUMINARY_DEVICE_SKY_H */

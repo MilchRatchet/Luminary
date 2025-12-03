@@ -494,6 +494,7 @@ struct DevicePointers {
   DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
   DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
   DEVICE const float* LUM_RESTRICT bridge_lut;
+  DEVICE const float* LUM_RESTRICT spectral_cdf;
   DEVICE const DeviceMaterialCompressed* LUM_RESTRICT materials;
   DEVICE INTERLEAVED_STORAGE const DeviceTriangle** LUM_RESTRICT triangles;
   DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
@@ -503,9 +504,9 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   DEVICE const Quad* LUM_RESTRICT particle_quads;
+  // DeviceSkyStars
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
-  DEVICE const float* LUM_RESTRICT spectral_cdf;
   // DevicePhysicalCamera
   DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
   DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
