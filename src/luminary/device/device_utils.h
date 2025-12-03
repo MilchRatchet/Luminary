@@ -506,6 +506,7 @@ struct DevicePointers {
   DEVICE const Star* LUM_RESTRICT stars;
   DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
   DEVICE const float* LUM_RESTRICT spectral_cdf;
+  // DevicePhysicalCamera
   DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
   DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
   // DeviceAbort

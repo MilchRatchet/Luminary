@@ -5,8 +5,10 @@
 
 #define STAGING
 
-#define DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, __macro_type, __macro_offset) \
-  (__macro_type)(((uint8_t*) (*((__macro_type*) (((uint64_t*) (__macro_device_mem)) + 1)))) + __macro_offset)
+#define DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, __macro_type, __macro_offset)                              \
+  ((__macro_type) ((__macro_device_mem != 0)                                                                         \
+                     ? (((uint8_t*) (*((__macro_type*) (((uint64_t*) (__macro_device_mem)) + 1)))) + __macro_offset) \
+                     : 0))
 
 #define DEVICE_PTR(__macro_device_mem) DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, void*, 0)
 #define DEVICE_CUPTR(__macro_device_mem) DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, CUdeviceptr, 0)

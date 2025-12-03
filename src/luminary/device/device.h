@@ -122,6 +122,7 @@ struct Device {
   DeviceSkyHDRI* sky_hdri;
   DeviceSkyStars* sky_stars;
   DeviceBSDFLUT* bsdf_lut;
+  DevicePhysicalCamera* physical_camera;
   DeviceWorkBuffers* work_buffers;
   DevicePost* post;
   DeviceRenderer* renderer;

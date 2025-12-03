@@ -2,6 +2,7 @@
 
 #include <float.h>
 
+#include "device.h"
 #include "internal_error.h"
 
 LuminaryResult physical_camera_create(PhysicalCamera** physical_camera) {
@@ -67,6 +68,71 @@ LuminaryResult physical_camera_destroy(PhysicalCamera** physical_camera) {
   if ((*physical_camera)->camera_media != (DeviceCameraMedium*) 0) {
     __FAILURE_HANDLE(host_free(&(*physical_camera)->camera_media));
   }
+
+  __FAILURE_HANDLE(host_free(physical_camera));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_physical_camera_create(DevicePhysicalCamera** physical_camera) {
+  __CHECK_NULL_ARGUMENT(physical_camera);
+
+  __FAILURE_HANDLE(host_malloc(physical_camera, sizeof(DevicePhysicalCamera)));
+  memset(*physical_camera, 0, sizeof(DevicePhysicalCamera));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_physical_camera_update(
+  DevicePhysicalCamera* physical_camera, Device* device, const PhysicalCamera* shared_camera, bool* buffers_have_changed) {
+  __CHECK_NULL_ARGUMENT(physical_camera);
+  __CHECK_NULL_ARGUMENT(shared_camera);
+
+  *buffers_have_changed = false;
+
+  if (shared_camera->num_interfaces != physical_camera->allocated_num_interfaces) {
+    if (physical_camera->camera_interfaces)
+      __FAILURE_HANDLE(device_free(&physical_camera->camera_interfaces));
+
+    if (physical_camera->camera_media)
+      __FAILURE_HANDLE(device_free(&physical_camera->camera_media));
+
+    __FAILURE_HANDLE(device_malloc(&physical_camera->camera_interfaces, shared_camera->num_interfaces * sizeof(DeviceCameraInterface)));
+    __FAILURE_HANDLE(device_malloc(&physical_camera->camera_media, (shared_camera->num_interfaces + 1) * sizeof(DeviceCameraMedium)));
+
+    physical_camera->allocated_num_interfaces = shared_camera->num_interfaces;
+    *buffers_have_changed                     = true;
+  }
+
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, physical_camera->camera_interfaces, (DEVICE void*) physical_camera->camera_interfaces, 0,
+    physical_camera->allocated_num_interfaces * sizeof(DeviceCameraInterface)));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, physical_camera->camera_media, (DEVICE void*) physical_camera->camera_media, 0,
+    (physical_camera->allocated_num_interfaces + 1) * sizeof(DeviceCameraMedium)));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_physical_camera_get_ptrs(DevicePhysicalCamera* physical_camera, DevicePhysicalCameraPtrs* ptrs) {
+  __CHECK_NULL_ARGUMENT(physical_camera);
+  __CHECK_NULL_ARGUMENT(ptrs);
+
+  ptrs->camera_interfaces = DEVICE_CUPTR(physical_camera->camera_interfaces);
+  ptrs->camera_media      = DEVICE_CUPTR(physical_camera->camera_media);
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_physical_camera_destroy(DevicePhysicalCamera** physical_camera) {
+  __CHECK_NULL_ARGUMENT(physical_camera);
+  __CHECK_NULL_ARGUMENT(*physical_camera);
+
+  if ((*physical_camera)->camera_interfaces)
+    __FAILURE_HANDLE(device_free(&(*physical_camera)->camera_interfaces));
+
+  if ((*physical_camera)->camera_media)
+    __FAILURE_HANDLE(device_free(&(*physical_camera)->camera_media));
 
   __FAILURE_HANDLE(host_free(physical_camera));
 

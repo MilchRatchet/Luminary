@@ -18,7 +18,7 @@ static LuminaryResult _device_work_buffers_alloc(DEVICE void** buffer, const siz
 static LuminaryResult _device_work_buffers_get_ptr(DEVICE void* buffer, CUdeviceptr* ptr) {
   __CHECK_NULL_ARGUMENT(ptr);
 
-  *ptr = (buffer != (DEVICE void*) 0) ? DEVICE_CUPTR(buffer) : (CUdeviceptr) 0;
+  *ptr = DEVICE_CUPTR(buffer);
 
   return LUMINARY_SUCCESS;
 }

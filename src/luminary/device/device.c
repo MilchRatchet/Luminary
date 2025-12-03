@@ -705,8 +705,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(light_tree_root);
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
-  __DEVICE_BUFFER_FREE(camera_interfaces);
-  __DEVICE_BUFFER_FREE(camera_media);
 
   return LUMINARY_SUCCESS;
 }
@@ -819,6 +817,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
   __FAILURE_HANDLE(device_sky_stars_create(&device->sky_stars));
   __FAILURE_HANDLE(device_bsdf_lut_create(&device->bsdf_lut));
+  __FAILURE_HANDLE(device_physical_camera_create(&device->physical_camera));
   __FAILURE_HANDLE(device_cloud_noise_create(&device->cloud_noise, device));
   __FAILURE_HANDLE(device_particles_handle_create(&device->particles_handle));
   __FAILURE_HANDLE(device_adaptive_sampler_create(&device->adaptive_sampler));
@@ -1566,19 +1565,16 @@ LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamer
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __DEVICE_BUFFER_FREE(camera_interfaces);
-  __DEVICE_BUFFER_FREE(camera_media);
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_physical_camera_update(device->physical_camera, device, physical_camera, &buffers_have_changed));
 
-  const size_t interfaces_size = physical_camera->num_interfaces * sizeof(DeviceCameraInterface);
-  const size_t media_size      = (physical_camera->num_interfaces + 1) * sizeof(DeviceCameraMedium);
+  if (buffers_have_changed) {
+    DevicePhysicalCameraPtrs ptrs;
+    __FAILURE_HANDLE(device_physical_camera_get_ptrs(device->physical_camera, &ptrs));
 
-  __DEVICE_BUFFER_ALLOCATE(camera_interfaces, interfaces_size);
-  __DEVICE_BUFFER_ALLOCATE(camera_media, media_size);
-
-  __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, physical_camera->camera_interfaces, (DEVICE void*) device->buffers.camera_interfaces, 0, interfaces_size));
-  __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, physical_camera->camera_media, (DEVICE void*) device->buffers.camera_media, 0, media_size));
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.camera_interfaces, (void*) ptrs.camera_interfaces);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.camera_media, (void*) ptrs.camera_media);
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -2062,6 +2058,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));
   __FAILURE_HANDLE(device_sky_stars_destroy(&(*device)->sky_stars));
   __FAILURE_HANDLE(device_bsdf_lut_destroy(&(*device)->bsdf_lut));
+  __FAILURE_HANDLE(device_physical_camera_destroy(&(*device)->physical_camera));
   __FAILURE_HANDLE(device_cloud_noise_destroy(&(*device)->cloud_noise));
   __FAILURE_HANDLE(device_particles_handle_destroy(&(*device)->particles_handle));
   __FAILURE_HANDLE(device_adaptive_sampler_destroy(&(*device)->adaptive_sampler));
