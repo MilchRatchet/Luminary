@@ -45,7 +45,8 @@
 LUMINARY_KERNEL void tasks_create() {
   HANDLE_DEVICE_ABORT();
 
-  uint32_t task_count = 0;
+  uint32_t task_count   = 0;
+  uint32_t result_count = 0;
 
   const uint32_t undersampling_stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
   const uint32_t undersampling_iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
@@ -101,8 +102,30 @@ LUMINARY_KERNEL void tasks_create() {
 
     CameraSampleResult camera_result = camera_sample(task.path_id);
 
-    // Skip rays that haven't managed to leave the camera.
-    if (color_any(camera_result.weight) == false)
+    const bool ray_is_valid = color_any(camera_result.weight);
+
+    // Skip rays that haven't managed to leave the camera. During the first sample we need to write out a 0 result though.
+    if (sample_id != 0 && ray_is_valid == false)
+      continue;
+
+    const uint32_t thread_result_id         = result_count++;
+    const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(thread_result_id, TASK_STATE_BUFFER_INDEX_RESULT);
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Result
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
+
+    DeviceTaskResult result;
+
+    result.color = splat_color(0.0f);
+    result.index = index;
+
+    task_result_store(task_result_base_address, result);
+
+    // We have written out a 0 result, we can now safely skip this ray if it is not valid.
+    if (ray_is_valid == false)
       continue;
 
     const uint32_t thread_task_id = task_count++;
@@ -129,8 +152,6 @@ LUMINARY_KERNEL void tasks_create() {
     ////////////////////////////////////////////////////////////////////
     // Task Throughput
     ////////////////////////////////////////////////////////////////////
-
-    const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(thread_task_id, TASK_STATE_BUFFER_INDEX_RESULT);
 
     DeviceTaskThroughput throughput;
 
@@ -159,23 +180,10 @@ LUMINARY_KERNEL void tasks_create() {
     }
 
     task_medium_store(task_base_address, medium);
-
-    ////////////////////////////////////////////////////////////////////
-    // Task Result
-    ////////////////////////////////////////////////////////////////////
-
-    const uint32_t index = path_id_get_pixel_index(task.path_id);
-
-    DeviceTaskResult result;
-
-    result.color = splat_color(0.0f);
-    result.index = index;
-
-    task_result_store(throughput.results_index, result);
   }
 
   device.ptrs.trace_counts[THREAD_ID]   = task_count;
-  device.ptrs.results_counts[THREAD_ID] = task_count;
+  device.ptrs.results_counts[THREAD_ID] = result_count;
 }
 
 LUMINARY_KERNEL void sky_process_inscattering_events() {
