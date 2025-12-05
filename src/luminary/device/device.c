@@ -5,13 +5,11 @@
 #include "camera.h"
 #include "cloud.h"
 #include "config.h"
-#include "device_embedded.h"
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_texture.h"
 #include "device_utils.h"
 #include "fog.h"
-#include "host/png.h"
 #include "internal_error.h"
 #include "particles.h"
 #include "sky.h"
@@ -391,154 +389,6 @@ static LuminaryResult _device_setup_execution_config(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-////////////////////////////////////////////////////////////////////
-// Embedded data
-////////////////////////////////////////////////////////////////////
-
-static LuminaryResult _device_load_moon_textures(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  void* moon_albedo_data;
-  int64_t moon_albedo_data_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_MOON_ALBEDO, &moon_albedo_data, &moon_albedo_data_length));
-
-  void* moon_normal_data;
-  int64_t moon_normal_data_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_MOON_NORMAL, &moon_normal_data, &moon_normal_data_length));
-
-  Texture* moon_albedo_tex;
-  __FAILURE_HANDLE(texture_create(&moon_albedo_tex));
-  __FAILURE_HANDLE(png_load(moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
-
-  __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex, device, device->stream_main));
-
-  __FAILURE_HANDLE(texture_destroy(&moon_albedo_tex));
-
-  Texture* moon_normal_tex;
-  __FAILURE_HANDLE(texture_create(&moon_normal_tex));
-  __FAILURE_HANDLE(png_load(moon_normal_tex, moon_normal_data, moon_normal_data_length, "moon_normal.png"));
-
-  __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex, device, device->stream_main));
-
-  __FAILURE_HANDLE(texture_destroy(&moon_normal_tex));
-
-  __FAILURE_HANDLE(device_struct_texture_object_convert(device->moon_albedo_tex, &device->constant_memory->moon_albedo_tex));
-  __FAILURE_HANDLE(device_struct_texture_object_convert(device->moon_normal_tex, &device->constant_memory->moon_normal_tex));
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_load_spectral_data(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  // XYZ LUT
-
-  void* spectral_xy_lut_data;
-  int64_t spectral_xy_lut_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT, &spectral_xy_lut_data, &spectral_xy_lut_length));
-
-  void* spectral_z_lut_data;
-  int64_t spectral_z_lut_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT, &spectral_z_lut_data, &spectral_z_lut_length));
-
-  const uint32_t num_elements = spectral_z_lut_length / sizeof(float);
-
-  Texture* spectral_xy_lut_tex;
-  __FAILURE_HANDLE(texture_create(&spectral_xy_lut_tex));
-  __FAILURE_HANDLE(texture_fill(spectral_xy_lut_tex, num_elements, 1, 1, spectral_xy_lut_data, TEXTURE_DATA_TYPE_FP32, 2));
-  __FAILURE_HANDLE(texture_set_memory_owner(spectral_xy_lut_tex, false));
-
-  spectral_xy_lut_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_xy_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_xy_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
-
-  Texture* spectral_z_lut_tex;
-  __FAILURE_HANDLE(texture_create(&spectral_z_lut_tex));
-  __FAILURE_HANDLE(texture_fill(spectral_z_lut_tex, num_elements, 1, 1, spectral_z_lut_data, TEXTURE_DATA_TYPE_FP32, 1));
-  __FAILURE_HANDLE(texture_set_memory_owner(spectral_z_lut_tex, false));
-
-  spectral_z_lut_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_z_lut_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
-  spectral_z_lut_tex->wrap_mode_W = TEXTURE_WRAPPING_MODE_CLAMP;
-
-  __FAILURE_HANDLE(device_texture_create(&device->spectral_xy_tex, spectral_xy_lut_tex, device, device->stream_main));
-  __FAILURE_HANDLE(device_texture_create(&device->spectral_z_tex, spectral_z_lut_tex, device, device->stream_main));
-
-  __FAILURE_HANDLE(device_struct_texture_object_convert(device->spectral_xy_tex, &device->constant_memory->spectral_xy_lut_tex));
-  __FAILURE_HANDLE(device_struct_texture_object_convert(device->spectral_z_tex, &device->constant_memory->spectral_z_lut_tex));
-
-  __FAILURE_HANDLE(texture_destroy(&spectral_xy_lut_tex));
-  __FAILURE_HANDLE(texture_destroy(&spectral_z_lut_tex));
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX));
-
-  // CDF
-
-  void* spectral_cdf_data;
-  int64_t spectral_cdf_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_CDF, &spectral_cdf_data, &spectral_cdf_length));
-
-  __FAILURE_HANDLE(device_malloc(&device->buffers.spectral_cdf, spectral_cdf_length));
-  __FAILURE_HANDLE(device_upload((void*) device->buffers.spectral_cdf, spectral_cdf_data, 0, spectral_cdf_length, device->stream_main));
-
-  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.spectral_cdf, DEVICE_PTR(device->buffers.spectral_cdf));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_load_bluenoise_texture(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  void* bluenoise_1D_data;
-  int64_t bluenoise_1D_data_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_BLUENOISE1D, &bluenoise_1D_data, &bluenoise_1D_data_length));
-
-  void* bluenoise_2D_data;
-  int64_t bluenoise_2D_data_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_BLUENOISE2D, &bluenoise_2D_data, &bluenoise_2D_data_length));
-
-  __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_1D, bluenoise_1D_data_length));
-  __FAILURE_HANDLE(
-    device_upload((void*) device->buffers.bluenoise_1D, bluenoise_1D_data, 0, bluenoise_1D_data_length, device->stream_main));
-
-  __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_2D, bluenoise_2D_data_length));
-  __FAILURE_HANDLE(
-    device_upload((void*) device->buffers.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length, device->stream_main));
-
-  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_1D, DEVICE_PTR(device->buffers.bluenoise_1D));
-  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_2D, DEVICE_PTR(device->buffers.bluenoise_2D));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_load_light_bridge_lut(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  void* lut_data;
-  int64_t lut_length;
-  __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_BRIDGE_LUT, &lut_data, &lut_length));
-
-  __FAILURE_HANDLE(device_malloc(&device->buffers.bridge_lut, lut_length));
-  __FAILURE_HANDLE(device_upload((void*) device->buffers.bridge_lut, lut_data, 0, lut_length, device->stream_main));
-
-  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bridge_lut, DEVICE_PTR(device->buffers.bridge_lut));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_free_embedded_data(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  __FAILURE_HANDLE(device_texture_destroy(&device->moon_albedo_tex));
-  __FAILURE_HANDLE(device_texture_destroy(&device->moon_normal_tex));
-  __FAILURE_HANDLE(device_texture_destroy(&device->spectral_xy_tex));
-  __FAILURE_HANDLE(device_texture_destroy(&device->spectral_z_tex));
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _device_update_get_next_undersampling_state(Device* device, uint32_t* new_undersampling_state) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -693,10 +543,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   __DEVICE_BUFFER_FREE(textures);
-  __DEVICE_BUFFER_FREE(spectral_cdf);
-  __DEVICE_BUFFER_FREE(bluenoise_1D);
-  __DEVICE_BUFFER_FREE(bluenoise_2D);
-  __DEVICE_BUFFER_FREE(bridge_lut);
   __DEVICE_BUFFER_FREE(materials);
   __DEVICE_BUFFER_FREE(triangles);
   __DEVICE_BUFFER_FREE(triangle_counts);
@@ -803,6 +649,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Initialize processing objects
   ////////////////////////////////////////////////////////////////////
 
+  __FAILURE_HANDLE(device_embedded_data_create(&device->embedded_data));
   __FAILURE_HANDLE(device_work_buffers_create(&device->work_buffers));
   __FAILURE_HANDLE(device_renderer_create(&device->renderer));
   __FAILURE_HANDLE(device_output_create(&device->output));
@@ -928,10 +775,23 @@ LuminaryResult device_load_embedded_data(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(_device_load_light_bridge_lut(device));
-  __FAILURE_HANDLE(_device_load_spectral_data(device));
-  __FAILURE_HANDLE(_device_load_bluenoise_texture(device));
-  __FAILURE_HANDLE(_device_load_moon_textures(device));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_embedded_data_update(device->embedded_data, device, &buffers_have_changed));
+
+  if (buffers_have_changed) {
+    DeviceEmbeddedDataPtrs ptrs;
+    __FAILURE_HANDLE(device_embedded_data_get_ptrs(device->embedded_data, &ptrs));
+
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_1D, (void*) ptrs.bluenoise_1D);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_2D, (void*) ptrs.bluenoise_2D);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bridge_lut, (void*) ptrs.bridge_lut);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.spectral_cdf, (void*) ptrs.spectral_cdf);
+
+    DEVICE_UPDATE_CONSTANT_MEMORY(moon_albedo_tex, ptrs.moon_albedo_tex);
+    DEVICE_UPDATE_CONSTANT_MEMORY(moon_normal_tex, ptrs.moon_normal_tex);
+    DEVICE_UPDATE_CONSTANT_MEMORY(spectral_xy_lut_tex, ptrs.spectral_xy_tex);
+    DEVICE_UPDATE_CONSTANT_MEMORY(spectral_z_lut_tex, ptrs.spectral_z_tex);
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -2039,7 +1899,6 @@ LuminaryResult device_destroy(Device** device) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent((*device)->cuda_ctx));
   CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
-  __FAILURE_HANDLE(_device_free_embedded_data(*device));
   __FAILURE_HANDLE(_device_free_buffers(*device));
 
   uint32_t num_meshes;
@@ -2057,6 +1916,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_output_destroy(&(*device)->output));
   __FAILURE_HANDLE(device_renderer_destroy(&(*device)->renderer));
   __FAILURE_HANDLE(device_work_buffers_destroy(&(*device)->work_buffers));
+  __FAILURE_HANDLE(device_embedded_data_destroy(&(*device)->embedded_data));
 
   __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));

@@ -5,6 +5,7 @@
 #include "device_adaptive_sampler.h"
 #include "device_bsdf.h"
 #include "device_cloud.h"
+#include "device_embedded_data.h"
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
@@ -104,10 +105,6 @@ struct Device {
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING GBufferMetaData* gbuffer_meta_dst;
-  DeviceTexture* moon_albedo_tex;
-  DeviceTexture* moon_normal_tex;
-  DeviceTexture* spectral_xy_tex;
-  DeviceTexture* spectral_z_tex;
   DeviceStagingManager* staging_manager;
   ARRAY DeviceTexture** textures;
   uint32_t num_materials;
@@ -123,6 +120,7 @@ struct Device {
   DeviceSkyStars* sky_stars;
   DeviceBSDFLUT* bsdf_lut;
   DevicePhysicalCamera* physical_camera;
+  DeviceEmbeddedData* embedded_data;
   DeviceWorkBuffers* work_buffers;
   DevicePost* post;
   DeviceRenderer* renderer;

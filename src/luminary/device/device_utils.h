@@ -491,10 +491,6 @@ struct DevicePointers {
   DEVICE uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
   DEVICE uint32_t* LUM_RESTRICT tile_last_adaptive_sampling_block_index;
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
-  DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
-  DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
-  DEVICE const float* LUM_RESTRICT bridge_lut;
-  DEVICE const float* LUM_RESTRICT spectral_cdf;
   DEVICE const DeviceMaterialCompressed* LUM_RESTRICT materials;
   DEVICE INTERLEAVED_STORAGE const DeviceTriangle** LUM_RESTRICT triangles;
   DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
@@ -510,6 +506,11 @@ struct DevicePointers {
   // DevicePhysicalCamera
   DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
   DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
+  // DeviceEmbeddedData
+  DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
+  DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
+  DEVICE const float* LUM_RESTRICT bridge_lut;
+  DEVICE const float* LUM_RESTRICT spectral_cdf;
   // DeviceAbort
   DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
