@@ -542,15 +542,11 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(materials);
   __DEVICE_BUFFER_FREE(triangles);
   __DEVICE_BUFFER_FREE(triangle_counts);
   __DEVICE_BUFFER_FREE(instance_mesh_id);
   __DEVICE_BUFFER_FREE(instance_transforms);
-  __DEVICE_BUFFER_FREE(light_tree_root);
-  __DEVICE_BUFFER_FREE(light_tree_nodes);
-  __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
 
   return LUMINARY_SUCCESS;
 }
@@ -633,8 +629,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
   __FAILURE_HANDLE(_device_setup_execution_config(device));
 
-  __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
-
   ////////////////////////////////////////////////////////////////////
   // Optix data
   ////////////////////////////////////////////////////////////////////
@@ -656,9 +650,10 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_abort_create(&device->abort));
 
   ////////////////////////////////////////////////////////////////////
-  // Initialize scene entity LUT objects
+  // Initialize device object implementations
   ////////////////////////////////////////////////////////////////////
 
+  __FAILURE_HANDLE(device_texture_manager_create(&device->textures));
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
   __FAILURE_HANDLE(device_sky_stars_create(&device->sky_stars));
@@ -1037,26 +1032,14 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
-    DeviceTexture* device_texture;
-    __FAILURE_HANDLE(device_texture_create(&device_texture, textures[texture_id], device, device->stream_main));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_texture_manager_add(device->textures, device, textures, num_textures, &buffers_have_changed));
 
-    __FAILURE_HANDLE(array_push(&device->textures, &device_texture));
-  }
+  if (buffers_have_changed) {
+    DeviceTextureManagerPtrs ptrs;
+    __FAILURE_HANDLE(device_texture_manager_get_ptrs(device->textures, &ptrs));
 
-  uint32_t texture_object_count;
-  __FAILURE_HANDLE(array_get_num_elements(device->textures, &texture_object_count));
-
-  const size_t total_texture_object_size = sizeof(DeviceTextureObject) * texture_object_count;
-
-  __DEVICE_BUFFER_ALLOCATE(textures, total_texture_object_size);
-
-  DeviceTextureObject* buffer;
-  __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-    device->staging_manager, (void*) device->buffers.textures, 0, total_texture_object_size, (void**) &buffer));
-
-  for (uint32_t texture_object_id = 0; texture_object_id < texture_object_count; texture_object_id++) {
-    __FAILURE_HANDLE(device_struct_texture_object_convert(device->textures[texture_object_id], buffer + texture_object_id));
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.textures, (void*) ptrs.textures);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1924,20 +1907,12 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_particles_handle_destroy(&(*device)->particles_handle));
   __FAILURE_HANDLE(device_adaptive_sampler_destroy(&(*device)->adaptive_sampler));
   __FAILURE_HANDLE(device_light_tree_destroy(&(*device)->light_tree));
+  __FAILURE_HANDLE(device_texture_manager_destroy(&(*device)->textures));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
 
   __FAILURE_HANDLE(device_post_destroy(&(*device)->post));
-
-  uint32_t num_textures;
-  __FAILURE_HANDLE(array_get_num_elements((*device)->textures, &num_textures));
-
-  for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
-    __FAILURE_HANDLE(device_texture_destroy(&(*device)->textures[texture_id]));
-  }
-
-  __FAILURE_HANDLE(array_destroy(&(*device)->textures));
 
   for (uint32_t kernel_id = 0; kernel_id < CUDA_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(kernel_destroy(&(*device)->cuda_kernels[kernel_id]));

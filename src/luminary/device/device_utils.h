@@ -490,6 +490,7 @@ struct DevicePointers {
   DEVICE uint32_t* LUM_RESTRICT stage_total_task_counts;
   DEVICE uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
   DEVICE uint32_t* LUM_RESTRICT tile_last_adaptive_sampling_block_index;
+  // DeviceTextureManager
   DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
   DEVICE const DeviceMaterialCompressed* LUM_RESTRICT materials;
   DEVICE INTERLEAVED_STORAGE const DeviceTriangle** LUM_RESTRICT triangles;

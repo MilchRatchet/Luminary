@@ -18,6 +18,7 @@
 #include "device_result_interface.h"
 #include "device_sky.h"
 #include "device_staging_manager.h"
+#include "device_texture_manager.h"
 #include "device_utils.h"
 #include "device_work_buffers.h"
 #include "kernel.h"
@@ -106,7 +107,6 @@ struct Device {
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceStagingManager* staging_manager;
-  ARRAY DeviceTexture** textures;
   uint32_t num_materials;
   uint32_t num_instances;
   ARRAY DeviceMesh** meshes;
@@ -121,6 +121,7 @@ struct Device {
   DeviceLightTree* light_tree;
   DevicePhysicalCamera* physical_camera;
   DeviceEmbeddedData* embedded_data;
+  DeviceTextureManager* textures;
   DeviceWorkBuffers* work_buffers;
   DevicePost* post;
   DeviceRenderer* renderer;
