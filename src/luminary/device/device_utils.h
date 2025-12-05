@@ -496,6 +496,7 @@ struct DevicePointers {
   DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
   DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
   DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
+  // DeviceLightTree
   DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;

@@ -108,9 +108,7 @@ struct LightTree {
   void* nodes_data;
   size_t nodes_size;
   void* tri_handle_map_data;
-  size_t tri_handle_map_size;
   void* bvh_vertex_buffer_data;
-  size_t bvh_vertex_buffer_size;
   uint32_t light_count;
 } typedef LightTree;
 
@@ -127,5 +125,30 @@ DEVICE_CTX_FUNC LuminaryResult light_tree_build(LightTree* tree, Device* device)
 DEVICE_CTX_FUNC LuminaryResult light_tree_unload_integrator(LightTree* tree);
 
 LuminaryResult light_tree_destroy(LightTree** tree);
+
+struct DeviceLightTreePtrs {
+  CUdeviceptr root;
+  CUdeviceptr nodes;
+  CUdeviceptr tri_handle_map;
+  OptixTraversableHandle bvh;
+} typedef DeviceLightTreePtrs;
+
+struct DeviceLightTree {
+  uint32_t build_id;
+  size_t allocated_root_size;
+  size_t allocated_nodes_size;
+  uint32_t allocated_light_count;
+  DEVICE DeviceLightTreeRootHeader* root;
+  DEVICE DeviceLightTreeNode* nodes;
+  DEVICE TriangleHandle* tri_handle_map;
+  DEVICE LightTreeBVHTriangle* bvh_vertex_buffer;
+  OptixBVH* bvh;
+} typedef DeviceLightTree;
+
+LuminaryResult device_light_tree_create(DeviceLightTree** tree);
+DEVICE_CTX_FUNC LuminaryResult
+  device_light_tree_update(DeviceLightTree* tree, Device* device, const LightTree* shared_tree, bool* buffers_have_changed);
+DEVICE_CTX_FUNC LuminaryResult device_light_tree_get_ptrs(DeviceLightTree* tree, DeviceLightTreePtrs* ptrs);
+DEVICE_CTX_FUNC LuminaryResult device_light_tree_destroy(DeviceLightTree** tree);
 
 #endif /* LUMINARY_LIGHT_H */

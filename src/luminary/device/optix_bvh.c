@@ -396,7 +396,7 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightTree* tree) {
+LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const DeviceLightTree* tree) {
   __CHECK_NULL_ARGUMENT(bvh);
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(tree);
@@ -418,14 +418,9 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   memset(&build_input, 0, sizeof(OptixBuildInput));
   build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-  const uint32_t vertex_count = 3 * tree->light_count;
+  const uint32_t vertex_count = 3 * tree->allocated_light_count;
 
-  DEVICE float* device_vertex_buffer;
-  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * vertex_count));
-  __FAILURE_HANDLE(
-    device_upload(device_vertex_buffer, tree->bvh_vertex_buffer_data, 0, sizeof(float) * 4 * vertex_count, device->stream_main));
-
-  CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(device_vertex_buffer);
+  CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(tree->bvh_vertex_buffer);
 
   build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
   build_input.triangleArray.vertexStrideInBytes = 16;
@@ -494,14 +489,7 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   bvh->bvh_data[OPTIX_BVH_TYPE_DEFAULT]       = output_buffer;
   bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]    = traversable;
   bvh->allocated_mask[OPTIX_BVH_TYPE_DEFAULT] = true;
-
-  ////////////////////////////////////////////////////////////////////
-  // Clean up
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(device_free(&device_vertex_buffer));
-
-  bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+  bvh->fast_trace                             = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
 
   return LUMINARY_SUCCESS;
 }

@@ -1278,10 +1278,8 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
   tree->nodes_size = sizeof(DeviceLightTreeNode) * num_nodes_as_16bytes;
   tree->nodes_data = (void*) nodes_data;
 
-  tree->tri_handle_map_size = sizeof(TriangleHandle) * work->fragments_count;
   tree->tri_handle_map_data = (void*) tri_handle_map;
 
-  tree->bvh_vertex_buffer_size = sizeof(LightTreeBVHTriangle) * work->fragments_count;
   tree->bvh_vertex_buffer_data = (void*) bvh_triangles;
 
   tree->light_count = work->fragments_count;
@@ -2224,15 +2222,11 @@ static LuminaryResult _light_tree_free_data(LightTree* tree) {
     tree->nodes_size = 0;
   }
 
-  if (tree->tri_handle_map_data) {
+  if (tree->tri_handle_map_data)
     __FAILURE_HANDLE(host_free(&tree->tri_handle_map_data));
-    tree->tri_handle_map_size = 0;
-  }
 
-  if (tree->bvh_vertex_buffer_data) {
+  if (tree->bvh_vertex_buffer_data)
     __FAILURE_HANDLE(host_free(&tree->bvh_vertex_buffer_data));
-    tree->bvh_vertex_buffer_size = 0;
-  }
 
   return LUMINARY_SUCCESS;
 }
@@ -2340,6 +2334,116 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
   __FAILURE_HANDLE(array_destroy(&(*tree)->cache.materials));
 
   __FAILURE_HANDLE(_light_tree_free_data(*tree));
+
+  __FAILURE_HANDLE(host_free(tree));
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Device Handling
+////////////////////////////////////////////////////////////////////
+
+LuminaryResult device_light_tree_create(DeviceLightTree** tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  __FAILURE_HANDLE(host_malloc(tree, sizeof(DeviceLightTree)));
+  memset(*tree, 0, sizeof(DeviceLightTree));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_light_tree_update(DeviceLightTree* tree, Device* device, const LightTree* shared_tree, bool* buffers_have_changed) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(shared_tree);
+  __CHECK_NULL_ARGUMENT(buffers_have_changed);
+
+  *buffers_have_changed = false;
+
+  if (tree->build_id != shared_tree->build_id) {
+    if (tree->bvh == (OptixBVH*) 0)
+      __FAILURE_HANDLE(optix_bvh_create(&tree->bvh));
+
+    if (tree->allocated_root_size != shared_tree->root_size) {
+      if (tree->root)
+        __FAILURE_HANDLE(device_free(&tree->root));
+
+      __FAILURE_HANDLE(device_malloc(&tree->root, shared_tree->root_size));
+
+      tree->allocated_root_size = shared_tree->root_size;
+    }
+
+    if (tree->allocated_nodes_size != shared_tree->nodes_size) {
+      if (tree->nodes)
+        __FAILURE_HANDLE(device_free(&tree->nodes));
+
+      __FAILURE_HANDLE(device_malloc(&tree->nodes, shared_tree->nodes_size));
+
+      tree->allocated_nodes_size = shared_tree->nodes_size;
+    }
+
+    if (tree->allocated_light_count != shared_tree->light_count) {
+      if (tree->tri_handle_map)
+        __FAILURE_HANDLE(device_free(&tree->tri_handle_map));
+
+      if (tree->bvh_vertex_buffer)
+        __FAILURE_HANDLE(device_free(&tree->bvh_vertex_buffer));
+
+      __FAILURE_HANDLE(device_malloc(&tree->tri_handle_map, shared_tree->light_count * sizeof(TriangleHandle)));
+      __FAILURE_HANDLE(device_malloc(&tree->bvh_vertex_buffer, shared_tree->light_count * sizeof(LightTreeBVHTriangle)));
+
+      tree->allocated_light_count = shared_tree->light_count;
+    }
+
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_tree->root_data, (DEVICE void*) tree->root, 0, tree->allocated_root_size));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_tree->nodes_data, (DEVICE void*) tree->nodes, 0, tree->allocated_nodes_size));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_tree->tri_handle_map_data, (DEVICE void*) tree->tri_handle_map, 0,
+      tree->allocated_light_count * sizeof(TriangleHandle)));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_tree->bvh_vertex_buffer_data, (DEVICE void*) tree->bvh_vertex_buffer, 0,
+      tree->allocated_light_count * sizeof(LightTreeBVHTriangle)));
+
+    __FAILURE_HANDLE(optix_bvh_light_build(tree->bvh, device, tree));
+
+    tree->build_id        = shared_tree->build_id;
+    *buffers_have_changed = true;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_light_tree_get_ptrs(DeviceLightTree* tree, DeviceLightTreePtrs* ptrs) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(ptrs);
+
+  ptrs->root           = DEVICE_CUPTR(tree->root);
+  ptrs->nodes          = DEVICE_CUPTR(tree->nodes);
+  ptrs->tri_handle_map = DEVICE_CUPTR(tree->tri_handle_map);
+  ptrs->bvh            = tree->bvh->traversable[OPTIX_BVH_TYPE_DEFAULT];
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_light_tree_destroy(DeviceLightTree** tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  if ((*tree)->root)
+    __FAILURE_HANDLE(device_free(&(*tree)->root));
+
+  if ((*tree)->nodes)
+    __FAILURE_HANDLE(device_free(&(*tree)->nodes));
+
+  if ((*tree)->tri_handle_map)
+    __FAILURE_HANDLE(device_free(&(*tree)->tri_handle_map));
+
+  if ((*tree)->bvh_vertex_buffer)
+    __FAILURE_HANDLE(device_free(&(*tree)->bvh_vertex_buffer));
+
+  __FAILURE_HANDLE(optix_bvh_destroy(&(*tree)->bvh));
 
   __FAILURE_HANDLE(host_free(tree));
 
