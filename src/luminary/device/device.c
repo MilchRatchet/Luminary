@@ -1409,11 +1409,15 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  __FAILURE_HANDLE(device_particles_handle_generate(device->particles_handle, particles, device));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_particles_handle_update(device->particles_handle, device, particles, &buffers_have_changed));
 
-  if (particles->active) {
-    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, device->particles_handle->instance_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]);
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, DEVICE_PTR(device->particles_handle->quad_buffer));
+  if (buffers_have_changed) {
+    DeviceParticlesHandlePtrs ptrs;
+    __FAILURE_HANDLE(device_particles_handle_get_ptrs(device->particles_handle, &ptrs));
+
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, (void*) ptrs.quads);
+    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, ptrs.bvh);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));

@@ -528,7 +528,7 @@ LuminaryResult optix_bvh_particles_gas_build(OptixBVH* bvh, Device* device, cons
   memset(&build_input, 0, sizeof(OptixBuildInput));
   build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-  const uint32_t vertex_count = particles_handle->count * 6;
+  const uint32_t vertex_count = particles_handle->allocated_count * 6;
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(particles_handle->vertex_buffer);
 

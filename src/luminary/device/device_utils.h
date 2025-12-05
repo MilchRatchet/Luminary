@@ -499,6 +499,7 @@ struct DevicePointers {
   DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
   DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
+  // DeviceParticlesHandle
   DEVICE const Quad* LUM_RESTRICT particle_quads;
   // DeviceSkyStars
   DEVICE const Star* LUM_RESTRICT stars;

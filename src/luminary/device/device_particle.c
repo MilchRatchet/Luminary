@@ -74,48 +74,62 @@ static LuminaryResult _device_particles_instances_create(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_particles_handle_generate(DeviceParticlesHandle* particles_handle, const Particles* particles, Device* device) {
+LuminaryResult device_particles_handle_update(
+  DeviceParticlesHandle* particles_handle, Device* device, const Particles* shared_particles, bool* buffers_have_changed) {
   __CHECK_NULL_ARGUMENT(particles_handle);
-  __CHECK_NULL_ARGUMENT(particles);
   __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(shared_particles);
+  __CHECK_NULL_ARGUMENT(buffers_have_changed);
 
-  if (particles->count == 0 || particles->active == false)
-    return LUMINARY_SUCCESS;
+  *buffers_have_changed = false;
 
-  if (particles->count > particles_handle->allocated_count) {
-    if (particles_handle->vertex_buffer) {
+  const uint32_t count = (shared_particles->active) ? shared_particles->count : 0;
+
+  if (particles_handle->allocated_count != count) {
+    if (particles_handle->vertex_buffer)
       __FAILURE_HANDLE(device_free(&particles_handle->vertex_buffer));
-    }
 
-    if (particles_handle->quad_buffer) {
+    if (particles_handle->quad_buffer)
       __FAILURE_HANDLE(device_free(&particles_handle->quad_buffer));
+
+    particles_handle->allocated_count = 0;
+
+    if (count > 0) {
+      __FAILURE_HANDLE(device_malloc(&particles_handle->vertex_buffer, 6 * 4 * sizeof(float) * count));
+      __FAILURE_HANDLE(device_malloc(&particles_handle->quad_buffer, sizeof(Quad) * count));
+
+      particles_handle->allocated_count = count;
+
+      KernelArgsParticleGenerate args;
+      args.count          = count;
+      args.seed           = shared_particles->seed;
+      args.size           = shared_particles->size * 0.001f;
+      args.size_variation = shared_particles->size_variation;
+      args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
+      args.quads          = DEVICE_PTR(particles_handle->quad_buffer);
+
+      __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
+
+      __FAILURE_HANDLE(optix_bvh_particles_gas_build(particles_handle->geometry_bvh, device, particles_handle));
+
+      __FAILURE_HANDLE(
+        _device_particles_instances_create(particles_handle, device, particles_handle->geometry_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]));
+
+      __FAILURE_HANDLE(optix_bvh_particles_ias_build(particles_handle->instance_bvh, device, particles_handle));
     }
 
-    __FAILURE_HANDLE(device_malloc(&particles_handle->vertex_buffer, 6 * 4 * sizeof(float) * particles->count));
-    __FAILURE_HANDLE(device_malloc(&particles_handle->quad_buffer, sizeof(Quad) * particles->count));
-
-    particles_handle->allocated_count = particles->count;
+    *buffers_have_changed = true;
   }
 
-  particles_handle->count = particles->count;
+  return LUMINARY_SUCCESS;
+}
 
-  KernelArgsParticleGenerate args;
+LuminaryResult device_particles_handle_get_ptrs(DeviceParticlesHandle* particles_handle, DeviceParticlesHandlePtrs* ptrs) {
+  __CHECK_NULL_ARGUMENT(particles_handle);
+  __CHECK_NULL_ARGUMENT(ptrs);
 
-  args.count          = particles->count;
-  args.seed           = particles->seed;
-  args.size           = particles->size * 0.001f;
-  args.size_variation = particles->size_variation;
-  args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
-  args.quads          = DEVICE_PTR(particles_handle->quad_buffer);
-
-  __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
-
-  __FAILURE_HANDLE(optix_bvh_particles_gas_build(particles_handle->geometry_bvh, device, particles_handle));
-
-  __FAILURE_HANDLE(
-    _device_particles_instances_create(particles_handle, device, particles_handle->geometry_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]));
-
-  __FAILURE_HANDLE(optix_bvh_particles_ias_build(particles_handle->instance_bvh, device, particles_handle));
+  ptrs->quads = DEVICE_CUPTR(particles_handle->quad_buffer);
+  ptrs->bvh   = particles_handle->instance_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT];
 
   return LUMINARY_SUCCESS;
 }
