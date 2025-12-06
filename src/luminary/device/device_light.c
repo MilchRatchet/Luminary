@@ -2350,6 +2350,11 @@ LuminaryResult device_light_tree_create(DeviceLightTree** tree) {
   __FAILURE_HANDLE(host_malloc(tree, sizeof(DeviceLightTree)));
   memset(*tree, 0, sizeof(DeviceLightTree));
 
+  // Use an invalid value because 0 is a valid value and we need to properly allocate sizes of 0.
+  (*tree)->allocated_root_size   = 0xFFFFFFFF;
+  (*tree)->allocated_nodes_size  = 0xFFFFFFFF;
+  (*tree)->allocated_light_count = 0xFFFFFFFF;
+
   return LUMINARY_SUCCESS;
 }
 

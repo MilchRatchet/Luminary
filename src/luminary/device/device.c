@@ -542,7 +542,6 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  __DEVICE_BUFFER_FREE(materials);
   __DEVICE_BUFFER_FREE(triangles);
   __DEVICE_BUFFER_FREE(triangle_counts);
   __DEVICE_BUFFER_FREE(instance_mesh_id);
@@ -653,6 +652,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Initialize device object implementations
   ////////////////////////////////////////////////////////////////////
 
+  __FAILURE_HANDLE(device_material_manager_create(&device->materials));
   __FAILURE_HANDLE(device_texture_manager_create(&device->textures));
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
@@ -1113,40 +1113,22 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_apply_material_updates(
-  Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials) {
+LuminaryResult device_update_materials(Device* device, const MaterialManager* material_manager) {
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(updates);
-  __CHECK_NULL_ARGUMENT(materials);
+  __CHECK_NULL_ARGUMENT(material_manager);
 
   DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  uint32_t num_updates;
-  __FAILURE_HANDLE(array_get_num_elements(updates, &num_updates));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_material_manager_update(device->materials, device, material_manager, &buffers_have_changed));
 
-  bool new_materials_are_added = false;
+  if (buffers_have_changed) {
+    DeviceMaterialManagerPtrs ptrs;
+    __FAILURE_HANDLE(device_material_manager_get_ptrs(device->materials, &ptrs));
 
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const uint32_t material_id = updates[update_id].material_id;
-
-    if (material_id >= device->num_materials) {
-      device->num_materials   = material_id + 1;
-      new_materials_are_added = true;
-    }
-  }
-
-  if (new_materials_are_added) {
-    __DEVICE_BUFFER_REALLOC(materials, sizeof(DeviceMaterialCompressed) * device->num_materials);
-  }
-
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const uint32_t material_id = updates[update_id].material_id;
-
-    __FAILURE_HANDLE(device_staging_manager_register(
-      device->staging_manager, materials + update_id, (DEVICE void*) device->buffers.materials,
-      sizeof(DeviceMaterialCompressed) * material_id, sizeof(DeviceMaterialCompressed)));
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.materials, (void*) ptrs.materials);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1908,6 +1890,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_adaptive_sampler_destroy(&(*device)->adaptive_sampler));
   __FAILURE_HANDLE(device_light_tree_destroy(&(*device)->light_tree));
   __FAILURE_HANDLE(device_texture_manager_destroy(&(*device)->textures));
+  __FAILURE_HANDLE(device_material_manager_destroy(&(*device)->materials));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));

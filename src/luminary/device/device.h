@@ -7,6 +7,7 @@
 #include "device_cloud.h"
 #include "device_embedded_data.h"
 #include "device_light.h"
+#include "device_material_manager.h"
 #include "device_memory.h"
 #include "device_mesh.h"
 #include "device_omm.h"
@@ -107,7 +108,6 @@ struct Device {
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceStagingManager* staging_manager;
-  uint32_t num_materials;
   uint32_t num_instances;
   ARRAY DeviceMesh** meshes;
   ARRAY OpacityMicromap** omms;
@@ -122,6 +122,7 @@ struct Device {
   DevicePhysicalCamera* physical_camera;
   DeviceEmbeddedData* embedded_data;
   DeviceTextureManager* textures;
+  DeviceMaterialManager* materials;
   DeviceWorkBuffers* work_buffers;
   DevicePost* post;
   DeviceRenderer* renderer;
@@ -161,8 +162,7 @@ LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_update_mesh(Device* device, const Mesh* mesh);
 LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates);
 LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures);
-LuminaryResult device_apply_material_updates(
-  Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials);
+LuminaryResult device_update_materials(Device* device, const MaterialManager* material_manager);
 LuminaryResult device_build_light_tree(Device* device, LightTree* tree);
 LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree);
 LuminaryResult device_unload_light_tree(Device* device, LightTree* tree);

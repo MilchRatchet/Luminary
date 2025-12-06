@@ -72,25 +72,16 @@ static LuminaryResult _device_manager_handle_device_material_updates(DeviceManag
   ARRAY MaterialUpdate* material_updates;
   __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &material_updates, SCENE_ENTITY_MATERIALS));
 
-  uint32_t num_updates;
-  __FAILURE_HANDLE(array_get_num_elements(material_updates, &num_updates));
-
-  ARRAY DeviceMaterialCompressed* device_material_updates;
-  __FAILURE_HANDLE(array_create(&device_material_updates, sizeof(DeviceMaterialCompressed), num_updates));
-
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    DeviceMaterialCompressed device_material;
-    __FAILURE_HANDLE(device_struct_material_convert(&material_updates[update_id].material, &device_material));
-
-    __FAILURE_HANDLE(array_push(&device_material_updates, &device_material));
-  }
+  __FAILURE_HANDLE(material_manager_add_updates(device_manager->materials, material_updates));
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_apply_material_updates(device_manager->devices[device_id], material_updates, device_material_updates));
+    __FAILURE_HANDLE(device_update_materials(device_manager->devices[device_id], device_manager->materials));
   }
+
+  __FAILURE_HANDLE(material_manager_clear_updates(device_manager->materials));
 
   uint32_t num_material_updates;
   __FAILURE_HANDLE(array_get_num_elements(material_updates, &num_material_updates));
@@ -100,7 +91,6 @@ static LuminaryResult _device_manager_handle_device_material_updates(DeviceManag
   }
 
   __FAILURE_HANDLE(array_destroy(&material_updates));
-  __FAILURE_HANDLE(array_destroy(&device_material_updates));
 
   return LUMINARY_SUCCESS;
 }
@@ -795,6 +785,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(bsdf_lut_create(&device_manager->bsdf_lut));
   __FAILURE_HANDLE(physical_camera_create(&device_manager->physical_camera));
   __FAILURE_HANDLE(sample_time_create(&device_manager->sample_time));
+  __FAILURE_HANDLE(material_manager_create(&device_manager->materials));
 
   ////////////////////////////////////////////////////////////////////
   // Select main device
@@ -1117,6 +1108,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(bsdf_lut_destroy(&(*device_manager)->bsdf_lut));
   __FAILURE_HANDLE(physical_camera_destroy(&(*device_manager)->physical_camera));
   __FAILURE_HANDLE(sample_time_destroy(&(*device_manager)->sample_time));
+  __FAILURE_HANDLE(material_manager_destroy(&(*device_manager)->materials));
 
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
 
