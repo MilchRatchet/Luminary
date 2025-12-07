@@ -419,58 +419,6 @@ static LuminaryResult _device_update_get_next_undersampling_state(Device* device
   return LUMINARY_SUCCESS;
 }
 
-////////////////////////////////////////////////////////////////////
-// Buffer handling
-////////////////////////////////////////////////////////////////////
-
-#define __DEVICE_BUFFER_FREE(buffer)                          \
-  if (device->buffers.buffer) {                               \
-    __FAILURE_HANDLE(device_free(&(device->buffers.buffer))); \
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, (void*) 0);    \
-  }
-
-#define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                                  \
-  {                                                                                             \
-    bool __macro_buffer_requires_allocation = true;                                             \
-    if (device->buffers.buffer) {                                                               \
-      size_t __macro_previous_size;                                                             \
-      __FAILURE_HANDLE(device_memory_get_size(device->buffers.buffer, &__macro_previous_size)); \
-      if (__macro_previous_size != size) {                                                      \
-        __DEVICE_BUFFER_FREE(buffer);                                                           \
-      }                                                                                         \
-      else {                                                                                    \
-        __macro_buffer_requires_allocation = false;                                             \
-      }                                                                                         \
-    }                                                                                           \
-    if (__macro_buffer_requires_allocation) {                                                   \
-      __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));                           \
-      DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer));           \
-    }                                                                                           \
-  }
-
-#define __DEVICE_BUFFER_REALLOC(buffer, size)                                                                                             \
-  {                                                                                                                                       \
-    if (device->buffers.buffer) {                                                                                                         \
-      size_t __macro_previous_size;                                                                                                       \
-      __FAILURE_HANDLE(device_memory_get_size(device->buffers.buffer, &__macro_previous_size));                                           \
-      if (size > __macro_previous_size) {                                                                                                 \
-        DEVICE void* __macro_new_device_buffer;                                                                                           \
-        __FAILURE_HANDLE(device_malloc(&__macro_new_device_buffer, size));                                                                \
-        void* __macro_staging_buffer;                                                                                                     \
-        __FAILURE_HANDLE(device_staging_manager_register_direct_access(                                                                   \
-          device->staging_manager, __macro_new_device_buffer, 0, size, &__macro_staging_buffer));                                         \
-        __FAILURE_HANDLE(device_download(__macro_staging_buffer, device->buffers.buffer, 0, __macro_previous_size, device->stream_main)); \
-        CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));                                                                    \
-        __DEVICE_BUFFER_FREE(buffer);                                                                                                     \
-        device->buffers.buffer = __macro_new_device_buffer;                                                                               \
-        DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer));                                                   \
-      }                                                                                                                                   \
-    }                                                                                                                                     \
-    else {                                                                                                                                \
-      __DEVICE_BUFFER_ALLOCATE(buffer, size);                                                                                             \
-    }                                                                                                                                     \
-  }
-
 static LuminaryResult _device_allocate_work_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 

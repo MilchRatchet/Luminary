@@ -78,7 +78,7 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
     {
       KernelArgsPostImageDownsample args;
 
-      args.src       = DEVICE_PTR(device->buffers.frame_result[channel_id]);
+      args.src       = DEVICE_PTR(device->work_buffers->frame_result[channel_id]);
       args.sw        = width;
       args.sh        = height;
       args.dst       = DEVICE_PTR(post->bloom_mips[0]);
@@ -125,8 +125,8 @@ static LuminaryResult _device_post_bloom_apply(DevicePost* post, Device* device)
       args.src  = DEVICE_PTR(post->bloom_mips[0]);
       args.sw   = width >> 1;
       args.sh   = height >> 1;
-      args.dst  = DEVICE_PTR(device->buffers.frame_result[channel_id]);
-      args.base = DEVICE_PTR(device->buffers.frame_result[channel_id]);
+      args.dst  = DEVICE_PTR(device->work_buffers->frame_result[channel_id]);
+      args.base = DEVICE_PTR(device->work_buffers->frame_result[channel_id]);
       args.tw   = width;
       args.th   = height;
       args.sa   = post->bloom_blend / mip_count;

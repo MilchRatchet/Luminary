@@ -104,7 +104,6 @@ struct Device {
   CUstream stream_callbacks;
   CUevent event_queue_render;
   CUevent event_queue_gbuffer_meta;
-  DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING GBufferMetaData* gbuffer_meta_dst;

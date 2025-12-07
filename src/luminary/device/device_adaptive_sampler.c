@@ -154,9 +154,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   }
 
   __FAILURE_HANDLE(device_download(
-    sampler->stage_sample_counts, device->buffers.stage_sample_counts, 0, buffer_sizes.stage_sample_counts_size, device->stream_main));
+    sampler->stage_sample_counts, device->adaptive_sampler->stage_sample_counts, 0, buffer_sizes.stage_sample_counts_size,
+    device->stream_main));
   __FAILURE_HANDLE(device_download(
-    sampler->stage_total_task_counts, device->buffers.stage_total_task_counts, 0, buffer_sizes.stage_total_task_counts_size,
+    sampler->stage_total_task_counts, device->adaptive_sampler->stage_total_task_counts, 0, buffer_sizes.stage_total_task_counts_size,
     device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuEventRecord(sampler->stage_build_event, device->stream_main));

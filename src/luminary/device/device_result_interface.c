@@ -138,10 +138,10 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
     __FAILURE_HANDLE(device_download(
-      entry->frame_first_moment[channel_id], device->buffers.frame_first_moment[channel_id], 0, pixel_count * sizeof(float),
+      entry->frame_first_moment[channel_id], device->work_buffers->frame_first_moment[channel_id], 0, pixel_count * sizeof(float),
       device->stream_main));
     __FAILURE_HANDLE(device_download(
-      entry->frame_second_moment[channel_id], device->buffers.frame_second_moment[channel_id], 0, pixel_count * sizeof(float),
+      entry->frame_second_moment[channel_id], device->work_buffers->frame_second_moment[channel_id], 0, pixel_count * sizeof(float),
       device->stream_main));
   }
 
@@ -165,7 +165,7 @@ static LuminaryResult _device_result_interface_update_buffer(
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
-  __FAILURE_HANDLE(device_upload(device->buffers.frame_swap, src, 0, num_elements * sizeof(float), device->stream_main));
+  __FAILURE_HANDLE(device_upload(device->work_buffers->frame_swap, src, 0, num_elements * sizeof(float), device->stream_main));
 
   uint32_t num_blocks  = (num_elements + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
   uint32_t base_offset = 0;
@@ -175,7 +175,7 @@ static LuminaryResult _device_result_interface_update_buffer(
 
     KernelArgsBufferAdd args;
     args.dst          = DEVICE_PTR(dst);
-    args.src          = DEVICE_PTR(device->buffers.frame_swap);
+    args.src          = DEVICE_PTR(device->work_buffers->frame_swap);
     args.base_offset  = base_offset;
     args.num_elements = num_elements;
 
@@ -247,9 +247,9 @@ LuminaryResult device_result_interface_gather_results(DeviceResultInterface* int
 
     for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
       __FAILURE_HANDLE(_device_result_interface_update_buffer(
-        interface, device, device->buffers.frame_first_moment[channel_id], entry->frame_first_moment[channel_id], pixel_count));
+        interface, device, device->work_buffers->frame_first_moment[channel_id], entry->frame_first_moment[channel_id], pixel_count));
       __FAILURE_HANDLE(_device_result_interface_update_buffer(
-        interface, device, device->buffers.frame_second_moment[channel_id], entry->frame_second_moment[channel_id], pixel_count));
+        interface, device, device->work_buffers->frame_second_moment[channel_id], entry->frame_second_moment[channel_id], pixel_count));
     }
 
     if (entry->consumer_event_id == RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID) {
