@@ -10,6 +10,7 @@
 #include "device_material_manager.h"
 #include "device_memory.h"
 #include "device_mesh.h"
+#include "device_mesh_instance_manager.h"
 #include "device_omm.h"
 #include "device_output.h"
 #include "device_particle.h"
@@ -108,12 +109,6 @@ struct Device {
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceStagingManager* staging_manager;
-  uint32_t num_instances;
-  ARRAY DeviceMesh** meshes;
-  ARRAY OpacityMicromap** omms;
-  bool meshes_need_building;
-  OptixBVHInstanceCache* optix_instance_cache;
-  OptixBVH* optix_bvh_ias;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
   DeviceSkyStars* sky_stars;
@@ -123,6 +118,7 @@ struct Device {
   DeviceEmbeddedData* embedded_data;
   DeviceTextureManager* textures;
   DeviceMaterialManager* materials;
+  DeviceMeshInstanceManager* instances;
   DeviceWorkBuffers* work_buffers;
   DevicePost* post;
   DeviceRenderer* renderer;
@@ -159,8 +155,8 @@ LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id)
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
 LuminaryResult device_sync_constant_memory(Device* device);
 LuminaryResult device_allocate_work_buffers(Device* device);
-LuminaryResult device_update_mesh(Device* device, const Mesh* mesh);
-LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates);
+LuminaryResult device_add_mesh(Device* device, const Mesh* mesh);
+LuminaryResult device_update_instances(Device* device, const MeshInstanceManager* instance_manager);
 LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures);
 LuminaryResult device_update_materials(Device* device, const MaterialManager* material_manager);
 LuminaryResult device_build_light_tree(Device* device, LightTree* tree);

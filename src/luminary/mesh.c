@@ -44,19 +44,20 @@ LuminaryResult mesh_set_name(Mesh* mesh, const char* name) {
 LuminaryResult mesh_destroy(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
 
-  __FAILURE_HANDLE(host_free(&(*mesh)->triangles));
-
-  if ((*mesh)->name) {
+  if ((*mesh)->name)
     __FAILURE_HANDLE(host_free(&(*mesh)->name));
-  }
 
-  if ((*mesh)->data.vertex_buffer) {
+  if ((*mesh)->data.vertex_buffer)
     __FAILURE_HANDLE(host_free(&(*mesh)->data.vertex_buffer));
-  }
 
-  if ((*mesh)->data.index_buffer) {
-    __FAILURE_HANDLE(host_free(&(*mesh)->data.index_buffer));
-  }
+  if ((*mesh)->data.uv_buffer)
+    __FAILURE_HANDLE(host_free(&(*mesh)->data.uv_buffer));
+
+  if ((*mesh)->data.normal_buffer)
+    __FAILURE_HANDLE(host_free(&(*mesh)->data.normal_buffer));
+
+  if ((*mesh)->data.material_id_buffer)
+    __FAILURE_HANDLE(host_free(&(*mesh)->data.material_id_buffer));
 
   __FAILURE_HANDLE(host_free(mesh));
 

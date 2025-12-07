@@ -1646,9 +1646,7 @@ static LuminaryResult _light_tree_update_cache_mesh(
   uint32_t num_materials = 0;
 
   for (uint32_t tri_id = 0; tri_id < mesh->data.triangle_count; tri_id++) {
-    const Triangle* triangle = mesh->triangles + tri_id;
-
-    const uint16_t material_id = triangle->material_id;
+    const uint16_t material_id = mesh->data.material_id_buffer[tri_id];
 
     uint32_t material_slot = 0xFFFFFFFF;
 
@@ -1671,15 +1669,19 @@ static LuminaryResult _light_tree_update_cache_mesh(
       __FAILURE_HANDLE(array_push(&cache->material_triangles, &material_triangles));
     }
 
-    const Vec128 vertex = vec128_set(triangle->vertex.x, triangle->vertex.y, triangle->vertex.z, 0.0f);
-    const Vec128 edge1  = vec128_set(triangle->edge1.x, triangle->edge1.y, triangle->edge1.z, 0.0f);
-    const Vec128 edge2  = vec128_set(triangle->edge2.x, triangle->edge2.y, triangle->edge2.z, 0.0f);
+    // This relies on the host CPU supporting unaligned loads for this.
+    const Vec128 vertex  = vec128_set_w_to_0(vec128_load(mesh->data.vertex_buffer + tri_id * 9 + 0));
+    const Vec128 vertex1 = vec128_set_w_to_0(vec128_load(mesh->data.vertex_buffer + tri_id * 9 + 3));
+    const Vec128 vertex2 = vec128_set_w_to_0(vec128_load(mesh->data.vertex_buffer + tri_id * 9 + 6));
+
+    const Vec128 edge1 = vec128_sub(vertex1, vertex);
+    const Vec128 edge2 = vec128_sub(vertex2, vertex);
 
     LightTreeCacheTriangle cache_triangle;
     cache_triangle.tri_id            = tri_id;
     cache_triangle.vertex            = vertex;
-    cache_triangle.vertex1           = vec128_add(vertex, edge1);
-    cache_triangle.vertex2           = vec128_add(vertex, edge2);
+    cache_triangle.vertex1           = vertex1;
+    cache_triangle.vertex2           = vertex2;
     cache_triangle.cross             = vec128_cross(edge1, edge2);
     cache_triangle.average_intensity = 1.0f;
 

@@ -1,3 +1,4 @@
+#if 0
 #include "bvh.h"
 
 #include <float.h>
@@ -1450,3 +1451,5 @@ LuminaryResult bvh_destroy(BVH** bvh) {
 
   return LUMINARY_SUCCESS;
 }
+
+#endif

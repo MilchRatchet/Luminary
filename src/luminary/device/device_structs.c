@@ -347,39 +347,27 @@ LuminaryResult device_struct_scene_entity_convert(const void* restrict source, v
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle) {
-  __CHECK_NULL_ARGUMENT(triangle);
+LuminaryResult device_struct_vertex_convert(const TriangleGeomData* data, uint32_t vertex_id, DeviceTriangleVertex* device_vertex) {
+  __CHECK_NULL_ARGUMENT(data);
+  __CHECK_NULL_ARGUMENT(device_vertex);
+
+  device_vertex->pos.x  = data->vertex_buffer[vertex_id * 3 + 0];
+  device_vertex->pos.y  = data->vertex_buffer[vertex_id * 3 + 1];
+  device_vertex->pos.z  = data->vertex_buffer[vertex_id * 3 + 2];
+  device_vertex->normal = device_pack_normal(*((vec3*) &data->normal_buffer[vertex_id * 3]));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_struct_triangle_texture_convert(
+  const TriangleGeomData* data, uint32_t tri_id, DeviceTriangleTexture* device_triangle) {
+  __CHECK_NULL_ARGUMENT(data);
   __CHECK_NULL_ARGUMENT(device_triangle);
 
-  device_triangle->vertex = triangle->vertex;
-  device_triangle->edge1  = triangle->edge1;
-  device_triangle->edge2  = triangle->edge2;
-
-  device_triangle->vertex_normal = device_pack_normal(triangle->vertex_normal);
-
-  const vec3 vertex1_normal = (vec3) {.x = triangle->vertex_normal.x + triangle->edge1_normal.x,
-                                      .y = triangle->vertex_normal.y + triangle->edge1_normal.y,
-                                      .z = triangle->vertex_normal.z + triangle->edge1_normal.z};
-
-  const vec3 vertex2_normal = (vec3) {.x = triangle->vertex_normal.x + triangle->edge2_normal.x,
-                                      .y = triangle->vertex_normal.y + triangle->edge2_normal.y,
-                                      .z = triangle->vertex_normal.z + triangle->edge2_normal.z};
-
-  device_triangle->vertex1_normal = device_pack_normal(vertex1_normal);
-  device_triangle->vertex2_normal = device_pack_normal(vertex2_normal);
-
-  const UV vertex1_texture =
-    (UV) {.u = triangle->vertex_texture.u + triangle->edge1_texture.u, .v = triangle->vertex_texture.v + triangle->edge1_texture.v};
-
-  const UV vertex2_texture =
-    (UV) {.u = triangle->vertex_texture.u + triangle->edge2_texture.u, .v = triangle->vertex_texture.v + triangle->edge2_texture.v};
-
-  device_triangle->vertex_texture  = device_pack_uv(triangle->vertex_texture);
-  device_triangle->vertex1_texture = device_pack_uv(vertex1_texture);
-  device_triangle->vertex2_texture = device_pack_uv(vertex2_texture);
-
-  device_triangle->material_id = triangle->material_id;
-  device_triangle->padding     = 0;
+  device_triangle->vertex_texture  = device_pack_uv(*((UV*) &data->uv_buffer[tri_id * 6 + 0]));
+  device_triangle->vertex1_texture = device_pack_uv(*((UV*) &data->uv_buffer[tri_id * 6 + 2]));
+  device_triangle->vertex2_texture = device_pack_uv(*((UV*) &data->uv_buffer[tri_id * 6 + 4]));
+  device_triangle->material_id     = data->material_id_buffer[tri_id];
 
   return LUMINARY_SUCCESS;
 }

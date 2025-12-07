@@ -266,6 +266,19 @@ struct DeviceTriangle {
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
+struct DeviceTriangleVertex {
+  vec3 pos;
+  uint32_t normal;
+} typedef DeviceTriangleVertex;
+
+struct DeviceTriangleTexture {
+  uint32_t vertex_texture;
+  uint32_t vertex1_texture;
+  uint32_t vertex2_texture;
+  uint16_t material_id;
+  uint16_t padding;
+} typedef DeviceTriangleTexture;
+
 typedef CUtexObject DeviceTextureHandle;
 
 struct DeviceTextureObject {
@@ -295,7 +308,9 @@ LuminaryResult device_struct_fog_convert(const Fog* fog, DeviceFog* device_fog);
 LuminaryResult device_struct_particles_convert(const Particles* particles, DeviceParticles* device_particles);
 LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterialCompressed* device_material);
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
-LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);
+LuminaryResult device_struct_vertex_convert(const TriangleGeomData* data, uint32_t vertex_id, DeviceTriangleVertex* device_vertex);
+LuminaryResult device_struct_triangle_texture_convert(
+  const TriangleGeomData* data, uint32_t tri_id, DeviceTriangleTexture* device_triangle);
 LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* texture, DeviceTextureObject* texture_object);
 LuminaryResult device_struct_instance_transform_convert(const MeshInstance* instance, DeviceTransform* device_transform);
 

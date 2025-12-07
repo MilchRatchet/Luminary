@@ -56,20 +56,24 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const uint32_t mesh_id      = mesh_id_load(trace.handle.instance_id);
   const DeviceTransform trans = load_transform(trace.handle.instance_id);
 
-  const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+  const DeviceTriangleVertex* vertex_ptr = (const DeviceTriangleVertex*) __ldg((uint64_t*) (device.ptrs.vertices + mesh_id));
+  const DeviceTriangleTexture* tri_ptr   = (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
 
-  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, trace.handle.tri_id, triangle_count));
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, trace.handle.tri_id, triangle_count));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, trace.handle.tri_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, trace.handle.tri_id, triangle_count));
+  const float4 v0 = __ldg((float4*) (vertex_ptr + trace.handle.tri_id * 3 + 0));
+  const float4 v1 = __ldg((float4*) (vertex_ptr + trace.handle.tri_id * 3 + 1));
+  const float4 v2 = __ldg((float4*) (vertex_ptr + trace.handle.tri_id * 3 + 2));
+
+  const float4 tri = __ldg((float4*) (tri_ptr + trace.handle.tri_id));
 
   vec3 position  = transform_apply_inv(trans, task.origin);
   const vec3 ray = transform_apply_rotation_inv(trans, task.ray);
 
-  const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
-  const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
-  const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
+  const vec3 vertex  = get_vector(v0.x, v0.y, v0.z);
+  const vec3 vertex1 = get_vector(v1.x, v1.y, v2.z);
+  const vec3 vertex2 = get_vector(v2.x, v2.y, v2.z);
+
+  const vec3 edge1 = sub_vector(vertex1, vertex);
+  const vec3 edge2 = sub_vector(vertex2, vertex);
 
   vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
@@ -78,18 +82,18 @@ LUMINARY_FUNCTION MaterialContextGeometry
   position = add_vector(vertex, add_vector(scale_vector(edge1, coords.x), scale_vector(edge2, coords.y)));
   position = transform_apply(trans, position);
 
-  const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
+  const UV vertex_texture  = uv_unpack(__float_as_uint(tri.x));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(tri.y));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(tri.z));
 
   const UV tex_coords = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 
-  const uint16_t material_id = __float_as_uint(t3.w) & 0xFFFF;
+  const uint16_t material_id = __float_as_uint(tri.w) & 0xFFFF;
   const DeviceMaterial mat   = load_material(device.ptrs.materials, material_id);
 
-  const vec3 vertex_normal  = normal_unpack(__float_as_uint(t3.x));
-  const vec3 vertex1_normal = normal_unpack(__float_as_uint(t3.y));
-  const vec3 vertex2_normal = normal_unpack(__float_as_uint(t3.z));
+  const vec3 vertex_normal  = normal_unpack(__float_as_uint(v0.w));
+  const vec3 vertex1_normal = normal_unpack(__float_as_uint(v1.w));
+  const vec3 vertex2_normal = normal_unpack(__float_as_uint(v2.w));
 
   const vec3 edge1_normal = sub_vector(vertex1_normal, vertex_normal);
   const vec3 edge2_normal = sub_vector(vertex2_normal, vertex_normal);

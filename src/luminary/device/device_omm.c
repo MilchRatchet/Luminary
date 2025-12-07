@@ -30,13 +30,13 @@ static size_t _omm_array_size(const uint32_t count, const uint32_t level, const 
   return state_size * count;
 }
 
-LuminaryResult omm_build(OpacityMicromap* omm, const Mesh* mesh, Device* device) {
+LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh* mesh) {
   __CHECK_NULL_ARGUMENT(omm);
   __CHECK_NULL_ARGUMENT(mesh);
   __CHECK_NULL_ARGUMENT(device);
 
   const OptixOpacityMicromapFormat format = OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE;
-  const uint32_t total_tri_count          = mesh->data.triangle_count;
+  const uint32_t total_tri_count          = mesh->triangle_count;
 
   // Highest allowed level is 12 according to OptiX Docs
   const uint8_t max_num_levels = 10;

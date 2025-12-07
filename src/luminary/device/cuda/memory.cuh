@@ -5,25 +5,6 @@
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
-// Interleaved storage access
-////////////////////////////////////////////////////////////////////
-
-LUMINARY_FUNCTION void* interleaved_buffer_get_entry_address_chunk_16(
-  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
-}
-
-LUMINARY_FUNCTION void* interleaved_buffer_get_entry_address_chunk_8(
-  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) ptr) + (count * chunk + id) * 2 + offset);
-}
-
-LUMINARY_FUNCTION void* triangle_get_entry_address(
-  const DeviceTriangle* tri_ptr, const uint32_t chunk, const uint32_t offset, const uint32_t tri_id, const uint32_t triangle_count) {
-  return interleaved_buffer_get_entry_address_chunk_16((void*) tri_ptr, triangle_count, chunk, offset, tri_id);
-}
-
-////////////////////////////////////////////////////////////////////
 // Interthread IO
 ////////////////////////////////////////////////////////////////////
 
@@ -364,50 +345,26 @@ LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t res
   task_result_store(results_index, result);
 }
 
-#ifndef NO_LUMINARY_BVH
-
-LUMINARY_FUNCTION TraversalTriangle load_traversal_triangle(const int offset) {
-  float4* ptr     = (float4*) (device.bvh_triangles + offset);
-  const float4 v1 = __ldg(ptr);
-  const float4 v2 = __ldg(ptr + 1);
-  const float4 v3 = __ldg(ptr + 2);
-
-  TraversalTriangle triangle;
-  triangle.vertex     = get_vector(v1.x, v1.y, v1.z);
-  triangle.edge1      = get_vector(v1.w, v2.x, v2.y);
-  triangle.edge2      = get_vector(v2.z, v2.w, v3.x);
-  triangle.albedo_tex = __float_as_uint(v3.y);
-  triangle.id         = __float_as_uint(v3.z);
-
-  return triangle;
-}
-
-#endif
-
 LUMINARY_FUNCTION uint32_t mesh_id_load(const uint32_t instance_id) {
-  return __ldg(device.ptrs.instance_mesh_id + instance_id);
+  return __ldg(device.ptrs.instance_mesh_ids + instance_id);
 }
 
 LUMINARY_FUNCTION uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
-  const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
-  const uint32_t data           = __ldg((uint32_t*) triangle_get_entry_address(ptr, 3, 3, triangle_id, triangle_count));
-  const uint16_t material_id    = data & 0xFFFF;
+  const DeviceTriangleTexture* ptr = device.ptrs.texture_triangles[mesh_id];
 
-  return material_id;
+  return __ldg(&ptr[triangle_id].material_id);
 }
 
 LUMINARY_FUNCTION UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+  const DeviceTriangleTexture* ptr = device.ptrs.texture_triangles[mesh_id];
 
-  const float4 data = __ldg((float4*) triangle_get_entry_address(ptr, 2, 0, handle.tri_id, triangle_count));
+  const float4 data = __ldg((float4*) (ptr + handle.tri_id));
 
-  const UV vertex_texture  = uv_unpack(__float_as_uint(data.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(data.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(data.w));
+  const UV vertex_texture  = uv_unpack(__float_as_uint(data.x));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(data.y));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(data.z));
 
   return lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }

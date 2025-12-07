@@ -7,6 +7,7 @@
 #include "device_library.h"
 #include "device_light.h"
 #include "device_material_manager.h"
+#include "device_mesh_instance_manager.h"
 #include "device_physical_camera.h"
 #include "device_result_interface.h"
 #include "device_sampletime.h"
@@ -37,6 +38,7 @@ struct DeviceManager {
   DeviceResultInterface* result_interface;
   AdaptiveSampler* adaptive_sampler;
   MaterialManager* materials;
+  MeshInstanceManager* instances;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host, DeviceManagerCreateInfo info);

@@ -35,65 +35,35 @@ LUMINARY_FUNCTION float light_triangle_intersection_uv(const TriangleLight trian
 }
 
 LUMINARY_FUNCTION TriangleLight
-  light_triangle_load(const TriangleHandle handle, const vec3 origin, const vec3 ray, const DeviceTransform trans, float& dist) {
-  const uint32_t mesh_id = mesh_id_load(handle.instance_id);
-
-  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
-
-  const float4 v0   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
-  const float4 v1   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
-  const float4 v2   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
-  const uint32_t v3 = __ldg((uint32_t*) triangle_get_entry_address(tri_ptr, 3, 3, handle.tri_id, triangle_count));
-
-  TriangleLight triangle;
-  triangle.vertex = get_vector(v0.x, v0.y, v0.z);
-  triangle.edge1  = get_vector(v0.w, v1.x, v1.y);
-  triangle.edge2  = get_vector(v1.z, v1.w, v2.x);
-
-  triangle.vertex = transform_apply(trans, triangle.vertex);
-  triangle.edge1  = transform_apply_relative(trans, triangle.edge1);
-  triangle.edge2  = transform_apply_relative(trans, triangle.edge2);
-
-  const UV vertex_texture  = uv_unpack(__float_as_uint(v2.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(v2.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(v2.w));
-
-  float2 coords;
-  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
-
-  triangle.tex_coords  = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
-  triangle.material_id = v3 & 0xFFFF;
-
-  return triangle;
-}
-
-LUMINARY_FUNCTION TriangleLight
   light_triangle_sample_init(const TriangleHandle handle, const DeviceTransform trans, uint3& packed_light_data) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+  const DeviceTriangleVertex* vertex_ptr = (const DeviceTriangleVertex*) __ldg((uint64_t*) (device.ptrs.vertices + mesh_id));
+  const DeviceTriangleTexture* tri_ptr   = (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
 
-  const float4 v0   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
-  const float4 v1   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
-  const float4 v2   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
-  const uint32_t v3 = __ldg((uint32_t*) triangle_get_entry_address(tri_ptr, 3, 3, handle.tri_id, triangle_count));
+  const float4 v0 = __ldg((float4*) (vertex_ptr + handle.tri_id * 3 + 0));
+  const float4 v1 = __ldg((float4*) (vertex_ptr + handle.tri_id * 3 + 1));
+  const float4 v2 = __ldg((float4*) (vertex_ptr + handle.tri_id * 3 + 2));
+
+  const float4 tri = __ldg((float4*) (tri_ptr + handle.tri_id));
+
+  const vec3 vertex  = get_vector(v0.x, v0.y, v0.z);
+  const vec3 vertex1 = get_vector(v1.x, v1.y, v2.z);
+  const vec3 vertex2 = get_vector(v2.x, v2.y, v2.z);
+
+  const vec3 edge1 = sub_vector(vertex1, vertex);
+  const vec3 edge2 = sub_vector(vertex2, vertex);
 
   TriangleLight triangle;
-  triangle.vertex = get_vector(v0.x, v0.y, v0.z);
-  triangle.edge1  = get_vector(v0.w, v1.x, v1.y);
-  triangle.edge2  = get_vector(v1.z, v1.w, v2.x);
+  triangle.vertex = transform_apply(trans, vertex);
+  triangle.edge1  = transform_apply_relative(trans, edge1);
+  triangle.edge2  = transform_apply_relative(trans, edge2);
 
-  triangle.vertex = transform_apply(trans, triangle.vertex);
-  triangle.edge1  = transform_apply_relative(trans, triangle.edge1);
-  triangle.edge2  = transform_apply_relative(trans, triangle.edge2);
+  packed_light_data.x = __float_as_uint(tri.x);
+  packed_light_data.y = __float_as_uint(tri.y);
+  packed_light_data.z = __float_as_uint(tri.z);
 
-  packed_light_data.x = __float_as_uint(v2.y);
-  packed_light_data.y = __float_as_uint(v2.z);
-  packed_light_data.z = __float_as_uint(v2.w);
-
-  triangle.material_id = v3 & 0xFFFF;
+  triangle.material_id = __float_as_uint(tri.w) & 0xFFFF;
 
   const uint8_t material_flags = __ldg(&device.ptrs.materials[triangle.material_id].flags);
   triangle.bidirectional       = material_flags & DEVICE_MATERIAL_FLAG_BIDIRECTIONAL_EMISSION;

@@ -243,20 +243,18 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   const uint32_t mesh_id     = args.mesh_ids[light_id];
   const uint32_t triangle_id = args.triangle_ids[light_id];
 
-  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
+  const DeviceTriangleTexture* tri_ptr = (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
 
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, triangle_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_id, triangle_count));
+  const float4 tri = __ldg((float4*) (tri_ptr + triangle_id));
 
-  const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
+  const UV vertex_texture  = uv_unpack(__float_as_uint(tri.x));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(tri.y));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(tri.z));
 
   const UV edge1_texture = uv_sub(vertex1_texture, vertex_texture);
   const UV edge2_texture = uv_sub(vertex2_texture, vertex_texture);
 
-  const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
+  const uint16_t material_id    = __float_as_uint(tri.w) & 0xFFFF;
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
 
   const float microtriangle_max1 = lights_get_max_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);

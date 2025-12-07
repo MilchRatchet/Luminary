@@ -472,50 +472,52 @@ enum FrameChannel {
 
 struct DevicePointers {
   // DeviceWorkBuffers
-  DEVICE DeviceTaskState* LUM_RESTRICT task_states;
-  DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
-  DEVICE DeviceTaskResult* LUM_RESTRICT task_results;
-  DEVICE uint16_t* LUM_RESTRICT results_counts;
-  DEVICE uint16_t* LUM_RESTRICT trace_counts;
-  DEVICE uint16_t* LUM_RESTRICT task_counts;
-  DEVICE uint16_t* LUM_RESTRICT task_offsets;
-  DEVICE float* LUM_RESTRICT frame_first_moment[FRAME_CHANNEL_COUNT];
-  DEVICE float* LUM_RESTRICT frame_second_moment[FRAME_CHANNEL_COUNT];
-  DEVICE float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
-  DEVICE float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
-  DEVICE float* LUM_RESTRICT frame_swap;
-  DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
+  DeviceTaskState* LUM_RESTRICT task_states;
+  DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
+  DeviceTaskResult* LUM_RESTRICT task_results;
+  uint16_t* LUM_RESTRICT results_counts;
+  uint16_t* LUM_RESTRICT trace_counts;
+  uint16_t* LUM_RESTRICT task_counts;
+  uint16_t* LUM_RESTRICT task_offsets;
+  float* LUM_RESTRICT frame_first_moment[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_second_moment[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_swap;
+  GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   // DeviceAdaptiveSampler
-  DEVICE uint32_t* LUM_RESTRICT stage_sample_counts;
-  DEVICE uint32_t* LUM_RESTRICT stage_total_task_counts;
-  DEVICE uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
-  DEVICE uint32_t* LUM_RESTRICT tile_last_adaptive_sampling_block_index;
+  uint32_t* LUM_RESTRICT stage_sample_counts;
+  uint32_t* LUM_RESTRICT stage_total_task_counts;
+  uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
+  uint32_t* LUM_RESTRICT tile_last_adaptive_sampling_block_index;
   // DeviceTextureManager
-  DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
-  DEVICE const DeviceMaterialCompressed* LUM_RESTRICT materials;
-  DEVICE INTERLEAVED_STORAGE const DeviceTriangle** LUM_RESTRICT triangles;
-  DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
-  DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
-  DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
+  const DeviceTextureObject* LUM_RESTRICT textures;
+  // DeviceMaterialManager
+  const DeviceMaterialCompressed* LUM_RESTRICT materials;
+  // DeviceMeshInstanceManager
+  const DeviceTriangleVertex** LUM_RESTRICT vertices;
+  const DeviceTriangleTexture** LUM_RESTRICT texture_triangles;
+  const DeviceTransform* LUM_RESTRICT instance_transforms;
+  const uint32_t* LUM_RESTRICT instance_mesh_ids;
   // DeviceLightTree
-  DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
-  DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
-  DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
+  const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
+  const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
+  const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   // DeviceParticlesHandle
-  DEVICE const Quad* LUM_RESTRICT particle_quads;
+  const Quad* LUM_RESTRICT particle_quads;
   // DeviceSkyStars
-  DEVICE const Star* LUM_RESTRICT stars;
-  DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
+  const Star* LUM_RESTRICT stars;
+  const uint32_t* LUM_RESTRICT stars_offsets;
   // DevicePhysicalCamera
-  DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
-  DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
+  const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
+  const DeviceCameraMedium* LUM_RESTRICT camera_media;
   // DeviceEmbeddedData
-  DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
-  DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
-  DEVICE const float* LUM_RESTRICT bridge_lut;
-  DEVICE const float* LUM_RESTRICT spectral_cdf;
+  const uint16_t* LUM_RESTRICT bluenoise_1D;
+  const uint32_t* LUM_RESTRICT bluenoise_2D;
+  const float* LUM_RESTRICT bridge_lut;
+  const float* LUM_RESTRICT spectral_cdf;
   // DeviceAbort
-  DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
+  uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
 struct DeviceExecutionState {

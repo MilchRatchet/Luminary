@@ -539,17 +539,6 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_free_buffers(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  __DEVICE_BUFFER_FREE(triangles);
-  __DEVICE_BUFFER_FREE(triangle_counts);
-  __DEVICE_BUFFER_FREE(instance_mesh_id);
-  __DEVICE_BUFFER_FREE(instance_transforms);
-
-  return LUMINARY_SUCCESS;
-}
-
 ////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
@@ -629,15 +618,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(_device_setup_execution_config(device));
 
   ////////////////////////////////////////////////////////////////////
-  // Optix data
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(array_create(&device->meshes, sizeof(DeviceMesh*), 4));
-  __FAILURE_HANDLE(array_create(&device->omms, sizeof(OpacityMicromap*), 4));
-  __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
-  __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
-
-  ////////////////////////////////////////////////////////////////////
   // Initialize processing objects
   ////////////////////////////////////////////////////////////////////
 
@@ -652,6 +632,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Initialize device object implementations
   ////////////////////////////////////////////////////////////////////
 
+  __FAILURE_HANDLE(device_mesh_instance_manager_create(&device->instances));
   __FAILURE_HANDLE(device_material_manager_create(&device->materials));
   __FAILURE_HANDLE(device_texture_manager_create(&device->textures));
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
@@ -962,7 +943,7 @@ LuminaryResult device_allocate_work_buffers(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
+LuminaryResult device_add_mesh(Device* device, const Mesh* mesh) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(mesh);
 
@@ -970,54 +951,16 @@ LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  ////////////////////////////////////////////////////////////////////
-  // Compute new device mesh
-  ////////////////////////////////////////////////////////////////////
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_mesh_instance_manager_add_mesh(device->instances, device, mesh, &buffers_have_changed));
 
-  uint32_t num_meshes;
-  __FAILURE_HANDLE(array_get_num_elements(device->meshes, &num_meshes));
+  if (buffers_have_changed) {
+    DeviceMeshInstanceManagerPtrs ptrs;
+    __FAILURE_HANDLE(device_mesh_instance_manager_get_ptrs(device->instances, &ptrs));
 
-  if (mesh->id > num_meshes) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Meshes were not added in sequence.");
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.vertices, (void*) ptrs.vertices);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.texture_triangles, (void*) ptrs.texture_triangles);
   }
-
-  if (mesh->id < num_meshes) {
-    __FAILURE_HANDLE(device_mesh_destroy(device->meshes + mesh->id));
-  }
-
-  DeviceMesh* device_mesh;
-  OpacityMicromap* omm;
-
-  if (mesh->id == num_meshes) {
-    __FAILURE_HANDLE(device_mesh_create(&device_mesh, device, mesh));
-    __FAILURE_HANDLE(array_push(&device->meshes, &device_mesh));
-
-    __FAILURE_HANDLE(omm_create(&omm));
-    __FAILURE_HANDLE(array_push(&device->omms, &omm));
-
-    num_meshes++;
-    __DEVICE_BUFFER_REALLOC(triangles, sizeof(DeviceTriangle*) * num_meshes);
-    __DEVICE_BUFFER_REALLOC(triangle_counts, sizeof(uint32_t) * num_meshes);
-  }
-  else {
-    device_mesh = device->meshes[mesh->id];
-    omm         = device->omms[mesh->id];
-  }
-
-  void** direct_access_buffer;
-  __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-    device->staging_manager, (void*) device->buffers.triangles, sizeof(DeviceTriangle*) * mesh->id, sizeof(DeviceTriangle*),
-    (void**) &direct_access_buffer));
-
-  *direct_access_buffer = DEVICE_PTR(device->meshes[mesh->id]->triangles);
-
-  __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-    device->staging_manager, (void*) device->buffers.triangle_counts, sizeof(uint32_t) * mesh->id, sizeof(uint32_t),
-    (void**) &direct_access_buffer));
-
-  *(uint32_t*) direct_access_buffer = mesh->data.triangle_count;
-
-  device->meshes_need_building = true;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1047,66 +990,26 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates) {
+LuminaryResult device_update_instances(Device* device, const MeshInstanceManager* instance_manager) {
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(instance_updates);
+  __CHECK_NULL_ARGUMENT(instance_manager);
 
   DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  uint32_t num_updates;
-  __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_updates));
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(device_mesh_instance_manager_update(device->instances, device, instance_manager, &buffers_have_changed));
 
-  bool new_instances_are_added = false;
+  if (buffers_have_changed) {
+    DeviceMeshInstanceManagerPtrs ptrs;
+    __FAILURE_HANDLE(device_mesh_instance_manager_get_ptrs(device->instances, &ptrs));
 
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const uint32_t instance_id = instance_updates[update_id].instance_id;
-
-    if (instance_id >= device->num_instances) {
-      device->num_instances   = instance_id + 1;
-      new_instances_are_added = true;
-    }
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.instance_transforms, (void*) ptrs.instance_transforms);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.instance_mesh_ids, (void*) ptrs.instance_mesh_ids);
+    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh, ptrs.bvh);
+    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_shadow, ptrs.bvh_shadow);
   }
-
-  if (new_instances_are_added) {
-    __DEVICE_BUFFER_REALLOC(instance_mesh_id, sizeof(uint32_t) * device->num_instances);
-    __DEVICE_BUFFER_REALLOC(instance_transforms, sizeof(DeviceTransform) * device->num_instances);
-  }
-
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const uint32_t instance_id = instance_updates[update_id].instance_id;
-    const uint32_t mesh_id     = instance_updates[update_id].instance.mesh_id;
-
-    __FAILURE_HANDLE(device_staging_manager_register(
-      device->staging_manager, &mesh_id, (DEVICE void*) device->buffers.instance_mesh_id, sizeof(uint32_t) * instance_id,
-      sizeof(uint32_t)));
-
-    DeviceTransform* transform;
-
-    __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-      device->staging_manager, (DEVICE void*) device->buffers.instance_transforms, sizeof(DeviceTransform) * instance_id,
-      sizeof(DeviceTransform), (void**) &transform));
-
-    __FAILURE_HANDLE(device_struct_instance_transform_convert(&instance_updates[update_id].instance, transform));
-  }
-
-  if (device->meshes_need_building) {
-    uint32_t num_meshes;
-    __FAILURE_HANDLE(array_get_num_elements(device->meshes, &num_meshes));
-
-    for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
-      __FAILURE_HANDLE(device_mesh_build_structures(device->meshes[mesh_id], device->omms[mesh_id], device));
-    }
-
-    device->meshes_need_building = false;
-  }
-
-  __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));
-  __FAILURE_HANDLE(optix_bvh_ias_build(device->optix_bvh_ias, device));
-
-  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh, device->optix_bvh_ias->traversable[OPTIX_BVH_TYPE_DEFAULT]);
-  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_shadow, device->optix_bvh_ias->traversable[OPTIX_BVH_TYPE_SHADOW]);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1861,19 +1764,6 @@ LuminaryResult device_destroy(Device** device) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent((*device)->cuda_ctx));
   CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
-  __FAILURE_HANDLE(_device_free_buffers(*device));
-
-  uint32_t num_meshes;
-  __FAILURE_HANDLE(array_get_num_elements((*device)->meshes, &num_meshes));
-
-  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
-    __FAILURE_HANDLE(device_mesh_destroy(&(*device)->meshes[mesh_id]));
-    __FAILURE_HANDLE(omm_destroy(&(*device)->omms[mesh_id]));
-  }
-
-  __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
-  __FAILURE_HANDLE(array_destroy(&(*device)->omms));
-
   __FAILURE_HANDLE(device_abort_destroy(&(*device)->abort));
   __FAILURE_HANDLE(device_output_destroy(&(*device)->output));
   __FAILURE_HANDLE(device_renderer_destroy(&(*device)->renderer));
@@ -1891,9 +1781,7 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(device_light_tree_destroy(&(*device)->light_tree));
   __FAILURE_HANDLE(device_texture_manager_destroy(&(*device)->textures));
   __FAILURE_HANDLE(device_material_manager_destroy(&(*device)->materials));
-
-  __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
-  __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
+  __FAILURE_HANDLE(device_mesh_instance_manager_destroy(&(*device)->instances));
 
   __FAILURE_HANDLE(device_post_destroy(&(*device)->post));
 

@@ -101,12 +101,16 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   ARRAY MeshInstanceUpdate* instance_updates;
   __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &instance_updates, SCENE_ENTITY_INSTANCES));
 
+  __FAILURE_HANDLE(mesh_instance_manager_add_updates(device_manager->instances, instance_updates));
+
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_apply_instance_updates(device_manager->devices[device_id], instance_updates));
+    __FAILURE_HANDLE(device_update_instances(device_manager->devices[device_id], device_manager->instances));
   }
+
+  __FAILURE_HANDLE(mesh_instance_manager_clear_updates(device_manager->instances));
 
   uint32_t num_instance_updates;
   __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_instance_updates));
@@ -622,7 +626,7 @@ static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, 
     Device* device = device_manager->devices[device_id];
 
     for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
-      __FAILURE_HANDLE(device_update_mesh(device, args->meshes[mesh_id]));
+      __FAILURE_HANDLE(device_add_mesh(device, args->meshes[mesh_id]));
     }
   }
 
@@ -786,6 +790,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(physical_camera_create(&device_manager->physical_camera));
   __FAILURE_HANDLE(sample_time_create(&device_manager->sample_time));
   __FAILURE_HANDLE(material_manager_create(&device_manager->materials));
+  __FAILURE_HANDLE(mesh_instance_manager_create(&device_manager->instances));
 
   ////////////////////////////////////////////////////////////////////
   // Select main device
@@ -1109,6 +1114,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(physical_camera_destroy(&(*device_manager)->physical_camera));
   __FAILURE_HANDLE(sample_time_destroy(&(*device_manager)->sample_time));
   __FAILURE_HANDLE(material_manager_destroy(&(*device_manager)->materials));
+  __FAILURE_HANDLE(mesh_instance_manager_destroy(&(*device_manager)->instances))
 
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
 

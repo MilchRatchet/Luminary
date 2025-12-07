@@ -18,30 +18,28 @@ struct OMMTextureTriangle {
 } typedef OMMTextureTriangle;
 
 LUMINARY_FUNCTION OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mesh_id, const uint32_t tri_id) {
-  const uint32_t material_id = material_id_load(mesh_id, tri_id);
-  const uint16_t tex         = __ldg(&device.ptrs.materials[material_id].albedo_tex);
+  const DeviceTriangleTexture* tri_ptr = (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
 
-  OMMTextureTriangle tri;
-  tri.tex_id       = tex;
-  tri.is_invisible = false;
+  const float4 tri = __ldg((float4*) (tri_ptr + tri_id));
 
-  if (tex == TEXTURE_NONE) {
-    tri.is_invisible = __ldg(&device.ptrs.materials[material_id].albedo_a) == 0;
-    return tri;
+  OMMTextureTriangle omm_triangle;
+  omm_triangle.vertex  = uv_unpack(__float_as_uint(tri.x));
+  omm_triangle.vertex1 = uv_unpack(__float_as_uint(tri.y));
+  omm_triangle.vertex2 = uv_unpack(__float_as_uint(tri.z));
+
+  const uint16_t material_id = __float_as_uint(tri.w) & 0xFFFF;
+
+  omm_triangle.tex_id = __ldg(&device.ptrs.materials[material_id].albedo_tex);
+
+  if (omm_triangle.tex_id == TEXTURE_NONE) {
+    omm_triangle.is_invisible = __ldg(&device.ptrs.materials[material_id].albedo_a) == 0;
+  }
+  else {
+    omm_triangle.is_invisible = false;
+    omm_triangle.tex          = device.ptrs.textures[omm_triangle.tex_id];
   }
 
-  const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
-
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, tri_id, triangle_count));
-
-  tri.tex = device.ptrs.textures[tex];
-
-  tri.vertex  = uv_unpack(__float_as_uint(t2.y));
-  tri.vertex1 = uv_unpack(__float_as_uint(t2.z));
-  tri.vertex2 = uv_unpack(__float_as_uint(t2.w));
-
-  return tri;
+  return omm_triangle;
 }
 
 // Load triangle only once for the refinement steps
