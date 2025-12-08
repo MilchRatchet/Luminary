@@ -56,21 +56,21 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const uint32_t mesh_id      = mesh_id_load(trace.handle.instance_id);
   const DeviceTransform trans = load_transform(trace.handle.instance_id);
 
-  const DeviceTriangleVertex* vertex_ptr = (const DeviceTriangleVertex*) __ldg((uint64_t*) (device.ptrs.vertices + mesh_id));
-  const DeviceTriangleTexture* tri_ptr   = (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
+  const DeviceTriangleVertex* vertex_ptr = triangle_vertex_ptr_load(mesh_id);
+  const DeviceTriangleTexture* tri_ptr   = triangle_texture_ptr_load(mesh_id);
 
-  const float4 v0 = __ldg((float4*) (vertex_ptr + trace.handle.tri_id * 3 + 0));
-  const float4 v1 = __ldg((float4*) (vertex_ptr + trace.handle.tri_id * 3 + 1));
-  const float4 v2 = __ldg((float4*) (vertex_ptr + trace.handle.tri_id * 3 + 2));
+  const DeviceTriangleVertex v0 = triangle_vertex_load(vertex_ptr, trace.handle.tri_id * 3 + 0);
+  const DeviceTriangleVertex v1 = triangle_vertex_load(vertex_ptr, trace.handle.tri_id * 3 + 1);
+  const DeviceTriangleVertex v2 = triangle_vertex_load(vertex_ptr, trace.handle.tri_id * 3 + 2);
 
   const float4 tri = __ldg((float4*) (tri_ptr + trace.handle.tri_id));
 
   vec3 position  = transform_apply_inv(trans, task.origin);
   const vec3 ray = transform_apply_rotation_inv(trans, task.ray);
 
-  const vec3 vertex  = get_vector(v0.x, v0.y, v0.z);
-  const vec3 vertex1 = get_vector(v1.x, v1.y, v1.z);
-  const vec3 vertex2 = get_vector(v2.x, v2.y, v2.z);
+  const vec3 vertex  = v0.pos;
+  const vec3 vertex1 = v1.pos;
+  const vec3 vertex2 = v2.pos;
 
   const vec3 edge1 = sub_vector(vertex1, vertex);
   const vec3 edge2 = sub_vector(vertex2, vertex);
@@ -91,9 +91,9 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const uint16_t material_id = __float_as_uint(tri.w) & 0xFFFF;
   const DeviceMaterial mat   = load_material(device.ptrs.materials, material_id);
 
-  const vec3 vertex_normal  = normal_unpack(__float_as_uint(v0.w));
-  const vec3 vertex1_normal = normal_unpack(__float_as_uint(v1.w));
-  const vec3 vertex2_normal = normal_unpack(__float_as_uint(v2.w));
+  const vec3 vertex_normal  = normal_unpack(v0.normal);
+  const vec3 vertex1_normal = normal_unpack(v1.normal);
+  const vec3 vertex2_normal = normal_unpack(v2.normal);
 
   const vec3 edge1_normal = sub_vector(vertex1_normal, vertex_normal);
   const vec3 edge2_normal = sub_vector(vertex2_normal, vertex_normal);

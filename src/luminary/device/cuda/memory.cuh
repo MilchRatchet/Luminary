@@ -345,6 +345,10 @@ LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t res
   task_result_store(results_index, result);
 }
 
+////////////////////////////////////////////////////////////////////
+// Geometry data IO
+////////////////////////////////////////////////////////////////////
+
 LUMINARY_FUNCTION uint32_t mesh_id_load(const uint32_t instance_id) {
   return __ldg(device.ptrs.instance_mesh_ids + instance_id);
 }
@@ -355,16 +359,45 @@ LUMINARY_FUNCTION uint16_t material_id_load(const uint32_t mesh_id, const uint32
   return __ldg(&ptr[triangle_id].material_id);
 }
 
+LUMINARY_FUNCTION const DeviceTriangleVertex* triangle_vertex_ptr_load(const uint32_t mesh_id) {
+  return (const DeviceTriangleVertex*) __ldg((uint64_t*) (device.ptrs.vertices + mesh_id));
+}
+
+LUMINARY_FUNCTION const DeviceTriangleTexture* triangle_texture_ptr_load(const uint32_t mesh_id) {
+  return (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
+}
+
+LUMINARY_FUNCTION DeviceTriangleVertex triangle_vertex_load(const DeviceTriangleVertex* ptr, const uint32_t vertex_id) {
+  const float4 data = __ldg((const float4*) (ptr + vertex_id));
+
+  DeviceTriangleVertex vertex;
+  vertex.pos    = get_vector(data.x, data.y, data.z);
+  vertex.normal = __float_as_uint(data.w);
+
+  return vertex;
+}
+
+LUMINARY_FUNCTION DeviceTriangleTexture triangle_texture_load(const DeviceTriangleTexture* ptr, const uint32_t triangle_id) {
+  const float4 data = __ldg((const float4*) (ptr + triangle_id));
+
+  DeviceTriangleTexture triangle;
+  triangle.vertex_texture  = __float_as_uint(data.x);
+  triangle.vertex1_texture = __float_as_uint(data.y);
+  triangle.vertex2_texture = __float_as_uint(data.z);
+  triangle.material_id     = __float_as_uint(data.w) & 0xFFFF;
+
+  return triangle;
+}
+
 LUMINARY_FUNCTION UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const DeviceTriangleTexture* ptr = device.ptrs.texture_triangles[mesh_id];
+  const DeviceTriangleTexture* ptr     = triangle_texture_ptr_load(mesh_id);
+  const DeviceTriangleTexture triangle = triangle_texture_load(ptr, handle.tri_id);
 
-  const float4 data = __ldg((float4*) (ptr + handle.tri_id));
-
-  const UV vertex_texture  = uv_unpack(__float_as_uint(data.x));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(data.y));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(data.z));
+  const UV vertex_texture  = uv_unpack(triangle.vertex_texture);
+  const UV vertex1_texture = uv_unpack(triangle.vertex1_texture);
+  const UV vertex2_texture = uv_unpack(triangle.vertex2_texture);
 
   return lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }

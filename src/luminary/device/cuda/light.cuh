@@ -243,7 +243,7 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   const uint32_t mesh_id     = args.mesh_ids[light_id];
   const uint32_t triangle_id = args.triangle_ids[light_id];
 
-  const DeviceTriangleTexture* tri_ptr = (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
+  const DeviceTriangleTexture* tri_ptr = triangle_texture_ptr_load(mesh_id);
 
   const float4 tri = __ldg((float4*) (tri_ptr + triangle_id));
 
