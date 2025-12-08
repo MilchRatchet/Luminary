@@ -48,7 +48,7 @@ LUMINARY_FUNCTION TriangleLight
   const float4 tri = __ldg((float4*) (tri_ptr + handle.tri_id));
 
   const vec3 vertex  = get_vector(v0.x, v0.y, v0.z);
-  const vec3 vertex1 = get_vector(v1.x, v1.y, v2.z);
+  const vec3 vertex1 = get_vector(v1.x, v1.y, v1.z);
   const vec3 vertex2 = get_vector(v2.x, v2.y, v2.z);
 
   const vec3 edge1 = sub_vector(vertex1, vertex);

@@ -2404,15 +2404,19 @@ LuminaryResult device_light_tree_update(DeviceLightTree* tree, Device* device, c
     }
 
     __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_tree->bvh_vertex_buffer_data, (DEVICE void*) tree->bvh_vertex_buffer, 0,
+      tree->allocated_light_count * sizeof(LightTreeBVHTriangle)));
+
+    // We need the BVH vertex buffer for the BVH construction.
+    __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
+
+    __FAILURE_HANDLE(device_staging_manager_register(
       device->staging_manager, shared_tree->root_data, (DEVICE void*) tree->root, 0, tree->allocated_root_size));
     __FAILURE_HANDLE(device_staging_manager_register(
       device->staging_manager, shared_tree->nodes_data, (DEVICE void*) tree->nodes, 0, tree->allocated_nodes_size));
     __FAILURE_HANDLE(device_staging_manager_register(
       device->staging_manager, shared_tree->tri_handle_map_data, (DEVICE void*) tree->tri_handle_map, 0,
       tree->allocated_light_count * sizeof(TriangleHandle)));
-    __FAILURE_HANDLE(device_staging_manager_register(
-      device->staging_manager, shared_tree->bvh_vertex_buffer_data, (DEVICE void*) tree->bvh_vertex_buffer, 0,
-      tree->allocated_light_count * sizeof(LightTreeBVHTriangle)));
 
     __FAILURE_HANDLE(optix_bvh_light_build(tree->bvh, device, tree));
 

@@ -22,6 +22,7 @@ LuminaryResult device_mesh_set(DeviceMesh* device_mesh, Device* device, const Me
   __CHECK_NULL_ARGUMENT(mesh);
 
   device_mesh->triangle_count = mesh->data.triangle_count;
+  device_mesh->id             = mesh->id;
 
   __FAILURE_HANDLE(device_malloc(&device_mesh->vertices, sizeof(DeviceTriangleVertex) * device_mesh->triangle_count * 3));
 

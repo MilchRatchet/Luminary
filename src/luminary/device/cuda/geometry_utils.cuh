@@ -69,7 +69,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const vec3 ray = transform_apply_rotation_inv(trans, task.ray);
 
   const vec3 vertex  = get_vector(v0.x, v0.y, v0.z);
-  const vec3 vertex1 = get_vector(v1.x, v1.y, v2.z);
+  const vec3 vertex1 = get_vector(v1.x, v1.y, v1.z);
   const vec3 vertex2 = get_vector(v2.x, v2.y, v2.z);
 
   const vec3 edge1 = sub_vector(vertex1, vertex);
