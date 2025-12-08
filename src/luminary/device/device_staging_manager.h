@@ -9,6 +9,7 @@ struct StagingEntry;
 
 struct DeviceStagingManager {
   Device* device;
+  CUevent execution_event;
   STAGING void* buffer;
   size_t buffer_write_offset;
   size_t buffer_size_in_use;

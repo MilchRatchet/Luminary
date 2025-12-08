@@ -24,6 +24,8 @@ LuminaryResult device_staging_manager_create(DeviceStagingManager** staging_mana
 
   (*staging_manager)->device = device;
 
+  CUDA_FAILURE_HANDLE(cuEventCreate(&(*staging_manager)->execution_event, CU_EVENT_DISABLE_TIMING));
+
   __FAILURE_HANDLE(device_malloc_staging(&(*staging_manager)->buffer, STAGING_BUFFER_SIZE, DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
   (*staging_manager)->buffer_write_offset = 0;
   (*staging_manager)->buffer_size_in_use  = 0;
@@ -83,6 +85,9 @@ LuminaryResult device_staging_manager_register_direct_access(
   staging_manager->entries_write_offset = (staging_manager->entries_write_offset + 1) & STAGING_ENTRIES_OFFSET_MASK;
   staging_manager->entries_count_in_use++;
 
+  // We need to wait for any uploads to have finished before we return control to the caller, else we risk corruption.
+  CUDA_FAILURE_HANDLE(cuEventSynchronize(staging_manager->execution_event));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -133,12 +138,16 @@ LuminaryResult device_staging_manager_execute(DeviceStagingManager* staging_mana
     staging_manager->entries_count_in_use--;
   }
 
+  CUDA_FAILURE_HANDLE(cuEventRecord(staging_manager->execution_event, staging_manager->device->stream_main));
+
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult device_staging_manager_destroy(DeviceStagingManager** staging_manager) {
   __CHECK_NULL_ARGUMENT(staging_manager);
   __CHECK_NULL_ARGUMENT(*staging_manager);
+
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*staging_manager)->execution_event));
 
   __FAILURE_HANDLE(device_free_staging(&(*staging_manager)->buffer));
   __FAILURE_HANDLE(host_free(&(*staging_manager)->entries));
