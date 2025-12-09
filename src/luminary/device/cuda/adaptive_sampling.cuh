@@ -5,6 +5,24 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+LUMINARY_FUNCTION uint32_t
+  adaptive_sampling_find_block(const uint32_t task_id, const uint32_t block_start, const uint32_t block_end, uint32_t& offset) {
+  // TODO: Consider using binary search
+  offset = 0;
+
+  uint32_t block_id;
+  for (block_id = block_start; block_id < block_end; block_id++) {
+    const uint32_t block_offset = device.ptrs.adaptive_sampling_block_task_offsets[block_id];
+
+    if (task_id < block_offset)
+      break;
+
+    offset = block_offset;
+  }
+
+  return block_id;
+}
+
 LUMINARY_FUNCTION uint32_t adapative_sampling_get_sample_offset(const uint32_t x, const uint32_t y) {
   const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
   const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;

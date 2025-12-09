@@ -57,16 +57,6 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
   DeviceRendererQueueAction action;
 
   for (uint32_t depth = 0; depth <= args->max_depth; depth++) {
-    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
-    action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = depth};
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (depth == 0) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_TASKS_CREATE;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
     action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
     action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
@@ -132,6 +122,12 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
       action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
+
+    if (depth + 1 != args->max_depth) {
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
+      action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = depth + 1};
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
   }
 
   return LUMINARY_SUCCESS;
@@ -142,14 +138,6 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   __CHECK_NULL_ARGUMENT(args);
 
   DeviceRendererQueueAction action;
-
-  action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
-  action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = 0};
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_TASKS_CREATE;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
   action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE;
@@ -439,7 +427,16 @@ static LuminaryResult _device_renderer_handle_queue_action(
 
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_TILE:
+      __FAILURE_HANDLE(device_update_depth_const_mem(device, 0));
       __FAILURE_HANDLE(device_update_tile_id_const_mem(device, renderer->tile_id));
+
+      if (renderer->sample_allocation.stage_id > 0) {
+        __FAILURE_HANDLE(
+          _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING, &work->launch_id));
+      }
+      else {
+        __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_CREATE, &work->launch_id));
+      }
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_TILE:
       if (renderer->executed_aggregate_sample_counts[0] == 0) {

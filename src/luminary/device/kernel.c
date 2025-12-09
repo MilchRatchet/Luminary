@@ -10,11 +10,12 @@ struct CUDAKernelConfig {
 } typedef CUDAKernelConfig;
 
 static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
-  [CUDA_KERNEL_TYPE_TASKS_CREATE]                 = {.name = "tasks_create", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TASKS_SORT]                   = {.name = "tasks_sort", .param_size = 0},
-  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]       = {.name = "geometry_process_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG] = {.name = "geometry_process_tasks_debug", .param_size = 0},
-  [CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT]         = {.name = "bsdf_generate_ss_lut", .param_size = sizeof(KernelArgsBSDFGenerateSSLUT)},
+  [CUDA_KERNEL_TYPE_TASKS_CREATE]                   = {.name = "tasks_create", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING] = {.name = "tasks_create_adaptive_sampling", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_SORT]                     = {.name = "tasks_sort", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]         = {.name = "geometry_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG]   = {.name = "geometry_process_tasks_debug", .param_size = 0},
+  [CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT]           = {.name = "bsdf_generate_ss_lut", .param_size = sizeof(KernelArgsBSDFGenerateSSLUT)},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_GLOSSY_LUT] = {.name = "bsdf_generate_glossy_lut", .param_size = sizeof(KernelArgsBSDFGenerateGlossyLUT)},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_DIELECTRIC_LUT] =
     {.name = "bsdf_generate_dielectric_lut", .param_size = sizeof(KernelArgsBSDFGenerateDielectricLUT)},

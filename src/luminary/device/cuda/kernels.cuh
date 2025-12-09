@@ -186,6 +186,158 @@ LUMINARY_KERNEL void tasks_create() {
   device.ptrs.results_counts[THREAD_ID] = result_count;
 }
 
+LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
+  HANDLE_DEVICE_ABORT();
+
+  uint32_t task_count   = 0;
+  uint32_t result_count = 0;
+
+  const uint32_t adaptive_sampling_width =
+    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_height =
+    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+  const uint32_t tile_id = device.state.tile_id;
+
+  const uint32_t adaptive_sampling_block_start = (tile_id > 0) ? device.ptrs.tile_last_adaptive_sampling_block_index[tile_id - 1] : 0;
+  const uint32_t adaptive_sampling_block_end   = device.ptrs.tile_last_adaptive_sampling_block_index[tile_id];
+
+  const uint32_t num_threads    = NUM_THREADS;
+  const uint32_t tasks_per_tile = device.config.num_tasks_per_thread * num_threads;
+
+  for (uint32_t task_id = 0; task_id < tasks_per_tile; task_id += num_threads) {
+    ////////////////////////////////////////////////////////////////////
+    // Adaptive Sampling Block
+    ////////////////////////////////////////////////////////////////////
+    uint32_t task_base_id;
+    const uint32_t adaptive_sampling_block =
+      adaptive_sampling_find_block(task_id, adaptive_sampling_block_start, adaptive_sampling_block_end, task_base_id);
+
+    const uint32_t local_task_id = task_id - task_base_id;
+
+    const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+    const uint32_t tasks_per_pixel     = (stage_sample_counts >> ((device.state.sample_allocation.stage_id - 1) * 8)) & 0xFF;
+
+    const uint32_t local_pixel_id  = local_task_id / tasks_per_pixel;
+    const uint32_t local_sample_id = local_task_id % tasks_per_pixel;
+
+    const uint32_t local_x = local_pixel_id & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
+    const uint32_t local_y = local_pixel_id >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+    const uint32_t block_y = adaptive_sampling_block / adaptive_sampling_width;
+    const uint32_t block_x = adaptive_sampling_block - block_y * adaptive_sampling_width;
+
+    uint16_t x = (uint16_t) ((block_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x);
+    uint16_t y = (uint16_t) ((block_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y);
+
+    x += device.settings.window_x;
+    y += device.settings.window_y;
+
+    if (x >= device.settings.width || y >= device.settings.height)
+      continue;
+
+    if (x < device.settings.window_x || x >= device.settings.window_x + device.settings.window_width)
+      continue;
+
+    if (y < device.settings.window_y || y >= device.settings.window_y + device.settings.window_height)
+      continue;
+
+    ////////////////////////////////////////////////////////////////////
+    // Sample ID
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t sample_id = adapative_sampling_get_sample_offset(x, y) + local_sample_id;
+
+    DeviceTask task;
+    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
+    task.path_id = path_id_get(x, y, sample_id);
+
+    CameraSampleResult camera_result = camera_sample(task.path_id);
+
+    const bool ray_is_valid = color_any(camera_result.weight);
+
+    // Skip rays that haven't managed to leave the camera. During the first sample we need to write out a 0 result though.
+    if (sample_id != 0 && ray_is_valid == false)
+      continue;
+
+    const uint32_t thread_result_id         = result_count++;
+    const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(thread_result_id, TASK_STATE_BUFFER_INDEX_RESULT);
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Result
+    ////////////////////////////////////////////////////////////////////
+
+    const uint32_t index = path_id_get_pixel_index(task.path_id);
+
+    DeviceTaskResult result;
+
+    result.color = splat_color(0.0f);
+    result.index = index;
+
+    task_result_store(task_result_base_address, result);
+
+    // We have written out a 0 result, we can now safely skip this ray if it is not valid.
+    if (ray_is_valid == false)
+      continue;
+
+    const uint32_t thread_task_id = task_count++;
+
+    ////////////////////////////////////////////////////////////////////
+    // Task
+    ////////////////////////////////////////////////////////////////////
+
+    task.origin = camera_result.origin;
+    task.ray    = camera_result.ray;
+
+    const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
+
+    const uint32_t task_base_address = task_get_base_address(thread_task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+    task_store(task_base_address, task);
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Trace Result
+    ////////////////////////////////////////////////////////////////////
+
+    // Trace result does not need to be initialized
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Throughput
+    ////////////////////////////////////////////////////////////////////
+
+    DeviceTaskThroughput throughput;
+
+    throughput.record        = record_pack(camera_result.weight);
+    throughput.results_index = task_result_base_address;
+
+    task_throughput_store(task_base_address, throughput);
+
+    ////////////////////////////////////////////////////////////////////
+    // Task Medium Stack
+    ////////////////////////////////////////////////////////////////////
+
+    DeviceTaskMediumStack medium = {};
+
+    medium_stack_ior_modify(medium, ambient_ior, true);
+
+    if (device.fog.active) {
+      medium_stack_volume_modify(medium, VOLUME_TYPE_FOG, true);
+    }
+
+    if (device.ocean.active) {
+      const bool camera_is_underwater = ocean_is_underwater(task.origin);
+
+      if (camera_is_underwater)
+        medium_stack_volume_modify(medium, VOLUME_TYPE_OCEAN, true);
+    }
+
+    task_medium_store(task_base_address, medium);
+  }
+
+  device.ptrs.trace_counts[THREAD_ID]   = task_count;
+  device.ptrs.results_counts[THREAD_ID] = result_count;
+}
+
 LUMINARY_KERNEL void sky_process_inscattering_events() {
   HANDLE_DEVICE_ABORT();
 
