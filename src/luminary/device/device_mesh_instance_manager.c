@@ -258,6 +258,13 @@ LuminaryResult device_mesh_instance_manager_destroy(DeviceMeshInstanceManager** 
   if ((*manager)->bvh)
     __FAILURE_HANDLE(optix_bvh_destroy(&(*manager)->bvh));
 
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements((*manager)->meshes, &num_meshes));
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    __FAILURE_HANDLE(device_mesh_destroy(&(*manager)->meshes[mesh_id]));
+  }
+
   __FAILURE_HANDLE(array_destroy(&(*manager)->meshes));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*manager)->optix_instance_cache));

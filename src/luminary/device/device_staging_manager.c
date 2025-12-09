@@ -65,7 +65,7 @@ LuminaryResult device_staging_manager_register_direct_access(
   if (emergency_staging_required) {
     log_message("Staging buffer ran out of memory, performing emergency staging.");
     __FAILURE_HANDLE(device_staging_manager_execute(staging_manager));
-    CUDA_FAILURE_HANDLE(cuStreamSynchronize(staging_manager->device->stream_main));
+    CUDA_FAILURE_HANDLE(cuEventSynchronize(staging_manager->execution_event));
   }
 
   StagingEntry entry;
