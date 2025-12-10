@@ -32,12 +32,10 @@ DEVICE_CTX_FUNC LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler)
 LuminaryResult adaptive_sampler_destroy(AdaptiveSampler** sampler);
 
 struct DeviceAdaptiveSamplerDeviceBufferPtrs {
-  // TODO: Turn these into CUdeviceptr. I don't want to pass the buffers. To enable this we will need typeof() support which comes with C23.
-  // MSVC supports it but clang-cl only added std:clatest recently and they don't seem to support typeof() yet.
-  DEVICE uint32_t* stage_sample_counts;
-  DEVICE uint32_t* stage_total_task_counts;
-  DEVICE uint32_t* adaptive_sampling_block_task_offsets;
-  DEVICE uint32_t* tile_last_adaptive_sampling_block_index;
+  CUdeviceptr stage_sample_counts;
+  CUdeviceptr stage_total_task_counts;
+  CUdeviceptr adaptive_sampling_block_task_offsets;
+  CUdeviceptr adaptive_sampling_subtile_block_index;
 } typedef DeviceAdaptiveSamplerDeviceBufferPtrs;
 
 struct DeviceAdaptiveSampler {

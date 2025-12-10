@@ -8,10 +8,10 @@
 LUMINARY_FUNCTION uint32_t
   adaptive_sampling_find_block(const uint32_t task_id, const uint32_t block_start, const uint32_t block_end, uint32_t& offset) {
   // TODO: Consider using binary search
-  offset = 0;
+  offset = (block_start > 0) ? device.ptrs.adaptive_sampling_block_task_offsets[block_start] : 0;
 
   uint32_t block_id;
-  for (block_id = block_start; block_id < block_end; block_id++) {
+  for (block_id = block_start; block_id <= block_end; block_id++) {
     const uint32_t block_offset = device.ptrs.adaptive_sampling_block_task_offsets[block_id];
 
     if (task_id < block_offset)
@@ -168,8 +168,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const Ker
   if (adaptive_sampling_block < adaptive_sampling_amount) {
     const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
-    uint32_t tasks_per_block = (stage_sample_counts >> ((args.stage_id - 1) * 8)) & 0xFF;
-
+    tasks_per_block = (stage_sample_counts >> ((args.stage_id - 1) * 8)) & 0xFF;
     tasks_per_block *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
   }
 
@@ -221,8 +220,8 @@ LUMINARY_KERNEL void adaptive_sampling_compute_prefix_sum(const KernelArgsAdapti
   uint32_t thread_prefix_sum = warp_reduce_prefixsum(thread_value);
 
   uint32_t warp_prefix_sum = 0;
-  if (WARP_ID < args.warp_count)
-    warp_prefix_sum = args.warp_prefix_sum[WARP_ID];
+  if (WARP_ID > 0 && WARP_ID < args.warp_count)
+    warp_prefix_sum = args.warp_prefix_sum[WARP_ID - 1];
 
   thread_prefix_sum += warp_prefix_sum;
 
@@ -260,7 +259,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_tile_block_ranges(const KernelArg
       right = mid;
     }
     else {
-      left = mid;
+      left = mid + 1;
     }
   }
 

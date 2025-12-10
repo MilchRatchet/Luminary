@@ -313,10 +313,10 @@ LuminaryResult device_adaptive_sampler_get_device_buffer_ptrs(DeviceAdaptiveSamp
   __CHECK_NULL_ARGUMENT(sampler);
   __CHECK_NULL_ARGUMENT(ptrs);
 
-  ptrs->stage_sample_counts                     = sampler->stage_sample_counts;
-  ptrs->stage_total_task_counts                 = sampler->stage_total_task_counts;
-  ptrs->adaptive_sampling_block_task_offsets    = sampler->stage_prefix_mips[0];
-  ptrs->tile_last_adaptive_sampling_block_index = sampler->subtile_last_blocks;
+  ptrs->stage_sample_counts                   = DEVICE_CUPTR(sampler->stage_sample_counts);
+  ptrs->stage_total_task_counts               = DEVICE_CUPTR(sampler->stage_total_task_counts);
+  ptrs->adaptive_sampling_block_task_offsets  = DEVICE_CUPTR(sampler->stage_prefix_mips[0]);
+  ptrs->adaptive_sampling_subtile_block_index = DEVICE_CUPTR(sampler->subtile_last_blocks);
 
   return LUMINARY_SUCCESS;
 }
@@ -362,7 +362,7 @@ LuminaryResult device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampl
       device->stream_main));
   }
 
-  for (uint32_t mip_id = 0; mip_id < sampler->num_prefix_mips; mip_id++) {
+  for (uint32_t mip_id = 0; mip_id < sampler->num_prefix_mips - 1; mip_id++) {
     KernelArgsAdaptiveSamplingComputeBlockSum args;
     args.thread_prefix_sum = DEVICE_PTR(sampler->stage_prefix_mips[mip_id]);
     args.warp_prefix_sum   = DEVICE_PTR(sampler->stage_prefix_mips[mip_id + 1]);
@@ -376,7 +376,7 @@ LuminaryResult device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampl
       device->stream_main));
   }
 
-  for (uint32_t mip_id = sampler->num_prefix_mips; mip_id > 0; mip_id--) {
+  for (uint32_t mip_id = sampler->num_prefix_mips - 1; mip_id > 0; mip_id--) {
     KernelArgsAdaptiveSamplingComputePrefixSum args;
     args.thread_prefix_sum = DEVICE_PTR(sampler->stage_prefix_mips[mip_id - 1]);
     args.warp_prefix_sum   = DEVICE_PTR(sampler->stage_prefix_mips[mip_id]);
@@ -407,6 +407,8 @@ LuminaryResult device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampl
       device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TILE_BLOCK_RANGES], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
       device->stream_main));
   }
+
+  sampler->allocated_stage_id = stage_id;
 
   return LUMINARY_SUCCESS;
 }

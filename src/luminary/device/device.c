@@ -1337,10 +1337,10 @@ LuminaryResult device_update_adaptive_sampling(Device* device, AdaptiveSampler* 
     DeviceAdaptiveSamplerDeviceBufferPtrs ptrs;
     __FAILURE_HANDLE(device_adaptive_sampler_get_device_buffer_ptrs(device->adaptive_sampler, &ptrs));
 
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stage_sample_counts, DEVICE_PTR(ptrs.stage_sample_counts));
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stage_total_task_counts, DEVICE_PTR(ptrs.stage_total_task_counts));
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_block_task_offsets, DEVICE_PTR(ptrs.adaptive_sampling_block_task_offsets));
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.tile_last_adaptive_sampling_block_index, DEVICE_PTR(ptrs.tile_last_adaptive_sampling_block_index));
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stage_sample_counts, (void*) ptrs.stage_sample_counts);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stage_total_task_counts, (void*) ptrs.stage_total_task_counts);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_block_task_offsets, (void*) ptrs.adaptive_sampling_block_task_offsets);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_subtile_block_index, (void*) ptrs.adaptive_sampling_subtile_block_index);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1361,7 +1361,7 @@ LuminaryResult device_ensure_adaptive_sampling_stage(Device* device) {
   __FAILURE_HANDLE(device_adaptive_sampler_ensure_stage(device->adaptive_sampler, device, &buffers_have_changed));
 
   if (buffers_have_changed) {
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.tile_last_adaptive_sampling_block_index, DEVICE_PTR(device->adaptive_sampler->subtile_last_blocks));
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_subtile_block_index, DEVICE_PTR(device->adaptive_sampler->subtile_last_blocks));
 
     __FAILURE_HANDLE(_device_update_constant_memory(device));
   }
