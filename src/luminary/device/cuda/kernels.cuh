@@ -197,17 +197,19 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
   const uint32_t adaptive_sampling_height =
     (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
-  const uint32_t num_threads    = NUM_THREADS;
-  const uint32_t tasks_per_tile = device.config.num_tasks_per_thread * num_threads;
-  const uint32_t tasks_per_subtile =
-    (tasks_per_tile + (1 << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> (ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG * 2);
+  const uint32_t num_threads       = NUM_THREADS;
+  const uint32_t tasks_per_tile    = device.config.num_tasks_per_thread * num_threads;
+  const uint32_t tasks_per_subtile = (tasks_per_tile + WARP_SIZE - 1) >> WARP_SIZE_LOG;
 
-  for (uint32_t task_id = THREAD_ID; task_id < tasks_per_tile; task_id += num_threads) {
+  const uint32_t task_id_offset = tasks_per_tile * device.state.tile_id;
+  const uint32_t task_id_start  = task_id_offset + THREAD_ID;
+  const uint32_t task_id_end    = task_id_offset + tasks_per_tile;
+
+  for (uint32_t task_id = task_id_start; task_id < task_id_end; task_id += num_threads) {
     ////////////////////////////////////////////////////////////////////
     // Adaptive Sampling Block
     ////////////////////////////////////////////////////////////////////
-    const uint32_t local_subtile_id = task_id / tasks_per_subtile;
-    const uint32_t subtile_id       = (device.state.tile_id << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_subtile_id;
+    const uint32_t subtile_id = task_id / tasks_per_subtile;
 
     const uint32_t adaptive_sampling_block_start = (subtile_id > 0) ? device.ptrs.adaptive_sampling_subtile_block_index[subtile_id - 1] : 0;
     const uint32_t adaptive_sampling_block_end   = device.ptrs.adaptive_sampling_subtile_block_index[subtile_id];
