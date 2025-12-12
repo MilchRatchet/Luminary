@@ -60,8 +60,8 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count_from_block_index(c
 
   const uint32_t this_stage_id = device.state.sample_allocation.stage_id;
 
-  if (this_stage_id != 0) {
-    count += ((adaptive_sampling_counts >> (this_stage_id * 8)) & 0xFF) + 1;
+  if (this_stage_id > 0) {
+    count += ((adaptive_sampling_counts >> ((this_stage_id - 1) * 8)) & 0xFF) + 1;
   }
   else {
     count++;
@@ -175,7 +175,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const Ker
   const uint32_t total_tasks_warp = warp_reduce_sum(tasks_per_block);
 
   if (THREAD_ID_IN_WARP == 0 && total_tasks_warp > 0) {
-    atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id], total_tasks_warp);
+    atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id - 1], total_tasks_warp);
   }
 }
 
