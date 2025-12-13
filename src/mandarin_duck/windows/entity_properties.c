@@ -186,7 +186,8 @@ static void _window_entity_properties_renderer_settings_action(
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
-  uint32_t shading_mode = (uint32_t) settings.shading_mode;
+  uint32_t adaptive_sampling_output_mode = (uint32_t) settings.adaptive_sampling_output_mode;
+  uint32_t shading_mode                  = (uint32_t) settings.shading_mode;
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Renderer Settings", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -215,17 +216,26 @@ static void _window_entity_properties_renderer_settings_action(
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
-  update_data |= _window_entity_properties_add_checkbox(data, "Adaptive Sampling", &settings.enable_adaptive_sampling);
+
+  element_separator(
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Adaptive Sampling", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  update_data |= _window_entity_properties_add_checkbox(data, "Enable", &settings.enable_adaptive_sampling);
 
   if (settings.enable_adaptive_sampling) {
-    update_data |= _window_entity_properties_add_checkbox(data, "Show Variance", &settings.output_variance);
+    update_data |= _window_entity_properties_add_dropdown(
+      data, "Output Mode", LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT, (char**) luminary_strings_adaptive_sampling_output_mode,
+      &adaptive_sampling_output_mode);
   }
+
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Debug", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 
   if (update_data) {
-    settings.shading_mode = (LuminaryShadingMode) shading_mode;
+    settings.adaptive_sampling_output_mode = (LuminaryAdaptiveSamplingOutputMode) adaptive_sampling_output_mode;
+    settings.shading_mode                  = (LuminaryShadingMode) shading_mode;
 
     LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
   }

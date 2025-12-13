@@ -47,6 +47,14 @@ LUMINARY_API enum LuminaryShadingMode {
   LUMINARY_SHADING_MODE_COUNT
 } typedef LuminaryShadingMode;
 
+LUMINARY_API enum LuminaryAdaptiveSamplingOutputMode {
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY              = 0,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE            = 1,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR               = 2,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION = 3,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT
+} typedef LuminaryAdaptiveSamplingOutputMode;
+
 LUMINARY_API struct LuminaryRendererSettings {
   uint32_t width;
   uint32_t height;
@@ -55,7 +63,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t undersampling;
   uint32_t supersampling;
   bool enable_adaptive_sampling;
-  bool output_variance;
+  LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;
   LuminaryShadingMode shading_mode;
   float region_x;
   float region_y;

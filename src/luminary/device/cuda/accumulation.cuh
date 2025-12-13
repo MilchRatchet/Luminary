@@ -109,22 +109,42 @@ LUMINARY_KERNEL void accumulation_generate_result() {
     const float normalization = 1.0f / sample_count;
 
     RGBF result;
-    if (device.settings.output_variance) {
-      float max_value;
-      const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
+    switch (device.settings.adaptive_sampling_output_mode) {
+      case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY: {
+        result.r = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
+        result.g = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
+        result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
+      } break;
+      case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE: {
+        float max_value;
+        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
 
-      float relMSE = (max_value > 0.0f) ? variance / max_value : 0.0f;
+        const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
 
-      relMSE = floorf(relMSE * 16.0f) / 32.0f;
+        result = splat_color(floorf(rel_variance * 16.0f) / 32.0f);
+      } break;
+      case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR: {
+        float max_value;
+        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
 
-      result.r = relMSE;
-      result.g = relMSE;
-      result.b = relMSE;
-    }
-    else {
-      result.r = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
-      result.g = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
-      result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
+        const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
+        const float rel_mse      = rel_variance * normalization;
+
+        const float value = 16.0f * rel_mse;
+        const float red   = __saturatef(2.0f * value);
+        const float green = __saturatef(2.0f * (value - 0.5f));
+        const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
+
+        result = get_color(red, green, blue);
+
+      } break;
+      case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION: {
+        const uint32_t tasks_per_pixel = adaptive_sampling_get_current_tasks_per_pixel(x, y);
+
+        const float rel_value = ((float) tasks_per_pixel) / 128;
+
+        result = splat_color(rel_value);
+      } break;
     }
 
     __stcs(device.ptrs.frame_result[FRAME_CHANNEL_RED] + index, result.r);

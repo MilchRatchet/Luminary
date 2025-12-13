@@ -87,6 +87,23 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count(const uint32_t x, 
   return adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
 }
 
+LUMINARY_FUNCTION uint32_t adaptive_sampling_get_current_tasks_per_pixel(const uint32_t x, const uint32_t y) {
+  const uint32_t this_stage_id = device.state.sample_allocation.stage_id;
+
+  if (this_stage_id == 0)
+    return 1;
+
+  const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_y     = y >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+  const uint32_t adaptive_sampling_block = adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
+
+  const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+
+  return adaptive_sampling_get_stage_sample_count(adaptive_sampling_counts, this_stage_id - 1);
+}
+
 LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t x, const uint32_t y, const float inv_n, float& max_value) {
   const bool pixel_in_frame = (x < device.settings.width) && (y < device.settings.height);
   if (pixel_in_frame == false) {
@@ -150,7 +167,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
     // Zero out all the bits not currently occupied by valid data.
     adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
 
-    uint32_t new_sample_count = floorf(rel_variance * 16.0f) * (1.0f / 32.0f);
+    uint32_t new_sample_count = (uint32_t) (rel_variance * 32.0f);
 
     new_sample_count = max(new_sample_count, 1);
     new_sample_count = min(new_sample_count, 128);

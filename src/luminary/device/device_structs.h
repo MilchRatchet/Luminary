@@ -10,7 +10,7 @@ struct DeviceRendererSettings {
   uint32_t shading_mode : 3;
   uint32_t bridge_max_num_vertices : 4;
   uint32_t supersampling : 2;
-  uint32_t output_variance : 1;
+  uint32_t adaptive_sampling_output_mode : 2;
   // 11 bits spare
 
   uint16_t width;
