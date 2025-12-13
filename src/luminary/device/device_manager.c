@@ -428,9 +428,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
   }
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
+    Device* main_device = device_manager->devices[device_manager->main_device_index];
+
     const uint32_t previous_light_tree_build_id = device_manager->light_tree->build_id;
-    __FAILURE_HANDLE_CRITICAL(
-      device_build_light_tree(device_manager->devices[device_manager->main_device_index], device_manager->light_tree));
+    __FAILURE_HANDLE_CRITICAL(device_build_light_tree(main_device, device_manager->light_tree));
 
     if (previous_light_tree_build_id != device_manager->light_tree->build_id) {
       for (uint32_t device_id = 0; device_id < device_count; device_id++) {
@@ -441,14 +442,14 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
     uint32_t width;
     uint32_t height;
-    __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
+    __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(main_device, &width, &height));
 
     __FAILURE_HANDLE_CRITICAL(adaptive_sampler_start_sampling(device_manager->adaptive_sampler, width, height));
 
     // Main device always computes the first samples
-    __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(device_manager->devices[device_manager->main_device_index], &scene->settings));
-    __FAILURE_HANDLE_CRITICAL(adaptive_sampler_allocate_sample(
-      device_manager->adaptive_sampler, &device_manager->devices[device_manager->main_device_index]->renderer->sample_allocation, 32));
+    __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(main_device, &scene->settings));
+    __FAILURE_HANDLE_CRITICAL(
+      adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &main_device->renderer->sample_allocation, 32));
 
     DeviceRendererQueueArgs render_args;
     render_args.max_depth                = scene->settings.max_ray_depth;
@@ -474,6 +475,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       }
 
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
+      __FAILURE_HANDLE_CRITICAL(device_reset_adaptive_sampling(device));
       __FAILURE_HANDLE_CRITICAL(device_update_adaptive_sampling(device, device_manager->adaptive_sampler));
       __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
     }

@@ -174,6 +174,7 @@ LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamer
 LuminaryResult device_update_post(Device* device, const Camera* camera);
 LuminaryResult device_setup_undersampling(Device* device, const RendererSettings* settings);
 LuminaryResult device_build_adaptive_sampling_stage(Device* device, AdaptiveSampler* sampler, uint8_t stage_id);
+LuminaryResult device_reset_adaptive_sampling(Device* device);
 LuminaryResult device_update_adaptive_sampling(Device* device, AdaptiveSampler* sampler);
 LuminaryResult device_ensure_adaptive_sampling_stage(Device* device);
 LuminaryResult device_unload_adaptive_sampling(Device* device, AdaptiveSampler* sampler);

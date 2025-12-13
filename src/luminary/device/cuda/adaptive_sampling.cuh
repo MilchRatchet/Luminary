@@ -5,6 +5,10 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
+  return ((stage_sample_counts >> (stage_id * 8)) & 0xFF) + 1;
+}
+
 LUMINARY_FUNCTION uint32_t
   adaptive_sampling_find_block(const uint32_t task_id, const uint32_t block_start, const uint32_t block_end, uint32_t& offset) {
   // TODO: Consider using binary search
@@ -23,22 +27,25 @@ LUMINARY_FUNCTION uint32_t
   return block_id;
 }
 
+template <bool FIRST_STAGE_ONLY>
 LUMINARY_FUNCTION uint32_t adapative_sampling_get_sample_offset(const uint32_t x, const uint32_t y) {
-  const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_y     = y >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-
-  const uint32_t adaptive_sampling_block = adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
-
-  const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
-
   uint32_t sample_id = device.state.sample_allocation.stage_sample_offsets[0];
 
-  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
-    const uint32_t stage_sample_offset = device.state.sample_allocation.stage_sample_offsets[stage_id + 1];
-    const uint32_t stage_sample_count  = ((adaptive_sampling_counts >> (stage_id * 8)) & 0xFF) + 1;
+  if constexpr (FIRST_STAGE_ONLY == false) {
+    const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+    const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+    const uint32_t adaptive_sampling_y     = y >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
-    sample_id += stage_sample_offset * stage_sample_count;
+    const uint32_t adaptive_sampling_block = adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
+
+    const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+
+    for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
+      const uint32_t stage_sample_offset = device.state.sample_allocation.stage_sample_offsets[stage_id + 1];
+      const uint32_t stage_sample_count  = adaptive_sampling_get_stage_sample_count(adaptive_sampling_counts, stage_id);
+
+      sample_id += stage_sample_offset * stage_sample_count;
+    }
   }
 
   return sample_id;
@@ -53,7 +60,7 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count_from_block_index(c
 
   for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
     const uint32_t stage_sample_offset = device.state.sample_allocation.stage_sample_offsets[stage_id + 1];
-    const uint32_t stage_sample_count  = ((adaptive_sampling_counts >> (stage_id * 8)) & 0xFF) + 1;
+    const uint32_t stage_sample_count  = adaptive_sampling_get_stage_sample_count(adaptive_sampling_counts, stage_id);
 
     count += stage_sample_offset * stage_sample_count;
   }
@@ -148,7 +155,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
     new_sample_count = max(new_sample_count, 1);
     new_sample_count = min(new_sample_count, 128);
 
-    adaptive_sampling_counts |= new_sample_count << (args.current_stage_id * 8);
+    adaptive_sampling_counts |= (new_sample_count - 1) << (args.current_stage_id * 8);
 
     device.ptrs.stage_sample_counts[adaptive_sampling_block] = adaptive_sampling_counts;
   }
@@ -168,14 +175,14 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const Ker
   if (adaptive_sampling_block < adaptive_sampling_amount) {
     const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
-    tasks_per_block = (stage_sample_counts >> ((args.stage_id - 1) * 8)) & 0xFF;
+    tasks_per_block = adaptive_sampling_get_stage_sample_count(stage_sample_counts, args.stage_id - 1);
     tasks_per_block *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
   }
 
   const uint32_t total_tasks_warp = warp_reduce_sum(tasks_per_block);
 
   if (THREAD_ID_IN_WARP == 0 && total_tasks_warp > 0) {
-    atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id - 1], total_tasks_warp);
+    atomicAdd(&device.ptrs.stage_total_task_counts[args.stage_id], total_tasks_warp);
   }
 }
 
@@ -194,8 +201,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_tasks_per_block(const KernelArgsA
 
   const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
-  uint32_t tasks_per_block = (stage_sample_counts >> ((args.stage_id - 1) * 8)) & 0xFF;
-
+  uint32_t tasks_per_block = adaptive_sampling_get_stage_sample_count(stage_sample_counts, args.stage_id - 1);
   tasks_per_block *= (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) * (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
   args.dst[adaptive_sampling_block] = tasks_per_block;

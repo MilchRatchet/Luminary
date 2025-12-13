@@ -143,6 +143,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   }
 
   {
+    CUDA_FAILURE_HANDLE(cuMemsetD32Async(
+      DEVICE_CUPTR(device->adaptive_sampler->stage_total_task_counts) + sizeof(uint32_t) * (sampler->allocator.stage_id + 1), 0, 1,
+      device->stream_main));
+
     KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts args;
     args.stage_id = sampler->allocator.stage_id + 1;
 
@@ -214,7 +218,7 @@ static uint32_t _device_adaptive_sampler_compute_prefix_mip_count(const uint32_t
   return i + 1;
 }
 
-static LuminaryResult _device_adaptive_sampler_reset(DeviceAdaptiveSampler* sampler) {
+static LuminaryResult _device_adaptive_sampler_free(DeviceAdaptiveSampler* sampler) {
   __CHECK_NULL_ARGUMENT(sampler);
 
   if (sampler->stage_sample_counts) {
@@ -276,7 +280,7 @@ LuminaryResult device_adaptive_sampler_update(
   const uint32_t subtile_count = tile_count * WARP_SIZE;
 
   if (sampler->width != shared_sampler->width || sampler->height != shared_sampler->height) {
-    __FAILURE_HANDLE(_device_adaptive_sampler_reset(sampler));
+    __FAILURE_HANDLE(_device_adaptive_sampler_free(sampler));
 
     sampler->width  = shared_sampler->width;
     sampler->height = shared_sampler->height;
@@ -416,7 +420,7 @@ LuminaryResult device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampl
 LuminaryResult device_adaptive_sampler_destroy(DeviceAdaptiveSampler** sampler) {
   __CHECK_NULL_ARGUMENT(sampler);
 
-  __FAILURE_HANDLE(_device_adaptive_sampler_reset(*sampler));
+  __FAILURE_HANDLE(_device_adaptive_sampler_free(*sampler));
 
   __FAILURE_HANDLE(host_free(sampler));
 

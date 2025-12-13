@@ -67,6 +67,8 @@ LUMINARY_KERNEL void tasks_create() {
   const uint32_t end_pixel      = min(amount, start_pixel + tasks_per_tile);
 
   for (uint32_t pixel_id = start_pixel; pixel_id < end_pixel; pixel_id += num_threads) {
+    HANDLE_DEVICE_ABORT();
+
     uint16_t y = (uint16_t) (pixel_id / undersampling_width);
     uint16_t x = (uint16_t) (pixel_id - y * undersampling_width);
 
@@ -94,7 +96,7 @@ LUMINARY_KERNEL void tasks_create() {
     // Sample ID
     ////////////////////////////////////////////////////////////////////
 
-    const uint32_t sample_id = adapative_sampling_get_sample_offset(x, y);
+    const uint32_t sample_id = adapative_sampling_get_sample_offset<true>(x, y);
 
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
@@ -208,6 +210,8 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
   const uint32_t task_id_end    = min(task_id_offset + tasks_per_tile, adaptive_sampling_total_task_counts);
 
   for (uint32_t task_id = task_id_start; task_id < task_id_end; task_id += num_threads) {
+    HANDLE_DEVICE_ABORT();
+
     ////////////////////////////////////////////////////////////////////
     // Adaptive Sampling Block
     ////////////////////////////////////////////////////////////////////
@@ -223,7 +227,8 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
     const uint32_t local_task_id = task_id - task_base_id;
 
     const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
-    const uint32_t tasks_per_pixel     = (stage_sample_counts >> ((device.state.sample_allocation.stage_id - 1) * 8)) & 0xFF;
+    const uint32_t tasks_per_pixel =
+      adaptive_sampling_get_stage_sample_count(stage_sample_counts, device.state.sample_allocation.stage_id - 1);
 
     const uint32_t local_pixel_id  = local_task_id / tasks_per_pixel;
     const uint32_t local_sample_id = local_task_id % tasks_per_pixel;
@@ -253,7 +258,7 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
     // Sample ID
     ////////////////////////////////////////////////////////////////////
 
-    const uint32_t sample_id = adapative_sampling_get_sample_offset(x, y) + local_sample_id;
+    const uint32_t sample_id = adapative_sampling_get_sample_offset<false>(x, y) + local_sample_id;
 
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
