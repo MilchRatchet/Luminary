@@ -492,6 +492,8 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
 
   const float ior_ratio = (refraction_is_inside) ? device.ocean.refractive_index / other_ior : other_ior / device.ocean.refractive_index;
 
+  const float roughness = ((task.state & STATE_FLAG_DELTA_PATH) != 0) ? BSDF_ROUGHNESS_CLAMP * 2.0f : 0.25f;
+
   MaterialContextGeometry ctx;
 
   ctx.instance_id  = HIT_TYPE_OCEAN;
@@ -506,7 +508,7 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, 1.0f);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, BSDF_ROUGHNESS_CLAMP * 2.0f);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
   material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params, splat_color(0.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, ior_ratio);
 
