@@ -224,7 +224,7 @@ static void _window_entity_properties_renderer_settings_action(
 
   if (settings.enable_adaptive_sampling) {
     update_data |= _window_entity_properties_add_slider(
-      data, "Strength", &settings.adaptive_sampling_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.1f, 16.0f, 1.0f);
+      data, "Max. Sampling Rate", &settings.adaptive_sampling_max_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 256.0f, 1.0f);
     update_data |= _window_entity_properties_add_slider(
       data, "Update Interval", &settings.adaptive_sampling_update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 256.0f, 1.0f);
     update_data |= _window_entity_properties_add_checkbox(data, "Exposure Awareness", &settings.adaptive_sampling_exposure_aware);

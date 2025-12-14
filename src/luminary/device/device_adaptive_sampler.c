@@ -37,8 +37,8 @@ LuminaryResult adaptive_sampler_setup(AdaptiveSampler* sampler, const AdaptiveSa
     sampler->height = 0;
   }
 
-  sampler->strength = info->strength;
-  sampler->exposure = (info->exposure_aware) ? info->exposure : 0.0f;
+  sampler->max_sampling_rate = min(max(info->max_sampling_rate, 1), ADAPTIVE_SAMPLING_MAX_SAMPLING_RATE);
+  sampler->exposure          = (info->exposure_aware) ? info->exposure : 0.0f;
 
   memset(&sampler->allocator, 0, sizeof(DeviceSampleAllocation));
 
@@ -143,6 +143,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     sampler->allocated_variance_buffer_size = buffer_sizes.variance_buffer_size;
   }
 
+  if (sampler->global_variance_buffer == (float*) 0) {
+    __FAILURE_HANDLE(device_malloc(&sampler->global_variance_buffer, sizeof(float)));
+  }
+
   if (sampler->stage_build_event == (CUevent) 0) {
     CUDA_FAILURE_HANDLE(cuEventCreate(&sampler->stage_build_event, CU_EVENT_DISABLE_TIMING));
   }
@@ -150,11 +154,14 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   const uint32_t num_adaptive_sampling_blocks = sampler->width * sampler->height;
   const uint32_t warps_per_block              = THREADS_PER_BLOCK >> WARP_SIZE_LOG;
 
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(DEVICE_CUPTR(sampler->global_variance_buffer), 0, 1, device->stream_main));
+
   {
     KernelArgsAdaptiveSamplingBlockReduceVariance args;
-    args.dst              = DEVICE_PTR(sampler->variance_buffer);
-    args.current_stage_id = sampler->allocator.stage_id;
-    args.exposure         = sampler->exposure;
+    args.dst_block_variance  = DEVICE_PTR(sampler->variance_buffer);
+    args.dst_global_variance = DEVICE_PTR(sampler->global_variance_buffer);
+    args.current_stage_id    = sampler->allocator.stage_id;
+    args.exposure            = sampler->exposure;
 
     // 2 Warps per adaptive block
     const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG + 1)) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
@@ -166,9 +173,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
 
   {
     KernelArgsAdaptiveSamplingComputeStageSampleCounts args;
-    args.variance_src     = DEVICE_PTR(sampler->variance_buffer);
-    args.current_stage_id = sampler->allocator.stage_id;
-    args.strength         = sampler->strength;
+    args.src_block_variance  = DEVICE_PTR(sampler->variance_buffer);
+    args.src_global_variance = DEVICE_PTR(sampler->global_variance_buffer);
+    args.current_stage_id    = sampler->allocator.stage_id;
+    args.max_sampling_rate   = sampler->max_sampling_rate;
 
     const uint32_t num_blocks = (num_adaptive_sampling_blocks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
@@ -215,6 +223,9 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
 
   if (sampler->variance_buffer)
     __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
+
+  if (sampler->global_variance_buffer)
+    __FAILURE_HANDLE(device_free(&sampler->global_variance_buffer));
 
   if (sampler->stage_build_event != (CUevent) 0) {
     CUDA_FAILURE_HANDLE(cuEventDestroy(sampler->stage_build_event));

@@ -116,20 +116,20 @@ LUMINARY_KERNEL void accumulation_generate_result() {
         result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE: {
-        float max_value;
-        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
+        float luminance;
+        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, luminance);
 
-        const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
+        const float rel_variance = (luminance > 0.0f) ? variance / luminance : 0.0f;
 
         result = splat_color(rel_variance);
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR: {
-        float max_value;
-        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
+        float luminance;
+        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, luminance);
 
-        const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(max_value, device.camera.exposure);
+        const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(luminance, device.camera.exposure);
 
-        const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
+        const float rel_variance = (luminance > 0.0f) ? variance / luminance : 0.0f;
         const float rel_mse      = rel_variance * normalization * tonemap_compression * tonemap_compression;
 
         const float value = 1024.0f * rel_mse;
@@ -143,7 +143,7 @@ LUMINARY_KERNEL void accumulation_generate_result() {
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION: {
         const uint32_t tasks_per_pixel = adaptive_sampling_get_current_tasks_per_pixel(x, y);
 
-        const float rel_value = ((float) tasks_per_pixel) / ADAPTIVE_SAMPLING_MAX_SAMPLES;
+        const float rel_value = ((float) tasks_per_pixel) / ADAPTIVE_SAMPLING_MAX_SAMPLING_RATE;
 
         result = splat_color(rel_value);
       } break;

@@ -195,15 +195,17 @@ struct KernelArgsMipmapGenerateLevel2DRGBAF {
 } typedef KernelArgsMipmapGenerateLevel2DRGBAF;
 
 struct KernelArgsAdaptiveSamplingBlockReduceVariance {
-  float* dst;
+  float* dst_block_variance;
+  float* dst_global_variance;
   uint32_t current_stage_id;
   float exposure;
 } typedef KernelArgsAdaptiveSamplingBlockReduceVariance;
 
 struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
-  float* variance_src;
+  float* src_block_variance;
+  float* src_global_variance;
   uint32_t current_stage_id;
-  float strength;
+  uint32_t max_sampling_rate;
 } typedef KernelArgsAdaptiveSamplingComputeStageSampleCounts;
 
 struct KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts {
