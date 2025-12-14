@@ -251,14 +251,15 @@ LuminaryResult device_renderer_register_callback(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
 
   memset(renderer->executed_aggregate_sample_counts, 0, sizeof(renderer->executed_aggregate_sample_counts));
 
   renderer->tile_id = 0;
   renderer->render_id++;
-  renderer->enable_adaptive_sampling = args->enable_adaptive_sampling;
+  renderer->enable_adaptive_sampling          = args->enable_adaptive_sampling;
+  renderer->adaptive_sampling_update_interval = args->adaptive_sampling_update_interval;
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     renderer->total_render_time[event_id] = 0.0f;
@@ -363,7 +364,7 @@ static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRend
     return LUMINARY_SUCCESS;
 
   const uint32_t samples_this_stage = renderer->executed_aggregate_sample_counts[stage_id];
-  const uint32_t samples_to_update  = 64 << stage_id;
+  const uint32_t samples_to_update  = renderer->adaptive_sampling_update_interval << stage_id;
 
   if (samples_this_stage < samples_to_update)
     return LUMINARY_SUCCESS;

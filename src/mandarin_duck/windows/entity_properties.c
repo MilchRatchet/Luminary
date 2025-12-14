@@ -223,6 +223,10 @@ static void _window_entity_properties_renderer_settings_action(
   update_data |= _window_entity_properties_add_checkbox(data, "Enable", &settings.enable_adaptive_sampling);
 
   if (settings.enable_adaptive_sampling) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Strength", &settings.adaptive_sampling_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.1f, 16.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Update Interval", &settings.adaptive_sampling_update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 256.0f, 1.0f);
     update_data |= _window_entity_properties_add_dropdown(
       data, "Output Mode", LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT, (char**) luminary_strings_adaptive_sampling_output_mode,
       &adaptive_sampling_output_mode);

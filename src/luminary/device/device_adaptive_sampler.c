@@ -25,11 +25,19 @@ LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, Devic
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult adaptive_sampler_start_sampling(AdaptiveSampler* sampler, uint32_t width, uint32_t height) {
+LuminaryResult adaptive_sampler_setup(AdaptiveSampler* sampler, const AdaptiveSamplerSetupInfo* info) {
   __CHECK_NULL_ARGUMENT(sampler);
 
-  sampler->width  = (width + ((1 << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  sampler->height = (height + ((1 << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  if (info->enabled) {
+    sampler->width  = (info->width + ((1 << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+    sampler->height = (info->height + ((1 << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  }
+  else {
+    sampler->width  = 0;
+    sampler->height = 0;
+  }
+
+  sampler->strength = info->strength;
 
   memset(&sampler->allocator, 0, sizeof(DeviceSampleAllocation));
 
@@ -158,6 +166,7 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     KernelArgsAdaptiveSamplingComputeStageSampleCounts args;
     args.variance_src     = DEVICE_PTR(sampler->variance_buffer);
     args.current_stage_id = sampler->allocator.stage_id;
+    args.strength         = sampler->strength;
 
     const uint32_t num_blocks = (num_adaptive_sampling_blocks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 

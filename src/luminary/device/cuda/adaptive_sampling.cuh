@@ -171,8 +171,6 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
   // The previous kernel returns a relative variance image
   // We apply a filter and from it compute the sample counts
 
-  // It might make sense to perform a 4x4 prefilter here
-
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
   const float4 adaptive_sampling_block_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block);
@@ -188,7 +186,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
   // Zero out all the bits not currently occupied by valid data.
   adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
 
-  uint32_t new_sample_count = (uint32_t) (rel_variance * 1024.0f);
+  uint32_t new_sample_count = (uint32_t) (rel_variance * 1024.0f * args.strength);
 
   new_sample_count = max(new_sample_count, 1);
   new_sample_count = min(new_sample_count, ADAPTIVE_SAMPLING_MAX_SAMPLES);

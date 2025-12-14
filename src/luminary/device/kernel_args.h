@@ -202,6 +202,7 @@ struct KernelArgsAdaptiveSamplingBlockReduceVariance {
 struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
   float* variance_src;
   uint32_t current_stage_id;
+  float strength;
 } typedef KernelArgsAdaptiveSamplingComputeStageSampleCounts;
 
 struct KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts {

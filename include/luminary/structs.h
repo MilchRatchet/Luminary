@@ -63,6 +63,8 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t undersampling;
   uint32_t supersampling;
   bool enable_adaptive_sampling;
+  float adaptive_sampling_strength;
+  uint32_t adaptive_sampling_update_interval;
   LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;
   LuminaryShadingMode shading_mode;
   float region_x;

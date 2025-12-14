@@ -97,6 +97,7 @@ struct DeviceRenderer {
   bool shutdown;
 
   bool enable_adaptive_sampling;
+  uint32_t adaptive_sampling_update_interval;
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
   DeviceRendererPerKernelTimings kernel_times[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
@@ -113,6 +114,7 @@ struct DeviceRendererQueueArgs {
   bool render_inscattering;
   bool render_lights;
   bool render_procedural_sky;
+  uint32_t adaptive_sampling_update_interval;
   ShadingMode shading_mode;
 } typedef DeviceRendererQueueArgs;
 
@@ -120,7 +122,7 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer)
 LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceRenderCallbackData* data, bool* is_valid);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(
   DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, DeviceRendererQueueArgs* args);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device);
 LuminaryResult device_renderer_finish_iteration(DeviceRenderer* renderer, bool is_undersampling);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);

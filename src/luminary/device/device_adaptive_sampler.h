@@ -12,6 +12,13 @@ struct DeviceAdaptiveSamplerBufferSizes {
   size_t variance_buffer_size;
 } typedef DeviceAdaptiveSamplerBufferSizes;
 
+struct AdaptiveSamplerSetupInfo {
+  bool enabled;
+  uint32_t width;
+  uint32_t height;
+  float strength;
+} typedef AdaptiveSamplerSetupInfo;
+
 struct AdaptiveSampler {
   uint32_t width;
   uint32_t height;
@@ -22,12 +29,13 @@ struct AdaptiveSampler {
   STAGING uint32_t* stage_sample_counts;
   STAGING uint32_t* stage_total_task_counts;
   DEVICE float* variance_buffer;
+  float strength;
   CUevent stage_build_event;
 } typedef AdaptiveSampler;
 
 LuminaryResult adaptive_sampler_create(AdaptiveSampler** sampler);
 LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, DeviceAdaptiveSamplerBufferSizes* sizes);
-LuminaryResult adaptive_sampler_start_sampling(AdaptiveSampler* sampler, uint32_t width, uint32_t height);
+LuminaryResult adaptive_sampler_setup(AdaptiveSampler* sampler, const AdaptiveSamplerSetupInfo* info);
 LuminaryResult adaptive_sampler_allocate_sample(AdaptiveSampler* sampler, DeviceSampleAllocation* allocation, uint32_t num_samples);
 LuminaryResult adaptive_sampler_get_task_count_upper_bound(AdaptiveSampler* sampler, uint32_t* task_count, uint8_t stage_id);
 DEVICE_CTX_FUNC LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Device* device, uint8_t stage_id);

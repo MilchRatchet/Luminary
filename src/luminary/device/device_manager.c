@@ -444,7 +444,13 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     uint32_t height;
     __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(main_device, &width, &height));
 
-    __FAILURE_HANDLE_CRITICAL(adaptive_sampler_start_sampling(device_manager->adaptive_sampler, width, height));
+    AdaptiveSamplerSetupInfo setup_info;
+    setup_info.enabled  = scene->settings.enable_adaptive_sampling;
+    setup_info.width    = width;
+    setup_info.height   = height;
+    setup_info.strength = scene->settings.adaptive_sampling_strength;
+
+    __FAILURE_HANDLE_CRITICAL(adaptive_sampler_setup(device_manager->adaptive_sampler, &setup_info));
 
     // Main device always computes the first samples
     __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(main_device, &scene->settings));
@@ -452,16 +458,17 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &main_device->renderer->sample_allocation, 32));
 
     DeviceRendererQueueArgs render_args;
-    render_args.max_depth                = scene->settings.max_ray_depth;
-    render_args.enable_adaptive_sampling = scene->settings.enable_adaptive_sampling;
-    render_args.render_clouds            = scene->cloud.active && scene->sky.mode == LUMINARY_SKY_MODE_DEFAULT;
-    render_args.render_inscattering      = scene->sky.aerial_perspective && scene->sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
-    render_args.render_ocean             = scene->ocean.active;
-    render_args.render_particles         = scene->particles.active;
-    render_args.render_volumes           = scene->fog.active || scene->ocean.active;
-    render_args.render_lights            = true;
-    render_args.render_procedural_sky    = true;  // TODO: If possible do non procedural sky in another kernel.
-    render_args.shading_mode             = scene->settings.shading_mode;
+    render_args.max_depth                         = scene->settings.max_ray_depth;
+    render_args.enable_adaptive_sampling          = scene->settings.enable_adaptive_sampling;
+    render_args.render_clouds                     = scene->cloud.active && scene->sky.mode == LUMINARY_SKY_MODE_DEFAULT;
+    render_args.render_inscattering               = scene->sky.aerial_perspective && scene->sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
+    render_args.render_ocean                      = scene->ocean.active;
+    render_args.render_particles                  = scene->particles.active;
+    render_args.render_volumes                    = scene->fog.active || scene->ocean.active;
+    render_args.render_lights                     = true;
+    render_args.render_procedural_sky             = true;  // TODO: If possible do non procedural sky in another kernel.
+    render_args.adaptive_sampling_update_interval = scene->settings.adaptive_sampling_update_interval;
+    render_args.shading_mode                      = scene->settings.shading_mode;
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
