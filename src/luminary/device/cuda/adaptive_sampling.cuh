@@ -168,18 +168,103 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
 }
 
 LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelArgsAdaptiveSamplingComputeStageSampleCounts args) {
-  // The previous kernel returns a relative variance image
-  // We apply a filter and from it compute the sample counts
-
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
-  const float4 adaptive_sampling_block_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block);
+  const uint32_t adaptive_sampling_width =
+    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_height =
+    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+  const uint32_t adaptive_sampling_y = adaptive_sampling_block / adaptive_sampling_width;
+  const uint32_t adaptive_sampling_x = adaptive_sampling_block - adaptive_sampling_y * adaptive_sampling_width;
 
   float rel_variance = 0.0f;
-  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.x);
-  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.y);
-  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.z);
-  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.w);
+  if (adaptive_sampling_x > 0) {
+    if (adaptive_sampling_y > 0) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block - 1 - adaptive_sampling_width);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (1.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (4.0f / 4.0f));
+    }
+
+    if (true) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block - 1);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (1.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (2.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (1.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (2.0f / 2.0f));
+    }
+
+    if (adaptive_sampling_y < adaptive_sampling_height - 1) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block - 1 + adaptive_sampling_width);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (4.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (1.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (2.0f / 4.0f));
+    }
+  }
+
+  if (true) {
+    if (adaptive_sampling_y > 0) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block - adaptive_sampling_width);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (4.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (4.0f / 4.0f));
+    }
+
+    if (true) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (2.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (2.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (2.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (2.0f / 2.0f));
+    }
+
+    if (adaptive_sampling_y < adaptive_sampling_height - 1) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block + adaptive_sampling_width);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (4.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (4.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (2.0f / 4.0f));
+    }
+  }
+
+  if (adaptive_sampling_x < adaptive_sampling_width - 1) {
+    if (adaptive_sampling_y > 0) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block + 1 - adaptive_sampling_width);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (1.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (4.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (2.0f / 4.0f));
+    }
+
+    if (true) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block + 1);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (2.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (1.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (2.0f / 2.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (1.0f / 2.0f));
+    }
+
+    if (adaptive_sampling_y < adaptive_sampling_height - 1) {
+      const float4 neighbor_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block + 1 + adaptive_sampling_width);
+
+      rel_variance = fmaxf(rel_variance, neighbor_variances.x * (4.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.y * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.z * (2.0f / 4.0f));
+      rel_variance = fmaxf(rel_variance, neighbor_variances.w * (1.0f / 4.0f));
+    }
+  }
 
   uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
