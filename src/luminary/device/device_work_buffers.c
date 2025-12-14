@@ -71,9 +71,10 @@ LuminaryResult device_work_buffers_update(
   if (properties->internal_pixel_count != buffers->allocated_internal_pixel_count) {
     for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
       __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_first_moment[channel_id], sizeof(float) * properties->internal_pixel_count));
-      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_second_moment[channel_id], sizeof(float) * properties->internal_pixel_count));
       __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_result[channel_id], sizeof(float) * properties->internal_pixel_count));
     }
+
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_second_moment_luminance, sizeof(float) * properties->internal_pixel_count));
 
     buffers->allocated_internal_pixel_count = properties->internal_pixel_count;
     *buffers_have_changed                   = true;
@@ -122,10 +123,10 @@ LuminaryResult device_work_buffers_get_ptrs(DeviceWorkBuffers* buffers, DeviceWo
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_offsets));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, frame_swap));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, gbuffer_meta));
+  __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, frame_second_moment_luminance));
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
     __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, frame_first_moment[channel_id]));
-    __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, frame_second_moment[channel_id]));
     __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, frame_result[channel_id]));
     __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, frame_output[channel_id]));
   }
@@ -146,10 +147,10 @@ LuminaryResult device_work_buffers_destroy(DeviceWorkBuffers** buffers) {
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_offsets));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->frame_swap));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->gbuffer_meta));
+  __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->frame_second_moment_luminance));
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
     __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->frame_first_moment[channel_id]));
-    __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->frame_second_moment[channel_id]));
     __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->frame_result[channel_id]));
     __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->frame_output[channel_id]));
   }

@@ -482,7 +482,7 @@ struct DevicePointers {
   uint16_t* LUM_RESTRICT task_counts;
   uint16_t* LUM_RESTRICT task_offsets;
   float* LUM_RESTRICT frame_first_moment[FRAME_CHANNEL_COUNT];
-  float* LUM_RESTRICT frame_second_moment[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_second_moment_luminance;
   float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
   float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
   float* LUM_RESTRICT frame_swap;

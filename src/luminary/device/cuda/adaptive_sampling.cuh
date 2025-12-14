@@ -111,7 +111,7 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_current_tasks_per_pixel(const u
   return adaptive_sampling_get_stage_sample_count(adaptive_sampling_counts, this_stage_id - 1);
 }
 
-LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t x, const uint32_t y, const float inv_n, float& luminance) {
+LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance(const uint32_t x, const uint32_t y, const float inv_n, float& luminance) {
   const bool pixel_in_frame = (x < device.settings.width) && (y < device.settings.height);
   if (pixel_in_frame == false) {
     luminance = 0.0f;
@@ -126,15 +126,10 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t 
 
   luminance = color_luminance(get_color(red1, green1, blue1));
 
-  const float red2   = __ldg(device.ptrs.frame_second_moment[FRAME_CHANNEL_RED] + index) * inv_n;
-  const float green2 = __ldg(device.ptrs.frame_second_moment[FRAME_CHANNEL_GREEN] + index) * inv_n;
-  const float blue2  = __ldg(device.ptrs.frame_second_moment[FRAME_CHANNEL_BLUE] + index) * inv_n;
+  const float luminance2   = __ldg(device.ptrs.frame_second_moment_luminance + index) * inv_n;
+  const float luminance_sq = color_luminance(get_color(red1 * red1, green1 * green1, blue1 * blue1));
 
-  const float variance_red   = red2 - red1 * red1;
-  const float variance_green = green2 - green1 * green1;
-  const float variance_blue  = blue2 - blue1 * blue1;
-
-  return color_luminance(get_color(variance_red, variance_green, variance_blue));
+  return fmaxf(luminance2 - luminance_sq, 0.0f);
 }
 
 LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAdaptiveSamplingBlockReduceVariance args) {
@@ -162,7 +157,7 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   const uint32_t y = sub_block_y + (THREAD_ID_IN_WARP >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
   float luminance;
-  float variance = adaptive_sampling_get_pixel_max_variance(x, y, denominator, luminance);
+  float variance = adaptive_sampling_get_pixel_variance(x, y, denominator, luminance);
 
   if (args.exposure != 0.0f) {
     const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(luminance, args.exposure);

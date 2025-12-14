@@ -6,15 +6,16 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION bool accumulation_reduce_sample(const RGBF value, const uint32_t index, RGBF& first_moment, RGBF& second_moment) {
+LUMINARY_FUNCTION bool accumulation_reduce_sample(
+  const RGBF value, const uint32_t index, RGBF& first_moment, float& second_moment_lumiance) {
   const uint32_t index_mask = __match_any_sync(__activemask(), index);
 
   const bool is_first_thread = (__ffs(index_mask) - 1) == THREAD_ID_IN_WARP;
 
   // TODO: Implement fast path for when index_mask == 0xFFFFFFFF
 
-  first_moment  = value;
-  second_moment = mul_color(value, value);
+  first_moment           = value;
+  second_moment_lumiance = color_luminance(mul_color(value, value));
 
   for (uint32_t mask = index_mask & ~(1u << THREAD_ID_IN_WARP); mask != 0; mask &= mask - 1) {
     uint32_t other_thread_id = __ffs(mask) - 1;
@@ -25,8 +26,8 @@ LUMINARY_FUNCTION bool accumulation_reduce_sample(const RGBF value, const uint32
 
     const RGBF color = get_color(red, green, blue);
 
-    first_moment  = add_color(first_moment, color);
-    second_moment = add_color(second_moment, mul_color(color, color));
+    first_moment = add_color(first_moment, color);
+    second_moment_lumiance += color_luminance(mul_color(color, color));
   }
 
   return is_first_thread;
@@ -44,8 +45,9 @@ LUMINARY_KERNEL void accumulation_collect_results() {
 
     const DeviceTaskResult result = task_result_load(task_result_base_address);
 
-    RGBF first_moment, second_moment;
-    const bool is_first_thread = accumulation_reduce_sample(result.color, result.index, first_moment, second_moment);
+    RGBF first_moment;
+    float second_moment_luminance;
+    const bool is_first_thread = accumulation_reduce_sample(result.color, result.index, first_moment, second_moment_luminance);
 
     if (is_first_thread) {
       // TODO: Ensure this compiles to "red" instructions
@@ -53,9 +55,7 @@ LUMINARY_KERNEL void accumulation_collect_results() {
       atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);
       atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + result.index, first_moment.b);
 
-      atomicAdd(device.ptrs.frame_second_moment[FRAME_CHANNEL_RED] + result.index, second_moment.r);
-      atomicAdd(device.ptrs.frame_second_moment[FRAME_CHANNEL_GREEN] + result.index, second_moment.g);
-      atomicAdd(device.ptrs.frame_second_moment[FRAME_CHANNEL_BLUE] + result.index, second_moment.b);
+      atomicAdd(device.ptrs.frame_second_moment_luminance + result.index, second_moment_luminance);
     }
   }
 }
@@ -72,16 +72,14 @@ LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
 
     const DeviceTaskResult result = task_result_load(task_result_base_address);
 
-    const RGBF first_moment  = result.color;
-    const RGBF second_moment = mul_color(result.color, result.color);
+    const RGBF first_moment             = result.color;
+    const float second_moment_luminance = color_luminance(mul_color(result.color, result.color));
 
     __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);
     __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);
     __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + result.index, first_moment.b);
 
-    __stcs(device.ptrs.frame_second_moment[FRAME_CHANNEL_RED] + result.index, second_moment.r);
-    __stcs(device.ptrs.frame_second_moment[FRAME_CHANNEL_GREEN] + result.index, second_moment.g);
-    __stcs(device.ptrs.frame_second_moment[FRAME_CHANNEL_BLUE] + result.index, second_moment.b);
+    __stcs(device.ptrs.frame_second_moment_luminance + result.index, second_moment_luminance);
   }
 }
 
@@ -117,15 +115,15 @@ LUMINARY_KERNEL void accumulation_generate_result() {
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE: {
         float luminance;
-        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, luminance);
+        const float variance = adaptive_sampling_get_pixel_variance(x, y, normalization, luminance);
 
         const float rel_variance = (luminance > 0.0f) ? variance / luminance : 0.0f;
 
-        result = splat_color(rel_variance);
+        result = splat_color(4.0f * rel_variance);
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR: {
         float luminance;
-        const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, luminance);
+        const float variance = adaptive_sampling_get_pixel_variance(x, y, normalization, luminance);
 
         const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(luminance, device.camera.exposure);
 

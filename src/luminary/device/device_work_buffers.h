@@ -22,7 +22,7 @@ struct DeviceWorkBuffersPtrs {
   CUdeviceptr task_counts;
   CUdeviceptr task_offsets;
   CUdeviceptr frame_first_moment[FRAME_CHANNEL_COUNT];
-  CUdeviceptr frame_second_moment[FRAME_CHANNEL_COUNT];
+  CUdeviceptr frame_second_moment_luminance;
   CUdeviceptr frame_result[FRAME_CHANNEL_COUNT];
   CUdeviceptr frame_output[FRAME_CHANNEL_COUNT];
   CUdeviceptr frame_swap;
@@ -38,7 +38,7 @@ struct DeviceWorkBuffers {
   DEVICE uint16_t* task_counts;
   DEVICE uint16_t* task_offsets;
   DEVICE float* frame_first_moment[FRAME_CHANNEL_COUNT];
-  DEVICE float* frame_second_moment[FRAME_CHANNEL_COUNT];
+  DEVICE float* frame_second_moment_luminance;
   DEVICE float* frame_result[FRAME_CHANNEL_COUNT];
   DEVICE float* frame_output[FRAME_CHANNEL_COUNT];
   DEVICE float* frame_swap;

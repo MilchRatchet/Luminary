@@ -468,10 +468,10 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_offsets, (void*) ptrs.task_offsets);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_swap, (void*) ptrs.frame_swap);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.gbuffer_meta, (void*) ptrs.gbuffer_meta);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_second_moment_luminance, (void*) ptrs.frame_second_moment_luminance);
 
     for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
       DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_first_moment[channel_id], (void*) ptrs.frame_first_moment[channel_id]);
-      DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_second_moment[channel_id], (void*) ptrs.frame_second_moment[channel_id]);
       DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_result[channel_id], (void*) ptrs.frame_result[channel_id]);
       DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_output[channel_id], (void*) ptrs.frame_output[channel_id]);
     }

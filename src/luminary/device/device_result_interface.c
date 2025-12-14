@@ -35,10 +35,11 @@ static LuminaryResult _device_result_interface_entry_allocate(DeviceResultInterf
     __FAILURE_HANDLE(device_malloc_staging(
       &entry->frame_first_moment[channel_id], pixel_count * sizeof(float),
       DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
-    __FAILURE_HANDLE(device_malloc_staging(
-      &entry->frame_second_moment[channel_id], pixel_count * sizeof(float),
-      DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
   }
+
+  __FAILURE_HANDLE(device_malloc_staging(
+    &entry->frame_second_moment_luminance, pixel_count * sizeof(float),
+    DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
 
   CUDA_FAILURE_HANDLE(cuEventCreate(&entry->available_event, CU_EVENT_DISABLE_TIMING));
 
@@ -60,8 +61,9 @@ static LuminaryResult _device_result_interface_entry_free(DeviceResultInterface*
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
     __FAILURE_HANDLE(device_free_staging(&entry->frame_first_moment[channel_id]));
-    __FAILURE_HANDLE(device_free_staging(&entry->frame_second_moment[channel_id]));
   }
+
+  __FAILURE_HANDLE(device_free_staging(&entry->frame_second_moment_luminance));
 
   CUDA_FAILURE_HANDLE(cuEventDestroy(entry->available_event));
 
@@ -140,10 +142,11 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
     __FAILURE_HANDLE(device_download(
       entry->frame_first_moment[channel_id], device->work_buffers->frame_first_moment[channel_id], 0, pixel_count * sizeof(float),
       device->stream_main));
-    __FAILURE_HANDLE(device_download(
-      entry->frame_second_moment[channel_id], device->work_buffers->frame_second_moment[channel_id], 0, pixel_count * sizeof(float),
-      device->stream_main));
   }
+
+  __FAILURE_HANDLE(device_download(
+    entry->frame_second_moment_luminance, device->work_buffers->frame_second_moment_luminance, 0, pixel_count * sizeof(float),
+    device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuEventRecord(entry->available_event, device->stream_main));
 
@@ -248,9 +251,10 @@ LuminaryResult device_result_interface_gather_results(DeviceResultInterface* int
     for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
       __FAILURE_HANDLE(_device_result_interface_update_buffer(
         interface, device, device->work_buffers->frame_first_moment[channel_id], entry->frame_first_moment[channel_id], pixel_count));
-      __FAILURE_HANDLE(_device_result_interface_update_buffer(
-        interface, device, device->work_buffers->frame_second_moment[channel_id], entry->frame_second_moment[channel_id], pixel_count));
     }
+
+    __FAILURE_HANDLE(_device_result_interface_update_buffer(
+      interface, device, device->work_buffers->frame_second_moment_luminance, entry->frame_second_moment_luminance, pixel_count));
 
     if (entry->consumer_event_id == RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID) {
       __FAILURE_HANDLE(_device_result_interface_get_consumer_event(interface, &entry->consumer_event_id));
