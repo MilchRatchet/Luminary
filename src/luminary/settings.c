@@ -15,6 +15,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->enable_adaptive_sampling          = true;
   settings->adaptive_sampling_strength        = 1.0f;
   settings->adaptive_sampling_update_interval = 64;
+  settings->adaptive_sampling_exposure_aware  = true;
   settings->adaptive_sampling_output_mode     = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY;
   settings->shading_mode                      = LUMINARY_SHADING_MODE_DEFAULT;
   settings->region_x                          = 0.0f;
@@ -53,6 +54,7 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
   if (input->enable_adaptive_sampling) {
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_strength, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_update_interval, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+    __SETTINGS_CHECK_DIRTY(adaptive_sampling_exposure_aware, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_output_mode, SCENE_DIRTY_FLAG_OUTPUT);
   }
 

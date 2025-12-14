@@ -5,6 +5,13 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(const float value, const float exposure) {
+  const float exposed_value    = value * exposure;
+  const float tonemapped_value = exposed_value / (1.0f + exposed_value);
+
+  return tonemapped_value / exposed_value;
+}
+
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
   return ((stage_sample_counts >> (stage_id * 8)) & 0xFF) + 1;
 }
@@ -156,6 +163,11 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
 
   float max_value;
   float max_variance = adaptive_sampling_get_pixel_max_variance(x, y, denominator, max_value);
+
+  if (args.exposure != 0.0f) {
+    const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(max_value, args.exposure);
+    max_variance *= tonemap_compression * tonemap_compression;
+  }
 
   const float rel_variance = (max_value > 0.0f) ? max_variance / max_value : 0.0f;
 

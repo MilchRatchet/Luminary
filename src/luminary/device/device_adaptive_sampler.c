@@ -38,6 +38,7 @@ LuminaryResult adaptive_sampler_setup(AdaptiveSampler* sampler, const AdaptiveSa
   }
 
   sampler->strength = info->strength;
+  sampler->exposure = (info->exposure_aware) ? info->exposure : 0.0f;
 
   memset(&sampler->allocator, 0, sizeof(DeviceSampleAllocation));
 
@@ -153,6 +154,7 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     KernelArgsAdaptiveSamplingBlockReduceVariance args;
     args.dst              = DEVICE_PTR(sampler->variance_buffer);
     args.current_stage_id = sampler->allocator.stage_id;
+    args.exposure         = sampler->exposure;
 
     // 2 Warps per adaptive block
     const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG + 1)) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;

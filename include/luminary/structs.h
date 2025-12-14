@@ -65,6 +65,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   bool enable_adaptive_sampling;
   float adaptive_sampling_strength;
   uint32_t adaptive_sampling_update_interval;
+  bool adaptive_sampling_exposure_aware;
   LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;
   LuminaryShadingMode shading_mode;
   float region_x;

@@ -17,6 +17,8 @@ struct AdaptiveSamplerSetupInfo {
   uint32_t width;
   uint32_t height;
   float strength;
+  bool exposure_aware;
+  float exposure;
 } typedef AdaptiveSamplerSetupInfo;
 
 struct AdaptiveSampler {
@@ -30,6 +32,7 @@ struct AdaptiveSampler {
   STAGING uint32_t* stage_total_task_counts;
   DEVICE float* variance_buffer;
   float strength;
+  float exposure;
   CUevent stage_build_event;
 } typedef AdaptiveSampler;
 

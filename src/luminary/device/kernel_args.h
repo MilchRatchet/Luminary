@@ -197,6 +197,7 @@ struct KernelArgsMipmapGenerateLevel2DRGBAF {
 struct KernelArgsAdaptiveSamplingBlockReduceVariance {
   float* dst;
   uint32_t current_stage_id;
+  float exposure;
 } typedef KernelArgsAdaptiveSamplingBlockReduceVariance;
 
 struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {

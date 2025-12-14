@@ -121,16 +121,18 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
         const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
 
-        result = splat_color(floorf(rel_variance * 16.0f) / 32.0f);
+        result = splat_color(rel_variance);
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR: {
         float max_value;
         const float variance = adaptive_sampling_get_pixel_max_variance(x, y, normalization, max_value);
 
-        const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
-        const float rel_mse      = rel_variance * normalization;
+        const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(max_value, device.camera.exposure);
 
-        const float value = 16.0f * rel_mse;
+        const float rel_variance = (max_value > 0.0f) ? variance / max_value : 0.0f;
+        const float rel_mse      = rel_variance * normalization * tonemap_compression * tonemap_compression;
+
+        const float value = 1024.0f * rel_mse;
         const float red   = __saturatef(2.0f * value);
         const float green = __saturatef(2.0f * (value - 0.5f));
         const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
