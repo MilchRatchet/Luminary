@@ -8,25 +8,47 @@
 // Interthread IO
 ////////////////////////////////////////////////////////////////////
 
-template <typename T>
+template <uint32_t WIDTH = 32, typename T>
 LUMINARY_FUNCTION T warp_reduce_sum(T sum) {
   const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
-  sum += __shfl_xor_sync(mask, sum, 16);
-  sum += __shfl_xor_sync(mask, sum, 8);
-  sum += __shfl_xor_sync(mask, sum, 4);
-  sum += __shfl_xor_sync(mask, sum, 2);
-  sum += __shfl_xor_sync(mask, sum, 1);
+
+  if constexpr (WIDTH >= 32)
+    sum += __shfl_xor_sync(mask, sum, 16);
+
+  if constexpr (WIDTH >= 16)
+    sum += __shfl_xor_sync(mask, sum, 8);
+
+  if constexpr (WIDTH >= 8)
+    sum += __shfl_xor_sync(mask, sum, 4);
+
+  if constexpr (WIDTH >= 4)
+    sum += __shfl_xor_sync(mask, sum, 2);
+
+  if constexpr (WIDTH >= 2)
+    sum += __shfl_xor_sync(mask, sum, 1);
+
   return sum;
 }
 
-template <typename T>
+template <uint32_t WIDTH = 32, typename T>
 LUMINARY_FUNCTION T warp_reduce_max(T max_value) {
   const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 4));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 2));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 1));
+
+  if constexpr (WIDTH >= 32)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
+
+  if constexpr (WIDTH >= 16)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
+
+  if constexpr (WIDTH >= 8)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 4));
+
+  if constexpr (WIDTH >= 4)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 2));
+
+  if constexpr (WIDTH >= 2)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 1));
+
   return max_value;
 }
 

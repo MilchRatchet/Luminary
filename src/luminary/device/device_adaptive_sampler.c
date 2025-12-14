@@ -20,6 +20,7 @@ LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, Devic
 
   sizes->stage_sample_counts_size     = sizeof(uint32_t) * sampler->width * sampler->height;
   sizes->stage_total_task_counts_size = sizeof(uint32_t) * (ADAPTIVE_SAMPLER_NUM_STAGES + 1);
+  sizes->variance_buffer_size         = (sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG)) >> 2;
 
   return LUMINARY_SUCCESS;
 }
@@ -107,14 +108,14 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   __FAILURE_HANDLE(adaptive_sampler_get_buffer_sizes(sampler, &buffer_sizes));
 
   if (buffer_sizes.stage_sample_counts_size != sampler->allocated_stage_sample_counts_size) {
-    sampler->allocated_stage_sample_counts_size = buffer_sizes.stage_sample_counts_size;
-
     if (sampler->stage_sample_counts)
       __FAILURE_HANDLE(device_free_staging(&sampler->stage_sample_counts));
 
     __FAILURE_HANDLE(device_malloc_staging(
       &sampler->stage_sample_counts, buffer_sizes.stage_sample_counts_size,
       DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
+
+    sampler->allocated_stage_sample_counts_size = buffer_sizes.stage_sample_counts_size;
   }
 
   if (sampler->stage_total_task_counts == (uint32_t*) 0) {
@@ -122,6 +123,15 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
       device_malloc_staging(&sampler->stage_total_task_counts, buffer_sizes.stage_sample_counts_size, DEVICE_MEMORY_STAGING_FLAG_SHARED));
 
     sampler->stage_total_task_counts[0] = (sampler->width * sampler->height) << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  }
+
+  if (buffer_sizes.variance_buffer_size != sampler->allocated_variance_buffer_size) {
+    if (sampler->variance_buffer)
+      __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
+
+    __FAILURE_HANDLE(device_malloc(&sampler->variance_buffer, buffer_sizes.variance_buffer_size));
+
+    sampler->allocated_variance_buffer_size = buffer_sizes.variance_buffer_size;
   }
 
   if (sampler->stage_build_event == (CUevent) 0) {
@@ -132,10 +142,24 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   const uint32_t warps_per_block              = THREADS_PER_BLOCK >> WARP_SIZE_LOG;
 
   {
-    KernelArgsAdaptiveSamplingComputeStageSampleCounts args;
+    KernelArgsAdaptiveSamplingBlockReduceVariance args;
+    args.dst              = DEVICE_PTR(sampler->variance_buffer);
     args.current_stage_id = sampler->allocator.stage_id;
 
-    const uint32_t num_blocks = (num_adaptive_sampling_blocks + warps_per_block - 1) / warps_per_block;
+    // 2 Warps per adaptive block
+    const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG + 1)) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+
+    __FAILURE_HANDLE(kernel_execute_custom(
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_BLOCK_REDUCE_VARIANCE], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
+      device->stream_main));
+  }
+
+  {
+    KernelArgsAdaptiveSamplingComputeStageSampleCounts args;
+    args.variance_src     = DEVICE_PTR(sampler->variance_buffer);
+    args.current_stage_id = sampler->allocator.stage_id;
+
+    const uint32_t num_blocks = (num_adaptive_sampling_blocks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
       device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_SAMPLE_COUNTS], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
@@ -177,6 +201,9 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
 
   if (sampler->stage_total_task_counts)
     __FAILURE_HANDLE(device_free_staging(&sampler->stage_total_task_counts));
+
+  if (sampler->variance_buffer)
+    __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
 
   if (sampler->stage_build_event != (CUevent) 0) {
     CUDA_FAILURE_HANDLE(cuEventDestroy(sampler->stage_build_event));

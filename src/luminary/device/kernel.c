@@ -68,6 +68,8 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "mipmap_generate_level_3D_RGBAF", .param_size = sizeof(KernelArgsMipmapGenerateLevel3DRGBAF)},
   [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBAF] =
     {.name = "mipmap_generate_level_2D_RGBAF", .param_size = sizeof(KernelArgsMipmapGenerateLevel2DRGBAF)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_BLOCK_REDUCE_VARIANCE] =
+    {.name = "adaptive_sampling_block_reduce_variance", .param_size = sizeof(KernelArgsAdaptiveSamplingBlockReduceVariance)},
   [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_SAMPLE_COUNTS] =
     {.name = "adaptive_sampling_compute_stage_sample_counts", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeStageSampleCounts)},
   [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_TOTAL_TASK_COUNTS] =

@@ -130,11 +130,15 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_max_variance(const uint32_t 
   return fmaxf(variance_red, fmaxf(variance_green, variance_blue));
 }
 
-LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelArgsAdaptiveSamplingComputeStageSampleCounts args) {
+LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAdaptiveSamplingBlockReduceVariance args) {
   const uint32_t adaptive_sampling_width =
     (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
-  const uint32_t adaptive_sampling_block = WARP_ID;
+  // Two sub_blocks per warp
+  const uint32_t sub_block = THREAD_ID >> (WARP_SIZE_LOG - 1);
+
+  const uint32_t adaptive_sampling_block = sub_block >> 2;
+  const uint32_t local_id                = sub_block & 0b11;
 
   const uint32_t sample_count = adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
   const float denominator     = 1.0f / sample_count;
@@ -142,40 +146,56 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
   const uint32_t adaptive_sampling_y = adaptive_sampling_block / adaptive_sampling_width;
   const uint32_t adaptive_sampling_x = adaptive_sampling_block - adaptive_sampling_y * adaptive_sampling_width;
 
-  const uint32_t x0 = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + (THREAD_ID_IN_WARP & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK);
-  const uint32_t y0 = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + (THREAD_ID_IN_WARP >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  const uint32_t sub_block_x =
+    (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + ((local_id & 0b1) << (ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG - 1));
+  const uint32_t sub_block_y =
+    (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + ((local_id >> 1) << (ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG - 1));
 
-  float max_value0;
-  float max_variance = adaptive_sampling_get_pixel_max_variance(x0, y0, denominator, max_value0);
+  const uint32_t x = sub_block_x + (THREAD_ID_IN_WARP & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK);
+  const uint32_t y = sub_block_y + (THREAD_ID_IN_WARP >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
-  const uint32_t x1 = x0;
-  const uint32_t y1 = y0 + (1u << (ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG - 1));
+  float max_value;
+  float max_variance = adaptive_sampling_get_pixel_max_variance(x, y, denominator, max_value);
 
-  float max_value1;
-  max_variance = fmaxf(max_variance, adaptive_sampling_get_pixel_max_variance(x1, y1, denominator, max_value1));
+  const float rel_variance = (max_value > 0.0f) ? max_variance / max_value : 0.0f;
 
-  const float max_value = fmaxf(max_value0, max_value1);
+  const float sub_block_rel_variance = warp_reduce_max<16>(rel_variance);
 
-  const float max_variance_block = warp_reduce_max(max_variance);
-  const float max_value_block    = warp_reduce_max(max_value);
-
-  if (THREAD_ID_IN_WARP == 0) {
-    const float rel_variance = (max_value_block > 0.0f) ? max_variance_block / max_value_block : 0.0f;
-
-    uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
-
-    // Zero out all the bits not currently occupied by valid data.
-    adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
-
-    uint32_t new_sample_count = (uint32_t) (rel_variance * 32.0f);
-
-    new_sample_count = max(new_sample_count, 1);
-    new_sample_count = min(new_sample_count, 128);
-
-    adaptive_sampling_counts |= (new_sample_count - 1) << (args.current_stage_id * 8);
-
-    device.ptrs.stage_sample_counts[adaptive_sampling_block] = adaptive_sampling_counts;
+  if ((THREAD_ID_IN_WARP & (WARP_SIZE_MASK >> 1)) == 0) {
+    // TODO: This could be made faster by shuffling both values to THREAD 0 and using a 8 byte store
+    args.dst[sub_block] = sub_block_rel_variance;
   }
+}
+
+LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelArgsAdaptiveSamplingComputeStageSampleCounts args) {
+  // The previous kernel returns a relative variance image
+  // We apply a filter and from it compute the sample counts
+
+  // It might make sense to perform a 4x4 prefilter here
+
+  const uint32_t adaptive_sampling_block = THREAD_ID;
+
+  const float4 adaptive_sampling_block_variances = __ldg(((float4*) args.variance_src) + adaptive_sampling_block);
+
+  float rel_variance = 0.0f;
+  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.x);
+  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.y);
+  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.z);
+  rel_variance       = fmaxf(rel_variance, adaptive_sampling_block_variances.w);
+
+  uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+
+  // Zero out all the bits not currently occupied by valid data.
+  adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
+
+  uint32_t new_sample_count = (uint32_t) (rel_variance * 1024.0f);
+
+  new_sample_count = max(new_sample_count, 1);
+  new_sample_count = min(new_sample_count, ADAPTIVE_SAMPLING_MAX_SAMPLES);
+
+  adaptive_sampling_counts |= (new_sample_count - 1) << (args.current_stage_id * 8);
+
+  device.ptrs.stage_sample_counts[adaptive_sampling_block] = adaptive_sampling_counts;
 }
 
 LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts args) {

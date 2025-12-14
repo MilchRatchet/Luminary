@@ -356,11 +356,16 @@ static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRend
   if (renderer->enable_adaptive_sampling == false)
     return LUMINARY_SUCCESS;
 
+  const uint32_t stage_id = renderer->sample_allocation.stage_id;
+
   // We have reached the last stage, there is nothing left to do.
-  if (renderer->sample_allocation.stage_id >= ADAPTIVE_SAMPLER_NUM_STAGES)
+  if (stage_id >= ADAPTIVE_SAMPLER_NUM_STAGES)
     return LUMINARY_SUCCESS;
 
-  if (renderer->executed_aggregate_sample_counts[renderer->sample_allocation.stage_id] < 64)
+  const uint32_t samples_this_stage = renderer->executed_aggregate_sample_counts[stage_id];
+  const uint32_t samples_to_update  = 64 << stage_id;
+
+  if (samples_this_stage < samples_to_update)
     return LUMINARY_SUCCESS;
 
   work->shared_callback_data->adaptive_sampling_build_stage_id = renderer->sample_allocation.stage_id + 1;

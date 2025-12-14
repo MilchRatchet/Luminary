@@ -141,7 +141,7 @@ LUMINARY_KERNEL void accumulation_generate_result() {
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION: {
         const uint32_t tasks_per_pixel = adaptive_sampling_get_current_tasks_per_pixel(x, y);
 
-        const float rel_value = ((float) tasks_per_pixel) / 128;
+        const float rel_value = ((float) tasks_per_pixel) / ADAPTIVE_SAMPLING_MAX_SAMPLES;
 
         result = splat_color(rel_value);
       } break;
