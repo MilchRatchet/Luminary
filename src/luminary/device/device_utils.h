@@ -29,7 +29,7 @@
 #define MAXIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD << 1)
 
 // If this is changed, the warp-based filter in adaptive_sampling_compute_stage_sample_counts must be adapted.
-#define ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG 3
+#define ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG 2
 #define ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK ((1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)
 #define ADAPTIVE_SAMPLING_STAGE_INVALID 0xFF
 #define ADAPTIVE_SAMPLING_MAX_SAMPLING_RATE 256

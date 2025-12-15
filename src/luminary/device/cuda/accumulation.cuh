@@ -144,7 +144,7 @@ LUMINARY_KERNEL void accumulation_generate_result() {
           neighbour_mean             = scale_color(neighbour_mean, neighbour_norm);
           neighbour_error *= neighbour_norm;
 
-          const float t = remap01(center_error, 0.0f, neighbour_error);
+          const float t = remap01(center_error, 0.0f, 8.0f * neighbour_error);
           result        = lerp_color(center_mean, neighbour_mean, t);
         }
         else {
@@ -165,9 +165,9 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
         const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(luminance, device.camera.exposure);
 
-        const float mse = variance * normalization * tonemap_compression * tonemap_compression;
+        const float mse = sqrtf(variance * normalization) * tonemap_compression;
 
-        const float value = 1024.0f * 1024.0f * mse;
+        const float value = 1024.0f * mse;
         const float red   = __saturatef(2.0f * value);
         const float green = __saturatef(2.0f * (value - 0.5f));
         const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));

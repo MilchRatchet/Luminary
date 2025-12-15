@@ -20,7 +20,7 @@ LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, Devic
 
   sizes->stage_sample_counts_size     = sizeof(uint32_t) * sampler->width * sampler->height;
   sizes->stage_total_task_counts_size = sizeof(uint32_t) * (ADAPTIVE_SAMPLER_NUM_STAGES + 1);
-  sizes->variance_buffer_size         = (sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG)) >> 2;
+  sizes->variance_buffer_size         = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
   return LUMINARY_SUCCESS;
 }
@@ -161,10 +161,11 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     args.dst_block_variance  = DEVICE_PTR(sampler->variance_buffer);
     args.dst_global_variance = DEVICE_PTR(sampler->global_variance_buffer);
     args.current_stage_id    = sampler->allocator.stage_id;
+    args.width               = sampler->width;
     args.exposure            = sampler->exposure;
 
-    // 2 Warps per adaptive block
-    const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG + 1)) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    // Half a warp per adaptive sampler block
+    const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG - 1)) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
       device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_BLOCK_REDUCE_VARIANCE], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
