@@ -109,9 +109,49 @@ LUMINARY_KERNEL void accumulation_generate_result() {
     RGBF result;
     switch (device.settings.adaptive_sampling_output_mode) {
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY: {
-        result.r = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
-        result.g = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
-        result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
+        if (device.camera.use_local_error_minimization) {
+          RGBF center_mean;
+          const float center_variance = adaptive_sampling_get_pixel_variance_and_color(x, y, normalization, center_mean);
+
+          const float center_error = center_variance * normalization;
+
+          const uint32_t xi_start = max(x, 1) - 1;
+          const uint32_t xi_end   = min(x, width - 1) + 1;
+
+          const uint32_t yi_start = max(y, 1) - 1;
+          const uint32_t yi_end   = min(y, height - 1) + 1;
+
+          RGBF neighbour_mean   = splat_color(0.0f);
+          float neighbour_error = 0.0f;
+          for (uint32_t yi = yi_start; yi <= yi_end; yi++) {
+            for (uint32_t xi = xi_start; xi <= xi_end; xi++) {
+              if (xi == x && yi == y)
+                continue;
+
+              const uint32_t sample_count_neighbour = adaptive_sampling_get_sample_count(xi, yi);
+              const float norm_neighbour            = 1.0f / sample_count_neighbour;
+
+              RGBF neighbour_first_moment;
+              const float variance = adaptive_sampling_get_pixel_variance_and_color(xi, yi, norm_neighbour, neighbour_first_moment);
+
+              neighbour_mean = add_color(neighbour_mean, neighbour_first_moment);
+
+              neighbour_error += variance * norm_neighbour;
+            }
+          }
+
+          const float neighbour_norm = 1.0f / ((xi_end - xi_start + 1) * (yi_end - yi_start + 1) - 1);
+          neighbour_mean             = scale_color(neighbour_mean, neighbour_norm);
+          neighbour_error *= neighbour_norm;
+
+          const float t = remap01(center_error, 0.0f, neighbour_error);
+          result        = lerp_color(center_mean, neighbour_mean, t);
+        }
+        else {
+          result.r = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
+          result.g = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * normalization;
+          result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
+        }
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE: {
         float luminance;

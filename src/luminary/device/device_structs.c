@@ -41,15 +41,16 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(device_camera);
 
-  device_camera->aperture_shape         = camera->aperture_shape;
-  device_camera->aperture_blade_count   = camera->aperture_blade_count;
-  device_camera->tonemap                = camera->tonemap;
-  device_camera->dithering              = camera->dithering;
-  device_camera->purkinje               = camera->purkinje && (camera->use_physical_camera == false);
-  device_camera->use_color_correction   = camera->use_color_correction;
-  device_camera->allow_reflections      = camera->physical.allow_reflections;
-  device_camera->use_spectral_rendering = camera->physical.use_spectral_rendering;
-  device_camera->use_physical_camera    = camera->use_physical_camera;
+  device_camera->aperture_shape               = camera->aperture_shape;
+  device_camera->aperture_blade_count         = camera->aperture_blade_count;
+  device_camera->tonemap                      = camera->tonemap;
+  device_camera->dithering                    = camera->dithering;
+  device_camera->purkinje                     = camera->purkinje && (camera->use_physical_camera == false);
+  device_camera->use_color_correction         = camera->use_color_correction;
+  device_camera->allow_reflections            = camera->physical.allow_reflections;
+  device_camera->use_spectral_rendering       = camera->physical.use_spectral_rendering;
+  device_camera->use_physical_camera          = camera->use_physical_camera;
+  device_camera->use_local_error_minimization = camera->use_local_error_minimization;
 
   if (camera->use_physical_camera) {
     device_camera->physical.num_interfaces        = 12;

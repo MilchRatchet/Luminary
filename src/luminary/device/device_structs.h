@@ -46,7 +46,8 @@ struct DeviceCamera {
   uint32_t allow_reflections : 1;
   uint32_t use_spectral_rendering : 1;
   uint32_t use_physical_camera : 1;
-  // 19 bits spare
+  uint32_t use_local_error_minimization : 1;
+  // 18 bits spare
 
   vec3 pos;
   Quaternion rotation;

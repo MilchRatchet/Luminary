@@ -132,6 +132,27 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance(const uint32_t x, c
   return fmaxf(luminance2 - luminance_sq, 0.0f);
 }
 
+LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance_and_color(const uint32_t x, const uint32_t y, const float inv_n, RGBF& color) {
+  const bool pixel_in_frame = (x < device.settings.width) && (y < device.settings.height);
+  if (pixel_in_frame == false) {
+    color = splat_color(0.0f);
+    return 0.0f;
+  }
+
+  const uint32_t index = x + y * device.settings.width;
+
+  const float red1   = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * inv_n;
+  const float green1 = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + index) * inv_n;
+  const float blue1  = __ldg(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * inv_n;
+
+  color = get_color(red1, green1, blue1);
+
+  const float luminance2   = __ldg(device.ptrs.frame_second_moment_luminance + index) * inv_n;
+  const float luminance_sq = color_luminance(get_color(red1 * red1, green1 * green1, blue1 * blue1));
+
+  return fmaxf(luminance2 - luminance_sq, 0.0f);
+}
+
 LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAdaptiveSamplingBlockReduceVariance args) {
   const uint32_t adaptive_sampling_width =
     (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;

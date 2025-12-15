@@ -931,6 +931,16 @@ LUMINARY_FUNCTION RGBF inv_color(const RGBF a) {
   return result;
 }
 
+LUMINARY_FUNCTION RGBF lerp_color(const RGBF a, const RGBF b, const float t) {
+  RGBF result;
+
+  result.r = lerp(a.r, b.r, t);
+  result.g = lerp(a.g, b.g, t);
+  result.b = lerp(a.b, b.b, t);
+
+  return result;
+}
+
 LUMINARY_FUNCTION int color_any(const RGBF a) {
   return (a.r > 0.0f || a.g > 0.0f || a.b > 0.0f);
 }

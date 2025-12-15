@@ -324,6 +324,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "AGX Slope", &camera.agx_custom_slope, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   }
 
+  update_data |= _window_entity_properties_add_checkbox(data, "Local Error Minimization", &camera.use_local_error_minimization);
+
   update_data |=
     _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
