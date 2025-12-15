@@ -157,9 +157,7 @@ LUMINARY_KERNEL void accumulation_generate_result() {
         float luminance;
         const float variance = adaptive_sampling_get_pixel_variance(x, y, normalization, luminance);
 
-        const float rel_variance = (luminance > 0.0f) ? variance / luminance : 0.0f;
-
-        result = splat_color(4.0f * rel_variance);
+        result = splat_color(128.0f * variance);
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR: {
         float luminance;
@@ -167,10 +165,9 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
         const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(luminance, device.camera.exposure);
 
-        const float rel_variance = (luminance > 0.0f) ? variance / luminance : 0.0f;
-        const float rel_mse      = rel_variance * normalization * tonemap_compression * tonemap_compression;
+        const float mse = variance * normalization * tonemap_compression * tonemap_compression;
 
-        const float value = 1024.0f * rel_mse;
+        const float value = 1024.0f * 1024.0f * mse;
         const float red   = __saturatef(2.0f * value);
         const float green = __saturatef(2.0f * (value - 0.5f));
         const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));

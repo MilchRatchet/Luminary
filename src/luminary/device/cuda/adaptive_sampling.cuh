@@ -9,7 +9,7 @@ LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(con
   const float exposed_value    = value * exposure;
   const float tonemapped_value = exposed_value / (1.0f + exposed_value);
 
-  return tonemapped_value / exposed_value;
+  return (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
@@ -185,16 +185,14 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
     variance *= tonemap_compression * tonemap_compression;
   }
 
-  const float rel_variance = (luminance > 0.0f) ? variance / luminance : 0.0f;
-
-  const float sub_block_rel_variance = warp_reduce_max<16>(rel_variance);
+  const float sub_block_variance = warp_reduce_max<16>(variance);
 
   if ((THREAD_ID_IN_WARP & (WARP_SIZE_MASK >> 1)) == 0) {
     // TODO: This could be made faster by shuffling both values to THREAD 0 and using a 8 byte store
-    args.dst_block_variance[sub_block] = sub_block_rel_variance;
+    args.dst_block_variance[sub_block] = sub_block_variance;
 
     // Since variance >= 0, we can use the built-in integer atomicMax
-    atomicMax((uint32_t*) args.dst_global_variance, __float_as_uint(fabsf(sub_block_rel_variance)));
+    atomicMax((uint32_t*) args.dst_global_variance, __float_as_uint(fabsf(sub_block_variance)));
   }
 }
 
