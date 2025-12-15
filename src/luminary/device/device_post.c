@@ -214,6 +214,9 @@ DEVICE_CTX_FUNC LuminaryResult device_post_apply(DevicePost* post, Device* devic
   if (device->constant_memory->settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
     return LUMINARY_SUCCESS;
 
+  if (device->constant_memory->settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
+    return LUMINARY_SUCCESS;
+
   if (device->constant_memory->settings.window_width != device->constant_memory->settings.width)
     return LUMINARY_SUCCESS;
 
