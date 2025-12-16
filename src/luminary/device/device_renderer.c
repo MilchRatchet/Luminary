@@ -253,6 +253,7 @@ LuminaryResult device_renderer_register_callback(
 
 LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(args);
 
   memset(renderer->executed_aggregate_sample_counts, 0, sizeof(renderer->executed_aggregate_sample_counts));
 
@@ -486,10 +487,6 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   __CHECK_NULL_ARGUMENT(device);
 
   if (renderer->shutdown)
-    return LUMINARY_SUCCESS;
-
-  // Abort render if we exceeded maximum supported sample count
-  if (renderer->sample_allocation.global_sample_id >= MAX_NUM_GLOBAL_SAMPLES)
     return LUMINARY_SUCCESS;
 
   // Renderer has no samples allocated.

@@ -332,7 +332,6 @@ LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
 struct DeviceSampleAllocation {
   uint32_t stage_sample_offsets[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
-  uint32_t global_sample_id;
   uint32_t upper_bound_tasks_per_sample;
   uint8_t stage_id;
   uint8_t num_samples;
@@ -488,7 +487,6 @@ struct DevicePointers {
   GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   // DeviceAdaptiveSampler
   uint32_t* LUM_RESTRICT stage_sample_counts;
-  uint32_t* LUM_RESTRICT stage_total_task_counts;
   uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
   uint32_t* LUM_RESTRICT adaptive_sampling_subtile_block_index;
   // DeviceTextureManager

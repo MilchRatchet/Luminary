@@ -211,7 +211,7 @@ struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
 
 struct KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts {
   uint8_t stage_id;
-  uint32_t* dst_block_task_count;
+  uint32_t* dst;
 } typedef KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts;
 
 struct KernelArgsAdaptiveSamplingComputeTasksPerBlock {

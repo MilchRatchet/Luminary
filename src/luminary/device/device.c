@@ -815,9 +815,6 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAlloc
   }
 
   CUDA_FAILURE_HANDLE(cuMemsetD32Async(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.global_sample_id),
-    sample_allocation.global_sample_id, 1, device->stream_main));
-  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.upper_bound_tasks_per_sample),
     sample_allocation.upper_bound_tasks_per_sample, 1, device->stream_main));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
@@ -1350,7 +1347,6 @@ LuminaryResult device_update_adaptive_sampling(Device* device, AdaptiveSampler* 
     __FAILURE_HANDLE(device_adaptive_sampler_get_device_buffer_ptrs(device->adaptive_sampler, &ptrs));
 
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stage_sample_counts, (void*) ptrs.stage_sample_counts);
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.stage_total_task_counts, (void*) ptrs.stage_total_task_counts);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_block_task_offsets, (void*) ptrs.adaptive_sampling_block_task_offsets);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_subtile_block_index, (void*) ptrs.adaptive_sampling_subtile_block_index);
   }

@@ -16,7 +16,7 @@
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
-  if (device.state.sample_allocation.global_sample_id != 0 || device.state.depth != 0)
+  if (device.state.undersampling == 0 || device.state.depth != 0)
     return;
 
   const uint32_t shift = device.settings.supersampling + 1;

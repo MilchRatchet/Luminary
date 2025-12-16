@@ -30,6 +30,7 @@ struct AdaptiveSampler {
   DeviceSampleAllocation allocator;
   STAGING uint32_t* stage_sample_counts;
   STAGING uint32_t* stage_total_task_counts;
+  DEVICE uint32_t* stage_total_task_counts_buffer;
   DEVICE float* variance_buffer;
   DEVICE float* global_variance_buffer;
   uint32_t max_sampling_rate;
@@ -48,7 +49,6 @@ LuminaryResult adaptive_sampler_destroy(AdaptiveSampler** sampler);
 
 struct DeviceAdaptiveSamplerDeviceBufferPtrs {
   CUdeviceptr stage_sample_counts;
-  CUdeviceptr stage_total_task_counts;
   CUdeviceptr adaptive_sampling_block_task_offsets;
   CUdeviceptr adaptive_sampling_subtile_block_index;
 } typedef DeviceAdaptiveSamplerDeviceBufferPtrs;
@@ -58,7 +58,6 @@ struct DeviceAdaptiveSampler {
   uint32_t height;
   uint8_t allocated_stage_id;
   DEVICE uint32_t* stage_sample_counts;
-  DEVICE uint32_t* stage_total_task_counts;
   uint32_t num_prefix_mips;
   DEVICE uint32_t** stage_prefix_mips;
   uint32_t num_allocated_subtiles;
