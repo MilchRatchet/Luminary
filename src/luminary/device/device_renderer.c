@@ -405,10 +405,6 @@ static LuminaryResult _device_renderer_handle_queue_action(
         cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, work->shared_callback_data));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE:
-      if (renderer->enable_adaptive_sampling) {
-        __FAILURE_HANDLE(device_ensure_adaptive_sampling_stage(device));
-      }
-
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
@@ -446,9 +442,14 @@ static LuminaryResult _device_renderer_handle_queue_action(
       }
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_TILE:
-      if (renderer->executed_aggregate_sample_counts[0] == 0) {
-        // We assume that every device will always execute the base adaptive sampling stage first.
-        __DEBUG_ASSERT(renderer->executed_aggregate_sample_counts[1] == 0);
+      bool is_first_sample = true;
+      for (uint32_t stage_id = 0; stage_id <= ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
+        is_first_sample &= renderer->executed_aggregate_sample_counts[stage_id] == 0;
+      }
+
+      if (is_first_sample) {
+        // We assume that the main device will always execute the base adaptive sampling stage first.
+        __DEBUG_ASSERT(device->is_main_device == false || renderer->executed_aggregate_sample_counts[1] == 0);
 
         __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(
           renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE, &work->launch_id));
@@ -652,7 +653,7 @@ LuminaryResult device_renderer_allocate_sample(DeviceRenderer* renderer, Adaptiv
   __CHECK_NULL_ARGUMENT(renderer);
 
   if (renderer->sample_allocation.num_samples == 0)
-    __FAILURE_HANDLE(adaptive_sampler_allocate_sample(sampler, &renderer->sample_allocation, 1));
+    __FAILURE_HANDLE(adaptive_sampler_allocate_sample(sampler, &renderer->sample_allocation, 4));
 
   return LUMINARY_SUCCESS;
 }

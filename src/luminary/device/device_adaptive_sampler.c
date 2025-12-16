@@ -53,7 +53,6 @@ LuminaryResult adaptive_sampler_allocate_sample(AdaptiveSampler* sampler, Device
   __CHECK_NULL_ARGUMENT(allocation);
 
   __DEBUG_ASSERT(num_samples < 256);
-  __DEBUG_ASSERT(sampler->width > 0 && sampler->height > 0);
 
   memcpy(allocation, &sampler->allocator, sizeof(DeviceSampleAllocation));
 
@@ -315,7 +314,7 @@ LuminaryResult device_adaptive_sampler_create(DeviceAdaptiveSampler** sampler) {
 LuminaryResult device_adaptive_sampler_reset(DeviceAdaptiveSampler* sampler) {
   __CHECK_NULL_ARGUMENT(sampler);
 
-  sampler->allocated_stage_id = ADAPTIVE_SAMPLING_STAGE_INVALID;
+  sampler->allocated_stage_id = 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -377,19 +376,20 @@ LuminaryResult device_adaptive_sampler_get_device_buffer_ptrs(DeviceAdaptiveSamp
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampler, Device* device, bool* buffers_have_changed) {
+LuminaryResult device_adaptive_sampler_ensure_stage(
+  DeviceAdaptiveSampler* sampler, Device* device, DeviceRenderer* renderer, AdaptiveSampler* shared_sampler, bool* buffers_have_changed) {
   __CHECK_NULL_ARGUMENT(sampler);
   __CHECK_NULL_ARGUMENT(device);
 
   *buffers_have_changed = false;
 
-  const uint8_t stage_id = device->renderer->sample_allocation.stage_id;
+  const uint8_t stage_id = renderer->sample_allocation.stage_id;
 
-  if (sampler->allocated_stage_id != ADAPTIVE_SAMPLING_STAGE_INVALID && sampler->allocated_stage_id >= stage_id)
+  if (sampler->allocated_stage_id >= stage_id)
     return LUMINARY_SUCCESS;
 
   uint32_t tile_count;
-  __FAILURE_HANDLE(device_renderer_get_tile_count(device->renderer, device, 0, &tile_count));
+  __FAILURE_HANDLE(device_renderer_get_tile_count(renderer, device, 0, &tile_count));
 
   const uint32_t subtile_count = tile_count * WARP_SIZE;
 
@@ -405,6 +405,14 @@ LuminaryResult device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampl
   }
 
   const uint32_t num_adaptive_sampling_blocks = sampler->width * sampler->height;
+
+  if (device->is_main_device == false) {
+    DeviceAdaptiveSamplerBufferSizes buffer_sizes;
+    __FAILURE_HANDLE(adaptive_sampler_get_buffer_sizes(shared_sampler, &buffer_sizes));
+
+    __FAILURE_HANDLE(device_upload(
+      sampler->stage_sample_counts, shared_sampler->stage_sample_counts, 0, buffer_sizes.stage_sample_counts_size, device->stream_main));
+  }
 
   {
     KernelArgsAdaptiveSamplingComputeTasksPerBlock args;

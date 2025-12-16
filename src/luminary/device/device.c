@@ -1356,29 +1356,6 @@ LuminaryResult device_update_adaptive_sampling(Device* device, AdaptiveSampler* 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_ensure_adaptive_sampling_stage(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  DEVICE_ASSERT_AVAILABLE
-
-  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
-  __DEBUG_ASSERT(device->is_main_device);
-
-  bool buffers_have_changed;
-  __FAILURE_HANDLE(device_adaptive_sampler_ensure_stage(device->adaptive_sampler, device, &buffers_have_changed));
-
-  if (buffers_have_changed) {
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_subtile_block_index, DEVICE_PTR(device->adaptive_sampler->subtile_last_blocks));
-
-    __FAILURE_HANDLE(_device_update_constant_memory(device));
-  }
-
-  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_unload_adaptive_sampling(Device* device, AdaptiveSampler* sampler) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sampler);
@@ -1538,6 +1515,16 @@ LuminaryResult device_finish_render_iteration(Device* device, AdaptiveSampler* s
 
   __FAILURE_HANDLE(device_renderer_allocate_sample(device->renderer, sampler));
 
+  bool buffers_have_changed;
+  __FAILURE_HANDLE(
+    device_adaptive_sampler_ensure_stage(device->adaptive_sampler, device, device->renderer, sampler, &buffers_have_changed));
+
+  if (buffers_have_changed) {
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.adaptive_sampling_subtile_block_index, DEVICE_PTR(device->adaptive_sampler->subtile_last_blocks));
+
+    __FAILURE_HANDLE(_device_update_constant_memory(device));
+  }
+
   device->undersampling_state = new_undersampling_state;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1568,6 +1555,21 @@ LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackDat
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_renderer_update_render_time(device->renderer, callback_data->render_event_id));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_free_result_sharing_entries(Device* device, DeviceResultInterface* interface) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(interface);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_result_interface_free_entries(interface, device->index));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

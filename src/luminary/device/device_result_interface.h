@@ -35,7 +35,9 @@ struct DeviceResultInterface {
 } typedef DeviceResultInterface;
 
 LuminaryResult device_result_interface_create(DeviceResultInterface** interface);
-DEVICE_CTX_FUNC LuminaryResult device_result_interface_set_pixel_count(DeviceResultInterface* interface, uint32_t width, uint32_t height);
+LuminaryResult device_result_interface_set_pixel_count(
+  DeviceResultInterface* interface, uint32_t width, uint32_t height, bool* entries_must_be_freed);
+DEVICE_CTX_FUNC LuminaryResult device_result_interface_free_entries(DeviceResultInterface* interface, uint32_t device_id);
 DEVICE_CTX_FUNC LuminaryResult device_result_interface_queue_result(DeviceResultInterface* interface, Device* device);
 DEVICE_CTX_FUNC LuminaryResult device_result_interface_gather_results(DeviceResultInterface* interface, Device* device);
 LuminaryResult device_result_interface_destroy(DeviceResultInterface** interface);

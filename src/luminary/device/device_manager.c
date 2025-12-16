@@ -409,7 +409,16 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     uint32_t height;
     __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(device_manager->devices[device_manager->main_device_index], &width, &height));
 
-    __FAILURE_HANDLE_CRITICAL(device_result_interface_set_pixel_count(device_manager->result_interface, width, height));
+    bool result_entries_must_be_freed;
+    __FAILURE_HANDLE_CRITICAL(
+      device_result_interface_set_pixel_count(device_manager->result_interface, width, height, &result_entries_must_be_freed));
+
+    if (result_entries_must_be_freed) {
+      for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+        Device* device = device_manager->devices[device_id];
+        __FAILURE_HANDLE_CRITICAL(device_free_result_sharing_entries(device, device_manager->result_interface));
+      }
+    }
   }
 
   if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
@@ -454,10 +463,13 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
     __FAILURE_HANDLE_CRITICAL(adaptive_sampler_setup(device_manager->adaptive_sampler, &setup_info));
 
+    uint32_t num_initial_samples = (scene->settings.enable_adaptive_sampling) ? scene->settings.adaptive_sampling_update_interval : 32;
+    num_initial_samples          = (num_initial_samples + device_count - 1) / device_count;
+
     // Main device always computes the first samples
     __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(main_device, &scene->settings));
     __FAILURE_HANDLE_CRITICAL(
-      adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &main_device->renderer->sample_allocation, 32));
+      adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &main_device->renderer->sample_allocation, num_initial_samples));
 
     DeviceRendererQueueArgs render_args;
     render_args.max_depth                         = scene->settings.max_ray_depth;
@@ -480,7 +492,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
       if (device->is_main_device == false) {
         __FAILURE_HANDLE_CRITICAL(
-          adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &device->renderer->sample_allocation, 32));
+          adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &device->renderer->sample_allocation, num_initial_samples));
       }
 
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));

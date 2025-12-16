@@ -70,23 +70,36 @@ static LuminaryResult _device_result_interface_entry_free(DeviceResultInterface*
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_result_interface_set_pixel_count(DeviceResultInterface* interface, uint32_t width, uint32_t height) {
+LuminaryResult device_result_interface_set_pixel_count(
+  DeviceResultInterface* interface, uint32_t width, uint32_t height, bool* entries_must_be_freed) {
+  __CHECK_NULL_ARGUMENT(interface);
+  __CHECK_NULL_ARGUMENT(entries_must_be_freed);
+
+  *entries_must_be_freed = false;
+
+  const uint32_t new_pixel_count = width * height;
+
+  if (new_pixel_count != interface->pixel_count) {
+    __FAILURE_HANDLE(array_clear(interface->queued_results));
+
+    interface->pixel_count = new_pixel_count;
+    *entries_must_be_freed = true;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_result_interface_free_entries(DeviceResultInterface* interface, uint32_t device_id) {
   __CHECK_NULL_ARGUMENT(interface);
 
-  interface->pixel_count = width * height;
+  uint32_t num_allocated_results;
+  __FAILURE_HANDLE(array_get_num_elements(interface->allocated_results[device_id], &num_allocated_results));
 
-  __FAILURE_HANDLE(array_clear(interface->queued_results));
-
-  for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
-    uint32_t num_allocated_results;
-    __FAILURE_HANDLE(array_get_num_elements(interface->allocated_results[device_id], &num_allocated_results));
-
-    for (uint32_t result_id = 0; result_id < num_allocated_results; result_id++) {
-      __FAILURE_HANDLE(_device_result_interface_entry_free(interface, interface->allocated_results[device_id] + result_id));
-    }
-
-    __FAILURE_HANDLE(array_clear(interface->allocated_results[device_id]));
+  for (uint32_t result_id = 0; result_id < num_allocated_results; result_id++) {
+    __FAILURE_HANDLE(_device_result_interface_entry_free(interface, interface->allocated_results[device_id] + result_id));
   }
+
+  __FAILURE_HANDLE(array_clear(interface->allocated_results[device_id]));
 
   return LUMINARY_SUCCESS;
 }

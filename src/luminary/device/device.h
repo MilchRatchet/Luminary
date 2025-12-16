@@ -176,7 +176,6 @@ LuminaryResult device_setup_undersampling(Device* device, const RendererSettings
 LuminaryResult device_build_adaptive_sampling_stage(Device* device, AdaptiveSampler* sampler, uint8_t stage_id);
 LuminaryResult device_reset_adaptive_sampling(Device* device);
 LuminaryResult device_update_adaptive_sampling(Device* device, AdaptiveSampler* sampler);
-LuminaryResult device_ensure_adaptive_sampling_stage(Device* device);
 LuminaryResult device_unload_adaptive_sampling(Device* device, AdaptiveSampler* sampler);
 LuminaryResult device_register_callbacks(Device* device, DeviceRegisterCallbackFuncs funcs, DeviceCommonCallbackData callback_data);
 LuminaryResult device_set_output_dirty(Device* device);
@@ -188,6 +187,7 @@ LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallb
 LuminaryResult device_finish_render_iteration(Device* device, AdaptiveSampler* sampler, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data);
+LuminaryResult device_free_result_sharing_entries(Device* device, DeviceResultInterface* interface);
 LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);
 LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32_t* recommended_count);
 LuminaryResult device_set_abort(Device* device);

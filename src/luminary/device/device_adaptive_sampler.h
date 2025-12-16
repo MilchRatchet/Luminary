@@ -5,6 +5,7 @@
 #include "device_utils.h"
 
 struct Device typedef Device;
+struct DeviceRenderer typedef DeviceRenderer;
 
 struct DeviceAdaptiveSamplerBufferSizes {
   size_t stage_sample_counts_size;
@@ -70,8 +71,8 @@ DEVICE_CTX_FUNC LuminaryResult device_adaptive_sampler_update(
   DeviceAdaptiveSampler* sampler, Device* device, AdaptiveSampler* shared_sampler, bool* buffers_have_changed);
 DEVICE_CTX_FUNC LuminaryResult
   device_adaptive_sampler_get_device_buffer_ptrs(DeviceAdaptiveSampler* sampler, DeviceAdaptiveSamplerDeviceBufferPtrs* ptrs);
-DEVICE_CTX_FUNC LuminaryResult
-  device_adaptive_sampler_ensure_stage(DeviceAdaptiveSampler* sampler, Device* device, bool* buffers_have_changed);
+DEVICE_CTX_FUNC LuminaryResult device_adaptive_sampler_ensure_stage(
+  DeviceAdaptiveSampler* sampler, Device* device, DeviceRenderer* renderer, AdaptiveSampler* shared_sampler, bool* buffers_have_changed);
 DEVICE_CTX_FUNC LuminaryResult device_adaptive_sampler_destroy(DeviceAdaptiveSampler** sampler);
 
 LuminaryResult device_sample_allocation_step_next(DeviceSampleAllocation* allocation);
