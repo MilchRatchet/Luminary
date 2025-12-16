@@ -5,13 +5,14 @@
 
 struct Device typedef Device;
 
-struct DeviceWorkBuffersAllocationProperties {
+struct DeviceWorkBuffersAllocInfo {
   uint32_t external_pixel_count;
   uint32_t internal_pixel_count;
   uint32_t gbuffer_pixel_count;
   uint32_t thread_count;
   uint32_t task_count;
-} typedef DeviceWorkBuffersAllocationProperties;
+  uint32_t max_concurrent_blocks;
+} typedef DeviceWorkBuffersAllocInfo;
 
 struct DeviceWorkBuffersPtrs {
   CUdeviceptr task_states;
@@ -41,7 +42,7 @@ struct DeviceWorkBuffers {
   DEVICE float* frame_second_moment_luminance;
   DEVICE float* frame_result[FRAME_CHANNEL_COUNT];
   DEVICE float* frame_output[FRAME_CHANNEL_COUNT];
-  DEVICE float* frame_swap;
+  DEVICE void* frame_swap;
   DEVICE GBufferMetaData* gbuffer_meta;
 
   uint32_t allocated_external_pixel_count;
@@ -49,11 +50,12 @@ struct DeviceWorkBuffers {
   uint32_t allocated_gbuffer_pixel_count;
   uint32_t allocated_thread_count;
   uint32_t allocated_task_count;
+  uint32_t allocated_max_concurrent_blocks;
 } typedef DeviceWorkBuffers;
 
 LuminaryResult device_work_buffers_create(DeviceWorkBuffers** buffers);
-DEVICE_CTX_FUNC LuminaryResult device_work_buffers_update(
-  DeviceWorkBuffers* buffers, const DeviceWorkBuffersAllocationProperties* properties, bool* buffers_have_changed);
+DEVICE_CTX_FUNC LuminaryResult
+  device_work_buffers_update(DeviceWorkBuffers* buffers, const DeviceWorkBuffersAllocInfo* properties, bool* buffers_have_changed);
 DEVICE_CTX_FUNC LuminaryResult device_work_buffers_get_ptrs(DeviceWorkBuffers* buffers, DeviceWorkBuffersPtrs* ptrs);
 DEVICE_CTX_FUNC LuminaryResult device_work_buffers_destroy(DeviceWorkBuffers** buffers);
 

@@ -168,26 +168,35 @@ static LuminaryResult _device_result_interface_update_buffer(
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
-  __FAILURE_HANDLE(device_upload(device->work_buffers->frame_swap, src, 0, num_elements * sizeof(float), device->stream_main));
+  size_t allocated_swap_size;
+  __FAILURE_HANDLE(device_memory_get_size(device->work_buffers->frame_swap, &allocated_swap_size));
 
-  uint32_t num_blocks  = (num_elements + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
-  uint32_t base_offset = 0;
+  const uint32_t max_elements_per_iteration = min(device->properties.max_block_count * 128 * 4, allocated_swap_size / sizeof(float));
 
-  while (num_blocks > 0) {
-    uint32_t num_blocks_this_iteration = min(num_blocks, device->properties.max_block_count);
+  uint32_t element_offset         = 0;
+  uint32_t num_remaining_elements = num_elements;
+
+  while (num_remaining_elements > 0) {
+    const uint32_t num_elements_this_iteration = min(max_elements_per_iteration, num_remaining_elements);
+
+    __FAILURE_HANDLE(device_upload(
+      device->work_buffers->frame_swap, ((float*) src) + element_offset, 0, num_elements_this_iteration * sizeof(float),
+      device->stream_main));
+
+    const uint32_t num_blocks_this_iteration = (num_elements_this_iteration + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
 
     KernelArgsBufferAdd args;
     args.dst          = DEVICE_PTR(dst);
     args.src          = DEVICE_PTR(device->work_buffers->frame_swap);
-    args.base_offset  = base_offset;
-    args.num_elements = num_elements;
+    args.base_offset  = element_offset;
+    args.num_elements = num_elements_this_iteration;
 
     __FAILURE_HANDLE(kernel_execute_custom(
       device->cuda_kernels[CUDA_KERNEL_TYPE_BUFFER_ADD], THREADS_PER_BLOCK, 1, 1, num_blocks_this_iteration, 1, 1, &args,
       device->stream_main));
 
-    num_blocks -= num_blocks_this_iteration;
-    base_offset += num_blocks_this_iteration * 4 * THREADS_PER_BLOCK;
+    num_remaining_elements -= num_elements_this_iteration;
+    element_offset += num_elements_this_iteration;
   }
 
   return LUMINARY_SUCCESS;

@@ -51,60 +51,66 @@ LuminaryResult device_work_buffers_create(DeviceWorkBuffers** buffers) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_work_buffers_update(
-  DeviceWorkBuffers* buffers, const DeviceWorkBuffersAllocationProperties* properties, bool* buffers_have_changed) {
+LuminaryResult device_work_buffers_update(DeviceWorkBuffers* buffers, const DeviceWorkBuffersAllocInfo* info, bool* buffers_have_changed) {
   __CHECK_NULL_ARGUMENT(buffers);
-  __CHECK_NULL_ARGUMENT(properties);
+  __CHECK_NULL_ARGUMENT(info);
   __CHECK_NULL_ARGUMENT(buffers_have_changed);
 
   *buffers_have_changed = false;
 
-  if (properties->external_pixel_count != buffers->allocated_external_pixel_count) {
+  if (info->external_pixel_count != buffers->allocated_external_pixel_count) {
     for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
-      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_output[channel_id], sizeof(float) * properties->external_pixel_count));
+      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_output[channel_id], sizeof(float) * info->external_pixel_count));
     }
 
-    buffers->allocated_external_pixel_count = properties->external_pixel_count;
+    buffers->allocated_external_pixel_count = info->external_pixel_count;
     *buffers_have_changed                   = true;
   }
 
-  if (properties->internal_pixel_count != buffers->allocated_internal_pixel_count) {
+  if (info->internal_pixel_count != buffers->allocated_internal_pixel_count) {
     for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
-      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_first_moment[channel_id], sizeof(float) * properties->internal_pixel_count));
-      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_result[channel_id], sizeof(float) * properties->internal_pixel_count));
+      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_first_moment[channel_id], sizeof(float) * info->internal_pixel_count));
+      __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_result[channel_id], sizeof(float) * info->internal_pixel_count));
     }
 
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_second_moment_luminance, sizeof(float) * properties->internal_pixel_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_second_moment_luminance, sizeof(float) * info->internal_pixel_count));
 
-    buffers->allocated_internal_pixel_count = properties->internal_pixel_count;
+    buffers->allocated_internal_pixel_count = info->internal_pixel_count;
     *buffers_have_changed                   = true;
   }
 
-  if (properties->gbuffer_pixel_count != buffers->allocated_gbuffer_pixel_count) {
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->gbuffer_meta, sizeof(GBufferMetaData) * properties->gbuffer_pixel_count));
+  if (info->gbuffer_pixel_count != buffers->allocated_gbuffer_pixel_count) {
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->gbuffer_meta, sizeof(GBufferMetaData) * info->gbuffer_pixel_count));
 
-    buffers->allocated_gbuffer_pixel_count = properties->gbuffer_pixel_count;
+    buffers->allocated_gbuffer_pixel_count = info->gbuffer_pixel_count;
     *buffers_have_changed                  = true;
   }
 
-  if (properties->thread_count != buffers->allocated_thread_count) {
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->results_counts, sizeof(uint16_t) * properties->thread_count));
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->trace_counts, sizeof(uint16_t) * properties->thread_count));
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_counts, sizeof(uint16_t) * 5 * properties->thread_count));
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_offsets, sizeof(uint16_t) * 5 * properties->thread_count));
+  if (info->thread_count != buffers->allocated_thread_count) {
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->results_counts, sizeof(uint16_t) * info->thread_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->trace_counts, sizeof(uint16_t) * info->thread_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_counts, sizeof(uint16_t) * 5 * info->thread_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_offsets, sizeof(uint16_t) * 5 * info->thread_count));
 
-    buffers->allocated_thread_count = properties->thread_count;
+    buffers->allocated_thread_count = info->thread_count;
     *buffers_have_changed           = true;
   }
 
-  if (properties->task_count != buffers->allocated_task_count) {
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_states, sizeof(DeviceTaskState) * properties->task_count * TASK_STATE_BUFFER_INDEX_COUNT));
+  if (info->task_count != buffers->allocated_task_count) {
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_states, sizeof(DeviceTaskState) * info->task_count * TASK_STATE_BUFFER_INDEX_COUNT));
     __FAILURE_HANDLE(_BUFFER_ALLOC(
-      buffers->task_direct_light, sizeof(DeviceTaskDirectLight) * properties->task_count * TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT));
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_results, sizeof(DeviceTaskResult) * properties->task_count));
+      buffers->task_direct_light, sizeof(DeviceTaskDirectLight) * info->task_count * TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_results, sizeof(DeviceTaskResult) * info->task_count));
 
-    buffers->allocated_task_count = properties->task_count;
+    buffers->allocated_task_count = info->task_count;
     *buffers_have_changed         = true;
+  }
+
+  if (info->max_concurrent_blocks != buffers->allocated_max_concurrent_blocks) {
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_swap, info->max_concurrent_blocks * 4 * THREADS_PER_BLOCK * sizeof(float)));
+
+    buffers->allocated_max_concurrent_blocks = info->max_concurrent_blocks;
+    *buffers_have_changed                    = true;
   }
 
   return LUMINARY_SUCCESS;

@@ -445,15 +445,16 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     tasks_per_thread++;
   }
 
-  DeviceWorkBuffersAllocationProperties properties;
-  properties.external_pixel_count = external_pixel_count;
-  properties.internal_pixel_count = internal_pixel_count;
-  properties.gbuffer_pixel_count  = gbuffer_meta_pixel_count;
-  properties.thread_count         = thread_count;
-  properties.task_count           = total_task_count;
+  DeviceWorkBuffersAllocInfo alloc_info;
+  alloc_info.external_pixel_count  = external_pixel_count;
+  alloc_info.internal_pixel_count  = internal_pixel_count;
+  alloc_info.gbuffer_pixel_count   = gbuffer_meta_pixel_count;
+  alloc_info.thread_count          = thread_count;
+  alloc_info.task_count            = total_task_count;
+  alloc_info.max_concurrent_blocks = device->properties.optimal_block_count;
 
   bool buffers_have_changed;
-  __FAILURE_HANDLE(device_work_buffers_update(device->work_buffers, &properties, &buffers_have_changed));
+  __FAILURE_HANDLE(device_work_buffers_update(device->work_buffers, &alloc_info, &buffers_have_changed));
 
   if (buffers_have_changed) {
     DeviceWorkBuffersPtrs ptrs;
@@ -466,7 +467,6 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.trace_counts, (void*) ptrs.trace_counts);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_counts, (void*) ptrs.task_counts);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_offsets, (void*) ptrs.task_offsets);
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_swap, (void*) ptrs.frame_swap);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.gbuffer_meta, (void*) ptrs.gbuffer_meta);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.frame_second_moment_luminance, (void*) ptrs.frame_second_moment_luminance);
 

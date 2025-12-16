@@ -485,7 +485,6 @@ struct DevicePointers {
   float* LUM_RESTRICT frame_second_moment_luminance;
   float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
   float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
-  float* LUM_RESTRICT frame_swap;
   GBufferMetaData* LUM_RESTRICT gbuffer_meta;
   // DeviceAdaptiveSampler
   uint32_t* LUM_RESTRICT stage_sample_counts;
