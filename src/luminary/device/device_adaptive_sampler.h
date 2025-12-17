@@ -17,6 +17,8 @@ struct AdaptiveSamplerSetupInfo {
   bool enabled;
   uint32_t width;
   uint32_t height;
+  uint32_t render_width;
+  uint32_t render_height;
   uint32_t max_sampling_rate;
   bool exposure_aware;
   float exposure;
@@ -25,6 +27,8 @@ struct AdaptiveSamplerSetupInfo {
 struct AdaptiveSampler {
   uint32_t width;
   uint32_t height;
+  uint32_t render_width;
+  uint32_t render_height;
   size_t allocated_stage_sample_counts_size;
   size_t allocated_variance_buffer_size;
   uint8_t queued_stage_build;
@@ -43,7 +47,6 @@ LuminaryResult adaptive_sampler_create(AdaptiveSampler** sampler);
 LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, DeviceAdaptiveSamplerBufferSizes* sizes);
 LuminaryResult adaptive_sampler_setup(AdaptiveSampler* sampler, const AdaptiveSamplerSetupInfo* info);
 LuminaryResult adaptive_sampler_allocate_sample(AdaptiveSampler* sampler, DeviceSampleAllocation* allocation, uint32_t num_samples);
-LuminaryResult adaptive_sampler_get_task_count_upper_bound(AdaptiveSampler* sampler, uint32_t* task_count, uint8_t stage_id);
 DEVICE_CTX_FUNC LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Device* device, uint8_t stage_id);
 DEVICE_CTX_FUNC LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler);
 LuminaryResult adaptive_sampler_destroy(AdaptiveSampler** sampler);
@@ -57,6 +60,8 @@ struct DeviceAdaptiveSamplerDeviceBufferPtrs {
 struct DeviceAdaptiveSampler {
   uint32_t width;
   uint32_t height;
+  uint32_t render_width;
+  uint32_t render_height;
   uint8_t allocated_stage_id;
   DEVICE uint32_t* stage_sample_counts;
   uint32_t num_prefix_mips;

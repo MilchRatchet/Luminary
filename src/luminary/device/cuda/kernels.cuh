@@ -195,9 +195,7 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
   uint32_t result_count = 0;
 
   const uint32_t adaptive_sampling_width =
-    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_height =
-    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+    (device.settings.window_width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
   const uint32_t num_threads       = NUM_THREADS;
   const uint32_t tasks_per_tile    = device.config.num_tasks_per_thread * num_threads;

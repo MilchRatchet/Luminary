@@ -34,16 +34,20 @@ LUMINARY_FUNCTION uint32_t
   return block_id;
 }
 
+LUMINARY_FUNCTION uint32_t adaptive_sampling_get_block_index(const uint32_t x, const uint32_t y) {
+  const uint32_t adaptive_sampling_width = device.settings.window_width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_x     = (x - device.settings.window_x) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_y     = (y - device.settings.window_y) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+
+  return adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
+}
+
 template <bool FIRST_STAGE_ONLY>
 LUMINARY_FUNCTION uint32_t adapative_sampling_get_sample_offset(const uint32_t x, const uint32_t y) {
   uint32_t sample_id = device.state.sample_allocation.stage_sample_offsets[0];
 
   if constexpr (FIRST_STAGE_ONLY == false) {
-    const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-    const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-    const uint32_t adaptive_sampling_y     = y >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-
-    const uint32_t adaptive_sampling_block = adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
+    const uint32_t adaptive_sampling_block = adaptive_sampling_get_block_index(x, y);
 
     const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
@@ -83,11 +87,7 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count_from_block_index(c
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count(const uint32_t x, const uint32_t y) {
-  const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_y     = y >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-
-  const uint32_t adaptive_sampling_block = adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
+  const uint32_t adaptive_sampling_block = adaptive_sampling_get_block_index(x, y);
 
   return adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
 }
@@ -98,12 +98,7 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_current_tasks_per_pixel(const u
   if (this_stage_id == 0)
     return 1;
 
-  const uint32_t adaptive_sampling_width = device.settings.width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_x     = x >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_y     = y >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-
-  const uint32_t adaptive_sampling_block = adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
-
+  const uint32_t adaptive_sampling_block  = adaptive_sampling_get_block_index(x, y);
   const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
   return adaptive_sampling_get_stage_sample_count(adaptive_sampling_counts, this_stage_id - 1);
@@ -164,8 +159,8 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   const uint32_t local_x = THREAD_ID & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
   const uint32_t local_y = (THREAD_ID >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
 
-  const uint32_t x = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x;
-  const uint32_t y = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y;
+  const uint32_t x = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x + device.settings.window_x;
+  const uint32_t y = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y + device.settings.window_y;
 
   float luminance;
   float variance = adaptive_sampling_get_pixel_variance(x, y, denominator, luminance);
@@ -206,17 +201,10 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
 }
 
 LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts args) {
-  const uint32_t adaptive_sampling_width =
-    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_height =
-    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-
-  const uint32_t adaptive_sampling_amount = adaptive_sampling_width * adaptive_sampling_height;
-
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
   uint32_t tasks_per_block = 0;
-  if (adaptive_sampling_block < adaptive_sampling_amount) {
+  if (adaptive_sampling_block < args.num_adaptive_sampling_blocks) {
     const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
 
     tasks_per_block = adaptive_sampling_get_stage_sample_count(stage_sample_counts, args.stage_id - 1);
@@ -231,16 +219,9 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_total_task_counts(const Ker
 }
 
 LUMINARY_KERNEL void adaptive_sampling_compute_tasks_per_block(const KernelArgsAdaptiveSamplingComputeTasksPerBlock args) {
-  const uint32_t adaptive_sampling_width =
-    (device.settings.width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_height =
-    (device.settings.height + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-
-  const uint32_t adaptive_sampling_amount = adaptive_sampling_width * adaptive_sampling_height;
-
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
-  if (adaptive_sampling_block >= adaptive_sampling_amount)
+  if (adaptive_sampling_block >= args.num_adaptive_sampling_blocks)
     return;
 
   const uint32_t stage_sample_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
