@@ -35,9 +35,10 @@ LUMINARY_FUNCTION uint32_t
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_block_index(const uint32_t x, const uint32_t y) {
-  const uint32_t adaptive_sampling_width = device.settings.window_width >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_x     = (x - device.settings.window_x) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
-  const uint32_t adaptive_sampling_y     = (y - device.settings.window_y) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_width =
+    (device.settings.window_width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_x = (x - device.settings.window_x) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
+  const uint32_t adaptive_sampling_y = (y - device.settings.window_y) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
   return adaptive_sampling_x + adaptive_sampling_y * adaptive_sampling_width;
 }
@@ -105,7 +106,8 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_current_tasks_per_pixel(const u
 }
 
 LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance(const uint32_t x, const uint32_t y, const float inv_n, float& luminance) {
-  const bool pixel_in_frame = (x < device.settings.width) && (y < device.settings.height);
+  const bool pixel_in_frame =
+    (x - device.settings.window_x < device.settings.window_width) && (y - device.settings.window_y < device.settings.window_height);
   if (pixel_in_frame == false) {
     luminance = 0.0f;
     return 0.0f;
@@ -126,7 +128,8 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance(const uint32_t x, c
 }
 
 LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance_and_color(const uint32_t x, const uint32_t y, const float inv_n, RGBF& color) {
-  const bool pixel_in_frame = (x < device.settings.width) && (y < device.settings.height);
+  const bool pixel_in_frame =
+    (x - device.settings.window_x < device.settings.window_width) && (y - device.settings.window_y < device.settings.window_height);
   if (pixel_in_frame == false) {
     color = splat_color(0.0f);
     return 0.0f;
