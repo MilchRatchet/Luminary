@@ -18,18 +18,25 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32
 
 LUMINARY_FUNCTION uint32_t
   adaptive_sampling_find_block(const uint32_t task_id, const uint32_t block_start, const uint32_t block_end, uint32_t& offset) {
-  // TODO: Consider using binary search
-  offset = (block_start > 0) ? device.ptrs.adaptive_sampling_block_task_offsets[block_start - 1] : 0;
+  uint32_t left  = block_start;
+  uint32_t right = block_end;
 
-  uint32_t block_id;
-  for (block_id = block_start; block_id <= block_end; block_id++) {
-    const uint32_t block_offset = device.ptrs.adaptive_sampling_block_task_offsets[block_id];
+  while (left < right) {
+    const uint32_t mid = (left + right) >> 1;
 
-    if (task_id < block_offset)
-      break;
+    const uint32_t block_offset = device.ptrs.adaptive_sampling_block_task_offsets[mid];
 
-    offset = block_offset;
+    if (task_id < block_offset) {
+      right = mid;
+    }
+    else {
+      left = mid + 1;
+    }
   }
+
+  const uint32_t block_id = left;
+
+  offset = (block_id > 0) ? device.ptrs.adaptive_sampling_block_task_offsets[block_id - 1] : 0;
 
   return block_id;
 }
