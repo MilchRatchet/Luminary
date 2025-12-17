@@ -641,7 +641,7 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
 
 LUMINARY_KERNEL void buffer_add(const KernelArgsBufferAdd args) {
   static_assert(THREADS_PER_BLOCK == 128, "This assumes this threads per blocks value.");
-  uint32_t offset = args.base_offset + THREAD_ID * 4;
+  uint32_t offset = THREAD_ID * 4;
 
   if (offset >= args.num_elements)
     return;

@@ -463,8 +463,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
     __FAILURE_HANDLE_CRITICAL(adaptive_sampler_setup(device_manager->adaptive_sampler, &setup_info));
 
-    uint32_t num_initial_samples = (scene->settings.enable_adaptive_sampling) ? scene->settings.adaptive_sampling_update_interval : 32;
-    num_initial_samples          = (num_initial_samples + device_count - 1) / device_count;
+    uint32_t num_initial_samples = (scene->settings.enable_adaptive_sampling) ? scene->settings.adaptive_sampling_update_interval : 4;
 
     // Main device always computes the first samples
     __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(main_device, &scene->settings));
@@ -491,8 +490,11 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
         continue;
 
       if (device->is_main_device == false) {
-        __FAILURE_HANDLE_CRITICAL(
-          adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &device->renderer->sample_allocation, num_initial_samples));
+        uint32_t recommended_sample_count;
+        __FAILURE_HANDLE_CRITICAL(device_get_recommended_sample_queue_counts(device, &recommended_sample_count));
+
+        __FAILURE_HANDLE_CRITICAL(adaptive_sampler_allocate_sample(
+          device_manager->adaptive_sampler, &device->renderer->sample_allocation, recommended_sample_count));
       }
 
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));

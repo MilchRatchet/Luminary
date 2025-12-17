@@ -103,8 +103,7 @@ LUMINARY_KERNEL void accumulation_generate_result() {
     const uint32_t index = x + y * device.settings.width;
 
     const uint32_t sample_count = adaptive_sampling_get_sample_count(x, y);
-
-    const float normalization = 1.0f / sample_count;
+    const float normalization   = 1.0f / sample_count;
 
     RGBF result;
     switch (device.settings.adaptive_sampling_output_mode) {

@@ -149,7 +149,8 @@ LuminaryResult device_get_internal_render_resolution(Device* device, uint32_t* w
 LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_count);
 LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pixels_per_thread);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
-LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAllocation sample_allocation);
+LuminaryResult device_update_dynamic_const_mem(
+  Device* device, DeviceSampleAllocation sample_allocation, uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
 LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id);
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
 LuminaryResult device_sync_constant_memory(Device* device);

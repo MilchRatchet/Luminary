@@ -8,7 +8,7 @@
 struct Device typedef Device;
 
 struct DeviceResultEntry {
-  uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
+  uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   STAGING float* frame_first_moment[FRAME_CHANNEL_COUNT];
   STAGING float* frame_second_moment_luminance;
   CUevent available_event;

@@ -790,7 +790,8 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAllocation sample_allocation) {
+LuminaryResult device_update_dynamic_const_mem(
+  Device* device, DeviceSampleAllocation sample_allocation, uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1]) {
   __CHECK_NULL_ARGUMENT(device);
 
   DEVICE_ASSERT_AVAILABLE
@@ -823,6 +824,13 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, DeviceSampleAlloc
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.num_samples), sample_allocation.num_samples,
     1, device->stream_main));
+
+  const CUdeviceptr num_stage_executions_ptr =
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.adaptive_sampling_accumulated_stages);
+  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
+    const CUdeviceptr dst = num_stage_executions_ptr + sizeof(uint32_t) * stage_id;
+    CUDA_FAILURE_HANDLE(cuMemsetD32Async(dst, num_stage_executions[stage_id], 1, device->stream_main));
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1610,7 +1618,7 @@ LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32
   uint32_t tile_count;
   __FAILURE_HANDLE(device_renderer_get_tile_count(device->renderer, device, 0, &tile_count));
 
-  *recommended_count = (2048 + tile_count - 1) / tile_count;
+  *recommended_count = (512 + tile_count - 1) / tile_count;
 
   return LUMINARY_SUCCESS;
 }

@@ -524,6 +524,7 @@ struct DeviceExecutionState {
   uint8_t depth;
   uint8_t undersampling;
   DeviceSampleAllocation sample_allocation;
+  uint32_t adaptive_sampling_accumulated_stages[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   DeviceExecutionFlags flags;
 } typedef DeviceExecutionState;
 

@@ -127,9 +127,10 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_continue(DeviceRenderer* renderer
 LuminaryResult device_renderer_finish_iteration(DeviceRenderer* renderer, bool is_undersampling);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);
 LuminaryResult device_renderer_allocate_sample(DeviceRenderer* renderer, AdaptiveSampler* sampler);
-LuminaryResult device_renderer_externalize_samples(DeviceRenderer* renderer, uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
+LuminaryResult device_renderer_externalize_samples(
+  DeviceRenderer* renderer, uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
 LuminaryResult device_renderer_register_external_samples(
-  DeviceRenderer* renderer, uint32_t stage_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
+  DeviceRenderer* renderer, uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
 LuminaryResult device_renderer_get_render_time(DeviceRenderer* renderer, uint32_t event_id, float* time);
 LuminaryResult device_renderer_get_latest_event_id(DeviceRenderer* renderer, uint32_t* event_id);
 LuminaryResult device_renderer_get_status(DeviceRenderer* renderer, DeviceRendererStatusFlags* status_flags);

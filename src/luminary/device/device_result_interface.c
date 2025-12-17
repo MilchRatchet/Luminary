@@ -46,7 +46,7 @@ static LuminaryResult _device_result_interface_entry_allocate(DeviceResultInterf
   entry->consumer_event_id = RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID;
   entry->queued            = false;
 
-  memset(entry->stage_sample_counts, 0, sizeof(entry->stage_sample_counts));
+  memset(entry->num_stage_executions, 0, sizeof(entry->num_stage_executions));
 
   return LUMINARY_SUCCESS;
 }
@@ -163,7 +163,7 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
 
   CUDA_FAILURE_HANDLE(cuEventRecord(entry->available_event, device->stream_main));
 
-  __FAILURE_HANDLE(device_renderer_externalize_samples(device->renderer, entry->stage_sample_counts));
+  __FAILURE_HANDLE(device_renderer_externalize_samples(device->renderer, entry->num_stage_executions));
 
   DeviceResultMap map;
   map.allocation_id = selected_result;
@@ -199,9 +199,8 @@ static LuminaryResult _device_result_interface_update_buffer(
     const uint32_t num_blocks_this_iteration = (num_elements_this_iteration + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
 
     KernelArgsBufferAdd args;
-    args.dst          = DEVICE_PTR(dst);
+    args.dst          = (void*) DEVICE_CUPTR_OFFSET(dst, element_offset * sizeof(float));
     args.src          = DEVICE_PTR(device->work_buffers->frame_swap);
-    args.base_offset  = element_offset;
     args.num_elements = num_elements_this_iteration;
 
     __FAILURE_HANDLE(kernel_execute_custom(
@@ -284,7 +283,7 @@ LuminaryResult device_result_interface_gather_results(DeviceResultInterface* int
 
     CUDA_FAILURE_HANDLE(cuEventRecord(interface->allocated_events[entry->consumer_event_id].event, device->stream_main));
 
-    __FAILURE_HANDLE(device_renderer_register_external_samples(device->renderer, entry->stage_sample_counts));
+    __FAILURE_HANDLE(device_renderer_register_external_samples(device->renderer, entry->num_stage_executions));
 
     entry->queued = false;
   }

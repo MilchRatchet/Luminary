@@ -6,7 +6,6 @@
 struct KernelArgsBufferAdd {
   float* dst;
   const float* src;
-  uint32_t base_offset;
   uint32_t num_elements;
 } typedef KernelArgsBufferAdd;
 
