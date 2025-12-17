@@ -114,11 +114,11 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
           const float center_error = center_variance * normalization;
 
-          const uint32_t xi_start = max(x, 1) - 1;
-          const uint32_t xi_end   = min(x, width - 1) + 1;
+          const uint32_t xi_start = max(x, offset_x + 1) - 1;
+          const uint32_t xi_end   = min(x, offset_x + width - 1) + 1;
 
-          const uint32_t yi_start = max(y, 1) - 1;
-          const uint32_t yi_end   = min(y, height - 1) + 1;
+          const uint32_t yi_start = max(y, offset_y + 1) - 1;
+          const uint32_t yi_end   = min(y, offset_y + height - 1) + 1;
 
           RGBF neighbour_mean   = splat_color(0.0f);
           float neighbour_error = 0.0f;
