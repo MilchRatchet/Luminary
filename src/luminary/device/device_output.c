@@ -262,7 +262,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
-  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
+  __FAILURE_HANDLE(device_output_wait_for_completion(output, device->stream_main));
 
   // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
   __FAILURE_HANDLE(device_sync_constant_memory(device));
@@ -338,6 +338,14 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   }
 
   CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_finished, device->stream_output));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_output_wait_for_completion(DeviceOutput* output, CUstream stream) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(stream, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
 
   return LUMINARY_SUCCESS;
 }

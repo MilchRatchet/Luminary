@@ -1634,6 +1634,9 @@ LuminaryResult device_set_abort(Device* device) {
 
   device->state_abort = true;
 
+  // Make sure that we don't overwrite data while a output is in flight.
+  __FAILURE_HANDLE(device_output_wait_for_completion(device->output, device->stream_main));
+
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;

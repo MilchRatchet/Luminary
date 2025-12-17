@@ -433,6 +433,8 @@ LUMINARY_KERNEL void tasks_sort() {
   uint64_t offset_mask = 0;
 
   for (uint32_t task_id = 0; task_id < max_warp_task_count; task_id++) {
+    HANDLE_DEVICE_ABORT();
+
     // Due to the prefix sum, all threads must always keep participating, the actual load/stores must hence be predicated off.
     const bool thread_predicate = task_id < task_count;
 
@@ -493,8 +495,6 @@ LUMINARY_FUNCTION RGBF final_image_get_undersampling_sample(
 }
 
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
-  HANDLE_DEVICE_ABORT();
-
   const uint32_t undersampling_stage = (args.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 
   const uint32_t undersampling_output = max(undersampling_stage, device.settings.supersampling);
@@ -548,8 +548,6 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 }
 
 LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 args) {
-  HANDLE_DEVICE_ABORT();
-
   uint32_t id = THREAD_ID;
 
   const uint32_t amount = args.width * args.height;

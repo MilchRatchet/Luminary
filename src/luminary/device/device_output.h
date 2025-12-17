@@ -50,6 +50,7 @@ DEVICE_CTX_FUNC LuminaryResult device_output_add_request(DeviceOutput* output, O
 DEVICE_CTX_FUNC LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data);
 LuminaryResult device_output_will_output(DeviceOutput* output, DeviceRenderer* renderer, bool* does_output);
 DEVICE_CTX_FUNC LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id);
+DEVICE_CTX_FUNC LuminaryResult device_output_wait_for_completion(DeviceOutput* output, CUstream stream);
 DEVICE_CTX_FUNC LuminaryResult device_output_destroy(DeviceOutput** output);
 
 #endif /* LUMINARY_DEVICE_OUTPUT_H */
