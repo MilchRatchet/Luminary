@@ -146,8 +146,8 @@ extern "C" static __constant__ DeviceConstantMemory device;
 
 LUMINARY_FUNCTION PathID path_id_get(const uint32_t x, const uint32_t y, const uint32_t sample_id) {
   PathID path_id;
-  path_id.x = (x & PATH_ID_SENSOR_MASK) | ((sample_id >> (16 + PATH_ID_EXTRA_BITS * 0)) & PATH_ID_EXTRA_MASK);
-  path_id.y = (y & PATH_ID_SENSOR_MASK) | ((sample_id >> (16 + PATH_ID_EXTRA_BITS * 1)) & PATH_ID_EXTRA_MASK);
+  path_id.x = (x & PATH_ID_SENSOR_MASK) | (((sample_id >> (16 + PATH_ID_EXTRA_BITS * 0)) & PATH_ID_EXTRA_MASK) << PATH_ID_SENSOR_BITS);
+  path_id.y = (y & PATH_ID_SENSOR_MASK) | (((sample_id >> (16 + PATH_ID_EXTRA_BITS * 1)) & PATH_ID_EXTRA_MASK) << PATH_ID_SENSOR_BITS);
   path_id.z = sample_id & PATH_ID_SAMPLE_MASK;
 
   return path_id;

@@ -98,6 +98,10 @@ LUMINARY_KERNEL void tasks_create() {
 
     const uint32_t sample_id = adapative_sampling_get_sample_offset<true>(x, y);
 
+    // Skip rays that are beyond the valid sample range. They would just be duplicates of already computed samples.
+    if (sample_id >= MAX_NUM_GLOBAL_SAMPLES)
+      continue;
+
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
     task.path_id = path_id_get(x, y, sample_id);
@@ -255,6 +259,10 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
     ////////////////////////////////////////////////////////////////////
 
     const uint32_t sample_id = adapative_sampling_get_sample_offset<false>(x, y) + local_sample_id;
+
+    // Skip rays that are beyond the valid sample range. They would just be duplicates of already computed samples.
+    if (sample_id >= MAX_NUM_GLOBAL_SAMPLES)
+      continue;
 
     DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;

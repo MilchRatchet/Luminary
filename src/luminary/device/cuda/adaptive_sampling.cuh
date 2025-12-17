@@ -95,6 +95,9 @@ LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count_from_block_index(c
     count++;
   }
 
+  // All samples beyond this would have been cancelled.
+  count = min(count, MAX_NUM_GLOBAL_SAMPLES);
+
   return count;
 }
 
