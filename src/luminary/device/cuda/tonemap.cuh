@@ -2,6 +2,7 @@
 #define CU_TONEMAP_H
 
 #include "math.cuh"
+#include "purkinje.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 
@@ -162,13 +163,43 @@ LUMINARY_FUNCTION RGBF tonemap_agx_punchy(RGBF pixel) {
 LUMINARY_FUNCTION RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params) {
   pixel = agx_conversion(pixel);
 
-  RGBF slope = get_color(agx_params.slope, agx_params.slope, agx_params.slope);
-  RGBF power = get_color(agx_params.power, agx_params.power, agx_params.power);
+  const RGBF slope = splat_color(agx_params.slope);
+  const RGBF power = splat_color(agx_params.power);
 
   pixel = agx_look(pixel, slope, power, agx_params.saturation);
   pixel = agx_inv_conversion(pixel);
 
   return pixel;
+}
+
+LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel, const AGXCustomParams agx_params = {1.0f, 1.0f, 1.0f}) {
+  RGBF result;
+
+  switch (device.camera.tonemap) {
+    case LUMINARY_TONEMAP_NONE:
+      result = pixel;
+      break;
+    case LUMINARY_TONEMAP_ACES:
+      result = tonemap_aces(pixel);
+      break;
+    case LUMINARY_TONEMAP_REINHARD:
+      result = tonemap_reinhard(pixel);
+      break;
+    case LUMINARY_TONEMAP_UNCHARTED2:
+      result = tonemap_uncharted2(pixel);
+      break;
+    case LUMINARY_TONEMAP_AGX:
+      result = tonemap_agx(pixel);
+      break;
+    case LUMINARY_TONEMAP_AGX_PUNCHY:
+      result = tonemap_agx_punchy(pixel);
+      break;
+    case LUMINARY_TONEMAP_AGX_CUSTOM:
+      result = tonemap_agx_custom(pixel, agx_params);
+      break;
+  }
+
+  return result;
 }
 
 LUMINARY_FUNCTION RGBF
@@ -209,28 +240,7 @@ LUMINARY_FUNCTION RGBF
   pixel.g = fmaxf(0.0f, pixel.g + grain);
   pixel.b = fmaxf(0.0f, pixel.b + grain);
 
-  switch (device.camera.tonemap) {
-    case LUMINARY_TONEMAP_NONE:
-      break;
-    case LUMINARY_TONEMAP_ACES:
-      pixel = tonemap_aces(pixel);
-      break;
-    case LUMINARY_TONEMAP_REINHARD:
-      pixel = tonemap_reinhard(pixel);
-      break;
-    case LUMINARY_TONEMAP_UNCHARTED2:
-      pixel = tonemap_uncharted2(pixel);
-      break;
-    case LUMINARY_TONEMAP_AGX:
-      pixel = tonemap_agx(pixel);
-      break;
-    case LUMINARY_TONEMAP_AGX_PUNCHY:
-      pixel = tonemap_agx_punchy(pixel);
-      break;
-    case LUMINARY_TONEMAP_AGX_CUSTOM:
-      pixel = tonemap_agx_custom(pixel, agx_params);
-      break;
-  }
+  pixel = tonemap_apply_transform(pixel, agx_params);
 
   return pixel;
 }

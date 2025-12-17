@@ -452,6 +452,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     AdaptiveSamplerSetupInfo setup_info;
     setup_info.enabled           = scene->settings.enable_adaptive_sampling;
     setup_info.max_sampling_rate = scene->settings.adaptive_sampling_max_sampling_rate;
+    setup_info.avg_sampling_rate = scene->settings.adaptive_sampling_avg_sampling_rate;
     setup_info.exposure_aware    = scene->settings.adaptive_sampling_exposure_aware;
     setup_info.exposure          = expf(scene->camera.exposure);
 

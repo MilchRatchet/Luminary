@@ -3,11 +3,15 @@
 
 #include "math.cuh"
 #include "memory.cuh"
+#include "tonemap.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(const float value, const float exposure) {
-  const float exposed_value    = value * exposure;
-  const float tonemapped_value = exposed_value / (1.0f + exposed_value);
+LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(const RGBF color, const float exposure) {
+  const RGBF exposed_color    = scale_color(color, exposure);
+  const RGBF tonemapped_color = tonemap_apply_transform(exposed_color);
+
+  const float exposed_value    = color_luminance(exposed_color);
+  const float tonemapped_value = color_luminance(tonemapped_color);
 
   return (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
 }
@@ -172,26 +176,27 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   const uint32_t x = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x + device.settings.window_x;
   const uint32_t y = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y + device.settings.window_y;
 
-  float luminance;
-  float variance = adaptive_sampling_get_pixel_variance(x, y, denominator, luminance);
+  RGBF color;
+  float variance = adaptive_sampling_get_pixel_variance_and_color(x, y, denominator, color);
 
   if (args.exposure != 0.0f) {
-    const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(luminance, args.exposure);
+    const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(color, args.exposure);
     variance *= tonemap_compression * tonemap_compression;
   }
 
-  const float block_variance = warp_reduce_max<16>(variance);
+  const float block_variance = fabsf(warp_reduce_max<16>(variance));
 
   if ((THREAD_ID & (WARP_SIZE_MASK >> 1)) == 0) {
     args.dst_block_variance[adaptive_sampling_block] = block_variance;
 
-    // Since variance >= 0, we can use the built-in integer atomicMax
-    atomicMax((uint32_t*) args.dst_global_variance, __float_as_uint(fabsf(block_variance)));
+    atomicAdd(args.dst_sum_variance, block_variance);
   }
 }
 
 LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelArgsAdaptiveSamplingComputeStageSampleCounts args) {
   const uint32_t adaptive_sampling_block = THREAD_ID;
+
+  const float avg_variance = *args.src_sum_variance / args.num_adaptive_sampling_blocks;
 
   const float variance              = args.src_block_variance[adaptive_sampling_block];
   uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
@@ -199,8 +204,7 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
   // Zero out all the bits not currently occupied by valid data.
   adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
 
-  const float global_max_variance = __ldg(args.src_global_variance);
-  uint32_t new_sample_count       = (uint32_t) (remap(variance, 0.0f, global_max_variance, 0.0f, args.max_sampling_rate) + 0.5f);
+  uint32_t new_sample_count = (uint32_t) (remap(variance, 0.0f, avg_variance, 0.0f, args.avg_sampling_rate) + 0.5f);
 
   new_sample_count = max(new_sample_count, 1);
   new_sample_count = min(new_sample_count, args.max_sampling_rate);

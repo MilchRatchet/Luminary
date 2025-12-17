@@ -64,6 +64,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t supersampling;
   bool enable_adaptive_sampling;
   uint32_t adaptive_sampling_max_sampling_rate;
+  uint32_t adaptive_sampling_avg_sampling_rate;
   uint32_t adaptive_sampling_update_interval;
   bool adaptive_sampling_exposure_aware;
   LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;

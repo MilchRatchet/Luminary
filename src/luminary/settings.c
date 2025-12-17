@@ -13,7 +13,8 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->undersampling                       = 2;
   settings->supersampling                       = 1;
   settings->enable_adaptive_sampling            = true;
-  settings->adaptive_sampling_max_sampling_rate = 64;
+  settings->adaptive_sampling_max_sampling_rate = 256;
+  settings->adaptive_sampling_avg_sampling_rate = 2;
   settings->adaptive_sampling_update_interval   = 64;
   settings->adaptive_sampling_exposure_aware    = true;
   settings->adaptive_sampling_output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY;
@@ -53,6 +54,7 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
 
   if (input->enable_adaptive_sampling) {
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_max_sampling_rate, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+    __SETTINGS_CHECK_DIRTY(adaptive_sampling_avg_sampling_rate, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_update_interval, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_exposure_aware, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_output_mode, SCENE_DIRTY_FLAG_OUTPUT);
