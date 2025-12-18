@@ -537,13 +537,17 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
 
   const bool is_caustics_path = volume_id == VOLUME_TYPE_OCEAN && trace.handle.instance_id != HIT_TYPE_OCEAN;
 
+  bool sample_is_valid = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
+
   if (is_caustics_path && ray.y > 0.0f) {
     const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
   }
-
-  const bool sample_is_valid = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
+  // Check if we intersect with the ocean from above
+  else if (ray.y < 0.0f && device.ocean.active && task.origin.y > OCEAN_MIN_HEIGHT) {
+    sample_is_valid = false;
+  }
 
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
