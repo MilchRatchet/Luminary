@@ -47,6 +47,14 @@ LUMINARY_API enum LuminaryShadingMode {
   LUMINARY_SHADING_MODE_COUNT
 } typedef LuminaryShadingMode;
 
+LUMINARY_API enum LuminaryAdaptiveSamplingOutputMode {
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY              = 0,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE            = 1,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR               = 2,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION = 3,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT
+} typedef LuminaryAdaptiveSamplingOutputMode;
+
 LUMINARY_API struct LuminaryRendererSettings {
   uint32_t width;
   uint32_t height;
@@ -54,8 +62,13 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t bridge_max_num_vertices;
   uint32_t undersampling;
   uint32_t supersampling;
+  bool enable_adaptive_sampling;
+  uint32_t adaptive_sampling_max_sampling_rate;
+  uint32_t adaptive_sampling_avg_sampling_rate;
+  uint32_t adaptive_sampling_update_interval;
+  bool adaptive_sampling_exposure_aware;
+  LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;
   LuminaryShadingMode shading_mode;
-  uint32_t max_sample_count;
   float region_x;
   float region_y;
   float region_width;
@@ -152,9 +165,8 @@ LUMINARY_API struct LuminaryCamera {
   float agx_custom_power;
   float agx_custom_saturation;
   LuminaryFilter filter;
+  bool use_local_error_minimization;
   float bloom_blend;
-  bool lens_flare;
-  float lens_flare_threshold;
   bool dithering;
   bool purkinje;
   float purkinje_kappa1;
@@ -166,9 +178,7 @@ LUMINARY_API struct LuminaryCamera {
   float russian_roulette_threshold;
   bool use_color_correction;
   LuminaryRGBF color_correction;
-  bool do_firefly_rejection;
   float film_grain;
-  bool indirect_only;
   float camera_scale;
   float object_distance;
   bool use_physical_camera;

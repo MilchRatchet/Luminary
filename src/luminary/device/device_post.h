@@ -11,12 +11,8 @@ struct DevicePost {
 
   bool bloom;
   float bloom_blend;
-  RGBF* DEVICE* bloom_mips;
+  float* DEVICE* bloom_mips;
   uint32_t bloom_mip_count;
-
-  bool lens_flare;
-  float lens_flare_threshold;
-  RGBF* DEVICE* lens_flare_buffers;
 } typedef DevicePost;
 
 DEVICE_CTX_FUNC LuminaryResult device_post_create(DevicePost** post);

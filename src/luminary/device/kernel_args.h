@@ -6,7 +6,6 @@
 struct KernelArgsBufferAdd {
   float* dst;
   const float* src;
-  uint32_t base_offset;
   uint32_t num_elements;
 } typedef KernelArgsBufferAdd;
 
@@ -80,7 +79,6 @@ struct KernelArgsLightComputeIntensity {
 } typedef KernelArgsLightComputeIntensity;
 
 struct KernelArgsGenerateFinalImage {
-  RGBF* src;
   RGBF color_correction;
   AGXCustomParams agx_params;
   uint8_t undersampling;
@@ -94,54 +92,27 @@ struct KernelArgsConvertRGBFToARGB8 {
   uint8_t undersampling;
 } typedef KernelArgsConvertRGBFToARGB8;
 
-struct KernelArgsCameraPostImageDownsample {
-  const RGBF* src;
+struct KernelArgsPostImageDownsample {
+  const float* src;
   uint32_t sw;
   uint32_t sh;
-  RGBF* dst;
-  uint32_t tw;
-  uint32_t th;
-} typedef KernelArgsCameraPostImageDownsample;
-
-struct KernelArgsCameraPostImageDownsampleThreshold {
-  const RGBF* src;
-  uint32_t sw;
-  uint32_t sh;
-  RGBF* dst;
+  float* dst;
   uint32_t tw;
   uint32_t th;
   float threshold;
-} typedef KernelArgsCameraPostImageDownsampleThreshold;
+} typedef KernelArgsPostImageDownsample;
 
-struct KernelArgsCameraPostImageUpsample {
-  const RGBF* src;
+struct KernelArgsPostImageUpsample {
+  const float* src;
   uint32_t sw;
   uint32_t sh;
-  RGBF* dst;
-  const RGBF* base;
+  float* dst;
+  const float* base;
   uint32_t tw;
   uint32_t th;
   float sa;
   float sb;
-} typedef KernelArgsCameraPostImageUpsample;
-
-struct KernelArgsCameraPostLensFlareGhosts {
-  const RGBF* src;
-  uint32_t sw;
-  uint32_t sh;
-  RGBF* dst;
-  uint32_t tw;
-  uint32_t th;
-} typedef KernelArgsCameraPostLensFlareGhosts;
-
-struct KernelArgsCameraPostLensFlareHalo {
-  const RGBF* src;
-  uint32_t sw;
-  uint32_t sh;
-  RGBF* dst;
-  uint32_t tw;
-  uint32_t th;
-} typedef KernelArgsCameraPostLensFlareHalo;
+} typedef KernelArgsPostImageUpsample;
 
 struct KernelArgsOMMLevel0Format4 {
   uint32_t mesh_id;
@@ -221,5 +192,56 @@ struct KernelArgsMipmapGenerateLevel2DRGBAF {
   uint16_t width;
   uint16_t height;
 } typedef KernelArgsMipmapGenerateLevel2DRGBAF;
+
+struct KernelArgsAdaptiveSamplingBlockReduceVariance {
+  float* dst_block_variance;
+  float* dst_sum_variance;
+  uint32_t width;
+  uint32_t current_stage_id;
+  float exposure;
+} typedef KernelArgsAdaptiveSamplingBlockReduceVariance;
+
+struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
+  float* src_block_variance;
+  float* src_sum_variance;
+  uint32_t num_adaptive_sampling_blocks;
+  uint32_t current_stage_id;
+  uint32_t max_sampling_rate;
+  uint32_t avg_sampling_rate;
+} typedef KernelArgsAdaptiveSamplingComputeStageSampleCounts;
+
+struct KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts {
+  uint32_t num_adaptive_sampling_blocks;
+  uint8_t stage_id;
+  uint32_t* dst;
+} typedef KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts;
+
+struct KernelArgsAdaptiveSamplingComputeTasksPerBlock {
+  uint32_t num_adaptive_sampling_blocks;
+  uint8_t stage_id;
+  uint32_t* dst;
+} typedef KernelArgsAdaptiveSamplingComputeTasksPerBlock;
+
+struct KernelArgsAdaptiveSamplingComputeBlockSum {
+  uint32_t* thread_prefix_sum;
+  uint32_t* warp_prefix_sum;
+  uint32_t thread_count;
+  uint32_t warp_count;
+} typedef KernelArgsAdaptiveSamplingComputeBlockSum;
+
+struct KernelArgsAdaptiveSamplingComputePrefixSum {
+  uint32_t* thread_prefix_sum;
+  uint32_t* warp_prefix_sum;
+  uint32_t thread_count;
+  uint32_t warp_count;
+} typedef KernelArgsAdaptiveSamplingComputePrefixSum;
+
+struct KernelArgsAdaptiveSamplingComputeTileBlockRanges {
+  uint32_t* block_prefix_sum;
+  uint32_t* dst;
+  uint32_t block_count;
+  uint32_t tasks_per_tile;
+  uint32_t tile_count;
+} typedef KernelArgsAdaptiveSamplingComputeTileBlockRanges;
 
 #endif /* LUMINARY_KERNEL_ARGS_H */

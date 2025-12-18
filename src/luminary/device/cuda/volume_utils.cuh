@@ -14,13 +14,15 @@ LUMINARY_FUNCTION RGBF volume_get_transmittance(const VolumeDescriptor volume) {
 LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_fog() {
   VolumeDescriptor volume;
 
-  volume.type           = VOLUME_TYPE_FOG;
-  volume.absorption     = get_color(0.0f, 0.0f, 0.0f);
-  volume.scattering     = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
+  volume.type       = VOLUME_TYPE_FOG;
+  volume.absorption = get_color(0.0f, 0.0f, 0.0f);
+  volume.scattering = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
+  volume.dist       = device.fog.dist;
+  volume.max_height = device.fog.height;
+  volume.min_height = (device.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
+
+  volume.max_absorption = 0.0f;
   volume.max_scattering = FOG_DENSITY;
-  volume.dist           = device.fog.dist;
-  volume.max_height     = device.fog.height;
-  volume.min_height     = (device.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
 
   return volume;
 }
@@ -35,6 +37,7 @@ LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.max_height = 65535.0f;
   volume.min_height = -65535.0f;
 
+  volume.max_absorption = color_importance(volume.absorption);
   volume.max_scattering = color_importance(volume.scattering);
 
   return volume;
@@ -122,7 +125,7 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
   }
 
   // Horizontal intersection
-  const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
+  const float rn = rsqrtf(ray.x * ray.x + ray.z * ray.z);
   const float rx = ray.x * rn;
   const float rz = ray.z * rn;
 
@@ -310,8 +313,8 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
   return ctx;
 }
 
-LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const ushort2 pixel) {
-  const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, pixel);
+LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const PathID& path_id) {
+  const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, path_id);
 
   const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
 
@@ -333,8 +336,8 @@ LUMINARY_FUNCTION RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContex
   return weight;
 }
 
-LUMINARY_FUNCTION void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const ushort2 pixel, RGBF& weight) {
-  const float dist = volume_sample_sky_dl_initial_vertex_dist(ctx, pixel);
+LUMINARY_FUNCTION void volume_sample_sky_dl_initial_vertex(MaterialContextVolume& ctx, const PathID& path_id, RGBF& weight) {
+  const float dist = volume_sample_sky_dl_initial_vertex_dist(ctx, path_id);
   weight           = volume_sample_sky_dl_initial_vertex_weight(ctx, dist);
 }
 

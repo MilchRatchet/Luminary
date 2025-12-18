@@ -118,7 +118,7 @@ LUMINARY_FUNCTION RGBF bsdf_fresnel_schlick(const RGBF f0, const float f90, cons
 
 LUMINARY_FUNCTION float bsdf_shadowed_F90(const RGBF specular_f0) {
   const float t = 1.0f / 0.04f;
-  return fminf(1.0f, t * luminance(specular_f0));
+  return fminf(1.0f, t * color_luminance(specular_f0));
 }
 
 ///////////////////////////////////////////////////
@@ -216,10 +216,8 @@ LUMINARY_FUNCTION float bsdf_microfacet_pdf(const vec3 V, const float roughness,
   return D / (2.0f * (k * NdotV + t));
 }
 
-LUMINARY_FUNCTION vec3 bsdf_microfacet_sample(
-  const vec3 V, const float roughness, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
-  const uint32_t depth = device.state.depth) {
-  const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
+LUMINARY_FUNCTION vec3 bsdf_microfacet_sample(const vec3 V, const float roughness, const PathID& path_id, const uint32_t target) {
+  const float2 random = random_2D(target, path_id);
   return bsdf_microfacet_sample_normal(V, roughness, random);
 }
 
@@ -302,10 +300,9 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_pdf(
   return D * G1 * (HdotV / NdotV) * (HdotL / denominator);
 }
 
-LUMINARY_FUNCTION vec3 bsdf_microfacet_refraction_sample(
-  const vec3 V, const float roughness, const ushort2 pixel, const uint32_t target, const uint32_t sequence_id = device.state.sample_id,
-  const uint32_t depth = device.state.depth) {
-  const float2 random = random_2D_base_float(target, pixel, sequence_id, depth);
+LUMINARY_FUNCTION vec3
+  bsdf_microfacet_refraction_sample(const vec3 V, const float roughness, const PathID& path_id, const uint32_t target) {
+  const float2 random = random_2D(target, path_id);
   return bsdf_microfacet_refraction_sample_normal(V, roughness, random);
 }
 

@@ -337,7 +337,7 @@ LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(KernelArgsSkyComp
 
 LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
   Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const bool cloud_shadows,
-  const int steps, ushort2 pixel) {
+  const int steps, const PathID& path_id) {
   Spectrum result = spectrum_set1(0.0f);
 
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
@@ -352,7 +352,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
     float step_size;
 
     const float light_angle   = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, origin);
-    const float random_offset = random_1D(RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
+    const float random_offset = random_1D(RANDOM_TARGET_SKY_STEP_OFFSET, path_id);
 
     const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.sky.mie_diameter);
 
@@ -506,23 +506,23 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION RGBF
-  sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, ushort2 pixel) {
+  sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, const PathID& path_id) {
   Spectrum unused = spectrum_set1(0.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, pixel);
+  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, path_id);
 
   return sky_compute_color_from_spectrum(radiance);
 }
 
-LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, ushort2 pixel) {
+LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, const PathID& path_id) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
   const float base_range = (IS_PRIMARY_RAY) ? 40.0f : 80.0f;
 
   const int steps =
-    fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6) + random_1D(RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
+    fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6) + random_1D(RANDOM_TARGET_SKY_INSCATTERING_STEP, path_id) - 0.5f;
 
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, pixel);
+  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, path_id);
 
   const RGBF inscattering = mul_color(sky_compute_color_from_spectrum(radiance), record);
 
@@ -564,7 +564,7 @@ LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, c
   return sky;
 }
 
-LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const ushort2 index) {
+LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const PathID& path_id) {
   RGBF sky;
   switch (device.sky.mode) {
     default:
@@ -572,7 +572,7 @@ LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const u
       const vec3 sky_origin  = world_to_sky_transform(origin);
       const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
 
-      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, index);
+      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, path_id);
     } break;
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);
@@ -617,24 +617,18 @@ LUMINARY_KERNEL void sky_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    const DeviceTask task                 = task_load(task_base_address);
-    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task            = task_load(task_base_address);
 
     if ((task.state & STATE_FLAG_ALLOW_AMBIENT) == 0)
       continue;
 
-    RGBF sky = sky_color_main(task.origin, task.ray, task.state, task.index);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
+    RGBF sky = sky_color_main(task.origin, task.ray, task.state, task.path_id);
     sky      = mul_color(sky, record_unpack(throughput.record));
 
-    const uint32_t pixel = get_pixel_id(task.index);
-
-    if (device.state.depth <= 1) {
-      write_beauty_buffer_direct(sky, pixel);
-    }
-    else {
-      write_beauty_buffer(sky, pixel, task.state);
-    }
+    write_beauty_buffer(sky, throughput.results_index);
   }
 }
 
@@ -649,19 +643,24 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    const DeviceTask task            = task_load(task_base_address);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task                 = task_load(task_base_address);
+    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, task.index);
-      write_beauty_buffer_forced(sky, get_pixel_id(task.index));
+    RGBF result;
+    switch (device.settings.shading_mode) {
+      case LUMINARY_SHADING_MODE_ALBEDO:
+        result = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, task.path_id);
+        break;
+      case LUMINARY_SHADING_MODE_IDENTIFICATION:
+        result = get_color(0.0f, 0.63f, 1.0f);
+        break;
+      default:
+        result = splat_color(0.0f);
+        break;
     }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), get_pixel_id(task.index));
-    }
-    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), get_pixel_id(task.index));
-    }
+
+    write_beauty_buffer(result, throughput.results_index);
   }
 }
 

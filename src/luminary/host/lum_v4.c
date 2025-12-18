@@ -204,12 +204,14 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* LENSFLAR */
     case 5927102449525343564u:
-      sscanf(value, "%u\n", &bool_uint);
-      camera->lens_flare = bool_uint;
+      // Legacy
+      // sscanf(value, "%u\n", &bool_uint);
+      // camera->lens_flare = bool_uint;
       break;
     /* LENSFTHR */
     case 5929081570455340364u:
-      sscanf(value, "%f\n", &camera->lens_flare_threshold);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->lens_flare_threshold);
       break;
     /* DITHER__ */
     case 6872302013910370628u:
@@ -247,8 +249,9 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FIREFLYC */
     case 4852993938162862406u:
-      sscanf(value, "%u\n", &bool_uint);
-      camera->do_firefly_rejection = bool_uint;
+      // Legacy
+      // sscanf(value, "%u\n", &bool_uint);
+      // camera->do_firefly_rejection = bool_uint;
       break;
     /* FILMGRAI */
     case 5278590704447932742u:

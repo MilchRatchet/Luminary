@@ -25,11 +25,6 @@
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
 
-// This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
-#define INTERLEAVED_STORAGE
-// Round the size of an element in an interleaved buffer to the next multiple of 16 bytes
-#define INTERLEAVED_ALLOCATION_SIZE(X) ((X + 15u) & (~0xFu))
-
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
 #define MATERIAL_ID_INVALID 0xFFFF
@@ -41,7 +36,7 @@
 #define LUMINARY_WORK_QUEUE_STATS_PRINT
 #define LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD 0.01
 
-enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFF } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_NONE, VOLUME_TYPE_FOG, VOLUME_TYPE_OCEAN } typedef VolumeType;
 
 struct Quaternion {
   float x;
@@ -107,19 +102,6 @@ struct RGBA16 {
 ////////////////////////////////////////////////////////////////////
 // Mesh
 ////////////////////////////////////////////////////////////////////
-
-struct Triangle {
-  vec3 vertex;
-  vec3 edge1;
-  vec3 edge2;
-  vec3 vertex_normal;
-  vec3 edge1_normal;
-  vec3 edge2_normal;
-  UV vertex_texture;
-  UV edge1_texture;
-  UV edge2_texture;
-  uint16_t material_id;
-} typedef Triangle;
 
 struct TraversalTriangle {
   vec3 vertex;

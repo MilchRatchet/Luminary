@@ -5,47 +5,50 @@
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
-// Interleaved storage access
-////////////////////////////////////////////////////////////////////
-
-LUMINARY_FUNCTION void* interleaved_buffer_get_entry_address_chunk_16(
-  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
-}
-
-LUMINARY_FUNCTION void* interleaved_buffer_get_entry_address_chunk_8(
-  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) ptr) + (count * chunk + id) * 2 + offset);
-}
-
-LUMINARY_FUNCTION void* triangle_get_entry_address(
-  const DeviceTriangle* tri_ptr, const uint32_t chunk, const uint32_t offset, const uint32_t tri_id, const uint32_t triangle_count) {
-  return interleaved_buffer_get_entry_address_chunk_16((void*) tri_ptr, triangle_count, chunk, offset, tri_id);
-}
-
-////////////////////////////////////////////////////////////////////
 // Interthread IO
 ////////////////////////////////////////////////////////////////////
 
-template <typename T>
+template <uint32_t WIDTH = 32, typename T>
 LUMINARY_FUNCTION T warp_reduce_sum(T sum) {
   const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
-  sum += __shfl_xor_sync(mask, sum, 16);
-  sum += __shfl_xor_sync(mask, sum, 8);
-  sum += __shfl_xor_sync(mask, sum, 4);
-  sum += __shfl_xor_sync(mask, sum, 2);
-  sum += __shfl_xor_sync(mask, sum, 1);
+
+  if constexpr (WIDTH >= 32)
+    sum += __shfl_xor_sync(mask, sum, 16);
+
+  if constexpr (WIDTH >= 16)
+    sum += __shfl_xor_sync(mask, sum, 8);
+
+  if constexpr (WIDTH >= 8)
+    sum += __shfl_xor_sync(mask, sum, 4);
+
+  if constexpr (WIDTH >= 4)
+    sum += __shfl_xor_sync(mask, sum, 2);
+
+  if constexpr (WIDTH >= 2)
+    sum += __shfl_xor_sync(mask, sum, 1);
+
   return sum;
 }
 
-template <typename T>
+template <uint32_t WIDTH = 32, typename T>
 LUMINARY_FUNCTION T warp_reduce_max(T max_value) {
   const uint32_t mask = __ballot_sync(0xFFFFFFFF, 1);
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 4));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 2));
-  max_value           = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 1));
+
+  if constexpr (WIDTH >= 32)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 16));
+
+  if constexpr (WIDTH >= 16)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 8));
+
+  if constexpr (WIDTH >= 8)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 4));
+
+  if constexpr (WIDTH >= 4)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 2));
+
+  if constexpr (WIDTH >= 2)
+    max_value = fmaxf(max_value, __shfl_xor_sync(mask, max_value, 1));
+
   return max_value;
 }
 
@@ -67,6 +70,11 @@ LUMINARY_FUNCTION T warp_reduce_prefixsum(T value) {
   }
 
   return value;
+}
+
+template <typename T>
+LUMINARY_FUNCTION T warp_reduce_broadcast(const T value, const uint32_t src_thread_id_in_warp) {
+  return __shfl_sync(0xFFFFFFFF, value, src_thread_id_in_warp);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -200,6 +208,14 @@ LUMINARY_FUNCTION DeviceTaskThroughput task_throughput_load(const uint32_t base_
   return load_task_state<DeviceTaskThroughput, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput));
 }
 
+LUMINARY_FUNCTION DeviceTaskMediumStack task_medium_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium));
+}
+
+LUMINARY_FUNCTION DeviceTaskResult task_result_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0);
+}
+
 // DeviceTask
 
 LUMINARY_FUNCTION void task_store(const uint32_t base_address, const DeviceTask data) {
@@ -220,10 +236,6 @@ LUMINARY_FUNCTION void task_trace_depth_store(const uint32_t base_address, const
   store_task_state<float, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.depth), data);
 }
 
-LUMINARY_FUNCTION void task_trace_ior_stack_store(const uint32_t base_address, const DeviceIORStack data) {
-  store_task_state<DeviceIORStack, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.ior_stack), data);
-}
-
 // DeviceTaskThroughput
 
 LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {
@@ -232,6 +244,18 @@ LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const 
 
 LUMINARY_FUNCTION void task_throughput_record_store(const uint32_t base_address, const PackedRecord data) {
   store_task_state<PackedRecord, float2>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.record), data);
+}
+
+// DeviceTaskMediumStack
+
+LUMINARY_FUNCTION void task_medium_store(const uint32_t base_address, const DeviceTaskMediumStack data) {
+  store_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium), data);
+}
+
+// DeviceTaskResult
+
+LUMINARY_FUNCTION void task_result_store(const uint32_t base_address, const DeviceTaskResult data) {
+  store_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0, data);
 }
 
 // DeviceTaskDirectLight
@@ -298,7 +322,7 @@ LUMINARY_FUNCTION RGBF load_RGBF(const RGBF* ptr) {
 
 LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color, const char* func, uint32_t line) {
   RGBF sanitized_color = color;
-  if (is_non_finite(luminance(color))) {
+  if (is_non_finite(color_luminance(color))) {
     // Debug code to identify paths that cause NaNs and INFs
     ushort2 pixel;
     pixel.y = (uint16_t) (offset / device.settings.width);
@@ -319,7 +343,7 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
 #else /* UTILS_DEBUG_MODE */
 
 LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, const RGBF color) {
-  const RGBF sanitized_color = is_non_finite(luminance(color)) ? UTILS_DEBUG_NAN_COLOR : color;
+  const RGBF sanitized_color = is_non_finite(color_luminance(color)) ? UTILS_DEBUG_NAN_COLOR : color;
 
   buffer[offset] = sanitized_color;
 }
@@ -332,82 +356,70 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
 // Beauty Buffer IO
 ////////////////////////////////////////////////////////////////////
 
-template <bool MODE_SET>
-LUMINARY_FUNCTION void write_beauty_buffer_impl(const RGBF beauty, const uint32_t pixel, RGBF* buffer) {
-  RGBF output = beauty;
-  if constexpr (MODE_SET == false) {
-    output = add_color(beauty, load_RGBF(buffer + pixel));
-  }
-  store_RGBF(buffer, pixel, output);
+LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t results_index) {
+  if (color_any(beauty) == false)
+    return;
+
+  DeviceTaskResult result = task_result_load(results_index);
+
+  result.color = add_color(result.color, beauty);
+
+  task_result_store(results_index, result);
 }
 
-template <bool MODE_SET = false>
-LUMINARY_FUNCTION void write_beauty_buffer_direct(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, device.ptrs.frame_direct_buffer);
-}
-
-template <bool MODE_SET = false>
-LUMINARY_FUNCTION void write_beauty_buffer_indirect(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, device.ptrs.frame_indirect_buffer);
-}
-
-template <bool MODE_SET = false>
-LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t pixel, const uint8_t state) {
-  const bool is_direct = state & STATE_FLAG_DELTA_PATH;
-
-  RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
-
-  write_beauty_buffer_impl<MODE_SET>(beauty, pixel, buffer);
-}
-
-LUMINARY_FUNCTION void write_beauty_buffer_forced(const RGBF beauty, const uint32_t pixel) {
-  write_beauty_buffer<true>(beauty, pixel, STATE_FLAG_DELTA_PATH);
-}
-
-#ifndef NO_LUMINARY_BVH
-
-LUMINARY_FUNCTION TraversalTriangle load_traversal_triangle(const int offset) {
-  float4* ptr     = (float4*) (device.bvh_triangles + offset);
-  const float4 v1 = __ldg(ptr);
-  const float4 v2 = __ldg(ptr + 1);
-  const float4 v3 = __ldg(ptr + 2);
-
-  TraversalTriangle triangle;
-  triangle.vertex     = get_vector(v1.x, v1.y, v1.z);
-  triangle.edge1      = get_vector(v1.w, v2.x, v2.y);
-  triangle.edge2      = get_vector(v2.z, v2.w, v3.x);
-  triangle.albedo_tex = __float_as_uint(v3.y);
-  triangle.id         = __float_as_uint(v3.z);
-
-  return triangle;
-}
-
-#endif
+////////////////////////////////////////////////////////////////////
+// Geometry data IO
+////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION uint32_t mesh_id_load(const uint32_t instance_id) {
-  return __ldg(device.ptrs.instance_mesh_id + instance_id);
+  return __ldg(device.ptrs.instance_mesh_ids + instance_id);
 }
 
 LUMINARY_FUNCTION uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
-  const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
-  const uint32_t data           = __ldg((uint32_t*) triangle_get_entry_address(ptr, 3, 3, triangle_id, triangle_count));
-  const uint16_t material_id    = data & 0xFFFF;
+  const DeviceTriangleTexture* ptr = device.ptrs.texture_triangles[mesh_id];
 
-  return material_id;
+  return __ldg(&ptr[triangle_id].material_id);
+}
+
+LUMINARY_FUNCTION const DeviceTriangleVertex* triangle_vertex_ptr_load(const uint32_t mesh_id) {
+  return (const DeviceTriangleVertex*) __ldg((uint64_t*) (device.ptrs.vertices + mesh_id));
+}
+
+LUMINARY_FUNCTION const DeviceTriangleTexture* triangle_texture_ptr_load(const uint32_t mesh_id) {
+  return (const DeviceTriangleTexture*) __ldg((uint64_t*) (device.ptrs.texture_triangles + mesh_id));
+}
+
+LUMINARY_FUNCTION DeviceTriangleVertex triangle_vertex_load(const DeviceTriangleVertex* ptr, const uint32_t vertex_id) {
+  const float4 data = __ldg((const float4*) (ptr + vertex_id));
+
+  DeviceTriangleVertex vertex;
+  vertex.pos    = get_vector(data.x, data.y, data.z);
+  vertex.normal = __float_as_uint(data.w);
+
+  return vertex;
+}
+
+LUMINARY_FUNCTION DeviceTriangleTexture triangle_texture_load(const DeviceTriangleTexture* ptr, const uint32_t triangle_id) {
+  const float4 data = __ldg((const float4*) (ptr + triangle_id));
+
+  DeviceTriangleTexture triangle;
+  triangle.vertex_texture  = __float_as_uint(data.x);
+  triangle.vertex1_texture = __float_as_uint(data.y);
+  triangle.vertex2_texture = __float_as_uint(data.z);
+  triangle.material_id     = __float_as_uint(data.w) & 0xFFFF;
+
+  return triangle;
 }
 
 LUMINARY_FUNCTION UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const DeviceTriangle* ptr     = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+  const DeviceTriangleTexture* ptr     = triangle_texture_ptr_load(mesh_id);
+  const DeviceTriangleTexture triangle = triangle_texture_load(ptr, handle.tri_id);
 
-  const float4 data = __ldg((float4*) triangle_get_entry_address(ptr, 2, 0, handle.tri_id, triangle_count));
-
-  const UV vertex_texture  = uv_unpack(__float_as_uint(data.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(data.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(data.w));
+  const UV vertex_texture  = uv_unpack(triangle.vertex_texture);
+  const UV vertex1_texture = uv_unpack(triangle.vertex1_texture);
+  const UV vertex2_texture = uv_unpack(triangle.vertex2_texture);
 
   return lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }

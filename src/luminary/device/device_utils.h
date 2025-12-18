@@ -7,6 +7,10 @@
 #define LUMINARY_MAX_NUM_DEVICES 4
 #define THREADS_PER_BLOCK 128
 
+#define WARP_SIZE_LOG 5
+#define WARP_SIZE (1 << WARP_SIZE_LOG)
+#define WARP_SIZE_MASK (WARP_SIZE - 1)
+
 // #define OPTIX_VALIDATION
 #define NO_LUMINARY_BVH
 
@@ -23,6 +27,16 @@
 #define RECOMMENDED_TASKS_PER_THREAD 8
 #define MINIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD >> 1)
 #define MAXIMUM_TASKS_PER_THREAD (RECOMMENDED_TASKS_PER_THREAD << 1)
+
+// If this is changed, the warp-based filter in adaptive_sampling_compute_stage_sample_counts must be adapted.
+#define ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG 2
+#define ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK ((1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1)
+#define ADAPTIVE_SAMPLING_STAGE_INVALID 0xFF
+#define ADAPTIVE_SAMPLING_MAX_SAMPLING_RATE 256
+
+#define PATH_ID_SENSOR_BITS 14
+#define PATH_ID_SAMPLE_BITS 20
+#define MAX_NUM_GLOBAL_SAMPLES (1u << PATH_ID_SAMPLE_BITS)
 
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
@@ -48,6 +62,8 @@ static_assert(
 #define UNDERSAMPLING_STAGE_MASK 0x7C
 #define UNDERSAMPLING_STAGE_SHIFT 2
 #define UNDERSAMPLING_ITERATION_MASK 0x03
+
+#define RESULTS_INDEX_INVALID (0xFFFFFFFF)
 
 #define SPECTRAL_MIN_WAVELENGTH 360
 #define SPECTRAL_MAX_WAVELENGTH 830
@@ -142,6 +158,12 @@ struct ushort2 {
   uint16_t y;
 } typedef ushort2;
 
+struct ushort3 {
+  uint16_t x;
+  uint16_t y;
+  uint16_t z;
+} typedef ushort3;
+
 struct uint2 {
   uint32_t x;
   uint32_t y;
@@ -166,6 +188,7 @@ typedef uint2 PackedRayDirection;
 typedef uint2 PackedPosition;
 typedef uint32_t PackedNormal;
 typedef uint32_t PackedUV;
+typedef ushort3 PathID;
 
 #define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
 
@@ -218,6 +241,7 @@ struct VolumeDescriptor {
   VolumeType type;
   RGBF absorption;
   RGBF scattering;
+  float max_absorption;
   float max_scattering;
   float dist;
   float max_height;
@@ -247,6 +271,10 @@ struct GBufferMetaData {
   uint16_t material_id;
 } typedef GBufferMetaData;
 LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
+
+typedef uint8_t DeviceExecutionFlags;
+
+enum DeviceExecutionFlag { DEVICE_EXECUTION_FLAG_INTERACTIVE = 1 << 0 } typedef DeviceExecutionFlag;
 
 ////////////////////////////////////////////////////////////////////
 // Light Importance Sampling Structs
@@ -300,6 +328,15 @@ LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
 
 #define MAX_NUM_INDIRECT_BUCKETS 3
 
+#define ADAPTIVE_SAMPLER_NUM_STAGES (sizeof(uint32_t) / sizeof(uint8_t))
+
+struct DeviceSampleAllocation {
+  uint32_t stage_sample_offsets[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
+  uint32_t upper_bound_tasks_per_sample;
+  uint8_t stage_id;
+  uint8_t num_samples;
+} typedef DeviceSampleAllocation;
+
 ////////////////////////////////////////////////////////////////////
 // Task State
 ////////////////////////////////////////////////////////////////////
@@ -312,16 +349,16 @@ enum TaskStateBufferIndex {
 
   TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT = TASK_STATE_BUFFER_INDEX_PRESORT,
 
-  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT
-} typedef TaskStateBufferIndex;
+  TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT,
 
-// TODO: This needs to change when adding SSS.
-typedef uint32_t DeviceIORStack;
+  TASK_STATE_BUFFER_INDEX_RESULT = TASK_STATE_BUFFER_INDEX_PRESORT,
+
+  TASK_STATE_BUFFER_INDEX_RESULT_COUNT
+} typedef TaskStateBufferIndex;
 
 struct DeviceTask {
   uint16_t state;
-  uint16_t volume_id;
-  ushort2 index;
+  PathID path_id;
   vec3 origin;
   vec3 ray;
 } typedef DeviceTask;
@@ -330,22 +367,38 @@ LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
 struct DeviceTaskTrace {
   TriangleHandle handle;
   float depth;
-  DeviceIORStack ior_stack;
+  uint32_t padding;
 } typedef DeviceTaskTrace;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 
 struct DeviceTaskThroughput {
   PackedRecord record;
-  uint2 padding;
+  uint32_t results_index;
+  uint32_t padding;
 } typedef DeviceTaskThroughput;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
+
+struct DeviceTaskMediumStack {
+  uint32_t ior;
+  uint32_t volume_id_01;
+  uint32_t volume_id_23;
+  uint8_t padding[4];
+} typedef DeviceTaskMediumStack;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskMediumStack, 0x10);
 
 struct DeviceTaskState {
   DeviceTask task;
   DeviceTaskTrace trace_result;
   DeviceTaskThroughput throughput;
+  DeviceTaskMediumStack medium;
 } typedef DeviceTaskState;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x40);
+LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x50);
+
+struct DeviceTaskResult {
+  RGBF color;
+  uint32_t index;
+} typedef DeviceTaskResult;
+LUM_STATIC_SIZE_ASSERT(DeviceTaskResult, 0x10);
 
 ////////////////////////////////////////////////////////////////////
 // Task Direct Lighting
@@ -410,51 +463,69 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x60);
 // Globals
 ////////////////////////////////////////////////////////////////////
 
+enum FrameChannel {
+  FRAME_CHANNEL_RED,
+  FRAME_CHANNEL_GREEN,
+  FRAME_CHANNEL_BLUE,
+
+  FRAME_CHANNEL_COUNT
+} typedef FrameChannel;
+
 struct DevicePointers {
-  DEVICE DeviceTaskState* LUM_RESTRICT task_states;
-  DEVICE DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
-  DEVICE uint16_t* LUM_RESTRICT trace_counts;
-  DEVICE uint16_t* LUM_RESTRICT task_counts;
-  DEVICE uint16_t* LUM_RESTRICT task_offsets;
-  DEVICE RGBF* LUM_RESTRICT frame_current_result;
-  DEVICE RGBF* LUM_RESTRICT frame_direct_buffer;
-  DEVICE RGBF* LUM_RESTRICT frame_direct_accumulate;
-  DEVICE RGBF* LUM_RESTRICT frame_indirect_buffer;
-  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_red[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_green[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE float* LUM_RESTRICT frame_indirect_accumulate_blue[MAX_NUM_INDIRECT_BUCKETS];
-  DEVICE RGBF* LUM_RESTRICT frame_final;
-  DEVICE GBufferMetaData* LUM_RESTRICT gbuffer_meta;
-  DEVICE const DeviceTextureObject* LUM_RESTRICT textures;
-  DEVICE const uint16_t* LUM_RESTRICT bluenoise_1D;
-  DEVICE const uint32_t* LUM_RESTRICT bluenoise_2D;
-  DEVICE const float* LUM_RESTRICT bridge_lut;
-  DEVICE const DeviceMaterialCompressed* LUM_RESTRICT materials;
-  DEVICE INTERLEAVED_STORAGE const DeviceTriangle** LUM_RESTRICT triangles;
-  DEVICE const uint32_t* LUM_RESTRICT triangle_counts;
-  DEVICE const DeviceTransform* LUM_RESTRICT instance_transforms;
-  DEVICE const uint32_t* LUM_RESTRICT instance_mesh_id;
-  DEVICE const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
-  DEVICE const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
-  DEVICE const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
-  DEVICE const Quad* LUM_RESTRICT particle_quads;
-  DEVICE const Star* LUM_RESTRICT stars;
-  DEVICE const uint32_t* LUM_RESTRICT stars_offsets;
-  DEVICE const float* LUM_RESTRICT spectral_cdf;
-  DEVICE const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
-  DEVICE const DeviceCameraMedium* LUM_RESTRICT camera_media;
-  DEVICE uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
+  // DeviceWorkBuffers
+  DeviceTaskState* LUM_RESTRICT task_states;
+  DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
+  DeviceTaskResult* LUM_RESTRICT task_results;
+  uint16_t* LUM_RESTRICT results_counts;
+  uint16_t* LUM_RESTRICT trace_counts;
+  uint16_t* LUM_RESTRICT task_counts;
+  uint16_t* LUM_RESTRICT task_offsets;
+  float* LUM_RESTRICT frame_first_moment[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_second_moment_luminance;
+  float* LUM_RESTRICT frame_result[FRAME_CHANNEL_COUNT];
+  float* LUM_RESTRICT frame_output[FRAME_CHANNEL_COUNT];
+  GBufferMetaData* LUM_RESTRICT gbuffer_meta;
+  // DeviceAdaptiveSampler
+  uint32_t* LUM_RESTRICT stage_sample_counts;
+  uint32_t* LUM_RESTRICT adaptive_sampling_block_task_offsets;
+  uint32_t* LUM_RESTRICT adaptive_sampling_subtile_block_index;
+  // DeviceTextureManager
+  const DeviceTextureObject* LUM_RESTRICT textures;
+  // DeviceMaterialManager
+  const DeviceMaterialCompressed* LUM_RESTRICT materials;
+  // DeviceMeshInstanceManager
+  const DeviceTriangleVertex** LUM_RESTRICT vertices;
+  const DeviceTriangleTexture** LUM_RESTRICT texture_triangles;
+  const DeviceTransform* LUM_RESTRICT instance_transforms;
+  const uint32_t* LUM_RESTRICT instance_mesh_ids;
+  // DeviceLightTree
+  const DeviceLightTreeRootHeader* LUM_RESTRICT light_tree_root;
+  const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
+  const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
+  // DeviceParticlesHandle
+  const Quad* LUM_RESTRICT particle_quads;
+  // DeviceSkyStars
+  const Star* LUM_RESTRICT stars;
+  const uint32_t* LUM_RESTRICT stars_offsets;
+  // DevicePhysicalCamera
+  const DeviceCameraInterface* LUM_RESTRICT camera_interfaces;
+  const DeviceCameraMedium* LUM_RESTRICT camera_media;
+  // DeviceEmbeddedData
+  const uint16_t* LUM_RESTRICT bluenoise_1D;
+  const uint32_t* LUM_RESTRICT bluenoise_2D;
+  const float* LUM_RESTRICT bridge_lut;
+  const float* LUM_RESTRICT spectral_cdf;
+  // DeviceAbort
+  uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
 struct DeviceExecutionState {
-  // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
-  uint32_t sample_id;
   uint32_t tile_id;
-  uint16_t user_selected_x;
-  uint16_t user_selected_y;
   uint8_t depth;
   uint8_t undersampling;
-  uint32_t aggregate_sample_count;
+  DeviceSampleAllocation sample_allocation;
+  uint32_t adaptive_sampling_accumulated_stages[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
+  DeviceExecutionFlags flags;
 } typedef DeviceExecutionState;
 
 struct DeviceExecutionConfiguration {

@@ -7,42 +7,39 @@
 LuminaryResult camera_get_default(Camera* camera) {
   __CHECK_NULL_ARGUMENT(camera);
 
-  camera->pos.x                      = 0.0f;
-  camera->pos.y                      = 0.0f;
-  camera->pos.z                      = 0.0f;
-  camera->rotation.x                 = 0.0f;
-  camera->rotation.y                 = 0.0f;
-  camera->rotation.z                 = 0.0f;
-  camera->aperture_shape             = LUMINARY_APERTURE_ROUND;
-  camera->aperture_blade_count       = 7;
-  camera->exposure                   = 0.0f;
-  camera->bloom_blend                = 0.01f;
-  camera->lens_flare                 = 0;
-  camera->lens_flare_threshold       = 1.0f;
-  camera->dithering                  = 1;
-  camera->tonemap                    = LUMINARY_TONEMAP_AGX;
-  camera->agx_custom_slope           = 1.0f;
-  camera->agx_custom_power           = 1.0f;
-  camera->agx_custom_saturation      = 1.0f;
-  camera->filter                     = LUMINARY_FILTER_NONE;
-  camera->wasd_speed                 = 1.0f;
-  camera->mouse_speed                = 1.0f;
-  camera->smooth_movement            = 0;
-  camera->smoothing_factor           = 0.1f;
-  camera->purkinje                   = 1;
-  camera->purkinje_kappa1            = 0.2f;
-  camera->purkinje_kappa2            = 0.29f;
-  camera->russian_roulette_threshold = 0.1f;
-  camera->use_color_correction       = 0;
-  camera->color_correction.r         = 0.0f;
-  camera->color_correction.g         = 0.0f;
-  camera->color_correction.b         = 0.0f;
-  camera->do_firefly_rejection       = false;
-  camera->indirect_only              = false;
-  camera->film_grain                 = 0.0f;
-  camera->camera_scale               = 1.0f;
-  camera->object_distance            = 1.0f;
-  camera->use_physical_camera        = false;
+  camera->pos.x                        = 0.0f;
+  camera->pos.y                        = 0.0f;
+  camera->pos.z                        = 0.0f;
+  camera->rotation.x                   = 0.0f;
+  camera->rotation.y                   = 0.0f;
+  camera->rotation.z                   = 0.0f;
+  camera->aperture_shape               = LUMINARY_APERTURE_ROUND;
+  camera->aperture_blade_count         = 7;
+  camera->exposure                     = 0.0f;
+  camera->bloom_blend                  = 0.01f;
+  camera->dithering                    = 1;
+  camera->tonemap                      = LUMINARY_TONEMAP_AGX;
+  camera->use_local_error_minimization = false;
+  camera->agx_custom_slope             = 1.0f;
+  camera->agx_custom_power             = 1.0f;
+  camera->agx_custom_saturation        = 1.0f;
+  camera->filter                       = LUMINARY_FILTER_NONE;
+  camera->wasd_speed                   = 1.0f;
+  camera->mouse_speed                  = 1.0f;
+  camera->smooth_movement              = 0;
+  camera->smoothing_factor             = 0.1f;
+  camera->purkinje                     = 1;
+  camera->purkinje_kappa1              = 0.2f;
+  camera->purkinje_kappa2              = 0.29f;
+  camera->russian_roulette_threshold   = 0.1f;
+  camera->use_color_correction         = 0;
+  camera->color_correction.r           = 0.0f;
+  camera->color_correction.g           = 0.0f;
+  camera->color_correction.b           = 0.0f;
+  camera->film_grain                   = 0.0f;
+  camera->camera_scale                 = 1.0f;
+  camera->object_distance              = 1.0f;
+  camera->use_physical_camera          = false;
 
   camera->thin_lens.fov           = 1.0f;
   camera->thin_lens.aperture_size = 0.0f;
@@ -122,10 +119,9 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
     __CAMERA_CHECK_DIRTY(thin_lens.aperture_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   }
 
+  __CAMERA_CHECK_DIRTY(use_local_error_minimization, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(exposure, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(bloom_blend, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(lens_flare, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(lens_flare_threshold, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(dithering, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(tonemap, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(filter, SCENE_DIRTY_FLAG_OUTPUT);
@@ -134,8 +130,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(purkinje_kappa2, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(use_color_correction, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(film_grain, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(do_firefly_rejection, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(indirect_only, SCENE_DIRTY_FLAG_OUTPUT);
 
   if (input->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
     __CAMERA_CHECK_DIRTY(agx_custom_slope, SCENE_DIRTY_FLAG_OUTPUT);

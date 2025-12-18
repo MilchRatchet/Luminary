@@ -10,7 +10,8 @@ struct DeviceRendererSettings {
   uint32_t shading_mode : 3;
   uint32_t bridge_max_num_vertices : 4;
   uint32_t supersampling : 2;
-  // 12 bits spare
+  uint32_t adaptive_sampling_output_mode : 2;
+  // 11 bits spare
 
   uint16_t width;
   uint16_t height;
@@ -42,12 +43,11 @@ struct DeviceCamera {
   uint32_t dithering : 1;
   uint32_t purkinje : 1;
   uint32_t use_color_correction : 1;
-  uint32_t do_firefly_rejection : 1;
-  uint32_t indirect_only : 1;
   uint32_t allow_reflections : 1;
   uint32_t use_spectral_rendering : 1;
   uint32_t use_physical_camera : 1;
-  // 17 bits spare
+  uint32_t use_local_error_minimization : 1;
+  // 18 bits spare
 
   vec3 pos;
   Quaternion rotation;
@@ -267,6 +267,19 @@ struct DeviceTriangle {
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
+struct DeviceTriangleVertex {
+  vec3 pos;
+  uint32_t normal;
+} typedef DeviceTriangleVertex;
+
+struct DeviceTriangleTexture {
+  uint32_t vertex_texture;
+  uint32_t vertex1_texture;
+  uint32_t vertex2_texture;
+  uint16_t material_id;
+  uint16_t padding;
+} typedef DeviceTriangleTexture;
+
 typedef CUtexObject DeviceTextureHandle;
 
 struct DeviceTextureObject {
@@ -296,7 +309,9 @@ LuminaryResult device_struct_fog_convert(const Fog* fog, DeviceFog* device_fog);
 LuminaryResult device_struct_particles_convert(const Particles* particles, DeviceParticles* device_particles);
 LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterialCompressed* device_material);
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
-LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);
+LuminaryResult device_struct_vertex_convert(const TriangleGeomData* data, uint32_t vertex_id, DeviceTriangleVertex* device_vertex);
+LuminaryResult device_struct_triangle_texture_convert(
+  const TriangleGeomData* data, uint32_t tri_id, DeviceTriangleTexture* device_triangle);
 LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* texture, DeviceTextureObject* texture_object);
 LuminaryResult device_struct_instance_transform_convert(const MeshInstance* instance, DeviceTransform* device_transform);
 

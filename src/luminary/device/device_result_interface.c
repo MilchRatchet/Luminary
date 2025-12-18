@@ -31,19 +31,22 @@ static LuminaryResult _device_result_interface_entry_allocate(DeviceResultInterf
 
   const uint32_t pixel_count = interface->pixel_count;
 
-  __FAILURE_HANDLE(device_malloc_staging(&entry->direct_lighting_results, pixel_count * sizeof(RGBF), true));
-
-  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __FAILURE_HANDLE(device_malloc_staging(&entry->indirect_lighting_results_red[bucket_id], pixel_count * sizeof(float), true));
-    __FAILURE_HANDLE(device_malloc_staging(&entry->indirect_lighting_results_green[bucket_id], pixel_count * sizeof(float), true));
-    __FAILURE_HANDLE(device_malloc_staging(&entry->indirect_lighting_results_blue[bucket_id], pixel_count * sizeof(float), true));
+  for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+    __FAILURE_HANDLE(device_malloc_staging(
+      &entry->frame_first_moment[channel_id], pixel_count * sizeof(float),
+      DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
   }
+
+  __FAILURE_HANDLE(device_malloc_staging(
+    &entry->frame_second_moment_luminance, pixel_count * sizeof(float),
+    DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
 
   CUDA_FAILURE_HANDLE(cuEventCreate(&entry->available_event, CU_EVENT_DISABLE_TIMING));
 
   entry->consumer_event_id = RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID;
   entry->queued            = false;
-  entry->sample_count      = 0;
+
+  memset(entry->num_stage_executions, 0, sizeof(entry->num_stage_executions));
 
   return LUMINARY_SUCCESS;
 }
@@ -56,36 +59,47 @@ static LuminaryResult _device_result_interface_entry_free(DeviceResultInterface*
     interface->allocated_events[entry->consumer_event_id].assigned = false;
   }
 
-  __FAILURE_HANDLE(device_free_staging(&entry->direct_lighting_results));
-
-  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
-    __FAILURE_HANDLE(device_free_staging(&entry->indirect_lighting_results_red[bucket_id]));
-    __FAILURE_HANDLE(device_free_staging(&entry->indirect_lighting_results_green[bucket_id]));
-    __FAILURE_HANDLE(device_free_staging(&entry->indirect_lighting_results_blue[bucket_id]));
+  for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+    __FAILURE_HANDLE(device_free_staging(&entry->frame_first_moment[channel_id]));
   }
+
+  __FAILURE_HANDLE(device_free_staging(&entry->frame_second_moment_luminance));
 
   CUDA_FAILURE_HANDLE(cuEventDestroy(entry->available_event));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_result_interface_set_pixel_count(DeviceResultInterface* interface, uint32_t width, uint32_t height) {
+LuminaryResult device_result_interface_set_pixel_count(
+  DeviceResultInterface* interface, uint32_t width, uint32_t height, bool* entries_must_be_freed) {
+  __CHECK_NULL_ARGUMENT(interface);
+  __CHECK_NULL_ARGUMENT(entries_must_be_freed);
+
+  *entries_must_be_freed = false;
+
+  const uint32_t new_pixel_count = width * height;
+
+  if (new_pixel_count != interface->pixel_count) {
+    __FAILURE_HANDLE(array_clear(interface->queued_results));
+
+    interface->pixel_count = new_pixel_count;
+    *entries_must_be_freed = true;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_result_interface_free_entries(DeviceResultInterface* interface, uint32_t device_id) {
   __CHECK_NULL_ARGUMENT(interface);
 
-  interface->pixel_count = width * height;
+  uint32_t num_allocated_results;
+  __FAILURE_HANDLE(array_get_num_elements(interface->allocated_results[device_id], &num_allocated_results));
 
-  __FAILURE_HANDLE(array_clear(interface->queued_results));
-
-  for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
-    uint32_t num_allocated_results;
-    __FAILURE_HANDLE(array_get_num_elements(interface->allocated_results[device_id], &num_allocated_results));
-
-    for (uint32_t result_id = 0; result_id < num_allocated_results; result_id++) {
-      __FAILURE_HANDLE(_device_result_interface_entry_free(interface, interface->allocated_results[device_id] + result_id));
-    }
-
-    __FAILURE_HANDLE(array_clear(interface->allocated_results[device_id]));
+  for (uint32_t result_id = 0; result_id < num_allocated_results; result_id++) {
+    __FAILURE_HANDLE(_device_result_interface_entry_free(interface, interface->allocated_results[device_id] + result_id));
   }
+
+  __FAILURE_HANDLE(array_clear(interface->allocated_results[device_id]));
 
   return LUMINARY_SUCCESS;
 }
@@ -99,7 +113,10 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
   uint32_t recommended_sample_count;
   __FAILURE_HANDLE(device_get_recommended_sample_queue_counts(device, &recommended_sample_count));
 
-  if (device->aggregate_sample_count < recommended_sample_count)
+  uint32_t aggregate_sample_count;
+  __FAILURE_HANDLE(device_renderer_get_total_executed_samples(device->renderer, &aggregate_sample_count));
+
+  if (aggregate_sample_count < recommended_sample_count)
     return LUMINARY_SUCCESS;
 
   uint32_t currently_allocated_results;
@@ -134,32 +151,25 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
 
   const uint32_t pixel_count = interface->pixel_count;
 
-  __FAILURE_HANDLE(device_download(
-    entry->direct_lighting_results, device->buffers.frame_direct_accumulate, 0, pixel_count * sizeof(RGBF), device->stream_main));
-
-  for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
+  for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
     __FAILURE_HANDLE(device_download(
-      entry->indirect_lighting_results_red[bucket_id], device->buffers.frame_indirect_accumulate_red[bucket_id], 0,
-      pixel_count * sizeof(float), device->stream_main));
-    __FAILURE_HANDLE(device_download(
-      entry->indirect_lighting_results_green[bucket_id], device->buffers.frame_indirect_accumulate_green[bucket_id], 0,
-      pixel_count * sizeof(float), device->stream_main));
-    __FAILURE_HANDLE(device_download(
-      entry->indirect_lighting_results_blue[bucket_id], device->buffers.frame_indirect_accumulate_blue[bucket_id], 0,
-      pixel_count * sizeof(float), device->stream_main));
+      entry->frame_first_moment[channel_id], device->work_buffers->frame_first_moment[channel_id], 0, pixel_count * sizeof(float),
+      device->stream_main));
   }
+
+  __FAILURE_HANDLE(device_download(
+    entry->frame_second_moment_luminance, device->work_buffers->frame_second_moment_luminance, 0, pixel_count * sizeof(float),
+    device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuEventRecord(entry->available_event, device->stream_main));
 
-  entry->sample_count = device->aggregate_sample_count;
+  __FAILURE_HANDLE(device_renderer_externalize_samples(device->renderer, entry->num_stage_executions));
 
   DeviceResultMap map;
   map.allocation_id = selected_result;
   map.device_id     = device->index;
 
   __FAILURE_HANDLE(array_push(&interface->queued_results, &map));
-
-  device->aggregate_sample_count = 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -171,26 +181,34 @@ static LuminaryResult _device_result_interface_update_buffer(
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
-  __FAILURE_HANDLE(device_upload(device->buffers.frame_direct_buffer, src, 0, num_elements * sizeof(float), device->stream_main));
+  size_t allocated_swap_size;
+  __FAILURE_HANDLE(device_memory_get_size(device->work_buffers->frame_swap, &allocated_swap_size));
 
-  uint32_t num_blocks  = (num_elements + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
-  uint32_t base_offset = 0;
+  const uint32_t max_elements_per_iteration = min(device->properties.max_block_count * 128 * 4, allocated_swap_size / sizeof(float));
 
-  while (num_blocks > 0) {
-    uint32_t num_blocks_this_iteration = min(num_blocks, device->properties.max_block_count);
+  uint32_t element_offset         = 0;
+  uint32_t num_remaining_elements = num_elements;
+
+  while (num_remaining_elements > 0) {
+    const uint32_t num_elements_this_iteration = min(max_elements_per_iteration, num_remaining_elements);
+
+    __FAILURE_HANDLE(device_upload(
+      device->work_buffers->frame_swap, ((float*) src) + element_offset, 0, num_elements_this_iteration * sizeof(float),
+      device->stream_main));
+
+    const uint32_t num_blocks_this_iteration = (num_elements_this_iteration + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
 
     KernelArgsBufferAdd args;
-    args.dst          = DEVICE_PTR(dst);
-    args.src          = DEVICE_PTR(device->buffers.frame_direct_buffer);
-    args.base_offset  = base_offset;
-    args.num_elements = num_elements;
+    args.dst          = (void*) DEVICE_CUPTR_OFFSET(dst, element_offset * sizeof(float));
+    args.src          = DEVICE_PTR(device->work_buffers->frame_swap);
+    args.num_elements = num_elements_this_iteration;
 
     __FAILURE_HANDLE(kernel_execute_custom(
       device->cuda_kernels[CUDA_KERNEL_TYPE_BUFFER_ADD], THREADS_PER_BLOCK, 1, 1, num_blocks_this_iteration, 1, 1, &args,
       device->stream_main));
 
-    num_blocks -= num_blocks_this_iteration;
-    base_offset += num_blocks_this_iteration * 4 * THREADS_PER_BLOCK;
+    num_remaining_elements -= num_elements_this_iteration;
+    element_offset += num_elements_this_iteration;
   }
 
   return LUMINARY_SUCCESS;
@@ -251,20 +269,13 @@ LuminaryResult device_result_interface_gather_results(DeviceResultInterface* int
 
     CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, entry->available_event, CU_EVENT_WAIT_DEFAULT));
 
-    __FAILURE_HANDLE(_device_result_interface_update_buffer(
-      interface, device, device->buffers.frame_direct_accumulate, entry->direct_lighting_results, pixel_count * 3));
-
-    for (uint32_t bucket_id = 0; bucket_id < MAX_NUM_INDIRECT_BUCKETS; bucket_id++) {
+    for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
       __FAILURE_HANDLE(_device_result_interface_update_buffer(
-        interface, device, device->buffers.frame_indirect_accumulate_red[bucket_id], entry->indirect_lighting_results_red[bucket_id],
-        pixel_count));
-      __FAILURE_HANDLE(_device_result_interface_update_buffer(
-        interface, device, device->buffers.frame_indirect_accumulate_green[bucket_id], entry->indirect_lighting_results_green[bucket_id],
-        pixel_count));
-      __FAILURE_HANDLE(_device_result_interface_update_buffer(
-        interface, device, device->buffers.frame_indirect_accumulate_blue[bucket_id], entry->indirect_lighting_results_blue[bucket_id],
-        pixel_count));
+        interface, device, device->work_buffers->frame_first_moment[channel_id], entry->frame_first_moment[channel_id], pixel_count));
     }
+
+    __FAILURE_HANDLE(_device_result_interface_update_buffer(
+      interface, device, device->work_buffers->frame_second_moment_luminance, entry->frame_second_moment_luminance, pixel_count));
 
     if (entry->consumer_event_id == RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID) {
       __FAILURE_HANDLE(_device_result_interface_get_consumer_event(interface, &entry->consumer_event_id));
@@ -272,7 +283,7 @@ LuminaryResult device_result_interface_gather_results(DeviceResultInterface* int
 
     CUDA_FAILURE_HANDLE(cuEventRecord(interface->allocated_events[entry->consumer_event_id].event, device->stream_main));
 
-    device->aggregate_sample_count += entry->sample_count;
+    __FAILURE_HANDLE(device_renderer_register_external_samples(device->renderer, entry->num_stage_executions));
 
     entry->queued = false;
   }

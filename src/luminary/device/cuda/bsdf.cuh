@@ -130,15 +130,15 @@ LUMINARY_FUNCTION BSDFRayContext
 }
 
 template <MaterialType TYPE, typename RANDOM_SET>
-LUMINARY_FUNCTION BSDFSampleInfo<TYPE> bsdf_sample(const MaterialContext<TYPE> mat_ctx, const ushort2 pixel);
+LUMINARY_FUNCTION BSDFSampleInfo<TYPE> bsdf_sample(const MaterialContext<TYPE> mat_ctx, const PathID& path_id);
 
 template <typename RANDOM_SET>
 LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(
-  const MaterialContextGeometry mat_ctx, const ushort2 pixel) {
+  const MaterialContextGeometry mat_ctx, const PathID& path_id) {
   const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx.params);
 
   if (opacity < 1.0f) {
-    const float transparency_random = random_1D(RANDOM_SET::OPACITY, pixel);
+    const float transparency_random = random_1D(RANDOM_SET::OPACITY, path_id);
 
     if (transparency_random > opacity) {
       const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx.params);
@@ -174,7 +174,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   float sum_weights  = 0.0f;
   RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 
-  float resampling_random = random_1D(RANDOM_SET::RESAMPLING, pixel);
+  float resampling_random = random_1D(RANDOM_SET::RESAMPLING, path_id);
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx.params);
 
@@ -182,7 +182,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   if (true) {
     const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
-    const vec3 microfacet    = bsdf_microfacet_sample(V_local, roughness, pixel, RANDOM_SET::REFLECTION);
+    const vec3 microfacet    = bsdf_microfacet_sample(V_local, roughness, path_id, RANDOM_SET::REFLECTION);
     const vec3 ray           = reflect_vector(V_local, microfacet);
     const BSDFRayContext ctx = bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, false);
     const RGBF eval          = bsdf_evaluate_core(mat_ctx.params, ctx, BSDF_SAMPLING_MICROFACET, ray, face_normal_local);
@@ -197,7 +197,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
     const float weight = color_importance(eval) * mis_weight;
 
-    UTILS_CHECK_NANS(pixel, weight);
+    UTILS_CHECK_NANS(path_id, weight);
 
     ray_local                = ray;
     sum_weights              = weight;
@@ -210,7 +210,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   if (include_diffuse) {
     const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
-    const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_SET::DIFFUSE, pixel));
+    const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_SET::DIFFUSE, path_id));
     const vec3 microfacet      = normalize_vector(add_vector(V_local, ray));
     const BSDFRayContext ctx   = bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, false);
     const RGBF eval            = bsdf_evaluate_core(mat_ctx.params, ctx, BSDF_SAMPLING_DIFFUSE, ray, face_normal_local);
@@ -225,7 +225,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
     const float weight = color_importance(eval) * mis_weight;
 
-    UTILS_CHECK_NANS(pixel, weight);
+    UTILS_CHECK_NANS(path_id, weight);
 
     sum_weights += weight;
 
@@ -248,10 +248,10 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
     const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
     bool total_reflection;
-    const vec3 microfacet = bsdf_microfacet_refraction_sample(V_local, roughness, pixel, RANDOM_SET::REFRACTION);
+    const vec3 microfacet = bsdf_microfacet_refraction_sample(V_local, roughness, path_id, RANDOM_SET::REFRACTION);
     const vec3 ray        = refract_vector(V_local, microfacet, ior, total_reflection);
     const BSDFRayContext ctx =
-      bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), mat_ctx.V, microfacet, ray, !total_reflection);
+      bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, !total_reflection);
     const RGBF eval = bsdf_evaluate_core(mat_ctx.params, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, ray, face_normal_local);
 
     float mis_weight = 1.0f;
@@ -301,9 +301,9 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 }
 
 template <typename RANDOM_SET>
-LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const ushort2 pixel) {
-  const float random_choice = random_1D(RANDOM_SET::RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, pixel);
+LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(const MaterialContextVolume ctx, const PathID& path_id) {
+  const float random_choice = random_1D(RANDOM_SET::RESAMPLING, path_id);
+  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, path_id);
 
   const vec3 I = scale_vector(ctx.V, -1.0f);
 
@@ -317,9 +317,10 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(c
 }
 
 template <typename RANDOM_SET>
-LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICLE>(const MaterialContextParticle ctx, const ushort2 pixel) {
-  const float random_choice = random_1D(RANDOM_SET::RESAMPLING, pixel);
-  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, pixel);
+LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICLE>(
+  const MaterialContextParticle ctx, const PathID& path_id) {
+  const float random_choice = random_1D(RANDOM_SET::RESAMPLING, path_id);
+  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, path_id);
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
   info.ray    = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);
@@ -328,18 +329,18 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICL
   return info;
 }
 
-LUMINARY_FUNCTION vec3
-  bsdf_sample_microfacet_reflection(const MaterialParams& params, const vec3 V, const ushort2 pixel, const RandomTarget random_target_ray) {
+LUMINARY_FUNCTION vec3 bsdf_sample_microfacet_reflection(
+  const MaterialParams& params, const vec3 V, const PathID& path_id, const RandomTarget random_target_ray) {
   const float roughness         = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
-  const vec3 sampled_microfacet = bsdf_microfacet_sample(V, roughness, pixel, random_target_ray);
+  const vec3 sampled_microfacet = bsdf_microfacet_sample(V, roughness, path_id, random_target_ray);
 
   return reflect_vector(V, sampled_microfacet);
 }
 
-LUMINARY_FUNCTION vec3
-  bsdf_sample_microfacet_refraction(const MaterialParams& params, const vec3 V, const ushort2 pixel, const RandomTarget random_target_ray) {
+LUMINARY_FUNCTION vec3 bsdf_sample_microfacet_refraction(
+  const MaterialParams& params, const vec3 V, const PathID& path_id, const RandomTarget random_target_ray) {
   const float roughness         = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
-  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(V, roughness, pixel, random_target_ray);
+  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(V, roughness, path_id, random_target_ray);
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
 
@@ -347,8 +348,8 @@ LUMINARY_FUNCTION vec3
   return refract_vector(V, sampled_microfacet, ior, total_reflection);
 }
 
-LUMINARY_FUNCTION vec3 bsdf_sample_diffuse(const ushort2 pixel, const RandomTarget random_target_ray) {
-  return bsdf_diffuse_sample(random_2D(random_target_ray, pixel));
+LUMINARY_FUNCTION vec3 bsdf_sample_diffuse(const PathID& path_id, const RandomTarget random_target_ray) {
+  return bsdf_diffuse_sample(random_2D(random_target_ray, path_id));
 }
 
 LUMINARY_FUNCTION void bsdf_sample_for_light_probabilities(const MaterialFlags flags, float& reflection_prob, float& refraction_prob) {
@@ -373,26 +374,26 @@ LUMINARY_FUNCTION void bsdf_sample_for_light_probabilities(const MaterialFlags f
 }
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION vec3 bsdf_sample_for_sun(const MaterialContext<TYPE> mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid);
+LUMINARY_FUNCTION vec3 bsdf_sample_for_sun(const MaterialContext<TYPE> mat_ctx, const PathID& path_id, bool& is_refraction, bool& is_valid);
 
 template <>
-LUMINARY_FUNCTION vec3
-  bsdf_sample_for_sun<MATERIAL_GEOMETRY>(const MaterialContextGeometry mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
+LUMINARY_FUNCTION vec3 bsdf_sample_for_sun<MATERIAL_GEOMETRY>(
+  const MaterialContextGeometry mat_ctx, const PathID& path_id, bool& is_refraction, bool& is_valid) {
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
   const vec3 V_local             = quaternion_apply(rotation_to_z, mat_ctx.V);
 
   float reflection_probability, refraction_probability;
   bsdf_sample_for_light_probabilities(mat_ctx.params.flags, reflection_probability, refraction_probability);
 
-  const float random_method = random_1D(MaterialContextGeometry::RANDOM_DL_SUN::BSDF_METHOD, pixel);
+  const float random_method = random_1D(MaterialContextGeometry::RANDOM_DL_SUN::BSDF_METHOD, path_id);
 
   vec3 ray_local;
   if (random_method < reflection_probability) {
-    ray_local     = bsdf_sample_microfacet_reflection(mat_ctx.params, V_local, pixel, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
+    ray_local     = bsdf_sample_microfacet_reflection(mat_ctx.params, V_local, path_id, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
     is_refraction = false;
   }
   else {
-    ray_local     = bsdf_sample_microfacet_refraction(mat_ctx.params, V_local, pixel, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
+    ray_local     = bsdf_sample_microfacet_refraction(mat_ctx.params, V_local, path_id, MaterialContextGeometry::RANDOM_DL_SUN::BSDF);
     is_refraction = true;
   }
 
@@ -403,9 +404,9 @@ LUMINARY_FUNCTION vec3
 
 template <>
 LUMINARY_FUNCTION vec3
-  bsdf_sample_for_sun<MATERIAL_VOLUME>(const MaterialContextVolume mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
-  const float2 random_dir   = random_2D(MaterialContextVolume::RANDOM_DL_SUN::BSDF, pixel);
-  const float random_method = random_1D(MaterialContextVolume::RANDOM_DL_SUN::BSDF_METHOD, pixel);
+  bsdf_sample_for_sun<MATERIAL_VOLUME>(const MaterialContextVolume mat_ctx, const PathID& path_id, bool& is_refraction, bool& is_valid) {
+  const float2 random_dir   = random_2D(MaterialContextVolume::RANDOM_DL_SUN::BSDF, path_id);
+  const float random_method = random_1D(MaterialContextVolume::RANDOM_DL_SUN::BSDF_METHOD, path_id);
 
   const vec3 I = scale_vector(mat_ctx.V, -1.0f);
 
@@ -420,10 +421,10 @@ LUMINARY_FUNCTION vec3
 }
 
 template <>
-LUMINARY_FUNCTION vec3
-  bsdf_sample_for_sun<MATERIAL_PARTICLE>(const MaterialContextParticle mat_ctx, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
-  const float2 random_dir   = random_2D(MaterialContextParticle::RANDOM_DL_SUN::BSDF, pixel);
-  const float random_method = random_1D(MaterialContextParticle::RANDOM_DL_SUN::BSDF_METHOD, pixel);
+LUMINARY_FUNCTION vec3 bsdf_sample_for_sun<MATERIAL_PARTICLE>(
+  const MaterialContextParticle mat_ctx, const PathID& path_id, bool& is_refraction, bool& is_valid) {
+  const float2 random_dir   = random_2D(MaterialContextParticle::RANDOM_DL_SUN::BSDF, path_id);
+  const float random_method = random_1D(MaterialContextParticle::RANDOM_DL_SUN::BSDF_METHOD, path_id);
 
   is_refraction = true;
   is_valid      = true;

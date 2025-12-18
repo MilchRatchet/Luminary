@@ -83,7 +83,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
 
   const float t     = variance * inv_dist_sq;
   const float NdotL = __saturatef(dot_product(PO, ctx.normal) * sqrtf(inv_dist_sq));
-  result            = result * fmaf(NdotL, 1.0f - t, t);
+  result            = result * (NdotL * (1.0f - t) + t);
 
   return result;
 }
@@ -100,35 +100,24 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float clamped_dist_along_ray = clampf(dist_along_ray, 0.0f, ctx.max_dist);
 
   // This is only perpendicular if we didn't actually clamp
-  const float perpendicular_dist = get_length(sub_vector(mean, add_vector(ctx.position, scale_vector(ctx.V, -clamped_dist_along_ray))));
+  const vec3 perpendicular_vector   = sub_vector(PO, scale_vector(ctx.V, clamped_dist_along_ray));
+  const float perpendicular_dist_sq = dot_product(perpendicular_vector, perpendicular_vector);
 
-  const float z = (perpendicular_dist > std_dev) ? std_dev / perpendicular_dist : 1.0f;
+  // Account for quadratic falloff
+  const float falloff = 1.0f / (perpendicular_dist_sq + std_dev);
 
-  // This should be pre-computed.
-  const float extinction = color_importance(ctx.descriptor.absorption) + color_importance(ctx.descriptor.scattering);
+  const float variance = std_dev * std_dev;
 
-  // Surprisingly simple expession given by the root of the derivative of the transmittance function.
-  const float transmittance_maximizer = 1.0f / extinction;
+  // Don't use direct path to save on computations by using distances that we already computed.
+  const float transmittance_depth = fmaxf(perpendicular_dist_sq + clamped_dist_along_ray * clamped_dist_along_ray - variance, 0.0f);
 
-  // Compute the maximizer within the target domain
-  const float dist = clampf(transmittance_maximizer, 0.0f, clamped_dist_along_ray);
+  // Account for energy loss due to absorption
+  const float transmittance = expf(-ctx.descriptor.max_absorption * transmittance_depth);
 
-  // Integral of the transmittance term using the triangle inequality as an upper bound
-  const float transmittance = expf(-extinction * (dist + perpendicular_dist)) * dist;
+  // Account for limited amount of energy that is scattered along the ray before passing the mean
+  const float scattering = 1.0f - expf(-ctx.descriptor.max_scattering * (variance + clamped_dist_along_ray));
 
-  float result = power * transmittance;
-
-  // N^TL term is taken out by approximating it using its maximizer
-  const vec3 reference_point = add_vector(ctx.position, scale_vector(ctx.V, -dist));
-
-  // Compute a favourable L so that N^TL is roughly as large as it gets over the set of directions towards the light cluster
-  const vec3 L = normalize_vector(sub_vector(mean, reference_point));
-
-  // Phase can't be zero as the light cluster is given through a distribution with infinite support
-  const float phase = __saturatef(bridges_phase_function(-dot_product(L, ctx.V)));
-  result            = result * fmaf(phase, 1.0f - z, z);
-
-  return result;
+  return power * falloff * transmittance * scattering;
 }
 
 template <>
@@ -200,7 +189,7 @@ LUMINARY_FUNCTION float _light_tree_continuation_unpack_prob(const LightTreeCont
 }
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContext<TYPE> ctx, const PathID& path_id) {
   const DeviceLightTreeRootHeader header = load_light_tree_root();
 
   RISAggregator ris_aggregator = ris_aggregator_init();
@@ -208,7 +197,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   RISLane ris_lane[LIGHT_TREE_NUM_OUTPUTS];
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    ris_lane[lane_id] = ris_lane_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_PREPASS + lane_id, pixel));
+    ris_lane[lane_id] = ris_lane_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_PREPASS + lane_id, path_id));
   }
 
   const vec3 base   = get_vector(bfloat_unpack(header.x), bfloat_unpack(header.y), bfloat_unpack(header.z));
@@ -267,7 +256,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION LightTreeResult
-  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const ushort2 pixel, const uint32_t lane_id, const LightTreeWork& work) {
+  light_tree_traverse_postpass(const MaterialContext<TYPE> ctx, const PathID& path_id, const uint32_t lane_id, const LightTreeWork& work) {
   const LightTreeContinuation continuation = work.data[lane_id];
 
   _LIGHT_TREE_DEBUG_LOAD_CONTINUATION_TOKEN(lane_id, continuation);
@@ -288,7 +277,7 @@ LUMINARY_FUNCTION LightTreeResult
 
   DeviceLightTreeNode node = load_light_tree_node(continuation.child_index);
 
-  const float random     = random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_POSTPASS + lane_id, pixel);
+  const float random     = random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::TREE_POSTPASS + lane_id, path_id);
   RISReservoir reservoir = ris_reservoir_init(random);
 
 #pragma nounroll

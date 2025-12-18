@@ -48,10 +48,10 @@ LUMINARY_FUNCTION TriangleHandle light_get_blocked_handle<MATERIAL_GEOMETRY>(con
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION void light_evaluate_candidate(
-  const MaterialContext<TYPE> ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
+  const MaterialContext<TYPE> ctx, const PathID& path_id, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, const float tree_root_sum, RISReservoir& reservoir,
   LightSampleResult<TYPE>& result) {
-  const float2 ray_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_GEO::RAY + output_id, pixel);
+  const float2 ray_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_GEO::RAY + output_id, path_id);
 
   vec3 ray;
   float dist;
@@ -82,11 +82,11 @@ LUMINARY_FUNCTION void light_evaluate_candidate(
 
 template <>
 LUMINARY_FUNCTION void light_evaluate_candidate<MATERIAL_VOLUME>(
-  const MaterialContextVolume ctx, const ushort2 pixel, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
+  const MaterialContextVolume ctx, const PathID& path_id, TriangleLight& light, const uint32_t light_id, const uint3 light_uv_packed,
   const float tree_sampling_weight, const uint32_t output_id, const float tree_root_sum, RISReservoir& reservoir,
   LightSampleResult<MATERIAL_VOLUME>& result) {
   float2 target_and_weight;
-  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, light_id, light_uv_packed, pixel, output_id, target_and_weight);
+  LightSampleResult<MATERIAL_VOLUME> sample = bridges_sample(ctx, light, light_id, light_uv_packed, path_id, output_id, target_and_weight);
 
   const float target          = target_and_weight.x;
   const float sampling_weight = target_and_weight.y * tree_sampling_weight;
@@ -98,15 +98,15 @@ LUMINARY_FUNCTION void light_evaluate_candidate<MATERIAL_VOLUME>(
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
-  const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, ushort2 pixel, const TriangleHandle blocked_handle) {
+  const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, const PathID& path_id, const TriangleHandle blocked_handle) {
   LightSampleResult<TYPE> result;
   result.light_id = LIGHT_ID_INVALID;
 
-  RISReservoir reservoir = ris_reservoir_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::RESAMPLING, pixel));
+  RISReservoir reservoir = ris_reservoir_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::RESAMPLING, path_id));
 
 #pragma nounroll
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
-    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(ctx, pixel, output_id, light_tree_work);
+    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(ctx, path_id, output_id, light_tree_work);
 
     const uint32_t light_id = output.light_id;
 
@@ -123,7 +123,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
     light_evaluate_candidate(
-      ctx, pixel, triangle_light, light_id, light_uv_packed, output.weight, output_id, light_tree_work.root_sum, reservoir, result);
+      ctx, path_id, triangle_light, light_id, light_uv_packed, output.weight, output_id, light_tree_work.root_sum, reservoir, result);
   }
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
@@ -137,12 +137,12 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
 }
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYPE> ctx, const PathID& path_id) {
   ////////////////////////////////////////////////////////////////////
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  const LightTreeWork light_tree_work = light_tree_traverse_prepass(ctx, pixel);
+  const LightTreeWork light_tree_work = light_tree_traverse_prepass(ctx, path_id);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of list of candidates
@@ -151,9 +151,9 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
   // Don't allow triangles to sample themselves.
   const TriangleHandle blocked_handle = light_get_blocked_handle(ctx);
 
-  LightSampleResult<TYPE> result = light_list_resample(ctx, light_tree_work, pixel, blocked_handle);
+  LightSampleResult<TYPE> result = light_list_resample(ctx, light_tree_work, path_id, blocked_handle);
 
-  UTILS_CHECK_NANS(pixel, result.light_color);
+  UTILS_CHECK_NANS(path_id, result.light_color);
 
   return result;
 }
@@ -163,7 +163,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
 ////////////////////////////////////////////////////////////////////
 
 template <MaterialType TYPE>
-LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample(const MaterialContext<TYPE> ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample(const MaterialContext<TYPE> ctx, const PathID& path_id) {
   LightBSDFSampleResult result;
   result.light_color          = splat_color(0.0f);
   result.ray                  = get_vector(0.0f, 0.0f, 1.0f);
@@ -173,8 +173,8 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample(const MaterialContext<
 }
 
 template <>
-LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx, const ushort2 pixel) {
-  return light_bsdf_get_sample(ctx, pixel);
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample<MATERIAL_GEOMETRY>(const MaterialContextGeometry ctx, const PathID& path_id) {
+  return light_bsdf_get_sample(ctx, path_id);
 }
 
 #ifndef OPTIX_KERNEL
@@ -243,20 +243,18 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
   const uint32_t mesh_id     = args.mesh_ids[light_id];
   const uint32_t triangle_id = args.triangle_ids[light_id];
 
-  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
-  const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
+  const DeviceTriangleTexture* tri_ptr = triangle_texture_ptr_load(mesh_id);
 
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, triangle_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_id, triangle_count));
+  const float4 tri = __ldg((float4*) (tri_ptr + triangle_id));
 
-  const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
+  const UV vertex_texture  = uv_unpack(__float_as_uint(tri.x));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(tri.y));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(tri.z));
 
   const UV edge1_texture = uv_sub(vertex1_texture, vertex_texture);
   const UV edge2_texture = uv_sub(vertex2_texture, vertex_texture);
 
-  const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
+  const uint16_t material_id    = __float_as_uint(tri.w) & 0xFFFF;
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
 
   const float microtriangle_max1 = lights_get_max_emission(material, vertex_texture, edge1_texture, edge2_texture, microtriangle_id + 0);

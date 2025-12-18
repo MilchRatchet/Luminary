@@ -21,6 +21,7 @@ struct DeviceRenderCallbackData {
   DeviceCommonCallbackData common;
   uint64_t render_id;
   uint32_t render_event_id;
+  uint8_t adaptive_sampling_build_stage_id;
 } typedef DeviceRenderCallbackData;
 
 #endif /* LUMINARY_DEVICE_CALLBACK_H */

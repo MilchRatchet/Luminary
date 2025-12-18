@@ -185,7 +185,7 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
 
 void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
   char render_times_file_path[4096];
-  sprintf(render_times_file_path, "%s/LuminaryBenchmarkResults.txt", duck->output_directory ? duck->output_directory : ".");
+  sprintf(render_times_file_path, "%s/BenchResults-%s.txt", duck->output_directory ? duck->output_directory : ".", duck->benchmark_name);
 
   FILE* render_times_file = fopen(render_times_file_path, "wb");
 

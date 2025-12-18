@@ -1,6 +1,7 @@
 #include "device_output.h"
 
 #include "device.h"
+#include "device_renderer.h"
 #include "internal_error.h"
 #include "kernel_args.h"
 
@@ -100,7 +101,8 @@ LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutput
         __FAILURE_HANDLE_CRITICAL(device_free_staging(&output->buffers[buffer_id]));
       }
 
-      __FAILURE_HANDLE_CRITICAL(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
+      __FAILURE_HANDLE_CRITICAL(
+        device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), DEVICE_MEMORY_STAGING_FLAG_NONE));
 
       __FAILURE_HANDLE_CRITICAL(
         vault_object_set(output->buffer_objects[buffer_id], output->buffer_allocation_count, output->buffers[buffer_id]));
@@ -137,7 +139,8 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
   DeviceOutputRequest output_request;
 
   output_request.queued = false;
-  __FAILURE_HANDLE(device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, false));
+  __FAILURE_HANDLE(
+    device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, DEVICE_MEMORY_STAGING_FLAG_NONE));
   __FAILURE_HANDLE(vault_object_create(&output_request.buffer_object));
   output_request.props = props;
 
@@ -215,25 +218,8 @@ static bool _device_output_recurring_needs_queueing(DeviceOutput* output, const 
   if (output->recurring_output_is_dirty)
     return true;
 
-  const uint32_t base_threshold = 4;
-
-  if (current_sample_count < (1 << base_threshold))
-    return true;
-
-#if defined(__x86_64__) || defined(_M_X64)
-  uint32_t sample_count_log2;
-  __asm__ volatile("\tbsr %1, %0\n" : "=r"(sample_count_log2) : "r"(current_sample_count));
-
-  sample_count_log2 = sample_count_log2 - base_threshold;
-
-  if ((current_sample_count & ((1 << sample_count_log2) - 1)) == 0)
-    return true;
-
-  return false;
-#else
-  // No log2 on non x86 atm.
+  // TODO: Do we still need any advanced logic here with adaptive sampling?
   return true;
-#endif
 }
 
 static bool _device_output_request_needs_queueing(DeviceOutputRequest* request, const uint32_t current_sample_count) {
@@ -246,16 +232,17 @@ static bool _device_output_request_needs_queueing(DeviceOutputRequest* request, 
   return true;
 }
 
-LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, bool* does_output) {
+LuminaryResult device_output_will_output(DeviceOutput* output, DeviceRenderer* renderer, bool* does_output) {
   __CHECK_NULL_ARGUMENT(output);
-  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(does_output);
 
-  const uint32_t current_sample_count = device->aggregate_sample_count;
+  uint32_t aggregate_sample_count;
+  __FAILURE_HANDLE(device_renderer_get_total_executed_samples(renderer, &aggregate_sample_count));
 
   bool generate_output = false;
 
-  generate_output |= _device_output_recurring_needs_queueing(output, current_sample_count);
+  generate_output |= _device_output_recurring_needs_queueing(output, aggregate_sample_count);
 
   uint32_t num_output_requests;
   __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
@@ -263,7 +250,7 @@ LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, b
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
     DeviceOutputRequest* output_request = output->output_requests + output_request_id;
 
-    generate_output |= _device_output_request_needs_queueing(output_request, current_sample_count);
+    generate_output |= _device_output_request_needs_queueing(output_request, aggregate_sample_count);
   }
 
   *does_output = generate_output;
@@ -275,16 +262,16 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
-  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
+  __FAILURE_HANDLE(device_output_wait_for_completion(output, device->stream_main));
 
   // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
   __FAILURE_HANDLE(device_sync_constant_memory(device));
 
-  const uint32_t current_sample_count = device->aggregate_sample_count;
+  uint32_t aggregate_sample_count;
+  __FAILURE_HANDLE(device_renderer_get_total_executed_samples(device->renderer, &aggregate_sample_count));
 
   KernelArgsGenerateFinalImage generate_final_image_args;
 
-  generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_current_result);
   generate_final_image_args.color_correction = output->color_correction;
   generate_final_image_args.agx_params       = output->agx_params;
   generate_final_image_args.undersampling    = device->undersampling_state;
@@ -295,7 +282,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_output, output->event_output_ready, CU_EVENT_WAIT_DEFAULT));
 
-  if (_device_output_recurring_needs_queueing(output, current_sample_count) == true) {
+  if (_device_output_recurring_needs_queueing(output, aggregate_sample_count) == true) {
     __DEBUG_ASSERT(output->width > 0 && output->height > 0);
 
     output->recurring_output_is_dirty = false;
@@ -306,7 +293,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     data->descriptor.is_recurring_output       = true;
     data->descriptor.meta_data.width           = output->width;
     data->descriptor.meta_data.height          = output->height;
-    data->descriptor.meta_data.sample_count    = current_sample_count;
+    data->descriptor.meta_data.sample_count    = aggregate_sample_count;
     data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
 
     __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output->buffer_objects[output->buffer_index]));
@@ -327,7 +314,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     // TODO: If the output request has already been processed, mark it for deletion, else we leak precious staging memory.
 
-    if (_device_output_request_needs_queueing(output_request, current_sample_count) == false)
+    if (_device_output_request_needs_queueing(output_request, aggregate_sample_count) == false)
       continue;
 
     DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
@@ -336,7 +323,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     data->descriptor.is_recurring_output       = false;
     data->descriptor.meta_data.width           = output_request->props.width;
     data->descriptor.meta_data.height          = output_request->props.height;
-    data->descriptor.meta_data.sample_count    = current_sample_count;
+    data->descriptor.meta_data.sample_count    = aggregate_sample_count;
     data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
 
     __FAILURE_HANDLE(vault_handle_create(&data->descriptor.data_handle, output_request->buffer_object));
@@ -351,6 +338,14 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   }
 
   CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_finished, device->stream_output));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_output_wait_for_completion(DeviceOutput* output, CUstream stream) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(stream, output->event_output_finished, CU_EVENT_WAIT_DEFAULT));
 
   return LUMINARY_SUCCESS;
 }

@@ -122,7 +122,7 @@ LUMINARY_FUNCTION CausticsSamplingDomain caustics_get_domain(const MaterialConte
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION bool caustics_find_connection_point(
-  const MaterialContext<TYPE> ctx, const ushort2 index, const CausticsSamplingDomain domain, const bool is_refraction,
+  const MaterialContext<TYPE> ctx, const PathID& path_id, const CausticsSamplingDomain domain, const bool is_refraction,
   const uint32_t iteration, const uint32_t num_iterations, vec3& point, float& sample_weight) {
   if (domain.fast_path) {
     point         = domain.base;
@@ -131,7 +131,7 @@ LUMINARY_FUNCTION bool caustics_find_connection_point(
     return true;
   }
 
-  const float2 initial_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_INITIAL + iteration, index);
+  const float2 initial_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_INITIAL + iteration, path_id);
   const float2 sample         = ris_transform_stratum_2D(iteration, num_iterations, initial_random);
 
   point = add_vector(domain.base, add_vector(scale_vector(domain.edge1, sample.x), scale_vector(domain.edge2, sample.y)));
@@ -139,7 +139,7 @@ LUMINARY_FUNCTION bool caustics_find_connection_point(
   vec3 V = sub_vector(ctx.position, point);
 
   const float dist_sq = dot_product(V, V);
-  V                   = scale_vector(V, 1.0f / sqrtf(dist_sq));
+  V                   = scale_vector(V, rsqrtf(dist_sq));
 
   const vec3 normal = scale_vector(ocean_get_normal_fast(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_refraction) ? -1.0f : 1.0f);
 

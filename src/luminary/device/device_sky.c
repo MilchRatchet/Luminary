@@ -239,8 +239,8 @@ LuminaryResult sky_hdri_create(SkyHDRI** hdri) {
   (*hdri)->sky_is_dirty    = true;
   (*hdri)->output_is_dirty = true;
   (*hdri)->id              = 0;
+  (*hdri)->sample_count    = 32;
 
-  __FAILURE_HANDLE(sample_count_set(&(*hdri)->sample_count, 16));
   __FAILURE_HANDLE(sky_get_default(&(*hdri)->sky));
 
   return LUMINARY_SUCCESS;
@@ -274,7 +274,7 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
       hdri->height          = height;
     }
 
-    __FAILURE_HANDLE(sample_count_set(&hdri->sample_count, max(sky->hdri_samples, 1)));
+    hdri->sample_count = max(sky->hdri_samples, 1);
   }
 
   return LUMINARY_SUCCESS;
@@ -299,12 +299,14 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   args.ld_color     = device_hdri->color_tex->pitch / device_hdri->color_tex->pixel_size;
   args.ld_shadow    = device_hdri->shadow_tex->pitch / device_hdri->shadow_tex->pixel_size;
   args.origin       = hdri->origin;
-  args.sample_count = hdri->sample_count.end_sample_count;
+  args.sample_count = hdri->sample_count;
 
-  for (uint32_t sample_id = 0; sample_id < hdri->sky.hdri_samples; sample_id++) {
-    __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_id, 0xFFFF, 0xFFFF));
-    __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], &args, device->stream_main));
-  }
+  const uint32_t num_pixels = hdri->width * hdri->height;
+
+  const uint32_t num_blocks = (num_pixels * 32 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+
+  __FAILURE_HANDLE(kernel_execute_custom(
+    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
 
   __FAILURE_HANDLE(device_download2D(
     hdri->color_tex->data, device_hdri->color_tex->cuda_memory, device_hdri->color_tex->pitch, hdri->width * sizeof(RGBAF), hdri->height,
@@ -323,10 +325,10 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
   __CHECK_NULL_ARGUMENT(device);
 
   if (hdri->sky_is_dirty) {
-    hdri->sample_count.current_sample_count = 0;
+    hdri->computed_sample_count = 0;
   }
 
-  const bool requires_rendering = hdri->output_is_dirty || (hdri->sample_count.current_sample_count < hdri->sample_count.end_sample_count);
+  const bool requires_rendering = hdri->output_is_dirty || (hdri->computed_sample_count < hdri->sample_count);
 
   if (requires_rendering) {
     if (hdri->output_is_dirty) {
@@ -346,6 +348,9 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
 
         __FAILURE_HANDLE(texture_fill(hdri->color_tex, hdri->width, hdri->height, 1, (void*) 0, TEXTURE_DATA_TYPE_FP32, 4));
         __FAILURE_HANDLE(texture_fill(hdri->shadow_tex, hdri->width, hdri->height, 1, (void*) 0, TEXTURE_DATA_TYPE_FP32, 1));
+
+        hdri->color_tex->filter  = TEXTURE_FILTER_MODE_POINT;
+        hdri->shadow_tex->filter = TEXTURE_FILTER_MODE_POINT;
 
         __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
         __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->width * sizeof(float) * hdri->shadow_tex->height));
@@ -409,35 +414,48 @@ static LuminaryResult _device_sky_hdri_free(DeviceSkyHDRI* hdri) {
   return LUMINARY_SUCCESS;
 }
 
-DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Device* device, const SkyHDRI* source_hdri, bool* has_changed) {
+LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Device* device, const SkyHDRI* shared_hdri, bool* buffers_have_changed) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(source_hdri);
+  __CHECK_NULL_ARGUMENT(shared_hdri);
 
-  *has_changed = false;
+  *buffers_have_changed = false;
 
-  if (source_hdri->id != hdri->reference_id) {
+  if (shared_hdri->id != hdri->reference_id) {
     __FAILURE_HANDLE(_device_sky_hdri_free(hdri));
 
-    if (source_hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
-      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device, device->stream_main));
-      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device, device->stream_main));
+    if (shared_hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
+      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, shared_hdri->color_tex, device, device->stream_main));
+      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, shared_hdri->shadow_tex, device, device->stream_main));
 
-      *has_changed = true;
+      __FAILURE_HANDLE(device_struct_texture_object_convert(hdri->color_tex, &hdri->color_tex_obj));
+      __FAILURE_HANDLE(device_struct_texture_object_convert(hdri->shadow_tex, &hdri->shadow_tex_obj));
+
+      *buffers_have_changed = true;
     }
 
-    hdri->reference_id = source_hdri->id;
+    hdri->reference_id = shared_hdri->id;
   }
 
   if (hdri->force_device_update) {
-    *has_changed              = true;
+    *buffers_have_changed     = true;
     hdri->force_device_update = false;
   }
 
   return LUMINARY_SUCCESS;
 }
 
-DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_destroy(DeviceSkyHDRI** hdri) {
+LuminaryResult device_sky_hdri_get_ptrs(DeviceSkyHDRI* hdri, DeviceSkyHDRIPtrs* ptrs) {
+  __CHECK_NULL_ARGUMENT(hdri);
+  __CHECK_NULL_ARGUMENT(ptrs);
+
+  ptrs->color_tex_obj  = hdri->color_tex_obj;
+  ptrs->shadow_tex_obj = hdri->shadow_tex_obj;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_sky_hdri_destroy(DeviceSkyHDRI** hdri) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(*hdri);
 
@@ -576,20 +594,20 @@ LuminaryResult device_sky_stars_create(DeviceSkyStars** stars) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_sky_stars_update(DeviceSkyStars* stars, Device* device, const SkyStars* source_stars, bool* has_changed) {
+LuminaryResult device_sky_stars_update(DeviceSkyStars* stars, Device* device, const SkyStars* shared_stars, bool* buffers_have_changed) {
   __CHECK_NULL_ARGUMENT(stars);
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(source_stars);
-  __CHECK_NULL_ARGUMENT(has_changed);
+  __CHECK_NULL_ARGUMENT(shared_stars);
+  __CHECK_NULL_ARGUMENT(buffers_have_changed);
 
-  *has_changed = false;
+  *buffers_have_changed = false;
 
-  const bool seed_changed  = stars->seed != source_stars->seed;
-  const bool count_changed = stars->count != source_stars->count;
+  const bool seed_changed  = stars->seed != shared_stars->seed;
+  const bool count_changed = stars->count != shared_stars->count;
 
   if (seed_changed || count_changed) {
-    stars->seed  = source_stars->seed;
-    stars->count = source_stars->count;
+    stars->seed  = shared_stars->seed;
+    stars->count = shared_stars->count;
 
     if (stars->offsets == (DEVICE uint32_t*) 0) {
       __FAILURE_HANDLE(device_malloc(&stars->offsets, sizeof(uint32_t) * (STARS_GRID_X * STARS_GRID_Y + 1)));
@@ -602,13 +620,25 @@ LuminaryResult device_sky_stars_update(DeviceSkyStars* stars, Device* device, co
 
       __FAILURE_HANDLE(device_malloc(&stars->data, sizeof(Star) * stars->count));
 
-      *has_changed = true;
+      *buffers_have_changed = true;
     }
 
-    __FAILURE_HANDLE(device_upload(stars->data, source_stars->data, 0, sizeof(Star) * stars->count, device->stream_main));
-    __FAILURE_HANDLE(
-      device_upload(stars->offsets, source_stars->offsets, 0, sizeof(uint32_t) * (STARS_GRID_X * STARS_GRID_Y + 1), device->stream_main));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_stars->data, (DEVICE void*) stars->data, 0, sizeof(Star) * stars->count));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_stars->offsets, (DEVICE void*) stars->offsets, 0,
+      sizeof(uint32_t) * (STARS_GRID_X * STARS_GRID_Y + 1)));
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+DEVICE_CTX_FUNC LuminaryResult device_sky_stars_get_ptrs(DeviceSkyStars* stars, DeviceSkyStarsPtrs* ptrs) {
+  __CHECK_NULL_ARGUMENT(stars);
+  __CHECK_NULL_ARGUMENT(ptrs);
+
+  ptrs->data    = DEVICE_CUPTR(stars->data);
+  ptrs->offsets = DEVICE_CUPTR(stars->offsets);
 
   return LUMINARY_SUCCESS;
 }

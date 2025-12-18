@@ -8,16 +8,19 @@ struct Device typedef Device;
 struct OpacityMicromap typedef OpacityMicromap;
 
 struct DeviceMesh {
-  const Mesh* mesh;  // Non owning
-  DEVICE DeviceTriangle* triangles;
-  bool bvh_is_dirty;
+  uint32_t id;
+  uint32_t triangle_count;
+  DEVICE DeviceTriangleVertex* vertices;
+  DEVICE DeviceTriangleTexture* texture_triangles;
   OptixBVH* bvh;
+  OpacityMicromap* omm;
 } typedef DeviceMesh;
 
 struct Device typedef Device;
 
-DEVICE_CTX_FUNC LuminaryResult device_mesh_create(DeviceMesh** device_mesh, Device* device, const Mesh* mesh);
-DEVICE_CTX_FUNC LuminaryResult device_mesh_build_structures(DeviceMesh* device_mesh, OpacityMicromap* omm, Device* device);
+LuminaryResult device_mesh_create(DeviceMesh** device_mesh);
+DEVICE_CTX_FUNC LuminaryResult device_mesh_set(DeviceMesh* device_mesh, Device* device, const Mesh* mesh);
+DEVICE_CTX_FUNC LuminaryResult device_mesh_process(DeviceMesh* device_mesh, Device* device, bool* data_has_changed);
 DEVICE_CTX_FUNC LuminaryResult device_mesh_destroy(DeviceMesh** device_mesh);
 
 #endif /* LUMINARY_DEVICE_MESH_H */

@@ -16,17 +16,19 @@
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
-  if (device.state.sample_id != 0 || device.state.depth != 0)
+  if (device.state.undersampling == 0 || device.state.depth != 0)
     return;
 
   const uint32_t shift = device.settings.supersampling + 1;
   const uint32_t mask  = (1 << shift) - 1;
 
-  if ((task.index.x & mask) || (task.index.y & mask))
+  const ushort2 pixel = path_id_get_pixel(task.path_id);
+
+  if ((pixel.x & mask) || (pixel.y & mask))
     return;
 
-  const uint16_t x  = task.index.x >> shift;
-  const uint16_t y  = task.index.y >> shift;
+  const uint16_t x  = pixel.x >> shift;
+  const uint16_t y  = pixel.y >> shift;
   const uint32_t ld = device.settings.width >> shift;
 
   if (device.ocean.active) {
@@ -100,7 +102,7 @@ LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, OptixRayt
     trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
-  const float time         = random_1D_base_float(RANDOM_TARGET_CAMERA_TIME, task.index, device.state.sample_id, 0);
+  const float time         = random_1D_consistent(RANDOM_TARGET_CAMERA_TIME, task.path_id);
   const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
   const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 

@@ -186,7 +186,8 @@ static void _window_entity_properties_renderer_settings_action(
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
-  uint32_t shading_mode = (uint32_t) settings.shading_mode;
+  uint32_t adaptive_sampling_output_mode = (uint32_t) settings.adaptive_sampling_output_mode;
+  uint32_t shading_mode                  = (uint32_t) settings.shading_mode;
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Renderer Settings", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -215,11 +216,33 @@ static void _window_entity_properties_renderer_settings_action(
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
+
+  element_separator(
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Adaptive Sampling", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  update_data |= _window_entity_properties_add_checkbox(data, "Enable", &settings.enable_adaptive_sampling);
+
+  if (settings.enable_adaptive_sampling) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Max. Sampling Rate", &settings.adaptive_sampling_max_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 256.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Avg. Sampling Rate", &settings.adaptive_sampling_avg_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 128.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Update Interval", &settings.adaptive_sampling_update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 1024.0f, 1.0f);
+    update_data |= _window_entity_properties_add_checkbox(data, "Exposure Awareness", &settings.adaptive_sampling_exposure_aware);
+    update_data |= _window_entity_properties_add_dropdown(
+      data, "Output Mode", LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT, (char**) luminary_strings_adaptive_sampling_output_mode,
+      &adaptive_sampling_output_mode);
+  }
+
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Debug", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 
   if (update_data) {
-    settings.shading_mode = (LuminaryShadingMode) shading_mode;
+    settings.adaptive_sampling_output_mode = (LuminaryAdaptiveSamplingOutputMode) adaptive_sampling_output_mode;
+    settings.shading_mode                  = (LuminaryShadingMode) shading_mode;
 
     LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
   }
@@ -285,8 +308,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
   }
 
-  update_data |= _window_entity_properties_add_checkbox(data, "Firefly Rejection", &camera.do_firefly_rejection);
-  update_data |= _window_entity_properties_add_checkbox(data, "Only Indirect Lighting", &camera.indirect_only);
   update_data |= _window_entity_properties_add_slider(
     data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
@@ -305,14 +326,13 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "AGX Slope", &camera.agx_custom_slope, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   }
 
+  update_data |= _window_entity_properties_add_checkbox(data, "Local Error Minimization", &camera.use_local_error_minimization);
+
   update_data |=
     _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
-  update_data |= _window_entity_properties_add_checkbox(data, "Lens Flare", &camera.lens_flare);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Lens Flare Threshold", &camera.lens_flare_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
 
   if (camera.use_physical_camera == false) {
     update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);

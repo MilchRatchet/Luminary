@@ -21,7 +21,7 @@ LUMINARY_FUNCTION float light_bsdf_get_russian_roulette_probability(const float 
   return remap01(roughness, 0.5f, 0.1f);
 }
 
-LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialContextGeometry& mat_ctx, const ushort2 pixel) {
+LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialContextGeometry& mat_ctx, const PathID& path_id) {
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
   const vec3 V_local             = quaternion_apply(rotation_to_z, mat_ctx.V);
@@ -37,7 +37,7 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
 
   const float refraction_probability = (include_refraction) ? 1.0f / num_techniques : 0.0f;
 
-  const float choice_random = random_1D(RANDOM_TARGET_LIGHT_BSDF_CHOICE, pixel);
+  const float choice_random = random_1D(RANDOM_TARGET_LIGHT_BSDF_CHOICE, path_id);
 
   const uint32_t technique_id = (uint32_t) (choice_random * num_techniques);
 
@@ -48,7 +48,7 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
 
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
-  const float randomRR                     = random_1D(RANDOM_TARGET_LIGHT_BSDF_RR, pixel);
+  const float randomRR                     = random_1D(RANDOM_TARGET_LIGHT_BSDF_RR, path_id);
   const float russian_roulette_probability = light_bsdf_get_russian_roulette_probability(roughness);
 
   if (randomRR >= russian_roulette_probability) {
@@ -64,7 +64,7 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
   switch (technique) {
     case LIGHT_BSDF_SAMPLE_TECHNIQUE_MICROFACET_REFLECTION: {
       // TODO: Move things like bsdf_evaluate_core outside the switch
-      const vec3 microfacet    = bsdf_microfacet_sample(V_local, sampling_roughness, pixel, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
+      const vec3 microfacet    = bsdf_microfacet_sample(V_local, sampling_roughness, path_id, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
       const vec3 ray           = reflect_vector(V_local, microfacet);
       const BSDFRayContext ctx = bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, false);
       const float pdf          = bsdf_microfacet_pdf(V_local, sampling_roughness, ctx.NdotH, ctx.NdotV);
@@ -79,7 +79,7 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
       const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx.params);
 
       bool total_reflection;
-      const vec3 microfacet = bsdf_microfacet_refraction_sample(V_local, sampling_roughness, pixel, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
+      const vec3 microfacet = bsdf_microfacet_refraction_sample(V_local, sampling_roughness, path_id, RANDOM_TARGET_LIGHT_BSDF_DIRECTION);
       const vec3 ray        = refract_vector(V_local, microfacet, ior, total_reflection);
       const BSDFRayContext ctx =
         bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, !total_reflection);

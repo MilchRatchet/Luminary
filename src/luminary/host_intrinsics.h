@@ -122,6 +122,7 @@ inline Vec128 vec128_max(const Vec128 a, const Vec128 b) {
 #endif
 }
 
+// This supports unaligned loads
 inline Vec128 vec128_load(const float* ptr) {
 #ifdef LUMINARY_X86_INTRINSICS
   return (Vec128) {._imm = _mm_loadu_ps(ptr)};

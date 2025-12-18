@@ -866,217 +866,128 @@ LuminaryResult wavefront_convert_content(
 
   __FAILURE_HANDLE(mesh_set_name(mesh, content->object_names[0]));
 
-  __FAILURE_HANDLE(host_malloc(&mesh->data.index_buffer, sizeof(uint32_t) * 4 * triangle_count));
-  __FAILURE_HANDLE(host_malloc(&mesh->data.vertex_buffer, sizeof(float) * 4 * vertex_count));
+  __FAILURE_HANDLE(host_malloc(&mesh->data.vertex_buffer, sizeof(float) * triangle_count * 9));
+  __FAILURE_HANDLE(host_malloc(&mesh->data.normal_buffer, sizeof(float) * triangle_count * 9));
+  __FAILURE_HANDLE(host_malloc(&mesh->data.uv_buffer, sizeof(float) * triangle_count * 6));
+  __FAILURE_HANDLE(host_malloc(&mesh->data.material_id_buffer, sizeof(uint16_t) * triangle_count));
 
-  mesh->data.vertex_count = vertex_count;
-
-  for (uint32_t vertex_id = 0; vertex_id < vertex_count; vertex_id++) {
-    mesh->data.vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
-    mesh->data.vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
-    mesh->data.vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
-    mesh->data.vertex_buffer[vertex_id * 4 + 3] = 0.0f;
-  }
-
-  __FAILURE_HANDLE(host_malloc(&mesh->triangles, sizeof(Triangle) * triangle_count));
-
-  uint32_t ptr = 0;
+  uint32_t tri_ptr = 0;
 
   for (uint32_t tri_id = 0; tri_id < triangle_count; tri_id++) {
     WavefrontTriangle t = content->triangles[tri_id];
-    Triangle triangle;
-
-    WavefrontVertex v;
 
     const uint32_t v1_ptr = (t.v1 > 0) ? t.v1 - 1 : t.v1 + vertex_count;
-
-    if (v1_ptr >= vertex_count) {
-      continue;
-    }
-    else {
-      v = content->vertices[v1_ptr];
-    }
-
-    triangle.vertex.x = v.x;
-    triangle.vertex.y = v.y;
-    triangle.vertex.z = v.z;
-
     const uint32_t v2_ptr = (t.v2 > 0) ? t.v2 - 1 : t.v2 + vertex_count;
-
-    if (v2_ptr >= vertex_count) {
-      continue;
-    }
-    else {
-      v = content->vertices[v2_ptr];
-    }
-
-    triangle.edge1.x = v.x - triangle.vertex.x;
-    triangle.edge1.y = v.y - triangle.vertex.y;
-    triangle.edge1.z = v.z - triangle.vertex.z;
-
     const uint32_t v3_ptr = (t.v3 > 0) ? t.v3 - 1 : t.v3 + vertex_count;
 
-    if (v3_ptr >= vertex_count) {
+    if (v1_ptr >= vertex_count || v2_ptr >= vertex_count || v3_ptr >= vertex_count)
       continue;
-    }
-    else {
-      v = content->vertices[v3_ptr];
-    }
 
-    triangle.edge2.x = v.x - triangle.vertex.x;
-    triangle.edge2.y = v.y - triangle.vertex.y;
-    triangle.edge2.z = v.z - triangle.vertex.z;
+    const WavefrontVertex v1 = content->vertices[v1_ptr];
+    const WavefrontVertex v2 = content->vertices[v2_ptr];
+    const WavefrontVertex v3 = content->vertices[v3_ptr];
+
+    WavefrontVertex edge1;
+    edge1.x = v2.x - v1.x;
+    edge1.y = v2.y - v1.y;
+    edge1.z = v2.z - v1.z;
+
+    WavefrontVertex edge2;
+    edge2.x = v3.x - v1.x;
+    edge2.y = v3.y - v1.y;
+    edge2.z = v3.z - v1.z;
 
     if (
-      fabsf(triangle.edge1.x) < FLT_EPSILON && fabsf(triangle.edge1.y) < FLT_EPSILON && fabsf(triangle.edge1.z) < FLT_EPSILON
-      && fabsf(triangle.edge2.x) < FLT_EPSILON && fabsf(triangle.edge2.y) < FLT_EPSILON && fabsf(triangle.edge2.z) < FLT_EPSILON) {
+      fabsf(edge1.x) < FLT_EPSILON && fabsf(edge1.y) < FLT_EPSILON && fabsf(edge1.z) < FLT_EPSILON && fabsf(edge2.x) < FLT_EPSILON
+      && fabsf(edge2.y) < FLT_EPSILON && fabsf(edge2.z) < FLT_EPSILON) {
       continue;
     }
 
-    mesh->data.index_buffer[ptr * 4 + 0] = t.v1 - 1;
-    mesh->data.index_buffer[ptr * 4 + 1] = t.v2 - 1;
-    mesh->data.index_buffer[ptr * 4 + 2] = t.v3 - 1;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 0] = v1.x;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 1] = v1.y;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 2] = v1.z;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 3] = v2.x;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 4] = v2.y;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 5] = v2.z;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 6] = v3.x;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 7] = v3.y;
+    mesh->data.vertex_buffer[tri_ptr * 9 + 8] = v3.z;
 
     // Some OBJs have no normals. We compute the face normal here and use that instead.
     // TODO: Implement smooth normals generation.
-    vec3 face_n = (vec3) {.x = triangle.edge1.y * triangle.edge2.z - triangle.edge1.z * triangle.edge2.y,
-                          .y = triangle.edge1.z * triangle.edge2.x - triangle.edge1.x * triangle.edge2.z,
-                          .z = triangle.edge1.x * triangle.edge2.y - triangle.edge1.y * triangle.edge2.x};
+    vec3 face_n = (vec3) {
+      .x = edge1.y * edge2.z - edge1.z * edge2.y, .y = edge1.z * edge2.x - edge1.x * edge2.z, .z = edge1.x * edge2.y - edge1.y * edge2.x};
 
-    const float face_n_length = 1.0f / sqrtf(face_n.x * face_n.x + face_n.y * face_n.y + face_n.z * face_n.z);
+    const float face_n_rcplength = 1.0f / sqrtf(face_n.x * face_n.x + face_n.y * face_n.y + face_n.z * face_n.z);
 
-    if (isnan(face_n_length) == false && isinf(face_n_length) == false) {
-      face_n.x *= face_n_length;
-      face_n.y *= face_n_length;
-      face_n.z *= face_n_length;
+    if (isnan(face_n_rcplength) == false && isinf(face_n_rcplength) == false) {
+      face_n.x *= face_n_rcplength;
+      face_n.y *= face_n_rcplength;
+      face_n.z *= face_n_rcplength;
     }
-
-    WavefrontUV uv;
 
     const uint32_t vt1_ptr = (t.vt1 > 0) ? t.vt1 - 1 : t.vt1 + uv_count;
-
-    if (vt1_ptr >= uv_count) {
-      uv.u = 0.0f;
-      uv.v = 0.0f;
-    }
-    else {
-      uv = content->uvs[vt1_ptr];
-    }
-
-    triangle.vertex_texture.u = uv.u;
-    triangle.vertex_texture.v = uv.v;
-
     const uint32_t vt2_ptr = (t.vt2 > 0) ? t.vt2 - 1 : t.vt2 + uv_count;
-
-    if (vt2_ptr >= uv_count) {
-      uv.u = 0.0f;
-      uv.v = 0.0f;
-    }
-    else {
-      uv = content->uvs[vt2_ptr];
-    }
-
-    triangle.edge1_texture.u = uv.u - triangle.vertex_texture.u;
-    triangle.edge1_texture.v = uv.v - triangle.vertex_texture.v;
-
     const uint32_t vt3_ptr = (t.vt3 > 0) ? t.vt3 - 1 : t.vt3 + uv_count;
 
-    if (vt3_ptr >= uv_count) {
-      uv.u = 0.0f;
-      uv.v = 0.0f;
-    }
-    else {
-      uv = content->uvs[vt3_ptr];
-    }
+    const WavefrontUV uv1 = (vt1_ptr < uv_count) ? content->uvs[vt1_ptr] : (WavefrontUV) {.u = 0.0f, .v = 0.0f};
+    const WavefrontUV uv2 = (vt2_ptr < uv_count) ? content->uvs[vt2_ptr] : (WavefrontUV) {.u = 0.0f, .v = 0.0f};
+    const WavefrontUV uv3 = (vt3_ptr < uv_count) ? content->uvs[vt3_ptr] : (WavefrontUV) {.u = 0.0f, .v = 0.0f};
 
-    triangle.edge2_texture.u = uv.u - triangle.vertex_texture.u;
-    triangle.edge2_texture.v = uv.v - triangle.vertex_texture.v;
-
-    WavefrontNormal n;
+    mesh->data.uv_buffer[tri_ptr * 6 + 0] = uv1.u;
+    mesh->data.uv_buffer[tri_ptr * 6 + 1] = uv1.v;
+    mesh->data.uv_buffer[tri_ptr * 6 + 2] = uv2.u;
+    mesh->data.uv_buffer[tri_ptr * 6 + 3] = uv2.v;
+    mesh->data.uv_buffer[tri_ptr * 6 + 4] = uv3.u;
+    mesh->data.uv_buffer[tri_ptr * 6 + 5] = uv3.v;
 
     const uint32_t vn1_ptr = (t.vn1 > 0) ? t.vn1 - 1 : t.vn1 + normal_count;
-
-    if (vn1_ptr >= normal_count) {
-      n = face_n;
-    }
-    else {
-      n = content->normals[vn1_ptr];
-
-      const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
-
-      if (isnan(n_length) || isinf(n_length)) {
-        n = face_n;
-      }
-      else {
-        n.x *= n_length;
-        n.y *= n_length;
-        n.z *= n_length;
-      }
-    }
-
-    triangle.vertex_normal.x = n.x;
-    triangle.vertex_normal.y = n.y;
-    triangle.vertex_normal.z = n.z;
-
     const uint32_t vn2_ptr = (t.vn2 > 0) ? t.vn2 - 1 : t.vn2 + normal_count;
-
-    if (vn2_ptr >= normal_count) {
-      n = face_n;
-    }
-    else {
-      n = content->normals[vn2_ptr];
-
-      const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
-
-      if (isnan(n_length) || isinf(n_length)) {
-        n = face_n;
-      }
-      else {
-        n.x *= n_length;
-        n.y *= n_length;
-        n.z *= n_length;
-      }
-    }
-
-    triangle.edge1_normal.x = n.x - triangle.vertex_normal.x;
-    triangle.edge1_normal.y = n.y - triangle.vertex_normal.y;
-    triangle.edge1_normal.z = n.z - triangle.vertex_normal.z;
-
     const uint32_t vn3_ptr = (t.vn3 > 0) ? t.vn3 - 1 : t.vn3 + normal_count;
 
-    if (vn3_ptr >= normal_count) {
-      n = face_n;
-    }
-    else {
-      n = content->normals[vn3_ptr];
+    WavefrontNormal n1 = (vn1_ptr < normal_count) ? content->normals[vn1_ptr] : face_n;
+    WavefrontNormal n2 = (vn2_ptr < normal_count) ? content->normals[vn2_ptr] : face_n;
+    WavefrontNormal n3 = (vn3_ptr < normal_count) ? content->normals[vn3_ptr] : face_n;
 
-      const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
+    const float n1_rcplength = 1.0f / sqrtf(n1.x * n1.x + n1.y * n1.y + n1.z * n1.z);
 
-      if (isnan(n_length) || isinf(n_length)) {
-        n = face_n;
-      }
-      else {
-        n.x *= n_length;
-        n.y *= n_length;
-        n.z *= n_length;
-      }
-    }
+    n1 = (WavefrontNormal) {.x = n1.x * n1_rcplength, .y = n1.y * n1_rcplength, .z = n1.z * n1_rcplength};
+    n1 = (isnan(n1_rcplength) || isinf(n1_rcplength)) ? face_n : n1;
 
-    triangle.edge2_normal.x = n.x - triangle.vertex_normal.x;
-    triangle.edge2_normal.y = n.y - triangle.vertex_normal.y;
-    triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
+    const float n2_rcplength = 1.0f / sqrtf(n2.x * n2.x + n2.y * n2.y + n2.z * n2.z);
 
-    triangle.material_id = material_offset + t.material;
+    n2 = (WavefrontNormal) {.x = n2.x * n2_rcplength, .y = n2.y * n2_rcplength, .z = n2.z * n2_rcplength};
+    n2 = (isnan(n2_rcplength) || isinf(n2_rcplength)) ? face_n : n2;
 
-    mesh->triangles[ptr++] = triangle;
+    const float n3_rcplength = 1.0f / sqrtf(n3.x * n3.x + n3.y * n3.y + n3.z * n3.z);
+
+    n3 = (WavefrontNormal) {.x = n3.x * n3_rcplength, .y = n3.y * n3_rcplength, .z = n3.z * n3_rcplength};
+    n3 = (isnan(n3_rcplength) || isinf(n3_rcplength)) ? face_n : n3;
+
+    mesh->data.normal_buffer[tri_ptr * 9 + 0] = n1.x;
+    mesh->data.normal_buffer[tri_ptr * 9 + 1] = n1.y;
+    mesh->data.normal_buffer[tri_ptr * 9 + 2] = n1.z;
+    mesh->data.normal_buffer[tri_ptr * 9 + 3] = n2.x;
+    mesh->data.normal_buffer[tri_ptr * 9 + 4] = n2.y;
+    mesh->data.normal_buffer[tri_ptr * 9 + 5] = n2.z;
+    mesh->data.normal_buffer[tri_ptr * 9 + 6] = n3.x;
+    mesh->data.normal_buffer[tri_ptr * 9 + 7] = n3.y;
+    mesh->data.normal_buffer[tri_ptr * 9 + 8] = n3.z;
+
+    mesh->data.material_id_buffer[tri_ptr] = material_offset + t.material;
+
+    tri_ptr++;
   }
 
-  const uint32_t new_triangle_count = ptr;
+  const uint32_t new_triangle_count = tri_ptr;
 
-  __FAILURE_HANDLE(host_realloc(&mesh->triangles, sizeof(Triangle) * new_triangle_count));
+  if (new_triangle_count != triangle_count) {
+    __FAILURE_HANDLE(host_realloc(&mesh->data.vertex_buffer, sizeof(float) * new_triangle_count * 9));
+    __FAILURE_HANDLE(host_realloc(&mesh->data.normal_buffer, sizeof(float) * new_triangle_count * 9));
+    __FAILURE_HANDLE(host_realloc(&mesh->data.uv_buffer, sizeof(float) * new_triangle_count * 6));
+    __FAILURE_HANDLE(host_realloc(&mesh->data.material_id_buffer, sizeof(uint16_t) * new_triangle_count));
+  }
 
-  __FAILURE_HANDLE(host_realloc(&mesh->data.index_buffer, sizeof(uint32_t) * 4 * new_triangle_count));
-  mesh->data.index_count    = 3 * new_triangle_count;
   mesh->data.triangle_count = new_triangle_count;
 
   __FAILURE_HANDLE(array_push(meshes, &mesh));

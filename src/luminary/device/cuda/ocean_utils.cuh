@@ -1,8 +1,8 @@
 #ifndef CU_OCEAN_UTILS_H
 #define CU_OCEAN_UTILS_H
 
-#include "ior_stack.cuh"
 #include "material.cuh"
+#include "medium_stack.cuh"
 #include "sky_utils.cuh"
 #include "utils.cuh"
 
@@ -26,8 +26,9 @@
 #define OCEAN_ITERATIONS_NORMAL_CAUSTICS 8
 
 LUMINARY_FUNCTION float ocean_hash(const float2 p) {
-  const float x = p.x + p.y * (311.7f / 127.1f);
-  return (__float_as_uint(x) * 2654435769u) * (1.0f / 0xFFFFFFFFu);
+  const float x = fabsf(p.x + p.y * (311.7f / 127.1f));
+
+  return white_noise_offset((uint32_t) x);
 }
 
 LUMINARY_FUNCTION float ocean_noise(const float2 p) {
@@ -115,7 +116,10 @@ LUMINARY_FUNCTION bool ocean_is_underwater(const vec3 p) {
 }
 
 LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
-  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+  if (device.ocean.amplitude == 0.0f)
+    return get_vector(0.0f, 1.0f, 0.0f);
+
+  const float d = (OCEAN_LIPSCHITZ + get_length(p) + 1.0f) * eps * 16.0f;
 
   // Sobel filter
   const float h_0 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
@@ -136,7 +140,10 @@ LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations 
 }
 
 LUMINARY_FUNCTION vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
-  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+  if (device.ocean.amplitude == 0.0f)
+    return get_vector(0.0f, 1.0f, 0.0f);
+
+  const float d = (OCEAN_LIPSCHITZ + get_length(p) + 1.0f) * eps * 16.0f;
 
   const float h_0 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
   const float h_1 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
@@ -464,7 +471,7 @@ LUMINARY_FUNCTION float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceIORStack& ior_stack) {
+LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceTaskMediumStack& medium) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
@@ -478,12 +485,14 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
     flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const bool refraction_is_inside       = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
-  const IORStackMethod ior_stack_method = (refraction_is_inside) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior                   = ior_stack_interact(ior_stack, device.ocean.refractive_index, ior_stack_method);
+  const bool refraction_is_inside = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
 
-  const float ior_ratio =
-    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index / ray_ior : ray_ior / device.ocean.refractive_index;
+  const float other_ior    = medium_stack_ior_peek(medium, refraction_is_inside);
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
+  const float ior_ratio = (refraction_is_inside) ? device.ocean.refractive_index / other_ior : other_ior / device.ocean.refractive_index;
+
+  const float roughness = ((task.state & STATE_FLAG_DELTA_PATH) != 0) ? BSDF_ROUGHNESS_CLAMP * 2.0f : 0.25f;
 
   MaterialContextGeometry ctx;
 
@@ -494,15 +503,22 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
   ctx.position     = task.origin;
   ctx.V            = scale_vector(task.ray, -1.0f);
   ctx.state        = task.state;
+  ctx.volume_type  = VolumeType(volume_id);
   ctx.params.flags = flags;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, 1.0f);
-  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, BSDF_ROUGHNESS_CLAMP);
+  material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
   material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params, splat_color(0.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, ior_ratio);
 
   return ctx;
+}
+
+LUMINARY_FUNCTION vec3 ocean_shift_vector(const MaterialContextGeometry& ctx, const bool is_refraction) {
+  const float shift_length = 8.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + fabsf(device.ocean.height));
+
+  return add_vector(ctx.position, scale_vector(ctx.normal, (is_refraction) ? -shift_length : shift_length));
 }
 
 #endif /* CU_OCEAN_UTILS_H */

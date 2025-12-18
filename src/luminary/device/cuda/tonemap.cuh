@@ -2,6 +2,7 @@
 #define CU_TONEMAP_H
 
 #include "math.cuh"
+#include "purkinje.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 
@@ -57,7 +58,7 @@ LUMINARY_FUNCTION RGBF tonemap_uncharted2(RGBF pixel) {
 }
 
 LUMINARY_FUNCTION RGBF tonemap_reinhard(RGBF pixel) {
-  const float factor = 1.0f / (1.0f + luminance(pixel));
+  const float factor = 1.0f / (1.0f + color_luminance(pixel));
   pixel.r *= factor;
   pixel.g *= factor;
   pixel.b *= factor;
@@ -129,7 +130,7 @@ LUMINARY_FUNCTION RGBF agx_inv_conversion(RGBF pixel) {
 }
 
 LUMINARY_FUNCTION RGBF agx_look(RGBF pixel, const RGBF slope, const RGBF power, const float saturation) {
-  const float lum = luminance(pixel);
+  const float lum = color_luminance(pixel);
 
   pixel = mul_color(pixel, slope);
 
@@ -162,8 +163,8 @@ LUMINARY_FUNCTION RGBF tonemap_agx_punchy(RGBF pixel) {
 LUMINARY_FUNCTION RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params) {
   pixel = agx_conversion(pixel);
 
-  RGBF slope = get_color(agx_params.slope, agx_params.slope, agx_params.slope);
-  RGBF power = get_color(agx_params.power, agx_params.power, agx_params.power);
+  const RGBF slope = splat_color(agx_params.slope);
+  const RGBF power = splat_color(agx_params.power);
 
   pixel = agx_look(pixel, slope, power, agx_params.saturation);
   pixel = agx_inv_conversion(pixel);
@@ -171,9 +172,42 @@ LUMINARY_FUNCTION RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_
   return pixel;
 }
 
+LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel, const AGXCustomParams agx_params = {1.0f, 1.0f, 1.0f}) {
+  RGBF result;
+
+  switch (device.camera.tonemap) {
+    case LUMINARY_TONEMAP_NONE:
+      result = pixel;
+      break;
+    case LUMINARY_TONEMAP_ACES:
+      result = tonemap_aces(pixel);
+      break;
+    case LUMINARY_TONEMAP_REINHARD:
+      result = tonemap_reinhard(pixel);
+      break;
+    case LUMINARY_TONEMAP_UNCHARTED2:
+      result = tonemap_uncharted2(pixel);
+      break;
+    case LUMINARY_TONEMAP_AGX:
+      result = tonemap_agx(pixel);
+      break;
+    case LUMINARY_TONEMAP_AGX_PUNCHY:
+      result = tonemap_agx_punchy(pixel);
+      break;
+    case LUMINARY_TONEMAP_AGX_CUSTOM:
+      result = tonemap_agx_custom(pixel, agx_params);
+      break;
+  }
+
+  return result;
+}
+
 LUMINARY_FUNCTION RGBF
   tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const RGBF color_correction, const AGXCustomParams agx_params) {
   if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
+    return pixel;
+
+  if (device.settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
     return pixel;
 
   if (device.camera.purkinje) {
@@ -206,28 +240,7 @@ LUMINARY_FUNCTION RGBF
   pixel.g = fmaxf(0.0f, pixel.g + grain);
   pixel.b = fmaxf(0.0f, pixel.b + grain);
 
-  switch (device.camera.tonemap) {
-    case LUMINARY_TONEMAP_NONE:
-      break;
-    case LUMINARY_TONEMAP_ACES:
-      pixel = tonemap_aces(pixel);
-      break;
-    case LUMINARY_TONEMAP_REINHARD:
-      pixel = tonemap_reinhard(pixel);
-      break;
-    case LUMINARY_TONEMAP_UNCHARTED2:
-      pixel = tonemap_uncharted2(pixel);
-      break;
-    case LUMINARY_TONEMAP_AGX:
-      pixel = tonemap_agx(pixel);
-      break;
-    case LUMINARY_TONEMAP_AGX_PUNCHY:
-      pixel = tonemap_agx_punchy(pixel);
-      break;
-    case LUMINARY_TONEMAP_AGX_CUSTOM:
-      pixel = tonemap_agx_custom(pixel, agx_params);
-      break;
-  }
+  pixel = tonemap_apply_transform(pixel, agx_params);
 
   return pixel;
 }

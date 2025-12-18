@@ -10,11 +10,12 @@ struct CUDAKernelConfig {
 } typedef CUDAKernelConfig;
 
 static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
-  [CUDA_KERNEL_TYPE_TASKS_CREATE]                 = {.name = "tasks_create", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TASKS_SORT]                   = {.name = "tasks_sort", .param_size = 0},
-  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]       = {.name = "geometry_process_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG] = {.name = "geometry_process_tasks_debug", .param_size = 0},
-  [CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT]         = {.name = "bsdf_generate_ss_lut", .param_size = sizeof(KernelArgsBSDFGenerateSSLUT)},
+  [CUDA_KERNEL_TYPE_TASKS_CREATE]                   = {.name = "tasks_create", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING] = {.name = "tasks_create_adaptive_sampling", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_SORT]                     = {.name = "tasks_sort", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]         = {.name = "geometry_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG]   = {.name = "geometry_process_tasks_debug", .param_size = 0},
+  [CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT]           = {.name = "bsdf_generate_ss_lut", .param_size = sizeof(KernelArgsBSDFGenerateSSLUT)},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_GLOSSY_LUT] = {.name = "bsdf_generate_glossy_lut", .param_size = sizeof(KernelArgsBSDFGenerateGlossyLUT)},
   [CUDA_KERNEL_TYPE_BSDF_GENERATE_DIELECTRIC_LUT] =
     {.name = "bsdf_generate_dielectric_lut", .param_size = sizeof(KernelArgsBSDFGenerateDielectricLUT)},
@@ -34,33 +35,24 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "cloud_compute_detail_noise", .param_size = sizeof(KernelArgsCloudComputeDetailNoise)},
   [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_WEATHER_NOISE] =
     {.name = "cloud_compute_weather_noise", .param_size = sizeof(KernelArgsCloudComputeWeatherNoise)},
-  [CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS]                = {.name = "cloud_process_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_INSCATTERING]        = {.name = "volume_process_inscattering", .param_size = 0},
-  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS]              = {.name = "volume_process_events", .param_size = 0},
-  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS]               = {.name = "volume_process_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS]             = {.name = "particle_process_tasks", .param_size = 0},
-  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG]       = {.name = "particle_process_tasks_debug", .param_size = 0},
-  [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]                  = {.name = "particle_generate", .param_size = 0},
-  [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY]            = {.name = "light_compute_intensity", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_FIRST_SAMPLE] = {.name = "temporal_accumulation_first_sample", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_UPDATE]       = {.name = "temporal_accumulation_update", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT]       = {.name = "temporal_accumulation_output", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_OUTPUT_RAW]   = {.name = "temporal_accumulation_output_raw", .param_size = 0},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV]          = {.name = "temporal_accumulation_aov", .param_size = 0},
+  [CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS]                        = {.name = "cloud_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_INSCATTERING]                = {.name = "volume_process_inscattering", .param_size = 0},
+  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS]                      = {.name = "volume_process_events", .param_size = 0},
+  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS]                       = {.name = "volume_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS]                     = {.name = "particle_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG]               = {.name = "particle_process_tasks_debug", .param_size = 0},
+  [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]                          = {.name = "particle_generate", .param_size = 0},
+  [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY]                    = {.name = "light_compute_intensity", .param_size = 0},
+  [CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS]               = {.name = "accumulation_collect_results", .param_size = 0},
+  [CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE]  = {.name = "accumulation_collect_results_first_sample", .param_size = 0},
+  [CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT]               = {.name = "accumulation_generate_result", .param_size = 0},
+  [CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT_UNDERSAMPLING] = {.name = "accumulation_generate_result_undersampling", .param_size = 0},
   [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]  = {.name = "generate_final_image", .param_size = sizeof(KernelArgsGenerateFinalImage)},
   [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8] = {.name = "convert_RGBF_to_ARGB8", .param_size = sizeof(KernelArgsConvertRGBFToARGB8)},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE] =
-    {.name = "camera_post_image_downsample", .param_size = sizeof(KernelArgsCameraPostImageDownsample)},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD] =
-    {.name = "camera_post_image_downsample_threshold", .param_size = sizeof(KernelArgsCameraPostImageDownsampleThreshold)},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE] =
-    {.name = "camera_post_image_upsample", .param_size = sizeof(KernelArgsCameraPostImageUpsample)},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS] =
-    {.name = "camera_post_lens_flare_ghosts", .param_size = sizeof(KernelArgsCameraPostLensFlareGhosts)},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO] =
-    {.name = "camera_post_lens_flare_halo", .param_size = sizeof(KernelArgsCameraPostLensFlareHalo)},
-  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4] = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
-  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]  = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
+  [CUDA_KERNEL_TYPE_POST_IMAGE_DOWNSAMPLE] = {.name = "post_image_downsample", .param_size = sizeof(KernelArgsPostImageDownsample)},
+  [CUDA_KERNEL_TYPE_POST_IMAGE_UPSAMPLE]   = {.name = "post_image_upsample", .param_size = sizeof(KernelArgsPostImageUpsample)},
+  [CUDA_KERNEL_TYPE_OMM_LEVEL_0_FORMAT_4]  = {.name = "omm_level_0_format_4", .param_size = sizeof(KernelArgsOMMLevel0Format4)},
+  [CUDA_KERNEL_TYPE_OMM_REFINE_FORMAT_4]   = {.name = "omm_refine_format_4", .param_size = sizeof(KernelArgsOMMRefineFormat4)},
   [CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4] =
     {.name = "omm_gather_array_format_4", .param_size = sizeof(KernelArgsOMMGatherArrayFormat4)},
   [CUDA_KERNEL_TYPE_BUFFER_ADD] = {.name = "buffer_add", .param_size = sizeof(KernelArgsBufferAdd)},
@@ -76,7 +68,21 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "mipmap_generate_level_3D_RGBAF", .param_size = sizeof(KernelArgsMipmapGenerateLevel3DRGBAF)},
   [CUDA_KERNEL_TYPE_MIPMAP_GENERATE_LEVEL_2D_RGBAF] =
     {.name = "mipmap_generate_level_2D_RGBAF", .param_size = sizeof(KernelArgsMipmapGenerateLevel2DRGBAF)},
-
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_BLOCK_REDUCE_VARIANCE] =
+    {.name = "adaptive_sampling_block_reduce_variance", .param_size = sizeof(KernelArgsAdaptiveSamplingBlockReduceVariance)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_SAMPLE_COUNTS] =
+    {.name = "adaptive_sampling_compute_stage_sample_counts", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeStageSampleCounts)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_TOTAL_TASK_COUNTS] =
+    {.name       = "adaptive_sampling_compute_stage_total_task_counts",
+     .param_size = sizeof(KernelArgsAdaptiveSamplingComputeStageTotalTaskCounts)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TASKS_PER_BLOCK] =
+    {.name = "adaptive_sampling_compute_tasks_per_block", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeTasksPerBlock)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_BLOCK_SUM] =
+    {.name = "adaptive_sampling_compute_block_sum", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeBlockSum)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_PREFIX_SUM] =
+    {.name = "adaptive_sampling_compute_prefix_sum", .param_size = sizeof(KernelArgsAdaptiveSamplingComputePrefixSum)},
+  [CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TILE_BLOCK_RANGES] =
+    {.name = "adaptive_sampling_compute_tile_block_ranges", .param_size = sizeof(KernelArgsAdaptiveSamplingComputeTileBlockRanges)},
 };
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 

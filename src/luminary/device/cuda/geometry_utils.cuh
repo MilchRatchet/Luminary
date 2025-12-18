@@ -1,10 +1,10 @@
 #ifndef CU_GEOMETRY_UTILS_H
 #define CU_GEOMETRY_UTILS_H
 
-#include "ior_stack.cuh"
 #include "light_triangle.cuh"
 #include "material.cuh"
 #include "math.cuh"
+#include "medium_stack.cuh"
 #include "memory.cuh"
 #include "mis.cuh"
 #include "texture_utils.cuh"
@@ -51,24 +51,29 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
   return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
 }
 
-LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask& task, DeviceTaskTrace& trace) {
+LUMINARY_FUNCTION MaterialContextGeometry
+  geometry_get_context(const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium) {
   const uint32_t mesh_id      = mesh_id_load(trace.handle.instance_id);
   const DeviceTransform trans = load_transform(trace.handle.instance_id);
 
-  const DeviceTriangle* tri_ptr = (const DeviceTriangle*) __ldg((uint64_t*) (device.ptrs.triangles + mesh_id));
-  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+  const DeviceTriangleVertex* vertex_ptr = triangle_vertex_ptr_load(mesh_id);
+  const DeviceTriangleTexture* tri_ptr   = triangle_texture_ptr_load(mesh_id);
 
-  const float4 t0 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, trace.handle.tri_id, triangle_count));
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, trace.handle.tri_id, triangle_count));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, trace.handle.tri_id, triangle_count));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, trace.handle.tri_id, triangle_count));
+  const DeviceTriangleVertex v0 = triangle_vertex_load(vertex_ptr, trace.handle.tri_id * 3 + 0);
+  const DeviceTriangleVertex v1 = triangle_vertex_load(vertex_ptr, trace.handle.tri_id * 3 + 1);
+  const DeviceTriangleVertex v2 = triangle_vertex_load(vertex_ptr, trace.handle.tri_id * 3 + 2);
+
+  const float4 tri = __ldg((float4*) (tri_ptr + trace.handle.tri_id));
 
   vec3 position  = transform_apply_inv(trans, task.origin);
   const vec3 ray = transform_apply_rotation_inv(trans, task.ray);
 
-  const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
-  const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
-  const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
+  const vec3 vertex  = v0.pos;
+  const vec3 vertex1 = v1.pos;
+  const vec3 vertex2 = v2.pos;
+
+  const vec3 edge1 = sub_vector(vertex1, vertex);
+  const vec3 edge2 = sub_vector(vertex2, vertex);
 
   vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
@@ -77,18 +82,18 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
   position = add_vector(vertex, add_vector(scale_vector(edge1, coords.x), scale_vector(edge2, coords.y)));
   position = transform_apply(trans, position);
 
-  const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
-  const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
-  const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
+  const UV vertex_texture  = uv_unpack(__float_as_uint(tri.x));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(tri.y));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(tri.z));
 
   const UV tex_coords = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 
-  const uint16_t material_id = __float_as_uint(t3.w) & 0xFFFF;
+  const uint16_t material_id = __float_as_uint(tri.w) & 0xFFFF;
   const DeviceMaterial mat   = load_material(device.ptrs.materials, material_id);
 
-  const vec3 vertex_normal  = normal_unpack(__float_as_uint(t3.x));
-  const vec3 vertex1_normal = normal_unpack(__float_as_uint(t3.y));
-  const vec3 vertex2_normal = normal_unpack(__float_as_uint(t3.z));
+  const vec3 vertex_normal  = normal_unpack(v0.normal);
+  const vec3 vertex1_normal = normal_unpack(v1.normal);
+  const vec3 vertex2_normal = normal_unpack(v2.normal);
 
   const vec3 edge1_normal = sub_vector(vertex1_normal, vertex_normal);
   const vec3 edge2_normal = sub_vector(vertex2_normal, vertex_normal);
@@ -173,12 +178,13 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
     flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const IORStackMethod ior_stack_method =
-    (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(trace.ior_stack, mat.refraction_index, ior_stack_method);
+  const bool refraction_is_inside = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) != 0;
 
-  const float ior_in  = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
-  const float ior_out = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+  const float other_ior    = medium_stack_ior_peek(medium, refraction_is_inside);
+  const uint16_t volume_id = medium_stack_volume_peek(medium, false);
+
+  const float ior_in  = (refraction_is_inside) ? mat.refraction_index : other_ior;
+  const float ior_out = (refraction_is_inside) ? other_ior : mat.refraction_index;
 
   // If we have a translucent substrate and the IOR change is within some small threshold, treat the material as fully transparent.
   if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(flags) && (fabsf(1.0f - ior_in / ior_out) < 1e-4f)) {
@@ -201,7 +207,7 @@ LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(const DeviceTask&
   ctx.position    = position;
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
-  ctx.volume_type = VolumeType(task.volume_id);
+  ctx.volume_type = VolumeType(volume_id);
 
   ctx.params.flags = flags;
 

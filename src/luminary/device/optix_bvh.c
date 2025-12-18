@@ -8,6 +8,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "device_memory.h"
+#include "device_mesh_instance_manager.h"
 #include "host_math.h"
 #include "internal_error.h"
 #include "utils.h"
@@ -42,10 +43,11 @@ static LuminaryResult _optix_bvh_compute_transform(Quaternion rotation, vec3 sca
 }
 
 static LuminaryResult _optix_bvh_get_optix_instance(
-  const Device* device, const MeshInstance* instance, uint32_t instance_id, OptixInstance* optix_instance, OptixBVHType type) {
+  const Device* device, const MeshInstance* instance, uint32_t instance_id, const ARRAY DeviceMesh** meshes, OptixInstance* optix_instance,
+  OptixBVHType type) {
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(device->meshes);
   __CHECK_NULL_ARGUMENT(instance);
+  __CHECK_NULL_ARGUMENT(meshes);
   __CHECK_NULL_ARGUMENT(optix_instance);
 
   memset(optix_instance, 0, sizeof(OptixInstance));
@@ -54,7 +56,7 @@ static LuminaryResult _optix_bvh_get_optix_instance(
   optix_instance->sbtOffset         = 0;
   optix_instance->visibilityMask    = (instance->active) ? ((1u << (device->optix_properties.num_bits_instance_visibility_mask)) - 1) : 0;
   optix_instance->flags             = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
-  optix_instance->traversableHandle = device->meshes[instance->mesh_id]->bvh->traversable[type];
+  optix_instance->traversableHandle = meshes[instance->mesh_id]->bvh->traversable[type];
 
   const Quaternion rotation = rotation_euler_angles_to_quaternion(instance->rotation);
 
@@ -63,9 +65,8 @@ static LuminaryResult _optix_bvh_get_optix_instance(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_instance_cache_create(OptixBVHInstanceCache** cache, Device* device) {
+LuminaryResult optix_bvh_instance_cache_create(OptixBVHInstanceCache** cache) {
   __CHECK_NULL_ARGUMENT(cache);
-  __CHECK_NULL_ARGUMENT(device);
 
   __FAILURE_HANDLE(host_malloc(cache, sizeof(OptixBVHInstanceCache)));
 
@@ -76,14 +77,16 @@ LuminaryResult optix_bvh_instance_cache_create(OptixBVHInstanceCache** cache, De
   (*cache)->num_instances           = 0;
   (*cache)->num_instances_allocated = 16;
 
-  (*cache)->device = device;
-
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_instance_cache_update(OptixBVHInstanceCache* cache, const ARRAY MeshInstanceUpdate* instance_updates) {
+LuminaryResult optix_bvh_instance_cache_update(
+  OptixBVHInstanceCache* cache, Device* device, const ARRAY MeshInstanceProcessedUpdate* instance_updates,
+  const ARRAY DeviceMesh** meshes) {
   __CHECK_NULL_ARGUMENT(cache);
+  __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(instance_updates);
+  __CHECK_NULL_ARGUMENT(meshes);
 
   uint32_t num_updates;
   __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_updates));
@@ -92,7 +95,7 @@ LuminaryResult optix_bvh_instance_cache_update(OptixBVHInstanceCache* cache, con
 
   // Compute the number of instances we will have afterwards
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const MeshInstanceUpdate* update = instance_updates + update_id;
+    const MeshInstanceProcessedUpdate* update = instance_updates + update_id;
 
     if (update->instance_id >= num_instances_after)
       num_instances_after = update->instance_id + 1;
@@ -108,10 +111,10 @@ LuminaryResult optix_bvh_instance_cache_update(OptixBVHInstanceCache* cache, con
 
       OptixInstance* direct_access_buffer;
       __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-        cache->device->staging_manager, new_instances, 0, sizeof(OptixInstance) * cache->num_instances, (void**) &direct_access_buffer));
+        device->staging_manager, new_instances, 0, sizeof(OptixInstance) * cache->num_instances, (void**) &direct_access_buffer));
 
       __FAILURE_HANDLE(device_download(
-        direct_access_buffer, cache->instances[type], 0, sizeof(OptixInstance) * cache->num_instances, cache->device->stream_main));
+        direct_access_buffer, cache->instances[type], 0, sizeof(OptixInstance) * cache->num_instances, device->stream_main));
 
       __FAILURE_HANDLE(device_free(&cache->instances[type]));
 
@@ -123,15 +126,15 @@ LuminaryResult optix_bvh_instance_cache_update(OptixBVHInstanceCache* cache, con
 
   // Stage the new optix instances
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const MeshInstanceUpdate* update = instance_updates + update_id;
+    const MeshInstanceProcessedUpdate* update = instance_updates + update_id;
 
     for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
       OptixInstance* direct_access_buffer;
       __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-        cache->device->staging_manager, cache->instances[type], sizeof(OptixInstance) * update->instance_id, sizeof(OptixInstance),
+        device->staging_manager, cache->instances[type], sizeof(OptixInstance) * update->instance_id, sizeof(OptixInstance),
         (void**) &direct_access_buffer));
 
-      __FAILURE_HANDLE(_optix_bvh_get_optix_instance(cache->device, &update->instance, update->instance_id, direct_access_buffer, type));
+      __FAILURE_HANDLE(_optix_bvh_get_optix_instance(device, &update->instance, update->instance_id, meshes, direct_access_buffer, type));
     }
   }
 
@@ -179,11 +182,10 @@ static LuminaryResult _optix_bvh_free(OptixBVH* bvh) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* mesh, const OpacityMicromap* omm) {
+LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const DeviceMesh* mesh) {
   __CHECK_NULL_ARGUMENT(bvh);
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(mesh);
-  __CHECK_NULL_ARGUMENT(omm);
 
   __FAILURE_HANDLE(_optix_bvh_free(bvh));
 
@@ -202,27 +204,17 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
   memset(&build_input, 0, sizeof(OptixBuildInput));
   build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-  DEVICE float* device_vertex_buffer;
-  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * mesh->data.vertex_count));
-  __FAILURE_HANDLE(
-    device_upload(device_vertex_buffer, mesh->data.vertex_buffer, 0, sizeof(float) * 4 * mesh->data.vertex_count, device->stream_main));
-
-  CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(device_vertex_buffer);
+  CUdeviceptr vertex_buffer_ptr = DEVICE_CUPTR(mesh->vertices);
 
   build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
   build_input.triangleArray.vertexStrideInBytes = 16;
-  build_input.triangleArray.numVertices         = mesh->data.vertex_count;
-  build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
+  build_input.triangleArray.numVertices         = mesh->triangle_count * 3;
+  build_input.triangleArray.vertexBuffers       = &vertex_buffer_ptr;
 
-  DEVICE uint32_t* device_index_buffer;
-  __FAILURE_HANDLE(device_malloc(&device_index_buffer, sizeof(uint32_t) * 4 * mesh->data.triangle_count));
-  __FAILURE_HANDLE(
-    device_upload(device_index_buffer, mesh->data.index_buffer, 0, sizeof(uint32_t) * 4 * mesh->data.triangle_count, device->stream_main));
-
-  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-  build_input.triangleArray.indexStrideInBytes = 16;
-  build_input.triangleArray.numIndexTriplets   = mesh->data.triangle_count;
-  build_input.triangleArray.indexBuffer        = DEVICE_CUPTR(device_index_buffer);
+  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_NONE;
+  build_input.triangleArray.indexStrideInBytes = 0;
+  build_input.triangleArray.numIndexTriplets   = 0;
+  build_input.triangleArray.indexBuffer        = (CUdeviceptr) 0;
 
   for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
     unsigned int inputFlags = 0;
@@ -233,8 +225,8 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     build_input.triangleArray.numSbtRecords = 1;
 
     // OMMs is only available on GPUs with RT cores
-    if (device->optix_properties.rtcore_version > 0)
-      build_input.triangleArray.opacityMicromap = omm->optix_build_input;
+    if (device->optix_properties.rtcore_version > 0 && mesh->omm)
+      build_input.triangleArray.opacityMicromap = mesh->omm->optix_build_input;
 
     ////////////////////////////////////////////////////////////////////
     // Building BVH
@@ -289,26 +281,17 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     bvh->allocated_mask[type] = true;
   }
 
-  ////////////////////////////////////////////////////////////////////
-  // Clean up
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(device_free(&device_vertex_buffer));
-  __FAILURE_HANDLE(device_free(&device_index_buffer));
-
   bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
+LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device, const OptixBVHInstanceCache* cache) {
   __CHECK_NULL_ARGUMENT(bvh);
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(device->optix_instance_cache);
-
   __FAILURE_HANDLE(_optix_bvh_free(bvh));
 
-  if (device->optix_instance_cache->num_instances == 0)
+  if (cache->num_instances == 0)
     return LUMINARY_SUCCESS;
 
   ////////////////////////////////////////////////////////////////////
@@ -329,9 +312,9 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
     memset(&build_input, 0, sizeof(OptixBuildInput));
     build_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
 
-    build_input.instanceArray.instances      = DEVICE_CUPTR(device->optix_instance_cache->instances[type]);
+    build_input.instanceArray.instances      = DEVICE_CUPTR(cache->instances[type]);
     build_input.instanceArray.instanceStride = sizeof(OptixInstance);
-    build_input.instanceArray.numInstances   = device->optix_instance_cache->num_instances;
+    build_input.instanceArray.numInstances   = cache->num_instances;
 
     ////////////////////////////////////////////////////////////////////
     // Building BVH
@@ -396,7 +379,7 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightTree* tree) {
+LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const DeviceLightTree* tree) {
   __CHECK_NULL_ARGUMENT(bvh);
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(tree);
@@ -418,14 +401,9 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   memset(&build_input, 0, sizeof(OptixBuildInput));
   build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-  const uint32_t vertex_count = 3 * tree->light_count;
+  const uint32_t vertex_count = 3 * tree->allocated_light_count;
 
-  DEVICE float* device_vertex_buffer;
-  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * vertex_count));
-  __FAILURE_HANDLE(
-    device_upload(device_vertex_buffer, tree->bvh_vertex_buffer_data, 0, sizeof(float) * 4 * vertex_count, device->stream_main));
-
-  CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(device_vertex_buffer);
+  CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(tree->bvh_vertex_buffer);
 
   build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
   build_input.triangleArray.vertexStrideInBytes = 16;
@@ -494,14 +472,7 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   bvh->bvh_data[OPTIX_BVH_TYPE_DEFAULT]       = output_buffer;
   bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]    = traversable;
   bvh->allocated_mask[OPTIX_BVH_TYPE_DEFAULT] = true;
-
-  ////////////////////////////////////////////////////////////////////
-  // Clean up
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(device_free(&device_vertex_buffer));
-
-  bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+  bvh->fast_trace                             = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
 
   return LUMINARY_SUCCESS;
 }
@@ -528,7 +499,7 @@ LuminaryResult optix_bvh_particles_gas_build(OptixBVH* bvh, Device* device, cons
   memset(&build_input, 0, sizeof(OptixBuildInput));
   build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-  const uint32_t vertex_count = particles_handle->count * 6;
+  const uint32_t vertex_count = particles_handle->allocated_count * 6;
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(particles_handle->vertex_buffer);
 

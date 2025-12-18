@@ -26,6 +26,9 @@ LUMINARY_FUNCTION float mis_compute_weight_base(
 LUMINARY_FUNCTION float mis_compute_weight_gi(
   const vec3 origin, const TriangleLight light, const RGBF light_color, const float dist, const float gi_pdf,
   const float light_tree_root_sum) {
+  if (light_tree_root_sum == 0.0f)
+    return 1.0f;
+
   const float light_area  = light_triangle_get_area(light);
   const float solid_angle = light_triangle_get_solid_angle(light, origin);
   const float power       = color_importance(light_color) * light_area;

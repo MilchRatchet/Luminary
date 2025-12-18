@@ -19,7 +19,7 @@
 #define PURKINJE_STRENGTH (5000.0f)
 
 LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
-  if (luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))
+  if (color_luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))
     return pixel;
 
   // sRGB => LMSR
@@ -42,9 +42,9 @@ LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
 
   RGBF signal;
 
-  signal.r = 1.0f / sqrtf(inverse_signal.r);
-  signal.g = 1.0f / sqrtf(inverse_signal.g);
-  signal.b = 1.0f / sqrtf(inverse_signal.b);
+  signal.r = rsqrtf(inverse_signal.r);
+  signal.g = rsqrtf(inverse_signal.g);
+  signal.b = rsqrtf(inverse_signal.b);
 
   const float K  = 45.0f;
   const float S  = 10.0f;
@@ -82,7 +82,7 @@ LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
 
   UTILS_CHECK_NANS(UTILS_NO_PIXEL_SELECTED, sRGB);
 
-  float blend = __saturatef(1.0f - PURKINJE_STRENGTH * luminance(pixel));
+  float blend = __saturatef(1.0f - PURKINJE_STRENGTH * color_luminance(pixel));
 
   blend *= blend;
 

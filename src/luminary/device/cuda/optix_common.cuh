@@ -3,7 +3,6 @@
 
 #if defined(OPTIX_KERNEL)
 
-#include "ior_stack.cuh"
 #include "memory.cuh"
 #include "optix_utils.cuh"
 #include "utils.cuh"

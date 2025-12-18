@@ -7,6 +7,7 @@
 #include "vault_object.h"
 
 struct Device typedef Device;
+struct DeviceRenderer typedef DeviceRenderer;
 
 #define DEVICE_OUTPUT_BUFFER_COUNT 128
 #define DEVICE_OUTPUT_CALLBACK_COUNT 128
@@ -47,8 +48,9 @@ DEVICE_CTX_FUNC LuminaryResult device_output_set_properties(DeviceOutput* output
 DEVICE_CTX_FUNC LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camera* camera);
 DEVICE_CTX_FUNC LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProperties props);
 DEVICE_CTX_FUNC LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data);
-LuminaryResult device_output_will_output(DeviceOutput* output, Device* device, bool* does_output);
+LuminaryResult device_output_will_output(DeviceOutput* output, DeviceRenderer* renderer, bool* does_output);
 DEVICE_CTX_FUNC LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id);
+DEVICE_CTX_FUNC LuminaryResult device_output_wait_for_completion(DeviceOutput* output, CUstream stream);
 DEVICE_CTX_FUNC LuminaryResult device_output_destroy(DeviceOutput** output);
 
 #endif /* LUMINARY_DEVICE_OUTPUT_H */

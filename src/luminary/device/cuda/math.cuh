@@ -23,9 +23,9 @@ LUMINARY_FUNCTION float difference_of_products(const float a, const float b, con
 LUMINARY_FUNCTION vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
-  result.x = difference_of_products(a.y, b.z, a.z, b.y);
-  result.y = difference_of_products(a.z, b.x, a.x, b.z);
-  result.z = difference_of_products(a.x, b.y, a.y, b.x);
+  result.x = a.y * b.z - a.z * b.y;
+  result.y = a.z * b.x - a.x * b.z;
+  result.z = a.x * b.y - a.y * b.x;
 
   return result;
 }
@@ -172,7 +172,7 @@ LUMINARY_FUNCTION vec3 floor_vector(const vec3 x) {
 }
 
 LUMINARY_FUNCTION vec3 normalize_vector(vec3 vector) {
-  const float scale = rnorm3df(vector.x, vector.y, vector.z);
+  const float scale = rsqrtf(dot_product(vector, vector));
 
   vector.x *= scale;
   vector.y *= scale;
@@ -197,7 +197,7 @@ LUMINARY_FUNCTION vec3 reflect_vector(const vec3 V, const vec3 normal) {
 }
 
 LUMINARY_FUNCTION float get_length(const vec3 vector) {
-  return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+  return sqrtf(dot_product(vector, vector));
 }
 
 LUMINARY_FUNCTION float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
@@ -351,14 +351,14 @@ LUMINARY_FUNCTION int trailing_zeros(const unsigned int n) {
 }
 
 LUMINARY_FUNCTION Quaternion normalize_quaternion(const Quaternion q) {
-  const float length = sqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  const float scale = rsqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
 
   Quaternion res;
 
-  res.x = q.x / length;
-  res.y = q.y / length;
-  res.z = q.z / length;
-  res.w = q.w / length;
+  res.x = q.x * scale;
+  res.y = q.y * scale;
+  res.z = q.z * scale;
+  res.w = q.w * scale;
 
   return res;
 }
@@ -386,7 +386,7 @@ LUMINARY_FUNCTION Quaternion quaternion_rotation_to_z_canonical(const vec3 v) {
   res.z = 0.0f;
   res.w = 1.0f + v.z;
 
-  const float norm = rnorm3df(res.x, res.y, res.w);
+  const float norm = rsqrtf(res.x * res.x + res.y * res.y + res.w * res.w);
 
   res.x *= norm;
   res.y *= norm;
@@ -931,6 +931,16 @@ LUMINARY_FUNCTION RGBF inv_color(const RGBF a) {
   return result;
 }
 
+LUMINARY_FUNCTION RGBF lerp_color(const RGBF a, const RGBF b, const float t) {
+  RGBF result;
+
+  result.r = lerp(a.r, b.r, t);
+  result.g = lerp(a.g, b.g, t);
+  result.b = lerp(a.b, b.b, t);
+
+  return result;
+}
+
 LUMINARY_FUNCTION int color_any(const RGBF a) {
   return (a.r > 0.0f || a.g > 0.0f || a.b > 0.0f);
 }
@@ -1049,7 +1059,7 @@ LUMINARY_FUNCTION float SRGB_to_linearRGB(const float value) {
   }
 }
 
-LUMINARY_FUNCTION float luminance(const RGBF v) {
+LUMINARY_FUNCTION float color_luminance(const RGBF v) {
   return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
 }
 
@@ -1069,7 +1079,7 @@ LUMINARY_FUNCTION RGBAF saturate_albedo(RGBAF color, float change) {
 }
 
 LUMINARY_FUNCTION RGBF filter_gray(const RGBF color) {
-  const float value = luminance(color);
+  const float value = color_luminance(color);
 
   return get_color(value, value, value);
 }
@@ -1081,7 +1091,7 @@ LUMINARY_FUNCTION RGBF filter_sepia(const RGBF color) {
 }
 
 LUMINARY_FUNCTION RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 4.0f * luminance(color);
+  const float value  = 4.0f * color_luminance(color);
   const float dither = random_dither_mask(x, y);
 
   const int tone = (int) (value + dither);
@@ -1100,7 +1110,7 @@ LUMINARY_FUNCTION RGBF filter_gameboy(const RGBF color, const uint32_t x, const 
 }
 
 LUMINARY_FUNCTION RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 4.0f * luminance(color);
+  const float value  = 4.0f * color_luminance(color);
   const float dither = random_dither_mask(x, y);
 
   const int tone = (int) (value + dither);
@@ -1142,7 +1152,7 @@ LUMINARY_FUNCTION RGBF filter_crt(RGBF color, int x, int y) {
 }
 
 LUMINARY_FUNCTION RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 2.0f * luminance(color);
+  const float value  = 2.0f * color_luminance(color);
   const float dither = random_dither_mask(x, y);
 
   const int tone = (int) (value + dither);
@@ -1745,6 +1755,16 @@ LUMINARY_FUNCTION PackedNormal normal_pack(const vec3 normal) {
   const uint32_t y_u16 = (uint32_t) (y * 0xFFFF + 0.5f);
 
   return (y_u16 << 16) | x_u16;
+}
+
+// BSDF transparent fast path relies on this precision.
+// If the precision is improved in the future we will run into INFs with surfaces with refractive index close to 1.
+LUMINARY_FUNCTION uint32_t ior_compress(const float ior) {
+  return (__float_as_uint((0.5f * (ior - 1.0f)) + 1.0f) >> 15) & 0xFF;
+}
+
+LUMINARY_FUNCTION float ior_decompress(const uint32_t compressed_ior) {
+  return ((__uint_as_float(0x3F800000u | (compressed_ior << 15)) - 1.0f) * 2.0f) + 1.0f;
 }
 
 #endif /* CU_MATH_H */

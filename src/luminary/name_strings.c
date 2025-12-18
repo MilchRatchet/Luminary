@@ -8,6 +8,13 @@ const char* const luminary_strings_shading_mode[LUMINARY_SHADING_MODE_COUNT] = {
   [LUMINARY_SHADING_MODE_IDENTIFICATION] = "Identification",
   [LUMINARY_SHADING_MODE_LIGHTS]         = "Lights"};
 
+const char* const luminary_strings_adaptive_sampling_output_mode[LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT] = {
+  [LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY]              = "Beauty",
+  [LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE]            = "Rel Variance",
+  [LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR]               = "Rel Error",
+  [LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION] = "Sample Distribution",
+};
+
 const char* const luminary_strings_filter[LUMINARY_FILTER_COUNT] = {
   [LUMINARY_FILTER_NONE]       = "None",
   [LUMINARY_FILTER_GRAY]       = "Gray",

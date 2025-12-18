@@ -8,11 +8,9 @@
 struct Device typedef Device;
 
 struct DeviceResultEntry {
-  uint32_t sample_count;
-  STAGING void* direct_lighting_results;
-  STAGING void* indirect_lighting_results_red[MAX_NUM_INDIRECT_BUCKETS];
-  STAGING void* indirect_lighting_results_green[MAX_NUM_INDIRECT_BUCKETS];
-  STAGING void* indirect_lighting_results_blue[MAX_NUM_INDIRECT_BUCKETS];
+  uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
+  STAGING float* frame_first_moment[FRAME_CHANNEL_COUNT];
+  STAGING float* frame_second_moment_luminance;
   CUevent available_event;
   uint32_t consumer_event_id;
   bool queued;
@@ -37,7 +35,9 @@ struct DeviceResultInterface {
 } typedef DeviceResultInterface;
 
 LuminaryResult device_result_interface_create(DeviceResultInterface** interface);
-DEVICE_CTX_FUNC LuminaryResult device_result_interface_set_pixel_count(DeviceResultInterface* interface, uint32_t width, uint32_t height);
+LuminaryResult device_result_interface_set_pixel_count(
+  DeviceResultInterface* interface, uint32_t width, uint32_t height, bool* entries_must_be_freed);
+DEVICE_CTX_FUNC LuminaryResult device_result_interface_free_entries(DeviceResultInterface* interface, uint32_t device_id);
 DEVICE_CTX_FUNC LuminaryResult device_result_interface_queue_result(DeviceResultInterface* interface, Device* device);
 DEVICE_CTX_FUNC LuminaryResult device_result_interface_gather_results(DeviceResultInterface* interface, Device* device);
 LuminaryResult device_result_interface_destroy(DeviceResultInterface** interface);
