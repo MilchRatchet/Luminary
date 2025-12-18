@@ -140,7 +140,6 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
   }
 
   vec3 connection_point;
-  float sum_connection_weight = 0.0f;
   float connection_weight;
 
   if (sampling_domain.fast_path) {
@@ -148,66 +147,33 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
     float sample_weight;
     caustics_find_connection_point(ctx, path_id, sampling_domain, IS_UNDERWATER, 0, 1, sample_point, sample_weight);
 
-    sum_connection_weight = sample_weight;
-    connection_point      = sample_point;
-    connection_weight     = sample_weight;
+    connection_point  = sample_point;
+    connection_weight = sample_weight;
   }
   else {
-    const uint32_t num_samples = device.ocean.caustics_ris_sample_count + 1;
-
-    float sum_weights_front = 0.0f;
-    float sum_weights_back  = 0.0f;
-
-    uint32_t index_front = (uint32_t) -1;
-    uint32_t index_back  = num_samples;
-
     const float resampling_random = random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_RESAMPLING, path_id);
+    const uint32_t num_samples    = device.ocean.caustics_ris_sample_count + 1;
 
-    for (uint32_t iteration = 0; iteration <= num_samples; iteration++) {
-      const bool compute_front = (sum_weights_front <= resampling_random * (sum_weights_front + sum_weights_back));
+    RISStratifiedReservoir reservoir = ris_stratified_reservoir_init(resampling_random, num_samples);
 
-      if (!compute_front && iteration == num_samples)
-        break;
+    const float mis_weight = 1.0f / num_samples;
 
-      uint32_t current_index;
-      if (compute_front) {
-        current_index = ++index_front;
-      }
-      else {
-        current_index = --index_back;
-      }
-
-      // This happens if all samples had a weight of zero
-      if (current_index == num_samples)
-        break;
-
+    uint32_t index;
+    while (ris_stratified_reservoir_next(reservoir, index)) {
       vec3 sample_point;
-      float sample_weight  = 0.0f;
-      const bool valid_hit = caustics_find_connection_point(
-        ctx, path_id, sampling_domain, IS_UNDERWATER, current_index, num_samples, sample_point, sample_weight);
+      float sample_weight = 0.0f;
+      const bool valid_hit =
+        caustics_find_connection_point(ctx, path_id, sampling_domain, IS_UNDERWATER, index, num_samples, sample_point, sample_weight);
 
-      if (valid_hit == false || sample_weight == 0.0f)
-        continue;
+      const float target = (valid_hit) ? 1.0f : 0.0f;
+      sample_weight      = (valid_hit) ? mis_weight * sample_weight : 0.0f;
 
-      if (compute_front) {
+      if (ris_stratified_reservoir_add_sample(reservoir, target, sample_weight)) {
         connection_point = sample_point;
-      }
-
-      // Last iteration cannot add to the weight sums to avoid double counting
-      if (iteration == num_samples)
-        break;
-
-      if (compute_front) {
-        sum_weights_front += sample_weight;
-      }
-      else {
-        sum_weights_back += sample_weight;
       }
     }
 
-    sum_connection_weight = sum_weights_front + sum_weights_back;
-
-    connection_weight = (1.0f / num_samples) * sum_connection_weight;
+    connection_weight = ris_stratified_reservoir_get_sampling_weight(reservoir);
 
     // Make no mistake. I do in fact have no idea what I am doing. So I just empirically gathered that these
     // weights are correct (they are very unlikely to be correct). I will look into fixing this the moment
@@ -222,7 +188,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
     }
   }
 
-  if (sum_connection_weight == 0.0f) {
+  if (connection_weight == 0.0f) {
     DeviceTaskDirectLightSun task;
     task.light_color = PACKED_RECORD_BLACK;
     return task;
