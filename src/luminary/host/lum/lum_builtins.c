@@ -30,7 +30,7 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]  = sizeof(LuminaryMaterial),
   [LUM_BUILTIN_TYPE_INSTANCE]  = sizeof(LuminaryInstance),
   [LUM_BUILTIN_TYPE_METADATA]  = 0,  // Static
-  [LUM_BUILTIN_TYPE_STRING]    = LUM_LITERAL_STRING_MAX_LENGTH};
+  [LUM_BUILTIN_TYPE_STRING]    = sizeof(char*)};
 
 const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID] = "",        [LUM_BUILTIN_TYPE_RGBF] = "f32x3",   [LUM_BUILTIN_TYPE_VEC3] = "f32x3",

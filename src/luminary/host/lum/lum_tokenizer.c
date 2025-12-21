@@ -6,9 +6,13 @@
 #include "internal_error.h"
 
 static const char _lum_separator_chars[LUM_SEPARATOR_COUNT] = {
-  [LUM_SEPARATOR_TYPE_EOL] = ';',    [LUM_SEPARATOR_TYPE_FUNC_BEGIN] = '[',   [LUM_SEPARATOR_TYPE_FUNC_END] = ']',
-  [LUM_SEPARATOR_TYPE_MEMBER] = '.', [LUM_SEPARATOR_TYPE_VECTOR_BEGIN] = '(', [LUM_SEPARATOR_TYPE_VECTOR_END] = ')',
-  [LUM_SEPARATOR_TYPE_LIST] = ','};
+  [LUM_SEPARATOR_TYPE_EOL]               = ';',
+  [LUM_SEPARATOR_TYPE_REF_BEGIN]         = '[',
+  [LUM_SEPARATOR_TYPE_REF_END]           = ']',
+  [LUM_SEPARATOR_TYPE_MEMBER]            = '.',
+  [LUM_SEPARATOR_TYPE_LIST]              = ',',
+  [LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN] = '{',
+  [LUM_SEPARATOR_TYPE_INITIALIZER_END]   = '}'};
 
 LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer) {
   __CHECK_NULL_ARGUMENT(tokenizer);
@@ -22,13 +26,15 @@ LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer) {
 }
 
 static uint32_t _lum_identifier_get_num_chars(const char* code, const bool for_literal) {
-  const char* next_space   = strchr(code, ' ');
-  const char* next_newline = strchr(code, '\n');
+  const char* next_space            = strchr(code, ' ');
+  const char* next_newline          = strchr(code, '\n');
+  const char* next_charriage_return = strchr(code, '\r');
 
   uint32_t num_chars = UINT32_MAX;
 
   num_chars = (next_space) ? min(next_space - code, num_chars) : num_chars;
   num_chars = (next_newline) ? min(next_newline - code, num_chars) : num_chars;
+  num_chars = (next_charriage_return) ? min(next_charriage_return - code, num_chars) : num_chars;
 
   for (uint32_t separator_id = 0; separator_id < LUM_SEPARATOR_COUNT; separator_id++) {
     // Member separator is special as it is allowed to be part of a literal
@@ -45,6 +51,83 @@ static uint32_t _lum_identifier_get_num_chars(const char* code, const bool for_l
   }
 
   return num_chars;
+}
+
+static uint32_t _lum_literal_parse_string(const char* code, LumToken* token) {
+  uint32_t read_chars       = 0;
+  uint32_t write_offset     = 0;
+  uint32_t allocated_length = 256;
+
+  char* dst;
+  __FAILURE_HANDLE(host_malloc(&dst, allocated_length));
+
+  while (code[read_chars] != '\0') {
+    // Carriage return
+    if (code[read_chars] == '\r') {
+      read_chars++;
+      continue;
+    }
+
+    // Newline
+    if (code[read_chars] == '\n') {
+      read_chars++;
+      continue;
+    }
+
+    // String End
+    if (code[read_chars] == '\"') {
+      read_chars++;
+      break;
+    }
+
+    // Escape Sequence
+    if (code[read_chars] == '\\') {
+      read_chars++;
+
+      if (write_offset == allocated_length) {
+        allocated_length *= 2;
+        __FAILURE_HANDLE(host_realloc(&dst, allocated_length));
+      }
+
+      switch (code[read_chars]) {
+        case '0':
+          dst[write_offset++] = '\0';
+          break;
+        case 'n':
+          dst[write_offset++] = '\n';
+          break;
+        case 't':
+          dst[write_offset++] = '\t';
+          break;
+        case 'r':
+          dst[write_offset++] = '\r';
+          break;
+        default:
+          break;
+      }
+
+      read_chars++;
+      continue;
+    }
+
+    if (write_offset == allocated_length) {
+      allocated_length *= 2;
+      __FAILURE_HANDLE(host_realloc(&dst, allocated_length));
+    }
+
+    dst[write_offset++] = code[read_chars];
+
+    read_chars++;
+  }
+
+  __FAILURE_HANDLE(host_realloc(&dst, write_offset + 1));
+
+  dst[write_offset++] = '\0';
+
+  token->literal.val_string    = dst;
+  token->literal.string_length = write_offset - 1;
+
+  return read_chars;
 }
 
 static bool _lum_tokenizer_is_identifier(LumToken* token, const char* code, uint32_t* consumed_chars) {
@@ -81,6 +164,13 @@ static bool _lum_tokenizer_is_keyword(LumToken* token, const char* code, uint32_
 }
 
 static bool _lum_tokenizer_is_literal(LumToken* token, const char* code, uint32_t* consumed_chars) {
+  if (code[0] == '\"') {
+    token->type         = LUM_TOKEN_TYPE_LITERAL;
+    token->literal.type = LUM_LITERAL_TYPE_STRING;
+    *consumed_chars     = _lum_literal_parse_string(code + 1, token) + 1;
+    return true;
+  }
+
   const uint32_t num_chars = _lum_identifier_get_num_chars(code, true);
 
   if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH - 1)
@@ -126,48 +216,40 @@ static bool _lum_tokenizer_is_literal(LumToken* token, const char* code, uint32_
       *consumed_chars         = num_chars;
       return true;
     }
+
+    return false;
   }
-  else {
-    if (code[0] == '\"') {
-      token->type         = LUM_TOKEN_TYPE_LITERAL;
-      token->literal.type = LUM_LITERAL_TYPE_STRING;
-      memcpy(token->literal.val_string, code + 1, num_chars - 2);
-      token->literal.val_string[num_chars - 2] = '\0';
-      *consumed_chars                          = num_chars;
-      return true;
-    }
 
-    if (num_chars == 4 && code[0] == 't' && code[1] == 'r' && code[2] == 'u' && code[3] == 'e') {
+  if (num_chars == 4 && code[0] == 't' && code[1] == 'r' && code[2] == 'u' && code[3] == 'e') {
+    token->type             = LUM_TOKEN_TYPE_LITERAL;
+    token->literal.type     = LUM_LITERAL_TYPE_BOOL;
+    token->literal.val_bool = true;
+    *consumed_chars         = num_chars;
+    return true;
+  }
+
+  if (num_chars == 5 && code[0] == 'f' && code[1] == 'a' && code[2] == 'l' && code[3] == 's' && code[4] == 'e') {
+    token->type             = LUM_TOKEN_TYPE_LITERAL;
+    token->literal.type     = LUM_LITERAL_TYPE_BOOL;
+    token->literal.val_bool = false;
+    *consumed_chars         = num_chars;
+    return true;
+  }
+
+  for (uint32_t enum_type = 0; enum_type < LUM_BUILTIN_ENUM_COUNT; enum_type++) {
+    const LumBuiltinEnumValuePair* pair = lum_builtin_enums + enum_type;
+
+    const size_t string_length = strlen(pair->string);
+
+    if (string_length != num_chars)
+      continue;
+
+    if (memcmp(pair->string, code, num_chars) == 0) {
       token->type             = LUM_TOKEN_TYPE_LITERAL;
-      token->literal.type     = LUM_LITERAL_TYPE_BOOL;
-      token->literal.val_bool = true;
+      token->literal.type     = LUM_LITERAL_TYPE_ENUM;
+      token->literal.val_enum = pair->value;
       *consumed_chars         = num_chars;
       return true;
-    }
-
-    if (num_chars == 5 && code[0] == 'f' && code[1] == 'a' && code[2] == 'l' && code[3] == 's' && code[4] == 'e') {
-      token->type             = LUM_TOKEN_TYPE_LITERAL;
-      token->literal.type     = LUM_LITERAL_TYPE_BOOL;
-      token->literal.val_bool = false;
-      *consumed_chars         = num_chars;
-      return true;
-    }
-
-    for (uint32_t enum_type = 0; enum_type < LUM_BUILTIN_ENUM_COUNT; enum_type++) {
-      const LumBuiltinEnumValuePair* pair = lum_builtin_enums + enum_type;
-
-      const size_t string_length = strlen(pair->string);
-
-      if (string_length != num_chars)
-        continue;
-
-      if (memcmp(pair->string, code, num_chars) == 0) {
-        token->type             = LUM_TOKEN_TYPE_LITERAL;
-        token->literal.type     = LUM_LITERAL_TYPE_ENUM;
-        token->literal.val_enum = pair->value;
-        *consumed_chars         = num_chars;
-        return true;
-      }
     }
   }
 
@@ -350,23 +432,23 @@ LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer) {
           case LUM_SEPARATOR_TYPE_EOL:
             info_message("[%04u:%04u][SEPARATOR] EOL", token.line, token.col);
             break;
-          case LUM_SEPARATOR_TYPE_FUNC_BEGIN:
-            info_message("[%04u:%04u][SEPARATOR] Func Begin", token.line, token.col);
+          case LUM_SEPARATOR_TYPE_REF_BEGIN:
+            info_message("[%04u:%04u][SEPARATOR] Reference Begin", token.line, token.col);
             break;
-          case LUM_SEPARATOR_TYPE_FUNC_END:
-            info_message("[%04u:%04u][SEPARATOR] Func End", token.line, token.col);
+          case LUM_SEPARATOR_TYPE_REF_END:
+            info_message("[%04u:%04u][SEPARATOR] Reference End", token.line, token.col);
             break;
           case LUM_SEPARATOR_TYPE_MEMBER:
             info_message("[%04u:%04u][SEPARATOR] Member", token.line, token.col);
             break;
-          case LUM_SEPARATOR_TYPE_VECTOR_BEGIN:
-            info_message("[%04u:%04u][SEPARATOR] Vector Begin", token.line, token.col);
-            break;
-          case LUM_SEPARATOR_TYPE_VECTOR_END:
-            info_message("[%04u:%04u][SEPARATOR] Vector End", token.line, token.col);
-            break;
           case LUM_SEPARATOR_TYPE_LIST:
             info_message("[%04u:%04u][SEPARATOR] List", token.line, token.col);
+            break;
+          case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN:
+            info_message("[%04u:%04u][SEPARATOR] Initializer Begin", token.line, token.col);
+            break;
+          case LUM_SEPARATOR_TYPE_INITIALIZER_END:
+            info_message("[%04u:%04u][SEPARATOR] Initializer End", token.line, token.col);
             break;
           default:
             info_message("[%04u:%04u][SEPARATOR] Unknown", token.line, token.col);
@@ -384,6 +466,19 @@ LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer) {
 
 LuminaryResult lum_tokenizer_destroy(LumTokenizer** tokenizer) {
   __CHECK_NULL_ARGUMENT(tokenizer);
+
+  uint32_t num_tokens;
+  __FAILURE_HANDLE(array_get_num_elements((*tokenizer)->tokens, &num_tokens));
+
+  for (uint32_t token_id = 0; token_id < num_tokens; token_id++) {
+    LumToken* token = (*tokenizer)->tokens + token_id;
+
+    if (token->type == LUM_TOKEN_TYPE_LITERAL) {
+      if (token->literal.type == LUM_LITERAL_TYPE_STRING) {
+        __FAILURE_HANDLE(host_free(&token->literal.val_string));
+      }
+    }
+  }
 
   __FAILURE_HANDLE(array_destroy(&(*tokenizer)->tokens));
 
