@@ -160,6 +160,13 @@ static bool _lum_tokenizer_is_keyword(LumTokenizer* tokenizer, LumToken* token, 
   LUM_UNUSED(tokenizer);
   LUM_UNUSED(token);
 
+  const char* code = tokenizer->code + tokenizer->read_offset;
+
+  const uint32_t num_chars = _lum_identifier_get_num_chars(code, false);
+
+  if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH - 1)
+    return false;
+
   *consumed_chars = 0;
 
   return false;
@@ -343,6 +350,9 @@ LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken*
       do {
         comment_char = tokenizer->code[tokenizer->read_offset++];
       } while (comment_char != '\0' && comment_char != '\n');
+
+      tokenizer->line++;
+      tokenizer->col = 0;
 
       continue;
     }
