@@ -19,21 +19,17 @@ LuminaryResult lum_parser_execute(LumParser* parser, const char* code, LumBinary
   __CHECK_NULL_ARGUMENT(parser);
   __CHECK_NULL_ARGUMENT(code);
 
-  LumTokenizer* tokenizer;
-  __FAILURE_HANDLE(lum_tokenizer_create(&tokenizer));
-
-  __FAILURE_HANDLE(lum_tokenizer_execute(tokenizer, code));
-
-  __FAILURE_HANDLE(lum_tokenizer_print(tokenizer));
-
   LumCompiler* compiler;
   __FAILURE_HANDLE(lum_compiler_create(&compiler));
 
-  __FAILURE_HANDLE(lum_compiler_compile(compiler, tokenizer->tokens, binary));
+  LumCompilerCompileInfo info;
+  info.binary             = binary;
+  info.code               = code;
+  info.print_parsed_token = true;
+
+  __FAILURE_HANDLE(lum_compiler_compile(compiler, &info));
 
   __FAILURE_HANDLE(lum_compiler_destroy(&compiler));
-
-  __FAILURE_HANDLE(lum_tokenizer_destroy(&tokenizer));
 
   return LUMINARY_SUCCESS;
 }

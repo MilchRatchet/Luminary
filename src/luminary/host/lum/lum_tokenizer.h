@@ -17,6 +17,7 @@ enum LumTokenType {
   LUM_TOKEN_TYPE_LITERAL,
   LUM_TOKEN_TYPE_OPERATOR,
   LUM_TOKEN_TYPE_SEPARATOR,
+  LUM_TOKEN_TYPE_EOF,
   LUM_TOKEN_TYPE_COUNT
 } typedef LumTokenType;
 
@@ -51,8 +52,8 @@ enum LumOperatorType {
 enum LumSeparatorType {
   // Version 1
   LUM_SEPARATOR_TYPE_EOL,                // ;
-  LUM_SEPARATOR_TYPE_REF_BEGIN,          // [
-  LUM_SEPARATOR_TYPE_REF_END,            // ]
+  LUM_SEPARATOR_TYPE_ACCESS_BEGIN,       // [
+  LUM_SEPARATOR_TYPE_ACCESS_END,         // ]
   LUM_SEPARATOR_TYPE_MEMBER,             // .
   LUM_SEPARATOR_TYPE_LIST,               // ,
   LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN,  // {
@@ -76,6 +77,11 @@ struct LumTokenKeyword {
   LumKeywordType type;
 } typedef LumTokenKeyword;
 
+struct LumTokenLiteralString {
+  char* data;
+  uint32_t length;
+} typedef LumTokenLiteralString;
+
 struct LumTokenLiteral {
   LumLiteralType type;
   union {
@@ -84,9 +90,8 @@ struct LumTokenLiteral {
     uint32_t val_uint;
     bool val_bool;
     uint32_t val_enum;
-    char* val_string;
+    LumTokenLiteralString val_string;
   };
-  uint32_t string_length;
 } typedef LumTokenLiteral;
 
 struct LumTokenOperator {
@@ -116,12 +121,18 @@ struct LumToken {
 } typedef LumToken;
 
 struct LumTokenizer {
-  ARRAY LumToken* tokens;
+  const char* code;
+  uint32_t read_offset;
+  uint32_t line;
+  uint32_t col;
+  char* string_mem;
+  uint32_t allocated_string_mem;
 } typedef LumTokenizer;
 
 LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer);
-LuminaryResult lum_tokenizer_execute(LumTokenizer* tokenizer, const char* code);
-LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer);
+LuminaryResult lum_tokenizer_set_code(LumTokenizer* tokenizer, const char* code);
+LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken* token);
+LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer, const LumToken token);
 LuminaryResult lum_tokenizer_destroy(LumTokenizer** tokenizer);
 
 #endif /* LUMINARY_LUM_TOKENIZER_H */
