@@ -44,10 +44,10 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_PARTICLES]        = sizeof(LuminaryParticles),
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(LuminaryMaterial),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(LuminaryInstance),
-  [LUM_BUILTIN_TYPE_STRING]           = sizeof(char*),
+  [LUM_BUILTIN_TYPE_STRING]           = sizeof(uint32_t),
   [LUM_BUILTIN_TYPE_LUMINARY]         = 4,
   [LUM_BUILTIN_TYPE_FILE]             = 0,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = 0,
+  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = 4,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0};
 
 const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
@@ -112,24 +112,35 @@ const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   __BUILTIN_ENUM_PAIR(LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE), __BUILTIN_ENUM_PAIR(LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT)};
 LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_BUILTIN_ENUM_COUNT);
 
+static const LumBuiltinTypeMember _lum_builtin_member_rgbf[] = {
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, r), .name = "r"},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, g), .name = "g"},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, b), .name = "b"}};
+
 static const LumBuiltinTypeMember _lum_builtin_member_vec3[] = {
   {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, x), .name = "x"},
   {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, y), .name = "y"},
   {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, z), .name = "z"}};
 
+static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
+  {.type = LUM_BUILTIN_TYPE_VEC3, .offset = offsetof(LuminaryCamera, pos), .name = "pos"}};
+
 static const LumBuiltinTypeMember _lum_builtin_member_luminary[] = {
   {.type = LUM_BUILTIN_TYPE_UINT, .offset = 0, .name = "compatibility_version"}};
 
+static const LumBuiltinTypeMember _lum_builtin_member_versioncontrol[] = {
+  {.type = LUM_BUILTIN_TYPE_STRING, .offset = 0, .name = "message"}};
+
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
-  [LUM_BUILTIN_TYPE_RGBF]             = 0,
+  [LUM_BUILTIN_TYPE_RGBF]             = sizeof(_lum_builtin_member_rgbf) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_VEC3]             = sizeof(_lum_builtin_member_vec3) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_UINT]             = 0,
   [LUM_BUILTIN_TYPE_BOOL]             = 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = 0,
   [LUM_BUILTIN_TYPE_ENUM]             = 0,
   [LUM_BUILTIN_TYPE_SETTINGS]         = 0,
-  [LUM_BUILTIN_TYPE_CAMERA]           = 0,
+  [LUM_BUILTIN_TYPE_CAMERA]           = sizeof(_lum_builtin_member_camera) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_OCEAN]            = 0,
   [LUM_BUILTIN_TYPE_SKY]              = 0,
   [LUM_BUILTIN_TYPE_CLOUD]            = 0,
@@ -140,19 +151,19 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_STRING]           = 0,
   [LUM_BUILTIN_TYPE_LUMINARY]         = sizeof(_lum_builtin_member_luminary) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_FILE]             = 0,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = 0,
+  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = sizeof(_lum_builtin_member_versioncontrol) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0};
 
 const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
-  [LUM_BUILTIN_TYPE_RGBF]             = 0,
+  [LUM_BUILTIN_TYPE_RGBF]             = _lum_builtin_member_rgbf,
   [LUM_BUILTIN_TYPE_VEC3]             = _lum_builtin_member_vec3,
   [LUM_BUILTIN_TYPE_UINT]             = 0,
   [LUM_BUILTIN_TYPE_BOOL]             = 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = 0,
   [LUM_BUILTIN_TYPE_ENUM]             = 0,
   [LUM_BUILTIN_TYPE_SETTINGS]         = 0,
-  [LUM_BUILTIN_TYPE_CAMERA]           = 0,
+  [LUM_BUILTIN_TYPE_CAMERA]           = _lum_builtin_member_camera,
   [LUM_BUILTIN_TYPE_OCEAN]            = 0,
   [LUM_BUILTIN_TYPE_SKY]              = 0,
   [LUM_BUILTIN_TYPE_CLOUD]            = 0,
@@ -163,5 +174,5 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_STRING]           = 0,
   [LUM_BUILTIN_TYPE_LUMINARY]         = _lum_builtin_member_luminary,
   [LUM_BUILTIN_TYPE_FILE]             = 0,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = 0,
+  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = _lum_builtin_member_versioncontrol,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0};

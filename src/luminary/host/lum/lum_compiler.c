@@ -449,15 +449,6 @@ static LuminaryResult _lum_compiler_context_finalize_statement(LumCompilerState*
 // Identifier
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_compiler_handle_identifier_null_context(LumCompilerState* state, const LumToken* token) {
-  __CHECK_NULL_ARGUMENT(state);
-  __CHECK_NULL_ARGUMENT(token);
-
-  __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected identifier"));
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _lum_compiler_handle_identifier_access_context(LumCompilerState* state, const LumToken* token) {
   __CHECK_NULL_ARGUMENT(state);
   __CHECK_NULL_ARGUMENT(token);
@@ -528,13 +519,18 @@ static LuminaryResult _lum_compiler_handle_identifier(LumCompilerState* state, c
 
   switch (type) {
     case LUM_COMPILER_CONTEXT_TYPE_NULL:
-      __FAILURE_HANDLE(_lum_compiler_handle_identifier_null_context(state, token));
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected identifier"));
       break;
     case LUM_COMPILER_CONTEXT_TYPE_ACCESS:
       __FAILURE_HANDLE(_lum_compiler_handle_identifier_access_context(state, token));
       break;
+
     case LUM_COMPILER_CONTEXT_TYPE_MEMBER_ACCESS:
       __FAILURE_HANDLE(_lum_compiler_handle_identifier_member_access_context(state, token));
+      break;
+    case LUM_COMPILER_CONTEXT_TYPE_OPERATOR:
+    case LUM_COMPILER_CONTEXT_TYPE_INITIALIZER:
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected identifier"));
       break;
     default:
       break;
@@ -598,15 +594,20 @@ static LuminaryResult _lum_compiler_handle_literal(LumCompilerState* state, cons
   LumCompilerContextType type = _lum_compiler_state_get_current_context_type(state);
 
   switch (type) {
-    case LUM_COMPILER_CONTEXT_TYPE_NULL: {
+    case LUM_COMPILER_CONTEXT_TYPE_NULL:
       __FAILURE_HANDLE(_lum_compiler_state_add_warn_message(state, token, "unexpected literal"));
-      return LUMINARY_SUCCESS;
-    } break;
+      break;
     case LUM_COMPILER_CONTEXT_TYPE_ACCESS:
       __FAILURE_HANDLE(_lum_compiler_handle_literal_access_context(state, token));
       break;
+    case LUM_COMPILER_CONTEXT_TYPE_MEMBER_ACCESS:
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected literal"));
+      break;
     case LUM_COMPILER_CONTEXT_TYPE_OPERATOR:
       __FAILURE_HANDLE(_lum_compiler_handle_literal_operator_context(state, token));
+      break;
+    case LUM_COMPILER_CONTEXT_TYPE_INITIALIZER:
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected literal"));
       break;
     default:
       break;
@@ -787,10 +788,19 @@ static LuminaryResult _lum_compiler_handle_separator_initializer_context(LumComp
       state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
-      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected list separator"));
+      state->returned_stack_object_id = STACK_ALLOCATOR_OBJECT_ID_INVALID;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
-      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
+      if (state->returned_stack_object_id == STACK_ALLOCATOR_OBJECT_ID_INVALID) {
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
+        break;
+      }
+
+      LumCompilerContext context;
+      context.type                        = LUM_COMPILER_CONTEXT_TYPE_INITIALIZER;
+      context.initializer.stack_object_id = state->returned_stack_object_id;
+
+      state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
       __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
@@ -813,6 +823,9 @@ static LuminaryResult _lum_compiler_handle_separator(LumCompilerState* state, co
       break;
     case LUM_COMPILER_CONTEXT_TYPE_ACCESS:
       __FAILURE_HANDLE(_lum_compiler_handle_separator_access_context(state, token));
+      break;
+    case LUM_COMPILER_CONTEXT_TYPE_MEMBER_ACCESS:
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected separator"));
       break;
     case LUM_COMPILER_CONTEXT_TYPE_OPERATOR:
       __FAILURE_HANDLE(_lum_compiler_handle_separator_operator_context(state, token));
@@ -880,6 +893,9 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
       default:
         break;
     }
+
+    if (state->error_occurred)
+      break;
   } while (token.type != LUM_TOKEN_TYPE_EOF);
 
   uint32_t message_count;
