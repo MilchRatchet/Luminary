@@ -8,8 +8,7 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = "void",
   [LUM_BUILTIN_TYPE_RGBF]             = "RGBF",
   [LUM_BUILTIN_TYPE_VEC3]             = "vec3",
-  [LUM_BUILTIN_TYPE_UINT16]           = "uint16_t",
-  [LUM_BUILTIN_TYPE_UINT32]           = "uint32_t",
+  [LUM_BUILTIN_TYPE_UINT]             = "uint",
   [LUM_BUILTIN_TYPE_BOOL]             = "bool",
   [LUM_BUILTIN_TYPE_FLOAT]            = "float",
   [LUM_BUILTIN_TYPE_ENUM]             = "Enum",
@@ -32,8 +31,7 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
   [LUM_BUILTIN_TYPE_RGBF]             = sizeof(LuminaryRGBF),
   [LUM_BUILTIN_TYPE_VEC3]             = sizeof(LuminaryVec3),
-  [LUM_BUILTIN_TYPE_UINT16]           = sizeof(uint16_t),
-  [LUM_BUILTIN_TYPE_UINT32]           = sizeof(uint32_t),
+  [LUM_BUILTIN_TYPE_UINT]             = sizeof(uint32_t),
   [LUM_BUILTIN_TYPE_BOOL]             = sizeof(bool),
   [LUM_BUILTIN_TYPE_FLOAT]            = sizeof(float),
   [LUM_BUILTIN_TYPE_ENUM]             = sizeof(uint32_t),
@@ -56,8 +54,7 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = "",
   [LUM_BUILTIN_TYPE_RGBF]             = "f32x3",
   [LUM_BUILTIN_TYPE_VEC3]             = "f32x3",
-  [LUM_BUILTIN_TYPE_UINT16]           = "u16",
-  [LUM_BUILTIN_TYPE_UINT32]           = "u32",
+  [LUM_BUILTIN_TYPE_UINT]             = "u32",
   [LUM_BUILTIN_TYPE_BOOL]             = "bool",
   [LUM_BUILTIN_TYPE_FLOAT]            = "f32",
   [LUM_BUILTIN_TYPE_ENUM]             = "u32",
@@ -77,17 +74,13 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "obj"};
 
 const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
-  [LUM_BUILTIN_TYPE_VOID] = false,           [LUM_BUILTIN_TYPE_RGBF] = false,
-  [LUM_BUILTIN_TYPE_VEC3] = false,           [LUM_BUILTIN_TYPE_UINT16] = false,
-  [LUM_BUILTIN_TYPE_UINT32] = false,         [LUM_BUILTIN_TYPE_BOOL] = false,
-  [LUM_BUILTIN_TYPE_FLOAT] = false,          [LUM_BUILTIN_TYPE_ENUM] = false,
-  [LUM_BUILTIN_TYPE_SETTINGS] = false,       [LUM_BUILTIN_TYPE_CAMERA] = false,
-  [LUM_BUILTIN_TYPE_OCEAN] = false,          [LUM_BUILTIN_TYPE_SKY] = false,
-  [LUM_BUILTIN_TYPE_CLOUD] = false,          [LUM_BUILTIN_TYPE_FOG] = false,
-  [LUM_BUILTIN_TYPE_PARTICLES] = false,      [LUM_BUILTIN_TYPE_MATERIAL] = true,
-  [LUM_BUILTIN_TYPE_INSTANCE] = true,        [LUM_BUILTIN_TYPE_STRING] = false,
-  [LUM_BUILTIN_TYPE_LUMINARY] = false,       [LUM_BUILTIN_TYPE_FILE] = false,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL] = false, [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = false};
+  [LUM_BUILTIN_TYPE_VOID] = false,    [LUM_BUILTIN_TYPE_RGBF] = false,          [LUM_BUILTIN_TYPE_VEC3] = false,
+  [LUM_BUILTIN_TYPE_UINT] = false,    [LUM_BUILTIN_TYPE_BOOL] = false,          [LUM_BUILTIN_TYPE_FLOAT] = false,
+  [LUM_BUILTIN_TYPE_ENUM] = false,    [LUM_BUILTIN_TYPE_SETTINGS] = false,      [LUM_BUILTIN_TYPE_CAMERA] = false,
+  [LUM_BUILTIN_TYPE_OCEAN] = false,   [LUM_BUILTIN_TYPE_SKY] = false,           [LUM_BUILTIN_TYPE_CLOUD] = false,
+  [LUM_BUILTIN_TYPE_FOG] = false,     [LUM_BUILTIN_TYPE_PARTICLES] = false,     [LUM_BUILTIN_TYPE_MATERIAL] = true,
+  [LUM_BUILTIN_TYPE_INSTANCE] = true, [LUM_BUILTIN_TYPE_STRING] = false,        [LUM_BUILTIN_TYPE_LUMINARY] = false,
+  [LUM_BUILTIN_TYPE_FILE] = true,     [LUM_BUILTIN_TYPE_VERSIONCONTROL] = true, [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true};
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum) {.string = #__internal_macro_enum, .value = __internal_macro_enum}
 
@@ -125,14 +118,13 @@ static const LumBuiltinTypeMember _lum_builtin_member_vec3[] = {
   {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, z), .name = "z"}};
 
 static const LumBuiltinTypeMember _lum_builtin_member_luminary[] = {
-  {.type = LUM_BUILTIN_TYPE_UINT32, .offset = 0, .name = "compatibility_version"}};
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = 0, .name = "compatibility_version"}};
 
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
   [LUM_BUILTIN_TYPE_RGBF]             = 0,
   [LUM_BUILTIN_TYPE_VEC3]             = sizeof(_lum_builtin_member_vec3) / sizeof(LumBuiltinTypeMember),
-  [LUM_BUILTIN_TYPE_UINT16]           = 0,
-  [LUM_BUILTIN_TYPE_UINT32]           = 0,
+  [LUM_BUILTIN_TYPE_UINT]             = 0,
   [LUM_BUILTIN_TYPE_BOOL]             = 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = 0,
   [LUM_BUILTIN_TYPE_ENUM]             = 0,
@@ -155,8 +147,7 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
   [LUM_BUILTIN_TYPE_RGBF]             = 0,
   [LUM_BUILTIN_TYPE_VEC3]             = _lum_builtin_member_vec3,
-  [LUM_BUILTIN_TYPE_UINT16]           = 0,
-  [LUM_BUILTIN_TYPE_UINT32]           = 0,
+  [LUM_BUILTIN_TYPE_UINT]             = 0,
   [LUM_BUILTIN_TYPE_BOOL]             = 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = 0,
   [LUM_BUILTIN_TYPE_ENUM]             = 0,

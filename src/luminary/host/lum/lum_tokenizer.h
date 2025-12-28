@@ -31,7 +31,6 @@ enum LumKeywordType {
 enum LumLiteralType {
   // Version 1
   LUM_LITERAL_TYPE_FLOAT,
-  LUM_LITERAL_TYPE_DOUBLE,
   LUM_LITERAL_TYPE_UINT,
   LUM_LITERAL_TYPE_BOOL,
   LUM_LITERAL_TYPE_ENUM,
@@ -51,7 +50,7 @@ enum LumOperatorType {
 
 enum LumSeparatorType {
   // Version 1
-  LUM_SEPARATOR_TYPE_EOL,                // ;
+  LUM_SEPARATOR_TYPE_STATEMENT_END,      // ;
   LUM_SEPARATOR_TYPE_ACCESS_BEGIN,       // [
   LUM_SEPARATOR_TYPE_ACCESS_END,         // ]
   LUM_SEPARATOR_TYPE_MEMBER,             // .
@@ -134,5 +133,7 @@ LuminaryResult lum_tokenizer_set_code(LumTokenizer* tokenizer, const char* code)
 LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken* token);
 LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer, const LumToken token);
 LuminaryResult lum_tokenizer_destroy(LumTokenizer** tokenizer);
+
+extern const LumBuiltinType lum_tokenizer_literal_type_to_builtin[LUM_LITERAL_TYPE_COUNT];
 
 #endif /* LUMINARY_LUM_TOKENIZER_H */

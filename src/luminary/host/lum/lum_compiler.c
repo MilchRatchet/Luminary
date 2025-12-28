@@ -1,5 +1,6 @@
 #include "lum_compiler.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -112,7 +113,7 @@ static LuminaryResult _lum_compiler_stack_allocator_reset(LumCompilerStackAlloca
 
   allocator->allocated_stack_size = 0;
 
-  __FAILURE_HANDLE(array_set_num_elements(allocator->allocated_objects, 0));
+  __FAILURE_HANDLE(array_clear(allocator->allocated_objects));
 
   return LUMINARY_SUCCESS;
 }
@@ -198,10 +199,10 @@ struct LumCompilerState {
   uint32_t returned_stack_object_id;
   uint32_t stack_ptr;
   LumCompilerContext context_stack[LUM_COMPILER_CONTEXT_STACK_SIZE];
-  size_t used_stack_size;
   LumCompilerStackAllocator* stack_allocator;
-  uint32_t register_variable_map[LUM_REGISTER_COUNT];
   LumTokenizer* tokenizer;
+  ARRAY LumInstruction* instructions_main;
+  ARRAY LumInstruction* instructions_cleanup;
 } typedef LumCompilerState;
 
 static LuminaryResult _lum_compiler_state_create(LumCompilerState** state) {
@@ -213,11 +214,11 @@ static LuminaryResult _lum_compiler_state_create(LumCompilerState** state) {
   (*state)->stack_ptr = LUM_COMPILER_CONTEXT_STACK_EMPTY;
 
   __FAILURE_HANDLE(array_create(&(*state)->messages, sizeof(LumCompilerMessage), 16));
+  __FAILURE_HANDLE(array_create(&(*state)->instructions_main, sizeof(LumInstruction), 16));
+  __FAILURE_HANDLE(array_create(&(*state)->instructions_cleanup, sizeof(LumInstruction), 16));
 
   __FAILURE_HANDLE(_lum_compiler_stack_allocator_create(&(*state)->stack_allocator));
   __FAILURE_HANDLE(lum_tokenizer_create(&(*state)->tokenizer));
-
-  memset((*state)->register_variable_map, 0xFF, sizeof(uint32_t) * LUM_REGISTER_COUNT);
 
   return LUMINARY_SUCCESS;
 }
@@ -225,6 +226,50 @@ static LuminaryResult _lum_compiler_state_create(LumCompilerState** state) {
 static LumCompilerContextType _lum_compiler_state_get_current_context_type(const LumCompilerState* state) {
   return (state->stack_ptr == LUM_COMPILER_CONTEXT_STACK_EMPTY) ? LUM_COMPILER_CONTEXT_TYPE_NULL
                                                                 : state->context_stack[state->stack_ptr].type;
+}
+
+static LuminaryResult _lum_compiler_state_add_info_message(LumCompilerState* state, const LumToken* token, const char* format, ...) {
+  LumCompilerMessage message;
+  __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_INFO, token));
+
+  va_list args;
+  va_start(args, format);
+  vsnprintf(message.message, LUM_COMPILER_MAX_MESSAGE_LENGTH, format, args);
+  va_end(args);
+
+  __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_compiler_state_add_warn_message(LumCompilerState* state, const LumToken* token, const char* format, ...) {
+  LumCompilerMessage message;
+  __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_WARNING, token));
+
+  va_list args;
+  va_start(args, format);
+  vsnprintf(message.message, LUM_COMPILER_MAX_MESSAGE_LENGTH, format, args);
+  va_end(args);
+
+  __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_compiler_state_add_error_message(LumCompilerState* state, const LumToken* token, const char* format, ...) {
+  LumCompilerMessage message;
+  __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_ERROR, token));
+
+  va_list args;
+  va_start(args, format);
+  vsnprintf(message.message, LUM_COMPILER_MAX_MESSAGE_LENGTH, format, args);
+  va_end(args);
+
+  state->error_occurred = true;
+
+  __FAILURE_HANDLE(array_push(&state->messages, &message));
+
+  return LUMINARY_SUCCESS;
 }
 
 static LuminaryResult _lum_compiler_state_destroy(LumCompilerState** state) {
@@ -235,6 +280,8 @@ static LuminaryResult _lum_compiler_state_destroy(LumCompilerState** state) {
   __FAILURE_HANDLE(_lum_compiler_stack_allocator_destroy(&(*state)->stack_allocator));
 
   __FAILURE_HANDLE(array_destroy(&(*state)->messages));
+  __FAILURE_HANDLE(array_destroy(&(*state)->instructions_main));
+  __FAILURE_HANDLE(array_destroy(&(*state)->instructions_cleanup));
 
   __FAILURE_HANDLE(host_free(state));
 
@@ -328,52 +375,35 @@ static LuminaryResult _lum_compiler_null_binary(LumBinary* binary) {
 // Context resolution
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
+static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state, const LumToken* token) {
   __CHECK_NULL_ARGUMENT(state);
 
   if (state->stack_ptr == LUM_COMPILER_CONTEXT_STACK_EMPTY) {
-    LumCompilerMessage message;
-    message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-    sprintf(message.message, "error: internal compiler error, resolved empty stack context");
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-    state->error_occurred = true;
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "internal compiler error, resolved empty stack context"));
     return LUMINARY_SUCCESS;
   }
 
   LumCompilerContext* context = state->context_stack + state->stack_ptr;
 
+  __DEBUG_ASSERT(context->type != LUM_COMPILER_CONTEXT_TYPE_NULL);
+
   switch (context->type) {
     case LUM_COMPILER_CONTEXT_TYPE_ACCESS: {
       if (context->access.type == LUM_BUILTIN_TYPE_VOID) {
-        LumCompilerMessage message;
-        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-        sprintf(message.message, "error: expected type identifier before ']'");
-        __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-        state->error_occurred = true;
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "expected type identifier before ']'"));
         return LUMINARY_SUCCESS;
       }
 
-      const bool is_addressable = lum_builtin_types_addressable[context->type];
+      const bool is_addressable = lum_builtin_types_addressable[context->access.type];
 
       if (is_addressable && context->access.string_stack_object_id == STACK_ALLOCATOR_OBJECT_ID_INVALID) {
-        LumCompilerMessage message;
-        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-        sprintf(message.message, "error: expected string literal before ']'");
-        __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-        state->error_occurred = true;
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "expected string literal before ']'"));
         return LUMINARY_SUCCESS;
       }
 
       if (is_addressable == false && context->access.string_stack_object_id != STACK_ALLOCATOR_OBJECT_ID_INVALID) {
-        LumCompilerMessage message;
-        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-        sprintf(message.message, "error: type '%s' is not addressable", lum_builtin_types_strings[context->type]);
-        __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-        state->error_occurred = true;
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(
+          state, token, "type '%s' is not addressable", lum_builtin_types_strings[context->access.type]));
         return LUMINARY_SUCCESS;
       }
 
@@ -396,6 +426,25 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _lum_compiler_context_finalize_statement(LumCompilerState* state) {
+  __CHECK_NULL_ARGUMENT(state);
+
+  __FAILURE_HANDLE(array_append(&state->binary->instructions, state->instructions_main));
+  __FAILURE_HANDLE(array_append(&state->binary->instructions, state->instructions_cleanup));
+
+  __FAILURE_HANDLE(array_clear(state->instructions_main));
+  __FAILURE_HANDLE(array_clear(state->instructions_cleanup));
+
+  if (state->stack_allocator->allocated_stack_size > state->binary->stack_frame_size)
+    state->binary->stack_frame_size = state->stack_allocator->allocated_stack_size;
+
+  __FAILURE_HANDLE(_lum_compiler_stack_allocator_reset(state->stack_allocator));
+
+  state->returned_stack_object_id = STACK_ALLOCATOR_OBJECT_ID_INVALID;
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Identifier
 ////////////////////////////////////////////////////////////////////
@@ -404,12 +453,8 @@ static LuminaryResult _lum_compiler_handle_identifier_null_context(LumCompilerSt
   __CHECK_NULL_ARGUMENT(state);
   __CHECK_NULL_ARGUMENT(token);
 
-  LumCompilerMessage message;
-  message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-  sprintf(message.message, "<source>:%u:%u: error: unexpected identifier", token->line, token->col);
-  __FAILURE_HANDLE(array_push(&state->messages, &message));
+  __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected identifier"));
 
-  state->error_occurred = true;
   return LUMINARY_SUCCESS;
 }
 
@@ -418,22 +463,12 @@ static LuminaryResult _lum_compiler_handle_identifier_access_context(LumCompiler
   __CHECK_NULL_ARGUMENT(token);
 
   if (token->identifier.is_builtin_type == false) {
-    LumCompilerMessage message;
-    message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-    sprintf(message.message, "<source>:%u:%u: error: '%s' does not name a type", token->line, token->col, token->identifier.name);
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-    state->error_occurred = true;
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "'%s' does not name a type", token->identifier.name));
     return LUMINARY_SUCCESS;
   }
 
   if (token->identifier.builtin_type == LUM_BUILTIN_TYPE_VOID) {
-    LumCompilerMessage message;
-    message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-    sprintf(message.message, "<source>:%u:%u: error: incomplete type 'void' is not allowed", token->line, token->col);
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-    state->error_occurred = true;
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "incomplete type 'void' is not allowed"));
     return LUMINARY_SUCCESS;
   }
 
@@ -469,14 +504,8 @@ static LuminaryResult _lum_compiler_handle_identifier_member_access_context(LumC
   }
 
   if (valid_member_name == false) {
-    LumCompilerMessage message;
-    message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-    sprintf(
-      message.message, "<source>:%u:%u: error: '%s' is not a member of '%s'", token->line, token->col, token->identifier.name,
-      lum_builtin_types_strings[base_type]);
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-    state->error_occurred = true;
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(
+      state, token, "'%s' is not a member of '%s'", token->identifier.name, lum_builtin_types_strings[base_type]));
     return LUMINARY_SUCCESS;
   }
 
@@ -486,7 +515,7 @@ static LuminaryResult _lum_compiler_handle_identifier_member_access_context(LumC
 
   state->context_stack[state->stack_ptr].member_access.member_stack_object_id = member_stack_id;
 
-  __FAILURE_HANDLE(_lum_compiler_context_resolve(state));
+  __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
 
   return LUMINARY_SUCCESS;
 }
@@ -523,11 +552,7 @@ static LuminaryResult _lum_compiler_handle_literal_access_context(LumCompilerSta
   __CHECK_NULL_ARGUMENT(token);
 
   if (token->literal.type != LUM_LITERAL_TYPE_STRING) {
-    LumCompilerMessage message;
-    __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_WARNING, token));
-    sprintf(message.message, "<source>:%u:%u: error: expected string literal", token->line, token->col);
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "expected string literal"));
     return LUMINARY_SUCCESS;
   }
 
@@ -539,6 +564,34 @@ static LuminaryResult _lum_compiler_handle_literal_access_context(LumCompilerSta
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _lum_compiler_handle_literal_operator_context(LumCompilerState* state, const LumToken* token) {
+  __CHECK_NULL_ARGUMENT(state);
+  __CHECK_NULL_ARGUMENT(token);
+
+  const uint32_t lhs_stack_id = state->context_stack[state->stack_ptr].operator.dst_stack_object_id;
+
+  __DEBUG_ASSERT(lhs_stack_id != STACK_ALLOCATOR_OBJECT_ID_INVALID);
+
+  const LumBuiltinType lhs_type = state->stack_allocator->allocated_objects[lhs_stack_id].type;
+  const LumBuiltinType rhs_type = lum_tokenizer_literal_type_to_builtin[token->literal.type];
+
+  if (lhs_type != rhs_type) {
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(
+      state, token, "a value of type '%s' cannot be assigned to an entity of type '%s'", lum_builtin_types_strings[rhs_type],
+      lum_builtin_types_strings[lhs_type]));
+    return LUMINARY_SUCCESS;
+  }
+
+  uint32_t stack_id;
+  __FAILURE_HANDLE(_lum_compiler_stack_allocator_push(state->stack_allocator, rhs_type, &stack_id));
+
+  state->context_stack[state->stack_ptr].operator.src_stack_object_id = stack_id;
+
+  __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_compiler_handle_literal(LumCompilerState* state, const LumToken* token) {
   __CHECK_NULL_ARGUMENT(state);
 
@@ -546,14 +599,14 @@ static LuminaryResult _lum_compiler_handle_literal(LumCompilerState* state, cons
 
   switch (type) {
     case LUM_COMPILER_CONTEXT_TYPE_NULL: {
-      LumCompilerMessage message;
-      __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_WARNING, token));
-      sprintf(message.message, "<source>:%u:%u: error: unexpected literal", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
+      __FAILURE_HANDLE(_lum_compiler_state_add_warn_message(state, token, "unexpected literal"));
       return LUMINARY_SUCCESS;
     } break;
     case LUM_COMPILER_CONTEXT_TYPE_ACCESS:
       __FAILURE_HANDLE(_lum_compiler_handle_literal_access_context(state, token));
+      break;
+    case LUM_COMPILER_CONTEXT_TYPE_OPERATOR:
+      __FAILURE_HANDLE(_lum_compiler_handle_literal_operator_context(state, token));
       break;
     default:
       break;
@@ -572,12 +625,7 @@ static LuminaryResult _lum_compiler_handle_operator(LumCompilerState* state, con
   LumCompilerContextType type = _lum_compiler_state_get_current_context_type(state);
 
   if (type != LUM_COMPILER_CONTEXT_TYPE_NULL && type != LUM_COMPILER_CONTEXT_TYPE_INITIALIZER) {
-    LumCompilerMessage message;
-    __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_ERROR, token));
-    sprintf(message.message, "<source>:%u:%u: error: unexpected operator", token->line, token->col);
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-    state->error_occurred = true;
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected operator"));
     return LUMINARY_SUCCESS;
   }
 
@@ -585,12 +633,7 @@ static LuminaryResult _lum_compiler_handle_operator(LumCompilerState* state, con
   context.type = LUM_COMPILER_CONTEXT_TYPE_OPERATOR;
 
   if (state->returned_stack_object_id == STACK_ALLOCATOR_OBJECT_ID_INVALID) {
-    LumCompilerMessage message;
-    __FAILURE_HANDLE(_lum_compiler_message_init(&message, LUM_COMPILER_MESSAGE_TYPE_ERROR, token));
-    sprintf(message.message, "<source>:%u:%u: error: unexpected operator", token->line, token->col);
-    __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-    state->error_occurred = true;
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected operator"));
     return LUMINARY_SUCCESS;
   }
 
@@ -611,7 +654,8 @@ static LuminaryResult _lum_compiler_handle_separator_null_context(LumCompilerSta
   __CHECK_NULL_ARGUMENT(token);
 
   switch (token->separator.type) {
-    case LUM_SEPARATOR_TYPE_EOL:
+    case LUM_SEPARATOR_TYPE_STATEMENT_END:
+      __FAILURE_HANDLE(_lum_compiler_context_finalize_statement(state));
       break;
     case LUM_SEPARATOR_TYPE_ACCESS_BEGIN: {
       LumCompilerContext context;
@@ -622,37 +666,17 @@ static LuminaryResult _lum_compiler_handle_separator_null_context(LumCompilerSta
       state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_ACCESS_END: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected end of accessor", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_MEMBER: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected member separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected member separator"));
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected list separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected list separator"));
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
       if (state->returned_stack_object_id == STACK_ALLOCATOR_OBJECT_ID_INVALID) {
-        LumCompilerMessage message;
-        message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-        sprintf(message.message, "<source>:%u:%u: error: cannot initialize 'null' object", token->line, token->col);
-        __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-        state->error_occurred = true;
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "cannot initialize 'null' object"));
         break;
       }
 
@@ -663,12 +687,7 @@ static LuminaryResult _lum_compiler_handle_separator_null_context(LumCompilerSta
       state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected end of initializer separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of initializer"));
     } break;
     default:
       break;
@@ -681,40 +700,26 @@ static LuminaryResult _lum_compiler_handle_separator_access_context(LumCompilerS
   __CHECK_NULL_ARGUMENT(state);
 
   switch (token->separator.type) {
-    case LUM_SEPARATOR_TYPE_EOL: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected end of line", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+    case LUM_SEPARATOR_TYPE_STATEMENT_END: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of statement"));
     } break;
     case LUM_SEPARATOR_TYPE_ACCESS_BEGIN: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected begin of accessor", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_ACCESS_END: {
-      __FAILURE_HANDLE(_lum_compiler_context_resolve(state));
+      __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
     } break;
     case LUM_SEPARATOR_TYPE_MEMBER: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected member separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected member separator"));
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected list separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected list separator"));
+    } break;
+    case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
+    } break;
+    case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of initializer"));
     } break;
     default:
       break;
@@ -728,40 +733,26 @@ static LuminaryResult _lum_compiler_handle_separator_operator_context(LumCompile
   __CHECK_NULL_ARGUMENT(token);
 
   switch (token->separator.type) {
-    case LUM_SEPARATOR_TYPE_EOL:
-      __FAILURE_HANDLE(_lum_compiler_context_resolve(state));
+    case LUM_SEPARATOR_TYPE_STATEMENT_END:
+      __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
       break;
     case LUM_SEPARATOR_TYPE_ACCESS_BEGIN: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected begin of accessor", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_ACCESS_END: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected end of accessor", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_MEMBER: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected member separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected member_separator"));
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected list separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected list separato"));
+    } break;
+    case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
+    } break;
+    case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of initializer"));
     } break;
     default:
       break;
@@ -775,23 +766,14 @@ static LuminaryResult _lum_compiler_handle_separator_initializer_context(LumComp
   __CHECK_NULL_ARGUMENT(token);
 
   switch (token->separator.type) {
-    case LUM_SEPARATOR_TYPE_EOL:
-      break;
+    case LUM_SEPARATOR_TYPE_STATEMENT_END: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of statement"));
+    } break;
     case LUM_SEPARATOR_TYPE_ACCESS_BEGIN: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected begin of accessor", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_ACCESS_END: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected end of accessor", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_MEMBER: {
       uint32_t base_stack_id = state->context_stack[state->stack_ptr].initializer.stack_object_id;
@@ -805,12 +787,13 @@ static LuminaryResult _lum_compiler_handle_separator_initializer_context(LumComp
       state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
-      LumCompilerMessage message;
-      message.type = LUM_COMPILER_MESSAGE_TYPE_ERROR;
-      sprintf(message.message, "<source>:%u:%u: error: unexpected list separator", token->line, token->col);
-      __FAILURE_HANDLE(array_push(&state->messages, &message));
-
-      state->error_occurred = true;
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected list separator"));
+    } break;
+    case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
+    } break;
+    case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
+      __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
     } break;
     default:
       break;
@@ -910,16 +893,16 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
     switch (message->type) {
       case LUM_COMPILER_MESSAGE_TYPE_INFO:
         if (compiler->log_level >= 2) {
-          info_message("%s", message->message);
+          info_message("<source>:%u:%u: info: %s", message->line, message->col, message->message);
         }
         break;
       case LUM_COMPILER_MESSAGE_TYPE_WARNING:
         if (compiler->log_level >= 1) {
-          warn_message("%s", message->message);
+          warn_message("<source>:%u:%u: warn: %s", message->line, message->col, message->message);
         }
         break;
       case LUM_COMPILER_MESSAGE_TYPE_ERROR:
-        error_message("%s", message->message);
+        error_message("<source>:%u:%u: error: %s", message->line, message->col, message->message);
         num_errors++;
         break;
       default:
@@ -944,6 +927,8 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
 LuminaryResult lum_compiler_destroy(LumCompiler** compiler) {
   __CHECK_NULL_ARGUMENT(compiler);
   __CHECK_NULL_ARGUMENT(*compiler);
+
+  __FAILURE_HANDLE(_lum_compiler_state_destroy((LumCompilerState**) &(*compiler)->data));
 
   __FAILURE_HANDLE(host_free(compiler));
 

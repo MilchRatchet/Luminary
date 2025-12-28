@@ -5,14 +5,17 @@
 
 #include "internal_error.h"
 
+const LumBuiltinType lum_tokenizer_literal_type_to_builtin[LUM_LITERAL_TYPE_COUNT] = {
+  [LUM_LITERAL_TYPE_FLOAT]  = LUM_BUILTIN_TYPE_FLOAT,
+  [LUM_LITERAL_TYPE_UINT]   = LUM_BUILTIN_TYPE_UINT,
+  [LUM_LITERAL_TYPE_BOOL]   = LUM_BUILTIN_TYPE_BOOL,
+  [LUM_LITERAL_TYPE_ENUM]   = LUM_BUILTIN_TYPE_ENUM,
+  [LUM_LITERAL_TYPE_STRING] = LUM_BUILTIN_TYPE_STRING};
+
 static const char _lum_separator_chars[LUM_SEPARATOR_COUNT] = {
-  [LUM_SEPARATOR_TYPE_EOL]               = ';',
-  [LUM_SEPARATOR_TYPE_ACCESS_BEGIN]      = '[',
-  [LUM_SEPARATOR_TYPE_ACCESS_END]        = ']',
-  [LUM_SEPARATOR_TYPE_MEMBER]            = '.',
-  [LUM_SEPARATOR_TYPE_LIST]              = ',',
-  [LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN] = '{',
-  [LUM_SEPARATOR_TYPE_INITIALIZER_END]   = '}'};
+  [LUM_SEPARATOR_TYPE_STATEMENT_END] = ';',  [LUM_SEPARATOR_TYPE_ACCESS_BEGIN] = '[', [LUM_SEPARATOR_TYPE_ACCESS_END] = ']',
+  [LUM_SEPARATOR_TYPE_MEMBER] = '.',         [LUM_SEPARATOR_TYPE_LIST] = ',',         [LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN] = '{',
+  [LUM_SEPARATOR_TYPE_INITIALIZER_END] = '}'};
 
 LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer) {
   __CHECK_NULL_ARGUMENT(tokenizer);
@@ -203,22 +206,11 @@ static bool _lum_tokenizer_is_literal(LumTokenizer* tokenizer, LumToken* token, 
     }
 
     if (has_decimal_seperator) {
-      const bool has_float_suffix = literal_string[num_chars - 1] == 'f';
-
-      if (has_float_suffix) {
-        token->type              = LUM_TOKEN_TYPE_LITERAL;
-        token->literal.type      = LUM_LITERAL_TYPE_FLOAT;
-        token->literal.val_float = strtof(literal_string, (char**) 0);
-        *consumed_chars          = num_chars;
-        return true;
-      }
-      else {
-        token->type               = LUM_TOKEN_TYPE_LITERAL;
-        token->literal.type       = LUM_LITERAL_TYPE_DOUBLE;
-        token->literal.val_double = strtod(literal_string, (char**) 0);
-        *consumed_chars           = num_chars;
-        return true;
-      }
+      token->type              = LUM_TOKEN_TYPE_LITERAL;
+      token->literal.type      = LUM_LITERAL_TYPE_FLOAT;
+      token->literal.val_float = strtof(literal_string, (char**) 0);
+      *consumed_chars          = num_chars;
+      return true;
     }
     else {
       token->type             = LUM_TOKEN_TYPE_LITERAL;
@@ -416,9 +408,6 @@ LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer, const LumToken token
         case LUM_LITERAL_TYPE_FLOAT:
           info_message("[%04u:%04u][LITERAL] Float %ff", token.line, token.col, token.literal.val_float);
           break;
-        case LUM_LITERAL_TYPE_DOUBLE:
-          info_message("[%04u:%04u][LITERAL] Double %f", token.line, token.col, token.literal.val_double);
-          break;
         case LUM_LITERAL_TYPE_UINT:
           info_message("[%04u:%04u][LITERAL] Uint %u", token.line, token.col, token.literal.val_uint);
           break;
@@ -448,7 +437,7 @@ LuminaryResult lum_tokenizer_print(LumTokenizer* tokenizer, const LumToken token
       break;
     case LUM_TOKEN_TYPE_SEPARATOR:
       switch (token.separator.type) {
-        case LUM_SEPARATOR_TYPE_EOL:
+        case LUM_SEPARATOR_TYPE_STATEMENT_END:
           info_message("[%04u:%04u][SEPARATOR] EOL", token.line, token.col);
           break;
         case LUM_SEPARATOR_TYPE_ACCESS_BEGIN:
