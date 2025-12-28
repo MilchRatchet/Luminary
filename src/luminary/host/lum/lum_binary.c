@@ -29,7 +29,23 @@ LuminaryResult lum_binary_print(LumBinary* binary) {
 
   fprintf(file, "======= .data =======\n");
 
-  // TODO
+  const uint32_t constant_bytes_per_line = 16;
+  const uint8_t* constant_memory_src     = (const uint8_t*) binary->constant_memory;
+
+  for (uint32_t byte_offset = 0; byte_offset < binary->constant_memory_size; byte_offset += constant_bytes_per_line) {
+    fprintf(file, "%08X ", byte_offset);
+
+    uint8_t byte_id = 0;
+    for (; byte_id < constant_bytes_per_line && byte_offset + byte_id < binary->constant_memory_size; byte_id++) {
+      fprintf(file, "%02X", constant_memory_src[byte_offset + byte_id]);
+    }
+
+    for (; byte_id < constant_bytes_per_line; byte_id++) {
+      fprintf(file, "  ");
+    }
+
+    fprintf(file, "\n");
+  }
 
   fprintf(file, "======= .text =======\n");
 
@@ -43,17 +59,12 @@ LuminaryResult lum_binary_print(LumBinary* binary) {
 
     fprintf(file, "%08X ", offset);
 
-    uint8_t bytes[9];
-    uint8_t size;
-    __FAILURE_HANDLE(lum_instruction_get_bytes(instruction, bytes, &size));
+    uint64_t bytes;
+    __FAILURE_HANDLE(lum_instruction_get_bytes(instruction, &bytes));
 
     uint8_t byte_id = 0;
-    for (; byte_id < size; byte_id++) {
-      fprintf(file, "%02X", bytes[byte_id]);
-    }
-
-    for (; byte_id < 8; byte_id++) {
-      fprintf(file, "  ");
+    for (; byte_id < sizeof(uint64_t); byte_id++) {
+      fprintf(file, "%02llX", (bytes >> (8 * byte_id)) & 0xFF);
     }
 
     char mnemonic[256];
@@ -65,7 +76,7 @@ LuminaryResult lum_binary_print(LumBinary* binary) {
     __FAILURE_HANDLE(lum_instruction_get_args(instruction, arg_string));
     fprintf(file, "%s\n", arg_string);
 
-    offset += size;
+    offset += sizeof(LumInstruction);
   }
 
   fclose(file);
@@ -79,6 +90,10 @@ LuminaryResult lum_binary_destroy(LumBinary** binary) {
 
   if ((*binary)->instructions) {
     __FAILURE_HANDLE(array_destroy(&(*binary)->instructions));
+  }
+
+  if ((*binary)->constant_memory) {
+    __FAILURE_HANDLE(host_free(&(*binary)->constant_memory));
   }
 
   __FAILURE_HANDLE(host_free(binary));

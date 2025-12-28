@@ -18,6 +18,8 @@ struct LumBinary {
   size_t stack_frame_size;
   uint32_t entry_points[LUM_BINARY_ENTRY_POINT_COUNT];
   ARRAY LumInstruction* instructions;
+  void* constant_memory;
+  size_t constant_memory_size;
 } typedef LumBinary;
 
 LuminaryResult lum_binary_create(LumBinary** binary);

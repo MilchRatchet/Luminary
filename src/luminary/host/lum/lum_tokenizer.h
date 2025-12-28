@@ -85,7 +85,6 @@ struct LumTokenLiteral {
   LumLiteralType type;
   union {
     float val_float;
-    double val_double;
     uint32_t val_uint;
     bool val_bool;
     uint32_t val_enum;

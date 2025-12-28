@@ -14,6 +14,9 @@ enum LumInstructionType {
   LUM_INSTRUCTION_TYPE_COUNT
 } typedef LumInstructionType;
 
+#define LUM_MEMORY_CONSTANT_MEMORY_SPACE_BIT (0x80000000)
+#define LUM_MEMORY_OFFSET_MASK (0x7FFFFFFF)
+
 struct LumMemoryAllocation {
   uint32_t offset;
   uint32_t size;
@@ -27,7 +30,7 @@ struct LumInstruction {
 
 LuminaryResult lum_instruction_get_type(const LumInstruction* instruction, LumInstructionType* type);
 LuminaryResult lum_instruction_get_mnemonic(const LumInstruction* instruction, char* mnemonic);
-LuminaryResult lum_instruction_get_bytes(const LumInstruction* instruction, uint8_t* data, uint8_t* size);
+LuminaryResult lum_instruction_get_bytes(const LumInstruction* instruction, uint64_t* data);
 LuminaryResult lum_instruction_get_args(const LumInstruction* instruction, char* args);
 
 LuminaryResult lum_instruction_encode_nop(LumInstruction* instruction);
