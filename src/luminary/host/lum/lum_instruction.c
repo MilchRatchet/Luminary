@@ -58,6 +58,15 @@ LuminaryResult lum_instruction_encode_mov(
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult lum_instruction_decode_mov(const LumInstruction* instruction, LumBuiltinType* type) {
+  __CHECK_NULL_ARGUMENT(instruction);
+  __CHECK_NULL_ARGUMENT(type);
+
+  *type = (instruction->meta >> LUM_INSTRUCTION_MOV_TYPE_SHIFT) & LUM_INSTRUCTION_MOV_ARG_MASK;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_instruction_mov_get_mnemonic_suffix(const LumInstruction* instruction, char* mnemonic) {
   __CHECK_NULL_ARGUMENT(instruction);
   __CHECK_NULL_ARGUMENT(mnemonic);
@@ -110,13 +119,18 @@ LuminaryResult lum_instruction_encode_ldg(
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult lum_instruction_decode_ldg(const LumInstruction* instruction, LumBuiltinType* type) {
+  __CHECK_NULL_ARGUMENT(instruction);
+  __CHECK_NULL_ARGUMENT(type);
+
+  *type = (instruction->meta >> LUM_INSTRUCTION_LDG_TYPE_SHIFT) & LUM_INSTRUCTION_LDG_ARG_MASK;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_instruction_ldg_get_args(const LumInstruction* instruction, char* args) {
   __CHECK_NULL_ARGUMENT(instruction);
   __CHECK_NULL_ARGUMENT(args);
-
-  const LumBuiltinType type = (instruction->meta >> LUM_INSTRUCTION_LDG_TYPE_SHIFT) & LUM_INSTRUCTION_LDG_ARG_MASK;
-
-  const char* class_name = lum_builtin_types_strings[type];
 
   int32_t offset = 0;
   __FAILURE_HANDLE(_lum_instruction_encode_address(instruction->dst, false, args, &offset));
@@ -162,13 +176,18 @@ LuminaryResult lum_instruction_encode_stg(LumInstruction* instruction, LumBuilti
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult lum_instruction_decode_stg(const LumInstruction* instruction, LumBuiltinType* type) {
+  __CHECK_NULL_ARGUMENT(instruction);
+  __CHECK_NULL_ARGUMENT(type);
+
+  *type = (instruction->meta >> LUM_INSTRUCTION_STG_TYPE_SHIFT) & LUM_INSTRUCTION_STG_ARG_MASK;
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_instruction_stg_get_args(const LumInstruction* instruction, char* args) {
   __CHECK_NULL_ARGUMENT(instruction);
   __CHECK_NULL_ARGUMENT(args);
-
-  const LumBuiltinType type = (instruction->meta >> LUM_INSTRUCTION_STG_TYPE_SHIFT) & LUM_INSTRUCTION_STG_ARG_MASK;
-
-  const char* class_name = lum_builtin_types_strings[type];
 
   int32_t offset = 0;
   __FAILURE_HANDLE(_lum_instruction_encode_address(instruction->src, true, args, &offset));
@@ -191,44 +210,14 @@ static LuminaryResult _lum_instruction_stg_get_mnemonic_suffix(const LumInstruct
 }
 
 ////////////////////////////////////////////////////////////////////
-// RET
-////////////////////////////////////////////////////////////////////
-
-LuminaryResult lum_instruction_encode_ret(LumInstruction* instruction) {
-  __CHECK_NULL_ARGUMENT(instruction);
-
-  memset(instruction, 0, sizeof(LumInstruction));
-
-  uint64_t type = LUM_INSTRUCTION_TYPE_RET;
-
-  instruction->meta |= type << LUM_INSTRUCTION_TYPE_SHIFT;
-
-  return LUMINARY_SUCCESS;
-}
-
-////////////////////////////////////////////////////////////////////
-// CVT
-////////////////////////////////////////////////////////////////////
-
-LuminaryResult lum_instruction_encode_cvt(LumInstruction* instruction) {
-  __CHECK_NULL_ARGUMENT(instruction);
-
-  memset(instruction, 0, sizeof(LumInstruction));
-
-  uint64_t type = LUM_INSTRUCTION_TYPE_CVT;
-
-  instruction->meta |= type << LUM_INSTRUCTION_TYPE_SHIFT;
-
-  return LUMINARY_SUCCESS;
-}
-
-////////////////////////////////////////////////////////////////////
 // COMMON
 ////////////////////////////////////////////////////////////////////
 
 static const char* lum_instruction_type_mnemonics[LUM_INSTRUCTION_TYPE_COUNT] = {
-  [LUM_INSTRUCTION_TYPE_NOP] = "nop", [LUM_INSTRUCTION_TYPE_MOV] = "mov", [LUM_INSTRUCTION_TYPE_LDG] = "ldg",
-  [LUM_INSTRUCTION_TYPE_STG] = "stg", [LUM_INSTRUCTION_TYPE_RET] = "ret", [LUM_INSTRUCTION_TYPE_CVT] = "cvt"};
+  [LUM_INSTRUCTION_TYPE_NOP] = "nop",
+  [LUM_INSTRUCTION_TYPE_MOV] = "mov",
+  [LUM_INSTRUCTION_TYPE_LDG] = "ldg",
+  [LUM_INSTRUCTION_TYPE_STG] = "stg"};
 
 LuminaryResult lum_instruction_get_type(const LumInstruction* instruction, LumInstructionType* type) {
   __CHECK_NULL_ARGUMENT(instruction);

@@ -15,7 +15,7 @@ enum LumBinaryEntryPoint {
 #define LUM_REGISTER_COUNT 256
 
 struct LumBinary {
-  size_t stack_frame_size;
+  size_t stack_size;
   uint32_t entry_points[LUM_BINARY_ENTRY_POINT_COUNT];
   ARRAY LumInstruction* instructions;
   void* constant_memory;

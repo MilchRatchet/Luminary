@@ -294,25 +294,6 @@ static LuminaryResult _lum_compiler_stack_allocator_push(LumCompilerStackAllocat
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_compiler_stack_allocator_push_string(LumCompilerStackAllocator* allocator, const char* string, uint32_t* id) {
-  __CHECK_NULL_ARGUMENT(allocator);
-
-  const size_t size = strlen(string) + 1;
-
-  LumMemoryObject object;
-  object.type              = LUM_BUILTIN_TYPE_STRING;
-  object.allocation.offset = allocator->allocated_stack_size;
-  object.allocation.size   = size;
-
-  allocator->allocated_stack_size += size;
-
-  __FAILURE_HANDLE(array_get_num_elements(allocator->allocated_objects, id));
-
-  __FAILURE_HANDLE(array_push(&allocator->allocated_objects, &object));
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _lum_compiler_stack_allocator_push_member(
   LumCompilerStackAllocator* allocator, uint32_t base_id, size_t offset, LumBuiltinType type, uint32_t* id) {
   __CHECK_NULL_ARGUMENT(allocator);
@@ -452,17 +433,6 @@ static LuminaryResult _lum_compiler_state_destroy(LumCompilerState** state) {
 // Instructions
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_compiler_emit_return(LumBinary* binary) {
-  __CHECK_NULL_ARGUMENT(binary);
-
-  LumInstruction instruction;
-  __FAILURE_HANDLE(lum_instruction_encode_ret(&instruction));
-
-  __FAILURE_HANDLE(array_push(&binary->instructions, &instruction));
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _lum_compiler_emit_ldg(LumCompilerState* state, uint32_t dst_stack_id, uint32_t src_const_id, bool is_cleanup) {
   __CHECK_NULL_ARGUMENT(state);
 
@@ -544,7 +514,7 @@ static LuminaryResult _lum_compiler_null_binary(LumBinary* binary) {
     binary->entry_points[entrypoint_id] = 0;
   }
 
-  binary->stack_frame_size = 0;
+  binary->stack_size = 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -617,8 +587,8 @@ static LuminaryResult _lum_compiler_context_finalize_statement(LumCompilerState*
   __FAILURE_HANDLE(array_clear(state->instructions_main));
   __FAILURE_HANDLE(array_clear(state->instructions_cleanup));
 
-  if (state->stack_allocator->allocated_stack_size > state->binary->stack_frame_size)
-    state->binary->stack_frame_size = state->stack_allocator->allocated_stack_size;
+  if (state->stack_allocator->allocated_stack_size > state->binary->stack_size)
+    state->binary->stack_size = state->stack_allocator->allocated_stack_size;
 
   __FAILURE_HANDLE(_lum_compiler_stack_allocator_reset(state->stack_allocator));
 

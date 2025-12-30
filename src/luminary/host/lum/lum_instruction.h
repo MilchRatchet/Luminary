@@ -9,8 +9,6 @@ enum LumInstructionType {
   LUM_INSTRUCTION_TYPE_MOV,
   LUM_INSTRUCTION_TYPE_LDG,
   LUM_INSTRUCTION_TYPE_STG,
-  LUM_INSTRUCTION_TYPE_RET,
-  LUM_INSTRUCTION_TYPE_CVT,
   LUM_INSTRUCTION_TYPE_COUNT
 } typedef LumInstructionType;
 
@@ -39,7 +37,9 @@ LuminaryResult lum_instruction_encode_mov(
 LuminaryResult lum_instruction_encode_ldg(
   LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation dst, LumMemoryAllocation src);
 LuminaryResult lum_instruction_encode_stg(LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation src);
-LuminaryResult lum_instruction_encode_ret(LumInstruction* instruction);
-LuminaryResult lum_instruction_encode_cvt(LumInstruction* instruction);
+
+LuminaryResult lum_instruction_decode_mov(const LumInstruction* instruction, LumBuiltinType* type);
+LuminaryResult lum_instruction_decode_ldg(const LumInstruction* instruction, LumBuiltinType* type);
+LuminaryResult lum_instruction_decode_stg(const LumInstruction* instruction, LumBuiltinType* type);
 
 #endif /* LUMINARY_LUM_INSTRUCTION_H */
