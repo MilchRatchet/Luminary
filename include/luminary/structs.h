@@ -55,6 +55,15 @@ LUMINARY_API enum LuminaryAdaptiveSamplingOutputMode {
   LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT
 } typedef LuminaryAdaptiveSamplingOutputMode;
 
+struct LuminaryAdaptiveSamplingSettings {
+  bool enable;
+  uint32_t max_sampling_rate;
+  uint32_t avg_sampling_rate;
+  uint32_t update_interval;
+  bool exposure_aware;
+  LuminaryAdaptiveSamplingOutputMode output_mode;
+} typedef LuminaryAdaptiveSamplingSettings;
+
 LUMINARY_API struct LuminaryRendererSettings {
   uint32_t width;
   uint32_t height;
@@ -62,12 +71,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t bridge_max_num_vertices;
   uint32_t undersampling;
   uint32_t supersampling;
-  bool enable_adaptive_sampling;
-  uint32_t adaptive_sampling_max_sampling_rate;
-  uint32_t adaptive_sampling_avg_sampling_rate;
-  uint32_t adaptive_sampling_update_interval;
-  bool adaptive_sampling_exposure_aware;
-  LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;
+  LuminaryAdaptiveSamplingSettings adaptive_sampling_settings;
   LuminaryShadingMode shading_mode;
   float region_x;
   float region_y;

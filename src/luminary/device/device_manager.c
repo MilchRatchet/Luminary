@@ -450,10 +450,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     }
 
     AdaptiveSamplerSetupInfo setup_info;
-    setup_info.enabled           = scene->settings.enable_adaptive_sampling;
-    setup_info.max_sampling_rate = scene->settings.adaptive_sampling_max_sampling_rate;
-    setup_info.avg_sampling_rate = scene->settings.adaptive_sampling_avg_sampling_rate;
-    setup_info.exposure_aware    = scene->settings.adaptive_sampling_exposure_aware;
+    setup_info.enabled           = scene->settings.adaptive_sampling_settings.enable;
+    setup_info.max_sampling_rate = scene->settings.adaptive_sampling_settings.max_sampling_rate;
+    setup_info.avg_sampling_rate = scene->settings.adaptive_sampling_settings.avg_sampling_rate;
+    setup_info.exposure_aware    = scene->settings.adaptive_sampling_settings.exposure_aware;
     setup_info.exposure          = expf(scene->camera.exposure);
 
     __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(main_device, &setup_info.width, &setup_info.height));
@@ -461,7 +461,8 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
     __FAILURE_HANDLE_CRITICAL(adaptive_sampler_setup(device_manager->adaptive_sampler, &setup_info));
 
-    uint32_t num_initial_samples = (scene->settings.enable_adaptive_sampling) ? scene->settings.adaptive_sampling_update_interval : 4;
+    uint32_t num_initial_samples =
+      (scene->settings.adaptive_sampling_settings.enable) ? scene->settings.adaptive_sampling_settings.update_interval : 4;
 
     // Main device always computes the first samples
     __FAILURE_HANDLE_CRITICAL(device_setup_undersampling(main_device, &scene->settings));
@@ -470,7 +471,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
 
     DeviceRendererQueueArgs render_args;
     render_args.max_depth                         = scene->settings.max_ray_depth;
-    render_args.enable_adaptive_sampling          = scene->settings.enable_adaptive_sampling;
+    render_args.enable_adaptive_sampling          = scene->settings.adaptive_sampling_settings.enable;
     render_args.render_clouds                     = scene->cloud.active && scene->sky.mode == LUMINARY_SKY_MODE_DEFAULT;
     render_args.render_inscattering               = scene->sky.aerial_perspective && scene->sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
     render_args.render_ocean                      = scene->ocean.active;
@@ -478,7 +479,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     render_args.render_volumes                    = scene->fog.active || scene->ocean.active;
     render_args.render_lights                     = true;
     render_args.render_procedural_sky             = true;  // TODO: If possible do non procedural sky in another kernel.
-    render_args.adaptive_sampling_update_interval = scene->settings.adaptive_sampling_update_interval;
+    render_args.adaptive_sampling_update_interval = scene->settings.adaptive_sampling_settings.update_interval;
     render_args.shading_mode                      = scene->settings.shading_mode;
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {

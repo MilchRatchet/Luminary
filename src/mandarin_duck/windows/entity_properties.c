@@ -186,7 +186,7 @@ static void _window_entity_properties_renderer_settings_action(
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
-  uint32_t adaptive_sampling_output_mode = (uint32_t) settings.adaptive_sampling_output_mode;
+  uint32_t adaptive_sampling_output_mode = (uint32_t) settings.adaptive_sampling_settings.output_mode;
   uint32_t shading_mode                  = (uint32_t) settings.shading_mode;
 
   element_separator(
@@ -220,16 +220,18 @@ static void _window_entity_properties_renderer_settings_action(
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Adaptive Sampling", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
-  update_data |= _window_entity_properties_add_checkbox(data, "Enable", &settings.enable_adaptive_sampling);
+  update_data |= _window_entity_properties_add_checkbox(data, "Enable", &settings.adaptive_sampling_settings.enable);
 
-  if (settings.enable_adaptive_sampling) {
+  if (settings.adaptive_sampling_settings.enable) {
     update_data |= _window_entity_properties_add_slider(
-      data, "Max. Sampling Rate", &settings.adaptive_sampling_max_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 256.0f, 1.0f);
+      data, "Max. Sampling Rate", &settings.adaptive_sampling_settings.max_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 256.0f,
+      1.0f);
     update_data |= _window_entity_properties_add_slider(
-      data, "Avg. Sampling Rate", &settings.adaptive_sampling_avg_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 128.0f, 1.0f);
+      data, "Avg. Sampling Rate", &settings.adaptive_sampling_settings.avg_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 128.0f,
+      1.0f);
     update_data |= _window_entity_properties_add_slider(
-      data, "Update Interval", &settings.adaptive_sampling_update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 1024.0f, 1.0f);
-    update_data |= _window_entity_properties_add_checkbox(data, "Exposure Awareness", &settings.adaptive_sampling_exposure_aware);
+      data, "Update Interval", &settings.adaptive_sampling_settings.update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 1024.0f, 1.0f);
+    update_data |= _window_entity_properties_add_checkbox(data, "Exposure Awareness", &settings.adaptive_sampling_settings.exposure_aware);
     update_data |= _window_entity_properties_add_dropdown(
       data, "Output Mode", LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT, (char**) luminary_strings_adaptive_sampling_output_mode,
       &adaptive_sampling_output_mode);
@@ -241,8 +243,8 @@ static void _window_entity_properties_renderer_settings_action(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
 
   if (update_data) {
-    settings.adaptive_sampling_output_mode = (LuminaryAdaptiveSamplingOutputMode) adaptive_sampling_output_mode;
-    settings.shading_mode                  = (LuminaryShadingMode) shading_mode;
+    settings.adaptive_sampling_settings.output_mode = (LuminaryAdaptiveSamplingOutputMode) adaptive_sampling_output_mode;
+    settings.shading_mode                           = (LuminaryShadingMode) shading_mode;
 
     LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
   }

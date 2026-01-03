@@ -16,7 +16,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->shading_mode                  = settings->shading_mode;
   device_settings->bridge_max_num_vertices       = settings->bridge_max_num_vertices;
   device_settings->supersampling                 = settings->supersampling;
-  device_settings->adaptive_sampling_output_mode = settings->adaptive_sampling_output_mode;
+  device_settings->adaptive_sampling_output_mode = settings->adaptive_sampling_settings.output_mode;
 
   device_settings->width  = settings->width << settings->supersampling;
   device_settings->height = settings->height << settings->supersampling;

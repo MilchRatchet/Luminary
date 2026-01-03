@@ -98,6 +98,8 @@ LuminaryResult lum_file_parse(LumFile* file, Path* path) {
   __CHECK_NULL_ARGUMENT(file);
   __CHECK_NULL_ARGUMENT(path);
 
+  __FAILURE_HANDLE(_lum_file_reset(file));
+
   const char* lum_file_path_string;
   __FAILURE_HANDLE(path_apply(path, (const char*) 0, &lum_file_path_string));
 

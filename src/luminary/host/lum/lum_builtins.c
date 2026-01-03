@@ -23,9 +23,8 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_INSTANCE]         = "Instance",
   [LUM_BUILTIN_TYPE_STRING]           = "String",
   [LUM_BUILTIN_TYPE_LUMINARY]         = "Luminary",
-  [LUM_BUILTIN_TYPE_FILE]             = "File",
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = "VersionControl",
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "WavefrontObjFile"};
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "WavefrontObjFile",
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "AdaptiveSamplingSettings"};
 
 const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
@@ -46,9 +45,8 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(LuminaryInstance),
   [LUM_BUILTIN_TYPE_STRING]           = sizeof(uint32_t),
   [LUM_BUILTIN_TYPE_LUMINARY]         = 4,
-  [LUM_BUILTIN_TYPE_FILE]             = 0,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = 4,
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0};
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(LuminaryAdaptiveSamplingSettings)};
 
 const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = "",
@@ -69,18 +67,30 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_INSTANCE]         = "ins",
   [LUM_BUILTIN_TYPE_STRING]           = "str",
   [LUM_BUILTIN_TYPE_LUMINARY]         = "lum",
-  [LUM_BUILTIN_TYPE_FILE]             = "file",
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = "ver",
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "obj"};
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "obj",
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "asam"};
 
 const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
-  [LUM_BUILTIN_TYPE_VOID] = false,    [LUM_BUILTIN_TYPE_RGBF] = false,          [LUM_BUILTIN_TYPE_VEC3] = false,
-  [LUM_BUILTIN_TYPE_UINT] = false,    [LUM_BUILTIN_TYPE_BOOL] = false,          [LUM_BUILTIN_TYPE_FLOAT] = false,
-  [LUM_BUILTIN_TYPE_ENUM] = false,    [LUM_BUILTIN_TYPE_SETTINGS] = false,      [LUM_BUILTIN_TYPE_CAMERA] = false,
-  [LUM_BUILTIN_TYPE_OCEAN] = false,   [LUM_BUILTIN_TYPE_SKY] = false,           [LUM_BUILTIN_TYPE_CLOUD] = false,
-  [LUM_BUILTIN_TYPE_FOG] = false,     [LUM_BUILTIN_TYPE_PARTICLES] = false,     [LUM_BUILTIN_TYPE_MATERIAL] = true,
-  [LUM_BUILTIN_TYPE_INSTANCE] = true, [LUM_BUILTIN_TYPE_STRING] = false,        [LUM_BUILTIN_TYPE_LUMINARY] = false,
-  [LUM_BUILTIN_TYPE_FILE] = true,     [LUM_BUILTIN_TYPE_VERSIONCONTROL] = true, [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true};
+  [LUM_BUILTIN_TYPE_VOID]             = false,
+  [LUM_BUILTIN_TYPE_RGBF]             = false,
+  [LUM_BUILTIN_TYPE_VEC3]             = false,
+  [LUM_BUILTIN_TYPE_UINT]             = false,
+  [LUM_BUILTIN_TYPE_BOOL]             = false,
+  [LUM_BUILTIN_TYPE_FLOAT]            = false,
+  [LUM_BUILTIN_TYPE_ENUM]             = false,
+  [LUM_BUILTIN_TYPE_SETTINGS]         = false,
+  [LUM_BUILTIN_TYPE_CAMERA]           = false,
+  [LUM_BUILTIN_TYPE_OCEAN]            = false,
+  [LUM_BUILTIN_TYPE_SKY]              = false,
+  [LUM_BUILTIN_TYPE_CLOUD]            = false,
+  [LUM_BUILTIN_TYPE_FOG]              = false,
+  [LUM_BUILTIN_TYPE_PARTICLES]        = false,
+  [LUM_BUILTIN_TYPE_MATERIAL]         = true,
+  [LUM_BUILTIN_TYPE_INSTANCE]         = true,
+  [LUM_BUILTIN_TYPE_STRING]           = false,
+  [LUM_BUILTIN_TYPE_LUMINARY]         = false,
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = false};
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum) {.string = #__internal_macro_enum, .value = __internal_macro_enum}
 
@@ -122,14 +132,36 @@ static const LumBuiltinTypeMember _lum_builtin_member_vec3[] = {
   {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, y), .name = "y"},
   {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, z), .name = "z"}};
 
+static const LumBuiltinTypeMember _lum_builtin_member_settings[] = {
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, width), .name = "width"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, height), .name = "height"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, max_ray_depth), .name = "max_ray_depth"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, bridge_max_num_vertices), .name = "bridge_max_num_vertices"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, undersampling), .name = "undersampling"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, supersampling), .name = "supersampling"},
+  {.type   = LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,
+   .offset = offsetof(LuminaryRendererSettings, adaptive_sampling_settings),
+   .name   = "adaptive_sampling_settings"},
+  {.type = LUM_BUILTIN_TYPE_ENUM, .offset = offsetof(LuminaryRendererSettings, shading_mode), .name = "shading_mode"},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_x), .name = "region_x"},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_y), .name = "region_y"},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_width), .name = "region_width"},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_height), .name = "region_height"}};
+
 static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   {.type = LUM_BUILTIN_TYPE_VEC3, .offset = offsetof(LuminaryCamera, pos), .name = "pos"}};
 
 static const LumBuiltinTypeMember _lum_builtin_member_luminary[] = {
   {.type = LUM_BUILTIN_TYPE_UINT, .offset = 0, .name = "compatibility_version"}};
 
-static const LumBuiltinTypeMember _lum_builtin_member_versioncontrol[] = {
-  {.type = LUM_BUILTIN_TYPE_STRING, .offset = 0, .name = "message"}};
+static const LumBuiltinTypeMember _lum_builtin_member_adaptive_sampling[] = {
+  {.type = LUM_BUILTIN_TYPE_BOOL, .offset = offsetof(LuminaryAdaptiveSamplingSettings, enable), .name = "enable"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryAdaptiveSamplingSettings, max_sampling_rate), .name = "max_sampling_rate"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryAdaptiveSamplingSettings, avg_sampling_rate), .name = "avg_sampling_rate"},
+  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryAdaptiveSamplingSettings, update_interval), .name = "update_interval"},
+  {.type = LUM_BUILTIN_TYPE_BOOL, .offset = offsetof(LuminaryAdaptiveSamplingSettings, exposure_aware), .name = "exposure_aware"},
+  {.type = LUM_BUILTIN_TYPE_ENUM, .offset = offsetof(LuminaryAdaptiveSamplingSettings, output_mode), .name = "output_mode"},
+};
 
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
@@ -139,7 +171,7 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_BOOL]             = 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = 0,
   [LUM_BUILTIN_TYPE_ENUM]             = 0,
-  [LUM_BUILTIN_TYPE_SETTINGS]         = 0,
+  [LUM_BUILTIN_TYPE_SETTINGS]         = sizeof(_lum_builtin_member_settings) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CAMERA]           = sizeof(_lum_builtin_member_camera) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_OCEAN]            = 0,
   [LUM_BUILTIN_TYPE_SKY]              = 0,
@@ -150,9 +182,8 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_INSTANCE]         = 0,
   [LUM_BUILTIN_TYPE_STRING]           = 0,
   [LUM_BUILTIN_TYPE_LUMINARY]         = sizeof(_lum_builtin_member_luminary) / sizeof(LumBuiltinTypeMember),
-  [LUM_BUILTIN_TYPE_FILE]             = 0,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = sizeof(_lum_builtin_member_versioncontrol) / sizeof(LumBuiltinTypeMember),
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0};
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(_lum_builtin_member_adaptive_sampling) / sizeof(LumBuiltinTypeMember)};
 
 const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
@@ -162,7 +193,7 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_BOOL]             = 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = 0,
   [LUM_BUILTIN_TYPE_ENUM]             = 0,
-  [LUM_BUILTIN_TYPE_SETTINGS]         = 0,
+  [LUM_BUILTIN_TYPE_SETTINGS]         = _lum_builtin_member_settings,
   [LUM_BUILTIN_TYPE_CAMERA]           = _lum_builtin_member_camera,
   [LUM_BUILTIN_TYPE_OCEAN]            = 0,
   [LUM_BUILTIN_TYPE_SKY]              = 0,
@@ -173,6 +204,5 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_INSTANCE]         = 0,
   [LUM_BUILTIN_TYPE_STRING]           = 0,
   [LUM_BUILTIN_TYPE_LUMINARY]         = _lum_builtin_member_luminary,
-  [LUM_BUILTIN_TYPE_FILE]             = 0,
-  [LUM_BUILTIN_TYPE_VERSIONCONTROL]   = _lum_builtin_member_versioncontrol,
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0};
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = _lum_builtin_member_adaptive_sampling};
