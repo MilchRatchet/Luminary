@@ -4,38 +4,18 @@
 #include <stdio.h>
 
 #include "utils.h"
-#include "wavefront.h"
 
-struct LumFileContent {
-  ARRAY char** obj_file_path_strings;
-  WavefrontArguments wavefront_args;
-  RendererSettings settings;
-  Camera camera;
-  Ocean ocean;
-  Sky sky;
-  Cloud cloud;
-  Fog fog;
-  Particles particles;
-  ARRAY MeshInstance* instances;
-} typedef LumFileContent;
+#define LUM_FILE_MAJOR_VERSION_INVALID (0xFFFFFFFF)
 
-LuminaryResult lum_content_create(LumFileContent** content);
-LuminaryResult lum_read_file(Path* path, LumFileContent* content);
-LuminaryResult lum_write_content(Path* path, LumFileContent* content);
-LuminaryResult lum_content_destroy(LumFileContent** content);
+struct LumFile {
+  Path* path;
+  uint32_t parsed_major_version;
+  void* parsed_data;
+} typedef LumFile;
 
-/*
- * Parses a v5 lum file.
- * @param File File handle to the lum file.
- * @param content LumFileContent instance to which the file's content will be written.
- */
-LuminaryResult lum_parse_file_v5(FILE* file, LumFileContent* content);
-
-/*
- * Parses a legacy v4 lum file.
- * @param File File handle to the lum file.
- * @param content LumFileContent instance to which the file's content will be written.
- */
-LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content);
+LuminaryResult lum_file_create(LumFile** file);
+LuminaryResult lum_file_parse(LumFile* file, Path* path);
+LuminaryResult lum_file_apply(LumFile* file, LuminaryHost* host);
+LuminaryResult lum_file_destroy(LumFile** file);
 
 #endif /* LUM_H */

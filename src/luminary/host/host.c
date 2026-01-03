@@ -236,7 +236,7 @@ static LuminaryResult _host_enable_device_queue_work(Host* host, HostEnableDevic
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _host_update_scene(Host* host) {
+LuminaryResult host_update_scene(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
 
   QueueEntry entry;
@@ -264,7 +264,7 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
 
   // If there are no changes, skip the propagation to avoid hammering the queue.
   if (scene_changed) {
-    __FAILURE_HANDLE(_host_update_scene(host));
+    __FAILURE_HANDLE(host_update_scene(host));
   }
 
   return LUMINARY_SUCCESS;
@@ -279,7 +279,7 @@ static LuminaryResult _host_set_scene_entity_entry(Host* host, void* object, Sce
 
   // If there are no changes, skip the propagation to avoid hammering the queue.
   if (scene_changed) {
-    __FAILURE_HANDLE(_host_update_scene(host));
+    __FAILURE_HANDLE(host_update_scene(host));
   }
 
   return LUMINARY_SUCCESS;
@@ -408,7 +408,7 @@ LuminaryResult luminary_host_start_new_render(LuminaryHost* host) {
 
   __FAILURE_HANDLE(scene_set_dirty_flags(host->scene_caller, SCENE_DIRTY_FLAG_INTEGRATION));
 
-  __FAILURE_HANDLE(_host_update_scene(host));
+  __FAILURE_HANDLE(host_update_scene(host));
 
   return LUMINARY_SUCCESS;
 }
@@ -495,16 +495,17 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments wavefront_args) {
+LuminaryResult host_queue_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(wavefront_args);
 
   HostLoadObjArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
 
   __FAILURE_HANDLE(path_copy(&args->path, path));
 
-  args->wavefront_args = wavefront_args;
+  args->wavefront_args = *wavefront_args;
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
@@ -526,7 +527,7 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   WavefrontArguments args;
   __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
 
-  __FAILURE_HANDLE(_host_queue_load_obj_file(host, path, args));
+  __FAILURE_HANDLE(host_queue_load_obj_file(host, path, &args));
 
   return LUMINARY_SUCCESS;
 }
@@ -535,71 +536,11 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
-  LumFileContent* content;
-  __FAILURE_HANDLE(lum_content_create(&content));
-
-  ////////////////////////////////////////////////////////////////////
-  // Read lum file
-  ////////////////////////////////////////////////////////////////////
-
-  Path* lum_path;
-  __FAILURE_HANDLE(path_copy(&lum_path, path));
-
-  __FAILURE_HANDLE(lum_read_file(lum_path, content));
-
-  __FAILURE_HANDLE(luminary_path_destroy(&lum_path));
-
-  ////////////////////////////////////////////////////////////////////
-  // Load meshes
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t mesh_id_offset;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &mesh_id_offset));
-
-  uint32_t num_obj_files_to_load;
-  __FAILURE_HANDLE(array_get_num_elements(content->obj_file_path_strings, &num_obj_files_to_load));
-
-  for (uint32_t obj_file_id = 0; obj_file_id < num_obj_files_to_load; obj_file_id++) {
-    Path* obj_path;
-    __FAILURE_HANDLE(path_extend(&obj_path, path, content->obj_file_path_strings[obj_file_id]));
-
-    __FAILURE_HANDLE(_host_queue_load_obj_file(host, obj_path, content->wavefront_args));
-
-    __FAILURE_HANDLE(luminary_path_destroy(&obj_path));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Add instances
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t num_instances_added;
-  __FAILURE_HANDLE(array_get_num_elements(content->instances, &num_instances_added));
-
-  for (uint32_t instance_id = 0; instance_id < num_instances_added; instance_id++) {
-    MeshInstance instance = content->instances[instance_id];
-
-    // Account for any meshes that were loaded prior to loading this lum file.
-    instance.mesh_id += mesh_id_offset;
-
-    __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES));
-
-    // We have added an instance, so the scene is dirty and we need to queue the propagation
-    __FAILURE_HANDLE(_host_update_scene(host));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Update global scene entities
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(luminary_host_set_settings(host, &content->settings));
-  __FAILURE_HANDLE(luminary_host_set_camera(host, &content->camera));
-  __FAILURE_HANDLE(luminary_host_set_ocean(host, &content->ocean));
-  __FAILURE_HANDLE(luminary_host_set_sky(host, &content->sky));
-  __FAILURE_HANDLE(luminary_host_set_cloud(host, &content->cloud));
-  __FAILURE_HANDLE(luminary_host_set_fog(host, &content->fog));
-  __FAILURE_HANDLE(luminary_host_set_particles(host, &content->particles));
-
-  __FAILURE_HANDLE(lum_content_destroy(&content));
+  LumFile* lum_file;
+  __FAILURE_HANDLE(lum_file_create(&lum_file));
+  __FAILURE_HANDLE(lum_file_parse(lum_file, path));
+  __FAILURE_HANDLE(lum_file_apply(lum_file, host));
+  __FAILURE_HANDLE(lum_file_destroy(&lum_file));
 
   return LUMINARY_SUCCESS;
 }
@@ -878,7 +819,7 @@ LuminaryResult luminary_host_new_instance(Host* host, LuminaryInstance* instance
   __FAILURE_HANDLE(mesh_instance_get_default(&mesh_instance));
 
   __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mesh_instance, SCENE_ENTITY_INSTANCES));
-  __FAILURE_HANDLE(_host_update_scene(host));
+  __FAILURE_HANDLE(host_update_scene(host));
 
   __FAILURE_HANDLE(mesh_instance_to_public_api_instance(instance, &mesh_instance));
 
@@ -1078,7 +1019,7 @@ LuminaryResult luminary_host_request_sky_hdri_build(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(scene_set_hdri_dirty(host->scene_caller));
-  __FAILURE_HANDLE(_host_update_scene(host));
+  __FAILURE_HANDLE(host_update_scene(host));
 
   return LUMINARY_SUCCESS;
 }

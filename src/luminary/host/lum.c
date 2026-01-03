@@ -2,46 +2,21 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "camera.h"
-#include "cloud.h"
-#include "fog.h"
 #include "internal_error.h"
 #include "internal_path.h"
-#include "ocean.h"
-#include "particles.h"
-#include "settings.h"
-#include "sky.h"
+#include "lum/lum_binary.h"
+#include "lum/lum_file_content.h"
+#include "lum/lum_virtual_machine.h"
 #include "utils.h"
 
 #define LINE_SIZE 4096
 #define CURRENT_VERSION 5
 #define MIN_SUPPORTED_VERSION 4
 
-LuminaryResult lum_content_create(LumFileContent** _content) {
-  __CHECK_NULL_ARGUMENT(_content);
-
-  LumFileContent* content;
-  __FAILURE_HANDLE(host_malloc(&content, sizeof(LumFileContent)));
-
-  __FAILURE_HANDLE(array_create(&content->obj_file_path_strings, sizeof(char*), 16));
-
-  __FAILURE_HANDLE(settings_get_default(&content->settings));
-  __FAILURE_HANDLE(camera_get_default(&content->camera));
-  __FAILURE_HANDLE(ocean_get_default(&content->ocean));
-  __FAILURE_HANDLE(sky_get_default(&content->sky));
-  __FAILURE_HANDLE(cloud_get_default(&content->cloud));
-  __FAILURE_HANDLE(fog_get_default(&content->fog));
-  __FAILURE_HANDLE(particles_get_default(&content->particles));
-
-  __FAILURE_HANDLE(wavefront_arguments_get_default(&content->wavefront_args));
-
-  __FAILURE_HANDLE(array_create(&content->instances, sizeof(MeshInstance), 16));
-
-  *_content = content;
-
-  return LUMINARY_SUCCESS;
-}
+LuminaryResult lum_file_parse_v5(FILE* file, LumBinary* binary);
+LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content);
 
 /*
  * Determines whether the file is a supported *.lum file and on success puts the file accessor past the header.
@@ -57,21 +32,19 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
 
   fgets(line, LINE_SIZE, file);
 
-  {
-    uint32_t result = 0;
+  uint32_t magic_error = 0;
 
-    result += line[0] ^ 'L';
-    result += line[1] ^ 'u';
-    result += line[2] ^ 'm';
-    result += line[3] ^ 'i';
-    result += line[4] ^ 'n';
-    result += line[5] ^ 'a';
-    result += line[6] ^ 'r';
-    result += line[7] ^ 'y';
+  magic_error += line[0] ^ 'L';
+  magic_error += line[1] ^ 'u';
+  magic_error += line[2] ^ 'm';
+  magic_error += line[3] ^ 'i';
+  magic_error += line[4] ^ 'n';
+  magic_error += line[5] ^ 'a';
+  magic_error += line[6] ^ 'r';
+  magic_error += line[7] ^ 'y';
 
-    if (result) {
-      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File is not a Luminary file.")
-    }
+  if (magic_error != 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File is not a Luminary file.")
   }
 
   fgets(line, LINE_SIZE, file);
@@ -88,67 +61,129 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult lum_read_file(Path* path, LumFileContent* content) {
-  __CHECK_NULL_ARGUMENT(path);
-  __CHECK_NULL_ARGUMENT(content);
+static LuminaryResult _lum_file_reset(LumFile* file) {
+  __CHECK_NULL_ARGUMENT(file);
 
-  const char* lum_file_path_string;
-  __FAILURE_HANDLE(path_apply(path, (const char*) 0, &lum_file_path_string));
-
-  FILE* file = fopen(lum_file_path_string, "rb");
-
-  if (!file) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File %s could not be opened.", lum_file_path_string);
-  }
-
-  uint32_t version;
-  __FAILURE_HANDLE(_lum_validate_file(file, &version));
-
-  switch (version) {
-    case 1:
-    case 2:
-    case 3:
-      __RETURN_ERROR(
-        LUMINARY_ERROR_API_EXCEPTION, "Luminary file is version %u but minimum supported version is %u.", version, MIN_SUPPORTED_VERSION);
-    case 4:
-      __FAILURE_HANDLE(lum_parse_file_v4(file, content));
-      break;
-    case 5:
-      __FAILURE_HANDLE(lum_parse_file_v5(file, content));
-      break;
+  switch (file->parsed_major_version) {
+    case 4: {
+      LumFileContent* content = (LumFileContent*) file->parsed_data;
+      __FAILURE_HANDLE(lum_file_content_destroy(&content));
+    } break;
+    case 5: {
+      LumBinary* binary = (LumBinary*) file->parsed_data;
+      __FAILURE_HANDLE(lum_binary_destroy(&binary));
+    } break;
     default:
-      __RETURN_ERROR(
-        LUMINARY_ERROR_API_EXCEPTION, "Luminary file is version %u is unknown. Current supported range [%u, %u].", version,
-        MIN_SUPPORTED_VERSION, CURRENT_VERSION);
+      break;
   }
 
-  fclose(file);
+  file->parsed_major_version = LUM_FILE_MAJOR_VERSION_INVALID;
+  file->parsed_data          = (void*) 0;
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult lum_write_content(Path* path, LumFileContent* content) {
-  __CHECK_NULL_ARGUMENT(path);
-  __CHECK_NULL_ARGUMENT(content);
+LuminaryResult lum_file_create(LumFile** file) {
+  __CHECK_NULL_ARGUMENT(file);
 
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Writing lum files is not yet implemented.");
+  __FAILURE_HANDLE(host_malloc(file, sizeof(LumFile)));
+  memset(*file, 0, sizeof(LumFile));
+
+  __FAILURE_HANDLE(_lum_file_reset(*file));
+
+  return LUMINARY_SUCCESS;
 }
 
-LuminaryResult lum_content_destroy(LumFileContent** content) {
-  __CHECK_NULL_ARGUMENT(content);
-  __CHECK_NULL_ARGUMENT(*content);
+LuminaryResult lum_file_parse(LumFile* file, Path* path) {
+  __CHECK_NULL_ARGUMENT(file);
+  __CHECK_NULL_ARGUMENT(path);
 
-  uint32_t num_obj_file_path_strings;
-  __FAILURE_HANDLE(array_get_num_elements((*content)->obj_file_path_strings, &num_obj_file_path_strings));
+  const char* lum_file_path_string;
+  __FAILURE_HANDLE(path_apply(path, (const char*) 0, &lum_file_path_string));
 
-  for (uint32_t i = 0; i < num_obj_file_path_strings; i++) {
-    __FAILURE_HANDLE(host_free(&(*content)->obj_file_path_strings[i]));
+  FILE* file_handle = fopen(lum_file_path_string, "rb");
+
+  if (file_handle == (FILE*) 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File %s could not be opened.", lum_file_path_string);
   }
 
-  __FAILURE_HANDLE(array_destroy(&(*content)->obj_file_path_strings));
-  __FAILURE_HANDLE(array_destroy(&(*content)->instances));
+  __FAILURE_HANDLE(path_copy(&file->path, path));
 
-  __FAILURE_HANDLE(host_free(content));
+  __FAILURE_HANDLE(_lum_validate_file(file_handle, &file->parsed_major_version));
+
+  switch (file->parsed_major_version) {
+    case 4: {
+      LumFileContent* content;
+      __FAILURE_HANDLE(lum_file_content_create(&content));
+      __FAILURE_HANDLE(lum_file_parse_v4(file_handle, content));
+
+      file->parsed_data = (void*) content;
+    } break;
+    case 5: {
+      LumBinary* binary;
+      __FAILURE_HANDLE(lum_binary_create(&binary));
+      __FAILURE_HANDLE(lum_file_parse_v5(file_handle, binary));
+
+      file->parsed_data = (void*) binary;
+    } break;
+    default:
+      break;
+  }
+
+  fclose(file_handle);
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_file_apply(LumFile* file, LuminaryHost* host) {
+  __CHECK_NULL_ARGUMENT(file);
+  __CHECK_NULL_ARGUMENT(host);
+
+  switch (file->parsed_major_version) {
+    case LUM_FILE_MAJOR_VERSION_INVALID:
+      warn_message("No Luminary file was parsed.");
+      break;
+    case 1:
+    case 2:
+    case 3:
+      __RETURN_ERROR(
+        LUMINARY_ERROR_API_EXCEPTION, "Luminary file is version %u but minimum supported version is %u.", file->parsed_major_version,
+        MIN_SUPPORTED_VERSION);
+    case 4: {
+      LumFileContent* content = (LumFileContent*) file->parsed_data;
+      __FAILURE_HANDLE(lum_file_content_apply(content, host, file->path));
+    } break;
+    case 5: {
+      LumBinary* binary = (LumBinary*) file->parsed_data;
+
+      LumVirtualMachineExecutionInfo info;
+      info.debug_mode = false;
+
+      LumVirtualMachine* vm;
+      __FAILURE_HANDLE(lum_virtual_machine_create(&vm));
+      __FAILURE_HANDLE(lum_virtual_machine_execute(vm, host, binary, &info));
+      __FAILURE_HANDLE(lum_virtual_machine_destroy(&vm));
+    } break;
+    default:
+      __RETURN_ERROR(
+        LUMINARY_ERROR_API_EXCEPTION, "Luminary file is version %u is unknown. Current supported range [%u, %u].",
+        file->parsed_major_version, MIN_SUPPORTED_VERSION, CURRENT_VERSION);
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_file_destroy(LumFile** file) {
+  __CHECK_NULL_ARGUMENT(file);
+  __CHECK_NULL_ARGUMENT(*file);
+
+  __FAILURE_HANDLE(_lum_file_reset(*file));
+
+  if ((*file)->path) {
+    __FAILURE_HANDLE(luminary_path_destroy(&(*file)->path));
+  }
+
+  __FAILURE_HANDLE(host_free(file));
 
   return LUMINARY_SUCCESS;
 }

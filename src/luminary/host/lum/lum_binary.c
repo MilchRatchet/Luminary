@@ -16,8 +16,6 @@ LuminaryResult lum_binary_create(LumBinary** binary) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult lum_binary_compute_stack_frame_size(LumBinary* binary);
-
 LuminaryResult lum_binary_print(LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(binary);
 

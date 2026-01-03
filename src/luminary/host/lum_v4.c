@@ -1,8 +1,10 @@
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "internal_error.h"
-#include "lum.h"
+#include "lum/lum_file_content.h"
+#include "mesh.h"
 
 #define LINE_SIZE 4096
 #define CURRENT_VERSION 4
@@ -683,7 +685,7 @@ static LuminaryResult parse_particle_settings(Particles* particle, char* line) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
+LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
   char* line;
 
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));

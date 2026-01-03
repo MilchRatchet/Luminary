@@ -510,11 +510,8 @@ static LuminaryResult _lum_compiler_null_binary(LumBinary* binary) {
 
   __FAILURE_HANDLE(array_clear(binary->instructions));
 
-  for (uint32_t entrypoint_id = 0; entrypoint_id < LUM_BINARY_ENTRY_POINT_COUNT; entrypoint_id++) {
-    binary->entry_points[entrypoint_id] = 0;
-  }
-
-  binary->stack_size = 0;
+  binary->stack_size           = 0;
+  binary->constant_memory_size = 0;
 
   return LUMINARY_SUCCESS;
 }

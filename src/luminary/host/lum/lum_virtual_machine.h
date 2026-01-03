@@ -12,7 +12,6 @@ struct LumVirtualMachine {
 } typedef LumVirtualMachine;
 
 struct LumVirtualMachineExecutionInfo {
-  LumBinaryEntryPoint entry_point;
   bool debug_mode;
 } typedef LumVirtualMachineExecutionInfo;
 
