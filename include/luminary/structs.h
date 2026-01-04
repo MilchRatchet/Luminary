@@ -360,7 +360,6 @@ enum LuminaryMaterialBaseSubstrate {
 } typedef LuminaryMaterialBaseSubstrate;
 
 LUMINARY_API struct LuminaryMaterial {
-  uint32_t id;
   LuminaryMaterialBaseSubstrate base_substrate;
   LuminaryRGBAF albedo;
   LuminaryRGBF emission;
@@ -387,7 +386,6 @@ LUMINARY_API struct LuminaryMaterial {
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_API struct LuminaryInstance {
-  uint32_t id;
   uint32_t mesh_id;
   LuminaryVec3 position;
   LuminaryVec3 rotation;

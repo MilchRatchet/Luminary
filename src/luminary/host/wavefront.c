@@ -794,7 +794,6 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     Material mat;
     __FAILURE_HANDLE(material_get_default(&mat));
 
-    mat.id                       = material_id_offset + mat_id;
     mat.base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
     mat.albedo.r                 = wavefront_mat.diffuse_reflectivity.r;
     mat.albedo.g                 = wavefront_mat.diffuse_reflectivity.g;

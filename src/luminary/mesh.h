@@ -20,7 +20,6 @@ struct Mesh {
 } typedef Mesh;
 
 struct MeshInstance {
-  uint32_t id;
   uint32_t mesh_id;
   vec3 translation;
   vec3 scale;

@@ -653,8 +653,6 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
 
       memcpy(&update.material, object, sizeof(Material));
 
-      update.material.id = material_id;
-
       __FAILURE_HANDLE(array_push(&scene->material_updates, &update));
 
       scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_MATERIALS;
@@ -693,8 +691,6 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
       update.instance_id = instance_id;
 
       memcpy(&update.instance, object, sizeof(MeshInstance));
-
-      update.instance.id = instance_id;
 
       __FAILURE_HANDLE(array_push(&scene->instance_updates, &update));
 

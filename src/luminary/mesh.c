@@ -9,8 +9,7 @@
 #include "internal_error.h"
 
 // TODO: Make per host instance
-static uint32_t mesh_id_counter     = 0;
-static uint32_t instance_id_counter = 0;
+static uint32_t mesh_id_counter = 0;
 
 LuminaryResult mesh_create(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
@@ -70,7 +69,6 @@ LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
   memset(instance, 0, sizeof(MeshInstance));
 
   instance->active  = true;
-  instance->id      = instance_id_counter++;
   instance->scale.x = 1.0f;
   instance->scale.y = 1.0f;
   instance->scale.z = 1.0f;
@@ -118,7 +116,6 @@ LuminaryResult mesh_instance_from_public_api_instance(MeshInstance* mesh_instanc
   __CHECK_NULL_ARGUMENT(mesh_instance);
   __CHECK_NULL_ARGUMENT(instance);
 
-  mesh_instance->id          = instance->id;
   mesh_instance->mesh_id     = instance->mesh_id;
   mesh_instance->translation = instance->position;
   mesh_instance->scale       = instance->scale;
@@ -132,8 +129,7 @@ LuminaryResult mesh_instance_to_public_api_instance(LuminaryInstance* instance, 
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(mesh_instance);
 
-  const LuminaryInstance converted_instance = (LuminaryInstance) {.id       = mesh_instance->id,
-                                                                  .mesh_id  = mesh_instance->mesh_id,
+  const LuminaryInstance converted_instance = (LuminaryInstance) {.mesh_id  = mesh_instance->mesh_id,
                                                                   .position = mesh_instance->translation,
                                                                   .scale    = mesh_instance->scale,
                                                                   .rotation = mesh_instance->rotation};

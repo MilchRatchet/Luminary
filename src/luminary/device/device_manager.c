@@ -87,7 +87,7 @@ static LuminaryResult _device_manager_handle_device_material_updates(DeviceManag
   __FAILURE_HANDLE(array_get_num_elements(material_updates, &num_material_updates));
 
   for (uint32_t material_update_id = 0; material_update_id < num_material_updates; material_update_id++) {
-    __FAILURE_HANDLE(light_tree_update_cache_material(device_manager->light_tree, &material_updates[material_update_id].material));
+    __FAILURE_HANDLE(light_tree_update_cache_material(device_manager->light_tree, material_updates + material_update_id));
   }
 
   __FAILURE_HANDLE(array_destroy(&material_updates));
@@ -116,7 +116,7 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_instance_updates));
 
   for (uint32_t instance_update_id = 0; instance_update_id < num_instance_updates; instance_update_id++) {
-    __FAILURE_HANDLE(light_tree_update_cache_instance(device_manager->light_tree, &instance_updates[instance_update_id].instance));
+    __FAILURE_HANDLE(light_tree_update_cache_instance(device_manager->light_tree, instance_updates + instance_update_id));
   }
 
   __FAILURE_HANDLE(array_destroy(&instance_updates));

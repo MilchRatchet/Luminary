@@ -34,8 +34,11 @@ static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* ho
 
     LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
 
+    uint32_t instance_id;
+    LUM_FAILURE_HANDLE(luminary_host_new_instance(host, &instance_id));
+
     LuminaryInstance instance;
-    LUM_FAILURE_HANDLE(luminary_host_new_instance(host, &instance));
+    LUM_FAILURE_HANDLE(luminary_host_get_instance(host, instance_id, &instance));
 
     instance.mesh_id  = mesh_id;
     instance.position = (LuminaryVec3) {.x = 0.0f, .y = 0.0f, .z = 0.0f};
@@ -44,7 +47,7 @@ static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* ho
 
     camera_handler_center_instance(duck->display->camera_handler, host, &instance);
 
-    LUM_FAILURE_HANDLE(luminary_host_set_instance(host, &instance));
+    LUM_FAILURE_HANDLE(luminary_host_set_instance(host, instance_id, &instance));
   }
 
   LUM_FAILURE_HANDLE(array_clear(file_drop_array));

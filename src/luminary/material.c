@@ -5,7 +5,6 @@
 LuminaryResult material_get_default(Material* material) {
   __CHECK_NULL_ARGUMENT(material);
 
-  material->id                       = 0;
   material->base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
   material->albedo                   = (RGBAF) {.r = 0.9f, .g = 0.9f, .b = 0.9f, .a = 0.9f};
   material->emission                 = (RGBF) {.r = 0.0f, .g = 0.0f, .b = 0.0f};

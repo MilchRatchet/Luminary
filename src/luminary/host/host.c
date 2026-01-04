@@ -799,29 +799,29 @@ LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInsta
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_instance(Host* host, const LuminaryInstance* instance) {
+LuminaryResult luminary_host_set_instance(Host* host, uint32_t id, const LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
 
   MeshInstance mesh_instance;
   __FAILURE_HANDLE(mesh_instance_from_public_api_instance(&mesh_instance, instance));
 
-  __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) &mesh_instance, SCENE_ENTITY_INSTANCES, mesh_instance.id));
+  __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) &mesh_instance, SCENE_ENTITY_INSTANCES, id));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_new_instance(Host* host, LuminaryInstance* instance) {
+LuminaryResult luminary_host_new_instance(Host* host, uint32_t* id) {
   __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(instance);
+  __CHECK_NULL_ARGUMENT(id);
+
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_INSTANCES, id));
 
   MeshInstance mesh_instance;
   __FAILURE_HANDLE(mesh_instance_get_default(&mesh_instance));
 
   __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mesh_instance, SCENE_ENTITY_INSTANCES));
   __FAILURE_HANDLE(host_update_scene(host));
-
-  __FAILURE_HANDLE(mesh_instance_to_public_api_instance(instance, &mesh_instance));
 
   return LUMINARY_SUCCESS;
 }

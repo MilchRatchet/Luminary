@@ -1789,25 +1789,28 @@ static LuminaryResult _light_tree_update_cache_instance(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstance* instance) {
+LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstanceUpdate* instance_update) {
   __CHECK_NULL_ARGUMENT(tree);
-  __CHECK_NULL_ARGUMENT(instance);
+  __CHECK_NULL_ARGUMENT(instance_update);
+
+  const MeshInstance* instance = &instance_update->instance;
+  const uint32_t instance_id   = instance_update->instance_id;
 
   uint32_t num_instances;
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.instances, &num_instances));
 
-  if (instance->id >= num_instances) {
-    __FAILURE_HANDLE(array_set_num_elements(&tree->cache.instances, instance->id + 1));
+  if (instance_id >= num_instances) {
+    __FAILURE_HANDLE(array_set_num_elements(&tree->cache.instances, instance_id + 1));
 
     // Invalidate the mesh ID for proper reference counting.
-    for (uint32_t instance_id = num_instances; instance_id < instance->id + 1; instance_id++) {
-      tree->cache.instances[instance_id].mesh_id = MESH_ID_INVALID;
+    for (uint32_t added_instance_id = num_instances; added_instance_id < instance_id + 1; added_instance_id++) {
+      tree->cache.instances[added_instance_id].mesh_id = MESH_ID_INVALID;
     }
   }
 
-  __FAILURE_HANDLE(_light_tree_update_cache_instance(tree->cache.instances + instance->id, tree->cache.meshes, instance));
+  __FAILURE_HANDLE(_light_tree_update_cache_instance(tree->cache.instances + instance_id, tree->cache.meshes, instance));
 
-  if (tree->cache.instances[instance->id].is_dirty) {
+  if (tree->cache.instances[instance_id].is_dirty) {
     tree->cache.is_dirty = true;
   }
 
@@ -1862,24 +1865,27 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material* material) {
+LuminaryResult light_tree_update_cache_material(LightTree* tree, const MaterialUpdate* material_update) {
   __CHECK_NULL_ARGUMENT(tree);
-  __CHECK_NULL_ARGUMENT(material);
+  __CHECK_NULL_ARGUMENT(material_update);
+
+  const Material* material   = &material_update->material;
+  const uint32_t material_id = material_update->material_id;
 
   uint32_t num_materials;
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_materials));
 
-  if (material->id >= num_materials) {
-    __FAILURE_HANDLE(array_set_num_elements(&tree->cache.materials, material->id + 1));
+  if (material_id >= num_materials) {
+    __FAILURE_HANDLE(array_set_num_elements(&tree->cache.materials, material_id + 1));
   }
 
   bool meshes_need_update = false;
-  __FAILURE_HANDLE(_light_tree_update_cache_material(tree->cache.materials + material->id, material, &meshes_need_update));
+  __FAILURE_HANDLE(_light_tree_update_cache_material(tree->cache.materials + material_id, material, &meshes_need_update));
 
-  if (tree->cache.materials[material->id].is_dirty) {
+  if (tree->cache.materials[material_id].is_dirty) {
     tree->cache.is_dirty = true;
 
-    tree->cache.materials[material->id].is_dirty = false;
+    tree->cache.materials[material_id].is_dirty = false;
   }
 
   if (meshes_need_update) {

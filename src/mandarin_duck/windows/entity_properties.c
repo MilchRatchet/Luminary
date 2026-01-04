@@ -827,7 +827,7 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
     _window_entity_properties_add_slider(data, "Scale", &instance.scale, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
 
   if (update_data) {
-    LUM_FAILURE_HANDLE(luminary_host_set_instance(host, &instance));
+    LUM_FAILURE_HANDLE(luminary_host_set_instance(host, display->select_pixel_data.instance_id, &instance));
   }
 
   return;
