@@ -108,6 +108,36 @@ LuminaryResult wavefront_destroy(WavefrontContent** content) {
   return LUMINARY_SUCCESS;
 }
 
+static float _fast_strtof(const char* restrict str, char** restrict str_end) {
+  // Skip whitespace
+  while (*str == ' ')
+    str++;
+
+  double sign = 1.0f;
+  if (*str == '-') {
+    str++;
+    sign = -1.0f;
+  }
+
+  double res = 0.0;
+  while (*str >= '0') {
+    res = res * 10.0 + ((double) (*(str++) - '0'));
+  }
+
+  if (*str == '.') {
+    double f = 1.0;
+    str++;
+    while (*str >= '0') {
+      f *= 0.1;
+      res += ((double) (*(str++) - '0')) * f;
+    }
+  }
+
+  *str_end = (char*) str;
+
+  return (float) (res * sign);
+}
+
 /*
  * Reads a line str of n floating point numbers and writes them into dst.
  * @param str String containing the floating point numbers.
@@ -119,9 +149,9 @@ static uint32_t read_float_line(const char* str, const uint32_t n, float* dst) {
   const char* rstr = str;
   for (uint32_t i = 0; i < n; i++) {
     char* new_rstr;
-    dst[i] = strtof(rstr, &new_rstr);
+    dst[i] = _fast_strtof(rstr, &new_rstr);
 
-    if (!new_rstr)
+    if (new_rstr == rstr)
       return i + 1;
 
     rstr = (const char*) new_rstr;

@@ -136,6 +136,7 @@ LuminaryResult image_load(Texture* texture, const char* path) {
   const size_t block_size = 16 * 1024 * 1024;
   size_t file_length      = 0;
 
+  // TODO: Pool these, host_malloc is performance bottleneck here.
   uint8_t* file_mem;
   __FAILURE_HANDLE(host_malloc(&file_mem, block_size));
 
