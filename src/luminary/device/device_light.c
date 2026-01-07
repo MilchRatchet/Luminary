@@ -104,7 +104,7 @@ struct Bin {
 #define OBJECT_SPLIT_BIN_COUNT (1 << OBJECT_SPLIT_BIN_COUNT_LOG)
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
-#define MAX_VALUE 1e10f
+#define MAX_VALUE 1e17f
 
 #define FRAGMENT_ERROR_COMP (FLT_EPSILON * 16.0f)
 
@@ -135,26 +135,6 @@ inline void _light_tree_fit_bounds(
     vec128_store((float*) low_out, low);
 }
 
-inline void _light_tree_fit_bounds_of_bins(
-  const Bin* bins, const uint32_t bins_count, Vec128* restrict high_out, Vec128* restrict low_out) {
-  Vec128 high = vec128_set_1(-MAX_VALUE);
-  Vec128 low  = vec128_set_1(MAX_VALUE);
-
-  for (uint32_t i = 0; i < bins_count; i++) {
-    // TODO: Split bin array memory layout so that bounds fitting can be done in a more cache friendly way
-    const Vec128 high_frag = vec128_load((float*) &(bins[i].high));
-    const Vec128 low_frag  = vec128_load((float*) &(bins[i].low));
-
-    high = vec128_max(high, high_frag);
-    low  = vec128_min(low, low_frag);
-  }
-
-  if (high_out)
-    vec128_store((float*) high_out, high);
-  if (low_out)
-    vec128_store((float*) low_out, low);
-}
-
 static void _light_tree_update_bounds_of_bins(const Bin* bin, Vec128* restrict high, Vec128* restrict low) {
   const float* __macro_baseptr = (float*) (bin);
 
@@ -165,8 +145,9 @@ static void _light_tree_update_bounds_of_bins(const Bin* bin, Vec128* restrict h
   *low  = vec128_min(*low, __macro_low_bin);
 }
 
-static double _light_tree_construct_bins(
-  Bin* bins, const LightTreeFragment* fragments, const uint32_t fragments_count, const LightTreeSweepAxis axis, double* offset) {
+static void _light_tree_construct_bins(
+  Bin* bins, const LightTreeFragment* fragments, const uint32_t fragments_count, const LightTreeSweepAxis axis, double* restrict offset,
+  double* restrict interval_out, Vec128* diff_right) {
   Vec128 high, low;
   _light_tree_fit_bounds(fragments, fragments_count, &high, &low);
 
@@ -176,10 +157,13 @@ static double _light_tree_construct_bins(
   const double span     = high_axis - low_axis;
   const double interval = span / OBJECT_SPLIT_BIN_COUNT;
 
-  if (interval <= FRAGMENT_ERROR_COMP * fabs(low_axis))
-    return 0.0;
+  if (interval <= FRAGMENT_ERROR_COMP * fabs(low_axis)) {
+    *interval_out = 0.0;
+    return;
+  }
 
-  *offset = low_axis;
+  *offset       = low_axis;
+  *interval_out = interval;
 
   const Bin b = {
     .high.x = -MAX_VALUE,
@@ -213,20 +197,33 @@ static double _light_tree_construct_bins(
     bins[pos].exit++;
     bins[pos].power += fragments[fragment_id].power;
 
-    Vec128 __macro_high_bin = vec128_load((const float*) &(bins[pos].high));
-    Vec128 __macro_low_bin  = vec128_load((const float*) &(bins[pos].low));
+    Vec128 high_bin = vec128_load((const float*) &(bins[pos].high));
+    Vec128 low_bin  = vec128_load((const float*) &(bins[pos].low));
 
-    const Vec128 __macro_high_frag = vec128_load((const float*) &(fragments[fragment_id].high));
-    const Vec128 __macro_low_frag  = vec128_load((const float*) &(fragments[fragment_id].low));
+    const Vec128 high_frag = vec128_load((const float*) &(fragments[fragment_id].high));
+    const Vec128 low_frag  = vec128_load((const float*) &(fragments[fragment_id].low));
 
-    __macro_high_bin = vec128_max(__macro_high_bin, __macro_high_frag);
-    __macro_low_bin  = vec128_min(__macro_low_bin, __macro_low_frag);
+    high_bin = vec128_max(high_bin, high_frag);
+    low_bin  = vec128_min(low_bin, low_frag);
 
-    vec128_store((float*) &(bins[pos].high), __macro_high_bin);
-    vec128_store((float*) &(bins[pos].low), __macro_low_bin);
+    vec128_store((float*) &(bins[pos].high), high_bin);
+    vec128_store((float*) &(bins[pos].low), low_bin);
   }
 
-  return interval;
+  // Compute prefix bounds starting from the right. These are needed when iterating over the different splits with the optimizer.
+  // We don't write the 0th element because the optimizer doesn't need it (it is the total bounds).
+
+  high = vec128_set_1(-MAX_VALUE);
+  low  = vec128_set_1(MAX_VALUE);
+  for (uint32_t bin_id = OBJECT_SPLIT_BIN_COUNT - 1; bin_id > 0; bin_id--) {
+    const Vec128 high_bin = vec128_load((const float*) &(bins[bin_id].high));
+    const Vec128 low_bin  = vec128_load((const float*) &(bins[bin_id].low));
+
+    high = vec128_max(high, high_bin);
+    low  = vec128_min(low, low_bin);
+
+    diff_right[bin_id] = vec128_sub(high, low);
+  }
 }
 
 static void _light_tree_divide_middles_along_axis(
@@ -282,9 +279,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
     __FAILURE_HANDLE(array_push(&nodes, &root_node));
   }
 
-  Bin* bins;
-  __FAILURE_HANDLE(host_malloc(&bins, sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT));
-
   uint32_t begin_of_current_nodes = 0;
   uint32_t end_of_current_nodes   = 1;
 
@@ -319,9 +313,13 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
       // For each axis, perform a greedy search for an optimal split.
       for (uint32_t a = 0; a < 3; a++) {
+        Bin bins[OBJECT_SPLIT_BIN_COUNT];
+        Vec128 diff_right[OBJECT_SPLIT_BIN_COUNT];
+
         double low_split;
-        const double interval =
-          _light_tree_construct_bins(bins, fragments + fragments_ptr, fragments_count, (LightTreeSweepAxis) a, &low_split);
+        double interval;
+        _light_tree_construct_bins(
+          bins, fragments + fragments_ptr, fragments_count, (LightTreeSweepAxis) a, &low_split, &interval, diff_right);
 
         if (interval == 0.0)
           continue;
@@ -337,23 +335,19 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
           right_power += bins[k].power;
         }
 
-        Vec128 high_left  = vec128_set_1(-MAX_VALUE);
-        Vec128 high_right = vec128_set_1(-MAX_VALUE);
-        Vec128 low_left   = vec128_set_1(MAX_VALUE);
-        Vec128 low_right  = vec128_set_1(MAX_VALUE);
+        Vec128 high_left = vec128_set_1(-MAX_VALUE);
+        Vec128 low_left  = vec128_set_1(MAX_VALUE);
 
         for (uint32_t k = 1; k < OBJECT_SPLIT_BIN_COUNT; k++) {
           _light_tree_update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
-          _light_tree_fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
           left_power += bins[k - 1].power;
           right_power -= bins[k - 1].power;
 
-          const Vec128 diff_left  = vec128_sub(high_left, low_left);
-          const Vec128 diff_right = vec128_sub(high_right, low_right);
+          const Vec128 diff_left = vec128_sub(high_left, low_left);
 
           const float left_area  = vec128_box_area(vec128_set_w_to_0(diff_left));
-          const float right_area = vec128_box_area(vec128_set_w_to_0(diff_right));
+          const float right_area = vec128_box_area(vec128_set_w_to_0(diff_right[k]));
 
           const double total_cost = interval_cost * (left_power * left_area + right_power * right_area);
 
@@ -462,8 +456,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
     __FAILURE_HANDLE(array_get_num_elements(nodes, &end_of_current_nodes));
   }
-
-  __FAILURE_HANDLE(host_free(&bins));
 
   work->binary_nodes = nodes;
 
