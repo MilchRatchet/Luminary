@@ -1800,12 +1800,11 @@ LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInsta
 // Material updating
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* cache, const Material* material, bool* meshes_need_update) {
+static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* cache, const Material* material) {
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(material);
 
-  bool has_emission   = false;
-  *meshes_need_update = false;
+  bool has_emission = false;
 
   float intensity = 0.0f;
 
@@ -1838,7 +1837,6 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
   if (cache->has_emission != has_emission) {
     cache->has_emission = has_emission;
     cache->is_dirty     = true;
-    *meshes_need_update = true;
   }
 
   return LUMINARY_SUCCESS;
@@ -1858,16 +1856,12 @@ LuminaryResult light_tree_update_cache_material(LightTree* tree, const MaterialU
     __FAILURE_HANDLE(array_set_num_elements(&tree->cache.materials, material_id + 1));
   }
 
-  bool meshes_need_update = false;
-  __FAILURE_HANDLE(_light_tree_update_cache_material(tree->cache.materials + material_id, material, &meshes_need_update));
+  __FAILURE_HANDLE(_light_tree_update_cache_material(tree->cache.materials + material_id, material));
 
   if (tree->cache.materials[material_id].is_dirty) {
     tree->cache.is_dirty = true;
 
-    tree->cache.materials[material_id].is_dirty = false;
-  }
-
-  if (meshes_need_update) {
+    // Update all meshes that use this material
     uint32_t num_meshes;
     __FAILURE_HANDLE(array_get_num_elements(tree->cache.meshes, &num_meshes));
 
@@ -1875,6 +1869,8 @@ LuminaryResult light_tree_update_cache_material(LightTree* tree, const MaterialU
       __FAILURE_HANDLE(_light_tree_update_cache_mesh_has_emission(tree->cache.meshes + mesh_id, tree->cache.materials));
       tree->cache.meshes[mesh_id].is_dirty = true;
     }
+
+    tree->cache.materials[material_id].is_dirty = false;
   }
 
   return LUMINARY_SUCCESS;
@@ -1908,7 +1904,7 @@ static LuminaryResult _light_tree_queue_texture_integrations(LightTree* tree, co
     if (material_id >= num_cached_materials)
       continue;
 
-    const LightTreeCacheMaterial* material = tree->cache.materials + material_id;
+    LightTreeCacheMaterial* material = tree->cache.materials + material_id;
 
     if (material->has_emission == false || material->needs_reintegration == false)
       continue;
@@ -1929,6 +1925,8 @@ static LuminaryResult _light_tree_queue_texture_integrations(LightTree* tree, co
 
       __FAILURE_HANDLE(array_push(&tree->integrator.tasks, &task));
     }
+
+    material->needs_reintegration = false;
   }
 
   return LUMINARY_SUCCESS;
@@ -2138,13 +2136,6 @@ static LuminaryResult _light_tree_handle_dirty_states(LightTree* tree, Device* d
   // Reset mesh dirty flags
   for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
     tree->cache.meshes[mesh_id].is_dirty = false;
-  }
-
-  uint32_t num_materials;
-  __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_materials));
-
-  for (uint32_t material_id = 0; material_id < num_materials; material_id++) {
-    tree->cache.materials[material_id].needs_reintegration = false;
   }
 
   tree->cache.is_dirty = false;
