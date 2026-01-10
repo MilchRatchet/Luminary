@@ -8,18 +8,11 @@ project("Luminary" LANGUAGES C VERSION 1.2.0)
 
 set(CMAKE_C_STANDARD 11)
 
-option(DEBUG "Debug Mode" OFF)
 option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
 option(LUMINARY_KERNEL_ARCHS "Architecture to build" "")
 option(LUMINARY_FAST_KERNEL_COMPILE "Use fast Kernel compilation" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
 option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
-
-set(CMAKE_BUILD_TYPE "Release")
-
-if (DEBUG)
-    set(CMAKE_BUILD_TYPE "Debug")
-endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
@@ -55,9 +48,10 @@ endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline -Wno-deprecated-non-prototype -Wextra")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline -Wno-deprecated-non-prototype -Wextra /Zi -g -fuse-ld=lld -Z7 /DEBUG")
         set(CMAKE_C_FLAGS_RELEASE "/O2")
-        set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG /DLUM_DEBUG")
+        set(CMAKE_C_FLAGS_DEBUG "/Od /DLUM_DEBUG")
+        add_link_options("/DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-deprecated-non-prototype")
         set(CMAKE_C_FLAGS_RELEASE "-O3")
@@ -76,8 +70,7 @@ if(USE_ADDRESS_SANITIZER)
     message(FATAL_ERROR "Address Sanitizer is only implemented for MSVC frontends atm.")
   endif()
 
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /fsanitize=address /Zi")
-  add_link_options("/DEBUG")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /fsanitize=address")
   add_link_options("/OPT:REF")
   add_link_options("/OPT:ICF")
   set(CMAKE_C_FLAGS_RELEASE "/Od")
@@ -90,11 +83,11 @@ endif()
 #=============================================================
 
 message("============================= Overall =============================")
-message("Debug Mode                     ||  ${DEBUG}")
+message("Build Type                     ||  ${CMAKE_BUILD_TYPE}")
 message("C Compiler:                    ||  ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message("C Flags:                       ||  ${CMAKE_C_FLAGS}")
 
-if (DEBUG)
+if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
   message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
 else()
   message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
