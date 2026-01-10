@@ -146,7 +146,7 @@ inline void vec128_store(float* ptr, const Vec128 a) {
  * Implicitely assumes that index < 4.
  */
 #ifdef LUMINARY_X86_INTRINSICS
-#define vec128_get_1(a, index) _mm_cvtss_f32(_mm_shuffle_ps(a._imm, a._imm, _MM_SHUFFLE(0, 0, 0, index)))
+#define vec128_get_1(a, index) _mm_cvtss_f32(_mm_shuffle_ps((a)._imm, (a)._imm, _MM_SHUFFLE(0, 0, 0, (index))))
 #else
 inline float vec128_get_1(const Vec128 a, const uint32_t index) {
   return a.data[index];

@@ -1016,7 +1016,8 @@ LuminaryResult wavefront_convert_content(
   const uint32_t new_triangle_count = tri_ptr;
 
   if (new_triangle_count != triangle_count) {
-    __FAILURE_HANDLE(host_realloc(&mesh->data.vertex_buffer, sizeof(float) * new_triangle_count * 9));
+    // We add one float for padding because we load the vertices as unaligned 128 bit vectors in other places.
+    __FAILURE_HANDLE(host_realloc(&mesh->data.vertex_buffer, sizeof(float) * (new_triangle_count * 9 + 1)));
     __FAILURE_HANDLE(host_realloc(&mesh->data.normal_buffer, sizeof(float) * new_triangle_count * 9));
     __FAILURE_HANDLE(host_realloc(&mesh->data.uv_buffer, sizeof(float) * new_triangle_count * 6));
     __FAILURE_HANDLE(host_realloc(&mesh->data.material_id_buffer, sizeof(uint16_t) * new_triangle_count));
