@@ -2426,7 +2426,8 @@ LuminaryResult device_light_tree_destroy(DeviceLightTree** tree) {
   if ((*tree)->bvh_vertex_buffer)
     __FAILURE_HANDLE(device_free(&(*tree)->bvh_vertex_buffer));
 
-  __FAILURE_HANDLE(optix_bvh_destroy(&(*tree)->bvh));
+  if ((*tree)->bvh)
+    __FAILURE_HANDLE(optix_bvh_destroy(&(*tree)->bvh));
 
   __FAILURE_HANDLE(host_free(tree));
 
