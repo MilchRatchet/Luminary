@@ -95,9 +95,9 @@ struct Bin {
   Vec128 high;
   Vec128 low;
   int32_t entry;
-  int32_t exit;
   float power;
-  uint32_t padding;
+  int32_t padding0;
+  uint32_t padding1;
 } typedef Bin;
 
 #define OBJECT_SPLIT_BIN_COUNT_LOG (5)
@@ -146,11 +146,8 @@ static void _light_tree_update_bounds_of_bins(const Bin* bin, Vec128* restrict h
 }
 
 static void _light_tree_construct_bins(
-  Bin* bins, const LightTreeFragment* fragments, const uint32_t fragments_count, const LightTreeSweepAxis axis, double* restrict offset,
-  double* restrict interval_out, Vec128* diff_right) {
-  Vec128 high, low;
-  _light_tree_fit_bounds(fragments, fragments_count, &high, &low);
-
+  Bin* bins, const LightTreeFragment* fragments, const uint32_t fragments_count, const Vec128 high, const Vec128 low,
+  const LightTreeSweepAxis axis, double* restrict offset, double* restrict interval_out, Vec128* diff_right) {
   const double high_axis = high.data[axis];
   const double low_axis  = low.data[axis];
 
@@ -173,7 +170,6 @@ static void _light_tree_construct_bins(
     .low.y  = MAX_VALUE,
     .low.z  = MAX_VALUE,
     .entry  = 0,
-    .exit   = 0,
     .power  = 0.0f};
   bins[0] = b;
 
@@ -194,7 +190,6 @@ static void _light_tree_construct_bins(
       pos = OBJECT_SPLIT_BIN_COUNT - 1;
 
     bins[pos].entry++;
-    bins[pos].exit++;
     bins[pos].power += fragments[fragment_id].power;
 
     Vec128 high_bin = vec128_load((const float*) &(bins[pos].high));
@@ -213,16 +208,16 @@ static void _light_tree_construct_bins(
   // Compute prefix bounds starting from the right. These are needed when iterating over the different splits with the optimizer.
   // We don't write the 0th element because the optimizer doesn't need it (it is the total bounds).
 
-  high = vec128_set_1(-MAX_VALUE);
-  low  = vec128_set_1(MAX_VALUE);
+  Vec128 prefix_high = vec128_set_1(-MAX_VALUE);
+  Vec128 prefix_low  = vec128_set_1(MAX_VALUE);
   for (uint32_t bin_id = OBJECT_SPLIT_BIN_COUNT - 1; bin_id > 0; bin_id--) {
     const Vec128 high_bin = vec128_load((const float*) &(bins[bin_id].high));
     const Vec128 low_bin  = vec128_load((const float*) &(bins[bin_id].low));
 
-    high = vec128_max(high, high_bin);
-    low  = vec128_min(low, low_bin);
+    prefix_high = vec128_max(prefix_high, high_bin);
+    prefix_low  = vec128_min(prefix_low, low_bin);
 
-    diff_right[bin_id] = vec128_sub(high, low);
+    diff_right[bin_id] = vec128_sub(prefix_high, prefix_low);
   }
 }
 
@@ -319,7 +314,8 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
         double low_split;
         double interval;
         _light_tree_construct_bins(
-          bins, fragments + fragments_ptr, fragments_count, (LightTreeSweepAxis) a, &low_split, &interval, diff_right);
+          bins, fragments + fragments_ptr, fragments_count, high_parent, low_parent, (LightTreeSweepAxis) a, &low_split, &interval,
+          diff_right);
 
         if (interval == 0.0)
           continue;

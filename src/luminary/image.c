@@ -151,8 +151,6 @@ LuminaryResult image_load(Texture* texture, const char* path) {
 
   file_length += read_size;
 
-  __FAILURE_HANDLE(host_realloc(&file_mem, file_length));
-
   LuminaryResult result;
 
   if (stbi_is_hdr_from_memory(file_mem, (int) file_length)) {
