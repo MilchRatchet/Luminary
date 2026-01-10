@@ -486,6 +486,11 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
     }
 
     if (c == '/' || c == ' ' || c == '\0' || c == '\r' || c == '\n') {
+      if (data_ptr >= 12) {
+        data_ptr++;
+        break;
+      }
+
       data[data_ptr++] = value * sign;
 
       sign = 1;
