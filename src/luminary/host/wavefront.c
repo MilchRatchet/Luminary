@@ -110,7 +110,7 @@ LuminaryResult wavefront_destroy(WavefrontContent** content) {
 
 static float _fast_strtof(const char* restrict str, char** restrict str_end) {
   // Skip whitespace
-  while (*str == ' ')
+  while (*str == ' ' && *str != '\0' && *str != '\n')
     str++;
 
   double sign = 1.0f;
@@ -453,6 +453,13 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
  * @result Returns the number of triangles parsed.
  */
 static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangle* face2) {
+  // Skip the `f`
+  str++;
+
+  // Skip whitespace
+  while (*str == ' ' && *str != '\0' && *str != '\n')
+    str++;
+
   uint32_t ptr = 0;
 
   const uint32_t num_check = 0b00110000;
@@ -465,14 +472,7 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
 
   char c = str[ptr++];
 
-  // Find first number
-  while ((c & num_mask) != num_check && c != '-') {
-    if (c == '\0' || c == '\r' || c == '\n')
-      break;
-    c = str[ptr++];
-  }
-
-  while (c != '\0' && c != '\r' && c != '\n') {
+  while (c != '\0' && c != '\n') {
     if (c == '-') {
       sign = -1;
     }
@@ -485,7 +485,7 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
       c = str[ptr++];
     }
 
-    if (c == '/' || c == ' ' || c == '\0' || c == '\r' || c == '\n') {
+    if (c == '/' || c == ' ' || c == '\0' || c == '\n') {
       if (data_ptr >= 12) {
         data_ptr++;
         break;
@@ -493,11 +493,11 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
 
       data[data_ptr++] = value * sign;
 
+      if (c == '\0' || c == '\n')
+        break;
+
       sign = 1;
     }
-
-    if (c == '\0' || c == '\r' || c == '\n')
-      break;
 
     c = str[ptr++];
   }
