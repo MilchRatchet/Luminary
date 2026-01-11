@@ -113,10 +113,11 @@ function(compile_cubin kernel_name kernel_arch out_cubin_file)
       -o ${cubin_file}
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
       -D"LUMINARY_MIN_BLOCKS_PER_SM"=${LUMINARY_${kernel_arch}_MIN_BLOCKS_PER_SM}
-    DEPENDS
-      "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/${kernel_name}.cu"
-      "${luminary_gpu_header_files}"
-      "${luminary_cpu_header_files}"
+      -MD -MF "${cubin_file}.d"
+    DEPFILE
+      "${cubin_file}.d"
+    BYPRODUCTS
+      "${cubin_file}.d"
     COMMENT
       "Compiling ${kernel_name}_${kernel_arch}.cubin"
   )
@@ -161,10 +162,11 @@ function(compile_optixir cuda_file_name kernel_name kernel_arch out_optixir_file
       -D${kernel_name}
       -o ${optixir_file}
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
-    DEPENDS
-      "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${cuda_file_name}.cu"
-      "${luminary_gpu_header_files}"
-      "${luminary_cpu_header_files}"
+      -MD -MF "${optixir_file}.d"
+    DEPFILE
+      "${optixir_file}.d"
+    BYPRODUCTS
+      "${optixir_file}.d"
     COMMENT
       "Compiling ${kernel_name}_${kernel_arch}.optix-ir"
   )
