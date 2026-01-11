@@ -8,6 +8,7 @@
 #include "internal_host.h"
 #include "internal_path.h"
 #include "lum.h"
+#include "material.h"
 #include "mesh.h"
 #include "png.h"
 #include "wavefront.h"
@@ -61,7 +62,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __FAILURE_HANDLE_CRITICAL(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
 
   __FAILURE_HANDLE_CRITICAL(
-    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset));
+    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset, host->mesh_name_dict));
 
   uint32_t num_added_materials;
   __FAILURE_HANDLE_CRITICAL(array_get_num_elements(added_materials, &num_added_materials));
@@ -307,6 +308,10 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   __FAILURE_HANDLE(queue_create(&(*host)->secondary_work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&(*host)->ringbuffer, HOST_RINGBUFFER_SIZE));
 
+  __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_instance_name_dict));
+  __FAILURE_HANDLE(dictionary_create(&(*host)->material_name_dict));
+  __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_name_dict));
+
   DeviceManagerCreateInfo device_manager_create_info;
   device_manager_create_info.device_mask = info.device_mask;
 
@@ -362,6 +367,10 @@ LuminaryResult luminary_host_destroy(Host** host) {
   ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
+
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->mesh_instance_name_dict));
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->material_name_dict));
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->mesh_name_dict));
 
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
@@ -787,6 +796,43 @@ LuminaryResult luminary_host_set_material(Host* host, uint16_t id, const Luminar
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_material_from_name(Host* host, const char* name, uint16_t* id) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(id);
+
+  uint32_t dict_id;
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->material_name_dict, name, &dict_id, &found));
+
+  if (found) {
+    __DEBUG_ASSERT(dict_id < 0x10000);
+
+    *id = (uint16_t) dict_id;
+
+    return LUMINARY_SUCCESS;
+  }
+
+  Material mat;
+  __FAILURE_HANDLE(material_get_default(&mat));
+
+  __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mat, SCENE_ENTITY_MATERIALS));
+
+  uint32_t new_id;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &new_id));
+
+  if (new_id >= MATERIAL_ID_INVALID)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Exceeded max number of materials.");
+
+  __FAILURE_HANDLE(dictionary_add_entry(host->material_name_dict, new_id, name));
+
+  *id = (uint16_t) new_id;
+
+  __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
@@ -822,6 +868,52 @@ LuminaryResult luminary_host_new_instance(Host* host, uint32_t* id) {
 
   __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mesh_instance, SCENE_ENTITY_INSTANCES));
   __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_instance_from_name(LuminaryHost* host, const char* name, uint32_t* id) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(id);
+
+  uint32_t dict_id;
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->mesh_instance_name_dict, name, &dict_id, &found));
+
+  if (found) {
+    *id = dict_id;
+    return LUMINARY_SUCCESS;
+  }
+
+  MeshInstance instance;
+  __FAILURE_HANDLE(mesh_instance_get_default(&instance));
+
+  __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES));
+
+  uint32_t new_id;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_INSTANCES, &new_id));
+
+  __FAILURE_HANDLE(dictionary_add_entry(host->mesh_instance_name_dict, new_id, name));
+
+  *id = new_id;
+
+  __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_mesh_from_name(LuminaryHost* host, const char* name, uint32_t* id) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(id);
+
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->mesh_name_dict, name, id, &found));
+
+  if (found == false) {
+    *id = MESH_ID_INVALID;
+  }
 
   return LUMINARY_SUCCESS;
 }

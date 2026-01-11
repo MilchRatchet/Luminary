@@ -860,12 +860,13 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
 static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
 LuminaryResult wavefront_convert_content(
-  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials,
-  uint32_t material_offset) {
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials, uint32_t material_offset,
+  Dictionary* mesh_name_dict) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(meshes);
   __CHECK_NULL_ARGUMENT(textures);
   __CHECK_NULL_ARGUMENT(materials);
+  __CHECK_NULL_ARGUMENT(mesh_name_dict);
 
   if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
@@ -897,8 +898,6 @@ LuminaryResult wavefront_convert_content(
 
   Mesh* mesh;
   __FAILURE_HANDLE(mesh_create(&mesh));
-
-  __FAILURE_HANDLE(mesh_set_name(mesh, content->object_names[0]));
 
   __FAILURE_HANDLE(host_malloc(&mesh->data.vertex_buffer, sizeof(float) * triangle_count * 9));
   __FAILURE_HANDLE(host_malloc(&mesh->data.normal_buffer, sizeof(float) * triangle_count * 9));
@@ -1024,6 +1023,11 @@ LuminaryResult wavefront_convert_content(
   }
 
   mesh->data.triangle_count = new_triangle_count;
+
+  __FAILURE_HANDLE(array_get_num_elements(*meshes, &mesh->id));
+
+  // TODO: Consider parsing multiple objects as multiple meshes :)
+  __FAILURE_HANDLE(dictionary_add_entry(mesh_name_dict, mesh->id, content->object_names[0]));
 
   __FAILURE_HANDLE(array_push(meshes, &mesh));
 

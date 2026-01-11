@@ -2,6 +2,7 @@
 #define LUMINARY_INTERNAL_HOST_H
 
 #include "device/device_manager.h"
+#include "dictionary.h"
 #include "host_output_handler.h"
 #include "mesh.h"
 #include "mutex.h"
@@ -27,6 +28,9 @@ struct LuminaryHost {
   Scene* scene_host;
   Scene* scene_caller;
   OutputHandler* output_handler;
+  Dictionary* mesh_instance_name_dict;
+  Dictionary* material_name_dict;
+  Dictionary* mesh_name_dict;
 } typedef LuminaryHost;
 
 LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor descriptor);

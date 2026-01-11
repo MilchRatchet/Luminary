@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dictionary.h"
 #include "mesh.h"
 #include "texture.h"
 #include "utils.h"
@@ -84,8 +85,8 @@ struct WavefrontContent {
 LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args);
 LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file, Queue* queue);
 LuminaryResult wavefront_convert_content(
-  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials,
-  uint32_t material_offset);
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials, uint32_t material_offset,
+  Dictionary* mesh_name_dict);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 
 LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments);
