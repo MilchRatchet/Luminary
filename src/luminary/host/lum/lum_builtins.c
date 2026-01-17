@@ -92,75 +92,102 @@ const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = false};
 
-#define __BUILTIN_ENUM_PAIR(__internal_macro_enum) {.string = #__internal_macro_enum, .value = __internal_macro_enum}
+#define __BUILTIN_ENUM_PAIR(__internal_macro_enum, __macro_min_ver, __macro_max_ver) \
+  {.string      = "LUMINARY_" #__internal_macro_enum,                                \
+   .value       = LUM_BUILTIN_ENUM_##__internal_macro_enum,                          \
+   .min_version = (__macro_min_ver),                                                 \
+   .max_version = (__macro_max_ver)}
 
 const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   // LuminaryShadingMode
-  __BUILTIN_ENUM_PAIR(LUMINARY_SHADING_MODE_DEFAULT), __BUILTIN_ENUM_PAIR(LUMINARY_SHADING_MODE_ALBEDO),
-  __BUILTIN_ENUM_PAIR(LUMINARY_SHADING_MODE_DEPTH), __BUILTIN_ENUM_PAIR(LUMINARY_SHADING_MODE_NORMAL),
-  __BUILTIN_ENUM_PAIR(LUMINARY_SHADING_MODE_IDENTIFICATION), __BUILTIN_ENUM_PAIR(LUMINARY_SHADING_MODE_LIGHTS),
+  __BUILTIN_ENUM_PAIR(SHADING_MODE_DEFAULT, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(SHADING_MODE_ALBEDO, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(SHADING_MODE_DEPTH, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(SHADING_MODE_NORMAL, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(SHADING_MODE_IDENTIFICATION, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(SHADING_MODE_LIGHTS, 1, LUM_VERSION_CURRENT),
   // LuminaryFilter
-  __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_NONE), __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_GRAY), __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_SEPIA),
-  __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_GAMEBOY), __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_2BITGRAY), __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_CRT),
-  __BUILTIN_ENUM_PAIR(LUMINARY_FILTER_BLACKWHITE),
+  __BUILTIN_ENUM_PAIR(FILTER_NONE, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(FILTER_GRAY, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(FILTER_SEPIA, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(FILTER_GAMEBOY, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(FILTER_2BITGRAY, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(FILTER_CRT, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(FILTER_BLACKWHITE, 1, LUM_VERSION_CURRENT),
   // LuminaryTonemap
-  __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_NONE), __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_ACES), __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_REINHARD),
-  __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_UNCHARTED2), __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_AGX),
-  __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_AGX_PUNCHY), __BUILTIN_ENUM_PAIR(LUMINARY_TONEMAP_AGX_CUSTOM),
+  __BUILTIN_ENUM_PAIR(TONEMAP_NONE, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(TONEMAP_ACES, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(TONEMAP_REINHARD, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(TONEMAP_UNCHARTED2, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(TONEMAP_AGX, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(TONEMAP_AGX_PUNCHY, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(TONEMAP_AGX_CUSTOM, 1, LUM_VERSION_CURRENT),
   // LuminaryAperture
-  __BUILTIN_ENUM_PAIR(LUMINARY_APERTURE_ROUND), __BUILTIN_ENUM_PAIR(LUMINARY_APERTURE_BLADED),
+  __BUILTIN_ENUM_PAIR(APERTURE_ROUND, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(APERTURE_BLADED, 1, LUM_VERSION_CURRENT),
   // LuminaryJerlovWaterType
-  __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_I), __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_IA),
-  __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_IB), __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_II),
-  __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_III), __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_1C),
-  __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_3C), __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_5C),
-  __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_7C), __BUILTIN_ENUM_PAIR(LUMINARY_JERLOV_WATER_TYPE_9C),
+  __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_I, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_IA, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_IB, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_II, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_III, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_1C, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_3C, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_5C, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_7C, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(JERLOV_WATER_TYPE_9C, 1, LUM_VERSION_CURRENT),
   // LuminarySkyMode
-  __BUILTIN_ENUM_PAIR(LUMINARY_SKY_MODE_DEFAULT), __BUILTIN_ENUM_PAIR(LUMINARY_SKY_MODE_HDRI),
-  __BUILTIN_ENUM_PAIR(LUMINARY_SKY_MODE_CONSTANT_COLOR),
+  __BUILTIN_ENUM_PAIR(SKY_MODE_DEFAULT, 1, LUM_VERSION_CURRENT), __BUILTIN_ENUM_PAIR(SKY_MODE_HDRI, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(SKY_MODE_CONSTANT_COLOR, 1, LUM_VERSION_CURRENT),
   // LuminaryMaterialBaseSubstrate
-  __BUILTIN_ENUM_PAIR(LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE), __BUILTIN_ENUM_PAIR(LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT)};
+  __BUILTIN_ENUM_PAIR(MATERIAL_BASE_SUBSTRATE_OPAQUE, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(MATERIAL_BASE_SUBSTRATE_TRANSLUCENT, 1, LUM_VERSION_CURRENT)};
 LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_BUILTIN_ENUM_COUNT);
 
 static const LumBuiltinTypeMember _lum_builtin_member_rgbf[] = {
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, r), .name = "r"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, g), .name = "g"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, b), .name = "b"}};
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, r), .name = "r", .min_version = 1, .max_version = LUM_VERSION_CURRENT},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, g), .name = "g", .min_version = 1, .max_version = LUM_VERSION_CURRENT},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRGBF, b), .name = "b", .min_version = 1, .max_version = LUM_VERSION_CURRENT}};
 
 static const LumBuiltinTypeMember _lum_builtin_member_vec3[] = {
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, x), .name = "x"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, y), .name = "y"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, z), .name = "z"}};
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, x), .name = "x", .min_version = 1, .max_version = LUM_VERSION_CURRENT},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, y), .name = "y", .min_version = 1, .max_version = LUM_VERSION_CURRENT},
+  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryVec3, z), .name = "z", .min_version = 1, .max_version = LUM_VERSION_CURRENT}};
+
+#define _LUM_BUILTIN_C_TYPE_TO_BUILTIN_TYPE(__macro_base_struct, __macro_member_name) \
+  _Generic(                                                                           \
+    ((__macro_base_struct*) 0)->__macro_member_name,                                  \
+    LuminaryRGBF: LUM_BUILTIN_TYPE_RGBF,                                              \
+    LuminaryVec3: LUM_BUILTIN_TYPE_VEC3,                                              \
+    uint32_t: LUM_BUILTIN_TYPE_UINT,                                                  \
+    bool: LUM_BUILTIN_TYPE_BOOL,                                                      \
+    float: LUM_BUILTIN_TYPE_FLOAT,                                                    \
+    int32_t: LUM_BUILTIN_TYPE_ENUM,                                                   \
+    LumBuiltinAdaptiveSampling: LUM_BUILTIN_TYPE_ADAPTIVESAMPLING)
+
+#define _LUM_BUILTIN_MEMBER(__macro_base_struct, __macro_member_name, __macro_min_ver, __macro_max_ver) \
+  {.type        = _LUM_BUILTIN_C_TYPE_TO_BUILTIN_TYPE(__macro_base_struct, __macro_member_name),        \
+   .offset      = offsetof(__macro_base_struct, __macro_member_name),                                   \
+   .name        = #__macro_member_name,                                                                 \
+   .min_version = (__macro_min_ver),                                                                    \
+   .max_version = (__macro_max_ver)}
 
 static const LumBuiltinTypeMember _lum_builtin_member_settings[] = {
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, width), .name = "width"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, height), .name = "height"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, max_ray_depth), .name = "max_ray_depth"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, bridge_max_num_vertices), .name = "bridge_max_num_vertices"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, undersampling), .name = "undersampling"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryRendererSettings, supersampling), .name = "supersampling"},
-  {.type   = LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,
-   .offset = offsetof(LuminaryRendererSettings, adaptive_sampling_settings),
-   .name   = "adaptive_sampling_settings"},
-  {.type = LUM_BUILTIN_TYPE_ENUM, .offset = offsetof(LuminaryRendererSettings, shading_mode), .name = "shading_mode"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_x), .name = "region_x"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_y), .name = "region_y"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_width), .name = "region_width"},
-  {.type = LUM_BUILTIN_TYPE_FLOAT, .offset = offsetof(LuminaryRendererSettings, region_height), .name = "region_height"}};
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, width, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, height, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, max_ray_depth, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, bridge_max_num_vertices, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, undersampling, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, supersampling, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, adaptive_sampling_settings, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, shading_mode, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_x, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_y, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_width, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_height, 1, LUM_VERSION_CURRENT),
+};
 
 static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
-  {.type = LUM_BUILTIN_TYPE_VEC3, .offset = offsetof(LuminaryCamera, pos), .name = "pos"}};
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, pos, 1, LUM_VERSION_CURRENT),
+};
 
 static const LumBuiltinTypeMember _lum_builtin_member_luminary[] = {
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = 0, .name = "compatibility_version"}};
+  _LUM_BUILTIN_MEMBER(LumBuiltinLuminary, compatibility_version, 1, LUM_VERSION_CURRENT),
+};
 
 static const LumBuiltinTypeMember _lum_builtin_member_adaptive_sampling[] = {
-  {.type = LUM_BUILTIN_TYPE_BOOL, .offset = offsetof(LuminaryAdaptiveSamplingSettings, enable), .name = "enable"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryAdaptiveSamplingSettings, max_sampling_rate), .name = "max_sampling_rate"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryAdaptiveSamplingSettings, avg_sampling_rate), .name = "avg_sampling_rate"},
-  {.type = LUM_BUILTIN_TYPE_UINT, .offset = offsetof(LuminaryAdaptiveSamplingSettings, update_interval), .name = "update_interval"},
-  {.type = LUM_BUILTIN_TYPE_BOOL, .offset = offsetof(LuminaryAdaptiveSamplingSettings, exposure_aware), .name = "exposure_aware"},
-  {.type = LUM_BUILTIN_TYPE_ENUM, .offset = offsetof(LuminaryAdaptiveSamplingSettings, output_mode), .name = "output_mode"},
+  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, enable, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, max_sampling_rate, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, avg_sampling_rate, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, update_interval, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, exposure_aware, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, output_mode, 1, LUM_VERSION_CURRENT),
 };
 
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
