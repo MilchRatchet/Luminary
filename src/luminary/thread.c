@@ -2,6 +2,7 @@
 
 #include <threads.h>
 
+#include "host_local_memory.h"
 #include "internal_error.h"
 
 struct ThreadMainArgs;
@@ -36,9 +37,17 @@ LuminaryResult thread_create(Thread** _thread) {
 }
 
 int _thread_main(struct ThreadMainArgs* args) {
-  LuminaryResult result = args->func(args->args);
+  args->self->result = _host_memory_local_init();
+  if (args->self->result != LUMINARY_SUCCESS)
+    return 1;
 
-  args->self->result = result;
+  args->self->result = args->func(args->args);
+  if (args->self->result != LUMINARY_SUCCESS)
+    return 1;
+
+  args->self->result = _host_memory_local_shutdown();
+  if (args->self->result != LUMINARY_SUCCESS)
+    return 1;
 
   return 0;
 }

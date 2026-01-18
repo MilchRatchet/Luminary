@@ -1,5 +1,6 @@
 #include "image.h"
 
+#include "host_local_memory.h"
 #include "internal_error.h"
 
 static void* _image_malloc_stbi(size_t size) {
@@ -136,15 +137,14 @@ LuminaryResult image_load(Texture* texture, const char* path) {
   const size_t block_size = 16 * 1024 * 1024;
   size_t file_length      = 0;
 
-  // TODO: Pool these, host_malloc is performance bottleneck here.
-  uint8_t* file_mem;
-  __FAILURE_HANDLE(host_malloc(&file_mem, block_size));
+  LOCAL uint8_t* file_mem;
+  __FAILURE_HANDLE(host_malloc_local(&file_mem, block_size));
 
   size_t read_size;
 
   while (read_size = fread(file_mem + file_length, 1, block_size, file), read_size == block_size) {
     file_length += block_size;
-    __FAILURE_HANDLE(host_realloc(&file_mem, file_length + block_size));
+    __FAILURE_HANDLE(host_realloc_local(&file_mem, file_length + block_size));
   }
 
   fclose(file);
@@ -163,7 +163,7 @@ LuminaryResult image_load(Texture* texture, const char* path) {
     result = _image_load_8(texture, file_mem, file_length, path);
   }
 
-  __FAILURE_HANDLE(host_free(&file_mem));
+  __FAILURE_HANDLE(host_free_local(&file_mem));
 
   return result;
 }
