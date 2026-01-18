@@ -150,7 +150,10 @@ LuminaryResult _host_realloc_local(void** ptr, size_t size) {
 
   LocalMemoryAllocation* allocation = _thread_local_allocator.allocations + allocation_id;
 
-  __FAILURE_HANDLE(host_realloc(&allocation->memory, size));
+  if (allocation->is_available)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Local memory has not been acquired but is being reallocated.");
+
+  __FAILURE_HANDLE(host_realloc(&allocation->memory, size + sizeof(LocalMemoryAllocationHeader)));
   allocation->size = size;
 
   *ptr = (void*) (((LocalMemoryAllocationHeader*) (_thread_local_allocator.allocations[allocation_id].memory)) + 1);
