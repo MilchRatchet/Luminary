@@ -8,6 +8,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "device_memory.h"
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "utils.h"
 
@@ -163,8 +164,8 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
   pipeline_compile_options.allowOpacityMicromaps            = true;
 
-  char* log;
-  __FAILURE_HANDLE(host_malloc(&log, OPTIX_LOG_SIZE));
+  LOCAL char* log;
+  __FAILURE_HANDLE(host_malloc_local(&log, OPTIX_LOG_SIZE));
   memset(log, 0, OPTIX_LOG_SIZE);
 
   size_t log_size = OPTIX_LOG_SIZE;
@@ -215,7 +216,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
       &(*kernel)->pipeline),
     log, log_size);
 
-  __FAILURE_HANDLE(host_free(&log));
+  __FAILURE_HANDLE(host_free_local(&log));
 
   ////////////////////////////////////////////////////////////////////
   // Shader Binding Table Creation

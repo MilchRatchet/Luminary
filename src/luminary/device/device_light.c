@@ -9,6 +9,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "device_packing.h"
+#include "host_local_memory.h"
 #include "host_math.h"
 #include "internal_error.h"
 #include "kernel_args.h"
@@ -82,10 +83,10 @@ struct LightTreeChildNode {
 } typedef LightTreeChildNode;
 
 struct LightTreeWork {
-  LightTreeFragment* fragments;
+  LOCAL LightTreeFragment* fragments;
   uint32_t fragments_count;
   ARRAY LightTreeBinaryNode* binary_nodes;
-  LightTreeNode* nodes;
+  LOCAL LightTreeNode* nodes;
   uint32_t nodes_count;
   ARRAY DeviceLightTreeRootHeader* root_output;
   ARRAY DeviceLightTreeNode* nodes_output;
@@ -249,8 +250,8 @@ static void _light_tree_divide_middles_along_axis(
 static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
-  LightTreeFragment* fragments = work->fragments;
-  uint32_t fragments_count     = work->fragments_count;
+  LOCAL LightTreeFragment* fragments = work->fragments;
+  uint32_t fragments_count           = work->fragments_count;
 
   ARRAY LightTreeBinaryNode* nodes;
   __FAILURE_HANDLE(array_create(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
@@ -559,8 +560,8 @@ static LuminaryResult _lights_get_vmf_and_mean_and_variance(
 // Then, based on that reference point, compute the smallest distance to any light center.
 // This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
 static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work) {
-  LightTreeNode* nodes;
-  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(LightTreeNode) * work->nodes_count));
+  LOCAL LightTreeNode* nodes;
+  __FAILURE_HANDLE(host_malloc_local(&nodes, sizeof(LightTreeNode) * work->nodes_count));
 
   for (uint32_t i = 0; i < work->nodes_count; i++) {
     LightTreeBinaryNode binary_node = work->binary_nodes[i];
@@ -616,10 +617,7 @@ struct LightTreeCollapseWork {
   ARRAY DeviceLightTreeRootHeader* root;
   ARRAY DeviceLightTreeNode* nodes;
   uint32_t num_node_jobs;
-  uint64_t* node_paths;
-  uint32_t* node_depths;
-  uint32_t* new_fragments;
-  uint64_t* fragment_paths;
+  LOCAL uint32_t* new_fragments;
   uint32_t triangles_ptr;
 } typedef LightTreeCollapseWork;
 
@@ -1139,7 +1137,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   const uint32_t fragments_count = work->fragments_count;
 
-  LightTreeNode* binary_nodes       = work->nodes;
+  LOCAL LightTreeNode* binary_nodes = work->nodes;
   const uint32_t binary_nodes_count = work->nodes_count;
 
   uint32_t node_count = binary_nodes_count;
@@ -1152,13 +1150,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __FAILURE_HANDLE(
     array_create(&cwork.root, sizeof(DeviceLightTreeRootHeader), 1 + LIGHT_TREE_ROOT_MAX_CHILD_COUNT * LIGHT_TREE_NODE_SECTION_REL_SIZE));
   __FAILURE_HANDLE(array_create(&cwork.nodes, sizeof(DeviceLightTreeNode), node_count));
-  __FAILURE_HANDLE(host_malloc(&cwork.node_paths, sizeof(uint64_t) * node_count));
-  __FAILURE_HANDLE(host_malloc(&cwork.node_depths, sizeof(uint32_t) * node_count));
-  __FAILURE_HANDLE(host_malloc(&cwork.new_fragments, sizeof(uint32_t) * fragments_count));
-  __FAILURE_HANDLE(host_malloc(&cwork.fragment_paths, sizeof(uint64_t) * fragments_count));
+  __FAILURE_HANDLE(host_malloc_local(&cwork.new_fragments, sizeof(uint32_t) * fragments_count));
 
   memset(cwork.new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
-  memset(cwork.fragment_paths, 0xFF, sizeof(uint64_t) * fragments_count);
 
   __FAILURE_HANDLE(_light_tree_collapse_root(&cwork, binary_nodes));
   __FAILURE_HANDLE(_light_tree_collapse_nodes(&cwork, binary_nodes));
@@ -1174,8 +1168,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   }
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
-  LightTreeFragment* fragments_swap;
-  __FAILURE_HANDLE(host_malloc(&fragments_swap, sizeof(LightTreeFragment) * fragments_count));
+  LOCAL LightTreeFragment* fragments_swap;
+  __FAILURE_HANDLE(host_malloc_local(&fragments_swap, sizeof(LightTreeFragment) * fragments_count));
 
   memcpy(fragments_swap, work->fragments, sizeof(LightTreeFragment) * fragments_count);
 
@@ -1183,12 +1177,9 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     work->fragments[i] = fragments_swap[cwork.new_fragments[i]];
   }
 
-  __FAILURE_HANDLE(host_free(&fragments_swap));
+  __FAILURE_HANDLE(host_free_local(&fragments_swap));
 
-  __FAILURE_HANDLE(host_free(&cwork.node_paths));
-  __FAILURE_HANDLE(host_free(&cwork.node_depths));
-  __FAILURE_HANDLE(host_free(&cwork.new_fragments));
-  __FAILURE_HANDLE(host_free(&cwork.fragment_paths));
+  __FAILURE_HANDLE(host_free_local(&cwork.new_fragments));
   __FAILURE_HANDLE(array_destroy(&cwork.binary_node_indices));
   __FAILURE_HANDLE(array_destroy(&cwork.node_offset));
 
@@ -1265,9 +1256,9 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 static LuminaryResult _light_tree_clear_work(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
-  __FAILURE_HANDLE(host_free(&work->fragments));
+  __FAILURE_HANDLE(host_free_local(&work->fragments));
   __FAILURE_HANDLE(array_destroy(&work->binary_nodes));
-  __FAILURE_HANDLE(host_free(&work->nodes));
+  __FAILURE_HANDLE(host_free_local(&work->nodes));
   __FAILURE_HANDLE(array_destroy(&work->root_output));
   __FAILURE_HANDLE(array_destroy(&work->nodes_output));
 
@@ -1342,8 +1333,8 @@ static LuminaryResult _light_tree_debug_output_export_device_node(
   const uint32_t child_ptr = ((uint32_t) header.child_and_light_ptr[0]) | (((uint32_t) header.child_and_light_ptr[1] & 0x00FF) << 16);
   const uint32_t light_ptr = ((uint32_t) header.child_and_light_ptr[2]) | (((uint32_t) header.child_and_light_ptr[1] & 0xFF00) << 8);
 
-  char* buffer;
-  __FAILURE_HANDLE(host_malloc(&buffer, 1024 * 1024));
+  LOCAL char* buffer;
+  __FAILURE_HANDLE(host_malloc_local(&buffer, 1024 * 1024));
 
   int buffer_offset = 0;
 
@@ -1472,7 +1463,7 @@ static LuminaryResult _light_tree_debug_output_export_device_node(
   __DEBUG_ASSERT(buffer_offset < 1024 * 1024);
   fwrite(buffer, buffer_offset, 1, mtl_file);
 
-  __FAILURE_HANDLE(host_free(&buffer));
+  __FAILURE_HANDLE(host_free_local(&buffer));
 #endif
   *node_offset = 0xFFFFFFFF;
 
@@ -2162,7 +2153,7 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
 
   work->fragments_count = total_fragments;
 
-  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(LightTreeFragment) * work->fragments_count));
+  __FAILURE_HANDLE(host_malloc_local(&work->fragments, sizeof(LightTreeFragment) * work->fragments_count));
 
   uint32_t fragment_offset = 0;
 

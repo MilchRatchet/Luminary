@@ -27,8 +27,7 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
   __CHECK_NULL_ARGUMENT(file);
   __CHECK_NULL_ARGUMENT(version);
 
-  char* line;
-  __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
+  char line[LINE_SIZE];
 
   fgets(line, LINE_SIZE, file);
 
@@ -55,8 +54,6 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
   else {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has no version information.");
   }
-
-  __FAILURE_HANDLE(host_free(&line));
 
   return LUMINARY_SUCCESS;
 }

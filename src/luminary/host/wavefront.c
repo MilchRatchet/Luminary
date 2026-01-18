@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "internal_path.h"
 #include "material.h"
@@ -329,8 +330,8 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
   // Invalidate file path string.
   mtl_file_path_string = (const char*) 0;
 
-  char* line;
-  __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
+  LOCAL char* line;
+  __FAILURE_HANDLE(host_malloc_local(&line, LINE_SIZE));
 
   uint32_t current_material_ptr;
   __FAILURE_HANDLE(array_get_num_elements(content->materials, &current_material_ptr));
@@ -438,7 +439,7 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
     }
   }
 
-  __FAILURE_HANDLE(host_free(&line));
+  __FAILURE_HANDLE(host_free_local(&line));
 
   fclose(file);
 
@@ -635,14 +636,14 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
 
   uint16_t current_material = 0;
 
-  char* path;
-  __FAILURE_HANDLE(host_malloc(&path, LINE_SIZE));
+  LOCAL char* path;
+  __FAILURE_HANDLE(host_malloc_local(&path, LINE_SIZE));
 
-  char* read_buffer;
-  __FAILURE_HANDLE(host_malloc(&read_buffer, READ_BUFFER_SIZE));
+  LOCAL char* read_buffer;
+  __FAILURE_HANDLE(host_malloc_local(&read_buffer, READ_BUFFER_SIZE));
 
-  char* read_buffer_swap;
-  __FAILURE_HANDLE(host_malloc(&read_buffer_swap, READ_BUFFER_SIZE));
+  LOCAL char* read_buffer_swap;
+  __FAILURE_HANDLE(host_malloc_local(&read_buffer_swap, READ_BUFFER_SIZE));
 
   // NULL terminate the buffers.
   read_buffer[READ_BUFFER_SIZE - 1]      = '\0';
@@ -783,9 +784,9 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   }
 
   __FAILURE_HANDLE(array_destroy(&loaded_mtls));
-  __FAILURE_HANDLE(host_free(&path));
-  __FAILURE_HANDLE(host_free(&read_buffer));
-  __FAILURE_HANDLE(host_free(&read_buffer_swap));
+  __FAILURE_HANDLE(host_free_local(&path));
+  __FAILURE_HANDLE(host_free_local(&read_buffer));
+  __FAILURE_HANDLE(host_free_local(&read_buffer_swap));
 
   return LUMINARY_SUCCESS;
 }

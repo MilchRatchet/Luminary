@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "ceb.h"
+#include "host_local_memory.h"
 #include "internal_error.h"
 
 // #define EMBEDDED_GENERATE
@@ -1002,14 +1003,14 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
     y_sum += (clamped_index > 0) ? y : 0.0f;
   }
 
-  float* cdf;
-  __FAILURE_HANDLE(host_malloc(&cdf, clamped_num_wavelengths * sizeof(float)));
+  LOCAL float* cdf;
+  __FAILURE_HANDLE(host_malloc_local(&cdf, clamped_num_wavelengths * sizeof(float)));
 
-  float* xy_lut;
-  __FAILURE_HANDLE(host_malloc(&xy_lut, clamped_num_wavelengths * sizeof(float) * 2));
+  LOCAL float* xy_lut;
+  __FAILURE_HANDLE(host_malloc_local(&xy_lut, clamped_num_wavelengths * sizeof(float) * 2));
 
-  float* z_lut;
-  __FAILURE_HANDLE(host_malloc(&z_lut, clamped_num_wavelengths * sizeof(float)));
+  LOCAL float* z_lut;
+  __FAILURE_HANDLE(host_malloc_local(&z_lut, clamped_num_wavelengths * sizeof(float)));
 
   float last_cdf = 0.0f;
 
@@ -1060,9 +1061,9 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
   fwrite(z_lut, sizeof(float), clamped_num_wavelengths, file_z);
   fclose(file_z);
 
-  __FAILURE_HANDLE(host_free(&cdf));
-  __FAILURE_HANDLE(host_free(&xy_lut));
-  __FAILURE_HANDLE(host_free(&z_lut));
+  __FAILURE_HANDLE(host_free_local(&cdf));
+  __FAILURE_HANDLE(host_free_local(&xy_lut));
+  __FAILURE_HANDLE(host_free_local(&z_lut));
 
   return LUMINARY_SUCCESS;
 }

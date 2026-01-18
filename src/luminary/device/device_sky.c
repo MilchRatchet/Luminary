@@ -2,6 +2,7 @@
 
 #include "device.h"
 #include "device_texture.h"
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "kernel_args.h"
 #include "sky.h"
@@ -490,11 +491,11 @@ static LuminaryResult _sky_stars_generate(SkyStars* stars) {
 
   srand(stars->seed);
 
-  Star* star_buffer;
-  __FAILURE_HANDLE(host_malloc(&star_buffer, sizeof(Star) * stars->count));
+  LOCAL Star* star_buffer;
+  __FAILURE_HANDLE(host_malloc_local(&star_buffer, sizeof(Star) * stars->count));
 
-  uint32_t* counts;
-  __FAILURE_HANDLE(host_malloc(&counts, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y));
+  LOCAL uint32_t* counts;
+  __FAILURE_HANDLE(host_malloc_local(&counts, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y));
 
   memset(counts, 0, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y);
 
@@ -539,8 +540,8 @@ static LuminaryResult _sky_stars_generate(SkyStars* stars) {
     stars->data[o + c] = s;
   }
 
-  __FAILURE_HANDLE(host_free(&star_buffer));
-  __FAILURE_HANDLE(host_free(&counts));
+  __FAILURE_HANDLE(host_free_local(&star_buffer));
+  __FAILURE_HANDLE(host_free_local(&counts));
 
   return LUMINARY_SUCCESS;
 }
