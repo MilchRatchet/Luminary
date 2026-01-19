@@ -153,6 +153,12 @@ LuminaryResult _host_realloc_local(void** ptr, size_t size) {
   if (allocation->is_available)
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Local memory has not been acquired but is being reallocated.");
 
+  // Since we want to avoid unnecessary reallocations, we forbid shrinking the memory. Since the caller does not know the actual size
+  // of the buffer, it is likely for shrinking calls to appear. Most of these calls actually only have the intention to increase buffer size
+  // and should never have the intention of reducing memory usage.
+  if (allocation->size >= size)
+    return LUMINARY_SUCCESS;
+
   __FAILURE_HANDLE(host_realloc(&allocation->memory, size + sizeof(LocalMemoryAllocationHeader)));
   allocation->size = size;
 
