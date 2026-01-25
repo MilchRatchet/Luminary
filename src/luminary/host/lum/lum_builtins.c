@@ -1,7 +1,9 @@
 #include "lum_builtins.h"
 
 #include <stddef.h>
+#include <string.h>
 
+#include "internal_error.h"
 #include "lum_tokenizer.h"
 
 const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
@@ -200,6 +202,32 @@ static const LumBuiltinTypeMember _lum_builtin_member_settings[] = {
 
 static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, pos, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, rotation, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, aperture_shape, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, aperture_blade_count, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, exposure, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, tonemap, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_slope, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_power, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_saturation, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, filter, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_local_error_minimization, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, bloom_blend, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, dithering, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa1, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa2, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, wasd_speed, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, mouse_speed, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, smooth_movement, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, smoothing_factor, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, russian_roulette_threshold, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_color_correction, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, color_correction, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, film_grain, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, camera_scale, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, object_distance, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_physical_camera, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_ocean[] = {
@@ -390,3 +418,296 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = _lum_builtin_member_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = _lum_builtin_member_cloud_layer,
 };
+
+LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(settings);
+
+  memset(settings, 0, sizeof(LumBuiltinSettings));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  settings->width                   = 2560;
+  settings->height                  = 1440;
+  settings->max_ray_depth           = 4;
+  settings->bridge_max_num_vertices = 15;
+  settings->undersampling           = 2;
+  settings->supersampling           = 1;
+  settings->shading_mode            = LUMINARY_SHADING_MODE_DEFAULT;
+  settings->region_x                = 0.0f;
+  settings->region_y                = 0.0f;
+  settings->region_width            = 1.0f;
+  settings->region_height           = 1.0f;
+
+  settings->adaptive_sampling_settings = (LumBuiltinAdaptiveSampling) {.enable            = true,
+                                                                       .max_sampling_rate = 256,
+                                                                       .avg_sampling_rate = 2,
+                                                                       .update_interval   = 64,
+                                                                       .exposure_aware    = true,
+                                                                       .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY};
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
+
+  memset(camera, 0, sizeof(LumBuiltinCamera));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  camera->pos.x                        = 0.0f;
+  camera->pos.y                        = 0.0f;
+  camera->pos.z                        = 0.0f;
+  camera->rotation.x                   = 0.0f;
+  camera->rotation.y                   = 0.0f;
+  camera->rotation.z                   = 0.0f;
+  camera->aperture_shape               = LUMINARY_APERTURE_ROUND;
+  camera->aperture_blade_count         = 7;
+  camera->exposure                     = 0.0f;
+  camera->bloom_blend                  = 0.01f;
+  camera->dithering                    = 1;
+  camera->tonemap                      = LUMINARY_TONEMAP_AGX;
+  camera->use_local_error_minimization = false;
+  camera->agx_custom_slope             = 1.0f;
+  camera->agx_custom_power             = 1.0f;
+  camera->agx_custom_saturation        = 1.0f;
+  camera->filter                       = LUMINARY_FILTER_NONE;
+  camera->wasd_speed                   = 1.0f;
+  camera->mouse_speed                  = 1.0f;
+  camera->smooth_movement              = 0;
+  camera->smoothing_factor             = 0.1f;
+  camera->purkinje                     = 1;
+  camera->purkinje_kappa1              = 0.2f;
+  camera->purkinje_kappa2              = 0.29f;
+  camera->russian_roulette_threshold   = 0.1f;
+  camera->use_color_correction         = 0;
+  camera->color_correction.r           = 0.0f;
+  camera->color_correction.g           = 0.0f;
+  camera->color_correction.b           = 0.0f;
+  camera->film_grain                   = 0.0f;
+  camera->camera_scale                 = 1.0f;
+  camera->object_distance              = 1.0f;
+  camera->use_physical_camera          = false;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_ocean_init(LumBuiltinOcean* ocean, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(ocean);
+
+  memset(ocean, 0, sizeof(LumBuiltinOcean));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  ocean->active                      = false;
+  ocean->height                      = 0.0f;
+  ocean->amplitude                   = 0.2f;
+  ocean->frequency                   = 0.12f;
+  ocean->refractive_index            = 1.333f;
+  ocean->water_type                  = LUMINARY_JERLOV_WATER_TYPE_IB;
+  ocean->caustics_active             = false;
+  ocean->caustics_ris_sample_count   = 32;
+  ocean->caustics_domain_scale       = 0.5f;
+  ocean->multiscattering             = false;
+  ocean->triangle_light_contribution = false;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_sky_init(LumBuiltinSky* sky, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(sky);
+
+  memset(sky, 0, sizeof(LumBuiltinSky));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  sky->geometry_offset.x      = 0.0f;
+  sky->geometry_offset.y      = 0.1f;
+  sky->geometry_offset.z      = 0.0f;
+  sky->altitude               = 0.5f;
+  sky->azimuth                = 3.141f;
+  sky->moon_altitude          = -0.5f;
+  sky->moon_azimuth           = 0.0f;
+  sky->moon_tex_offset        = 0.0f;
+  sky->sun_strength           = 1.0f;
+  sky->base_density           = 1.0f;
+  sky->rayleigh_density       = 1.0f;
+  sky->mie_density            = 1.0f;
+  sky->ozone_density          = 1.0f;
+  sky->ground_visibility      = 60.0f;
+  sky->mie_diameter           = 2.0f;
+  sky->ozone_layer_thickness  = 15.0f;
+  sky->rayleigh_falloff       = 8.0f;
+  sky->mie_falloff            = 1.7f;
+  sky->multiscattering_factor = 1.0f;
+  sky->steps                  = 40;
+  sky->ozone_absorption       = true;
+  sky->aerial_perspective     = false;
+  sky->hdri_dim               = 2048;
+  sky->hdri_samples           = 32;
+  sky->stars_seed             = 0;
+  sky->stars_count            = 10000;
+  sky->stars_intensity        = 1.0f;
+  sky->constant_color.r       = 1.0f;
+  sky->constant_color.g       = 1.0f;
+  sky->constant_color.b       = 1.0f;
+  sky->mode                   = LUMINARY_SKY_MODE_DEFAULT;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_cloud_init(LumBuiltinCloud* cloud, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(cloud);
+
+  memset(cloud, 0, sizeof(LumBuiltinCloud));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  cloud->active                = false;
+  cloud->initialized           = false;
+  cloud->steps                 = 96;
+  cloud->shadow_steps          = 8;
+  cloud->atmosphere_scattering = true;
+  cloud->seed                  = 0;
+  cloud->offset_x              = 0.0f;
+  cloud->offset_z              = 0.0f;
+  cloud->noise_shape_scale     = 1.0f;
+  cloud->noise_detail_scale    = 1.0f;
+  cloud->noise_weather_scale   = 1.0f;
+  cloud->octaves               = 9;
+  cloud->droplet_diameter      = 25.0f;
+  cloud->density               = 1.0f;
+  cloud->mipmap_bias           = 0.0f;
+
+  cloud->low = (LumBuiltinCloudLayer) {
+    .active       = true,
+    .height_max   = 5.0f,
+    .height_min   = 1.5f,
+    .coverage     = 1.0f,
+    .coverage_min = 0.0f,
+    .type         = 1.0f,
+    .type_min     = 0.0f,
+    .wind_speed   = 2.5f,
+    .wind_angle   = 0.0f,
+  };
+
+  cloud->mid = (LumBuiltinCloudLayer) {
+    .active       = true,
+    .height_max   = 6.0f,
+    .height_min   = 5.5f,
+    .coverage     = 1.0f,
+    .coverage_min = 0.0f,
+    .type         = 1.0f,
+    .type_min     = 0.0f,
+    .wind_speed   = 2.5f,
+    .wind_angle   = 0.0f,
+  };
+
+  cloud->top = (LumBuiltinCloudLayer) {
+    .active       = true,
+    .height_max   = 8.0f,
+    .height_min   = 7.95f,
+    .coverage     = 1.0f,
+    .coverage_min = 0.0f,
+    .type         = 1.0f,
+    .type_min     = 0.0f,
+    .wind_speed   = 1.0f,
+    .wind_angle   = 0.0f,
+  };
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_fog_init(LumBuiltinFog* fog, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(fog);
+
+  memset(fog, 0, sizeof(LumBuiltinFog));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  fog->active           = false;
+  fog->density          = 1.0f;
+  fog->droplet_diameter = 10.0f;
+  fog->height           = 500.0f;
+  fog->dist             = 500.0f;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_particles_init(LumBuiltinParticles* particles, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(particles);
+
+  memset(particles, 0, sizeof(LumBuiltinParticles));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  particles->active             = false;
+  particles->scale              = 10.0f;
+  particles->albedo.r           = 1.0f;
+  particles->albedo.g           = 1.0f;
+  particles->albedo.b           = 1.0f;
+  particles->direction_altitude = 1.234f;
+  particles->direction_azimuth  = 0.0f;
+  particles->speed              = 0.0f;
+  particles->phase_diameter     = 50.0f;
+  particles->seed               = 0;
+  particles->count              = 8192;
+  particles->size               = 1.0f;
+  particles->size_variation     = 0.1f;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_material_init(LumBuiltinMaterial* material, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(material);
+
+  memset(material, 0, sizeof(LumBuiltinMaterial));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  material->base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
+  material->albedo                   = (RGBF) {.r = 0.9f, .g = 0.9f, .b = 0.9f};
+  material->opacity                  = 0.9f;
+  material->emission                 = (RGBF) {.r = 0.0f, .g = 0.0f, .b = 0.0f};
+  material->emission_scale           = 1.0f;
+  material->roughness                = 0.7f;
+  material->roughness_clamp          = 0.25f;
+  material->refraction_index         = 1.0f;
+  material->emission_active          = false;
+  material->thin_walled              = false;
+  material->metallic                 = false;
+  material->colored_transparency     = false;
+  material->normal_map_is_compressed = true;
+  material->bidirectional_emission   = false;
+  material->albedo_tex               = TEXTURE_NONE;
+  material->luminance_tex            = TEXTURE_NONE;
+  material->roughness_tex            = TEXTURE_NONE;
+  material->metallic_tex             = TEXTURE_NONE;
+  material->normal_tex               = TEXTURE_NONE;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(instance);
+
+  memset(instance, 0, sizeof(LumBuiltinInstance));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  instance->mesh_id = 0;
+  instance->scale.x = 1.0f;
+  instance->scale.y = 1.0f;
+  instance->scale.z = 1.0f;
+
+  return LUMINARY_SUCCESS;
+}

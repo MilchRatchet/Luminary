@@ -151,6 +151,32 @@ struct LumBuiltinSettings {
 
 struct LumBuiltinCamera {
   LuminaryVec3 pos;
+  LuminaryVec3 rotation;
+  LuminaryApertureShape aperture_shape;
+  uint32_t aperture_blade_count;
+  float exposure;
+  LuminaryToneMap tonemap;
+  float agx_custom_slope;
+  float agx_custom_power;
+  float agx_custom_saturation;
+  LuminaryFilter filter;
+  bool use_local_error_minimization;
+  float bloom_blend;
+  bool dithering;
+  bool purkinje;
+  float purkinje_kappa1;
+  float purkinje_kappa2;
+  float wasd_speed;
+  float mouse_speed;
+  bool smooth_movement;
+  float smoothing_factor;
+  float russian_roulette_threshold;
+  bool use_color_correction;
+  LuminaryRGBF color_correction;
+  float film_grain;
+  float camera_scale;
+  float object_distance;
+  bool use_physical_camera;
 } typedef LumBuiltinCamera;
 
 struct LumBuiltinOcean {
@@ -285,5 +311,19 @@ struct LumBuiltinInstance {
 struct LumBuiltinLuminary {
   uint32_t compatibility_version;
 } typedef LumBuiltinLuminary;
+
+////////////////////////////////////////////////////////////////////
+// LumBuiltin Default Initializers
+////////////////////////////////////////////////////////////////////
+
+LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t version);
+LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t version);
+LuminaryResult lum_builtin_ocean_init(LumBuiltinOcean* ocean, uint32_t version);
+LuminaryResult lum_builtin_sky_init(LumBuiltinSky* sky, uint32_t version);
+LuminaryResult lum_builtin_cloud_init(LumBuiltinCloud* cloud, uint32_t version);
+LuminaryResult lum_builtin_fog_init(LumBuiltinFog* fog, uint32_t version);
+LuminaryResult lum_builtin_particles_init(LumBuiltinParticles* particles, uint32_t version);
+LuminaryResult lum_builtin_material_init(LumBuiltinMaterial* material, uint32_t version);
+LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t version);
 
 #endif /* LUMINARY_LUM_BUILTINS_H */
