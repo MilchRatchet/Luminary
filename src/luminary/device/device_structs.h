@@ -221,7 +221,7 @@ struct DeviceMaterialCompressed {
   uint16_t albedo_r;
   uint16_t albedo_g;
   uint16_t albedo_b;
-  uint16_t albedo_a;
+  uint16_t opacity;
 
   uint16_t emission_r;
   uint16_t emission_g;

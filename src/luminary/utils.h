@@ -38,6 +38,13 @@
 
 enum VolumeType { VOLUME_TYPE_NONE, VOLUME_TYPE_FOG, VOLUME_TYPE_OCEAN } typedef VolumeType;
 
+struct RGBAF {
+  float r;
+  float g;
+  float b;
+  float a;
+} typedef RGBAF;
+
 struct Quaternion {
   float x;
   float y;

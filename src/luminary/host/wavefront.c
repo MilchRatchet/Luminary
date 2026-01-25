@@ -834,7 +834,7 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     mat.albedo.r                 = wavefront_mat.diffuse_reflectivity.r;
     mat.albedo.g                 = wavefront_mat.diffuse_reflectivity.g;
     mat.albedo.b                 = wavefront_mat.diffuse_reflectivity.b;
-    mat.albedo.a                 = wavefront_mat.dissolve;
+    mat.opacity                  = wavefront_mat.dissolve;
     mat.emission                 = wavefront_mat.emission;
     mat.emission_scale           = content->args.emission_scale;
     mat.refraction_index         = wavefront_mat.refraction_index;

@@ -298,7 +298,7 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->albedo_r       = _device_struct_convert_float01_to_uint16(material->albedo.r);
   device_material->albedo_g       = _device_struct_convert_float01_to_uint16(material->albedo.g);
   device_material->albedo_b       = _device_struct_convert_float01_to_uint16(material->albedo.b);
-  device_material->albedo_a       = _device_struct_convert_float01_to_uint16(material->albedo.a);
+  device_material->opacity        = _device_struct_convert_float01_to_uint16(material->opacity);
   device_material->emission_r     = _device_struct_convert_float01_to_uint16(emission.r);
   device_material->emission_g     = _device_struct_convert_float01_to_uint16(emission.g);
   device_material->emission_b     = _device_struct_convert_float01_to_uint16(emission.b);

@@ -732,7 +732,7 @@ static void _window_entity_properties_material_action(Window* window, Display* d
   if (material.albedo_tex == 0xFFFF) {
     update_data |= _window_entity_properties_add_slider(data, "Albedo", &material.albedo, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
     update_data |=
-      _window_entity_properties_add_slider(data, "Opacity", &material.albedo.a, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+      _window_entity_properties_add_slider(data, "Opacity", &material.opacity, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Emission Active", &material.emission_active);

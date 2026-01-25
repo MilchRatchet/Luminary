@@ -361,7 +361,8 @@ enum LuminaryMaterialBaseSubstrate {
 
 LUMINARY_API struct LuminaryMaterial {
   LuminaryMaterialBaseSubstrate base_substrate;
-  LuminaryRGBAF albedo;
+  LuminaryRGBF albedo;
+  float opacity;
   LuminaryRGBF emission;
   float emission_scale;
   float roughness;
