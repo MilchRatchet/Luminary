@@ -31,6 +31,7 @@ enum LumBuiltinType {
   LUM_BUILTIN_TYPE_LUMINARY,
   LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE,
   LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,
+  LUM_BUILTIN_TYPE_CLOUDLAYER,
   LUM_BUILTIN_TYPE_COUNT_VERSION_1,
 
   LUM_BUILTIN_TYPE_COUNT = LUM_BUILTIN_TYPE_COUNT_VERSION_1
@@ -151,6 +152,135 @@ struct LumBuiltinSettings {
 struct LumBuiltinCamera {
   LuminaryVec3 pos;
 } typedef LumBuiltinCamera;
+
+struct LumBuiltinOcean {
+  bool active;
+  float height;
+  float amplitude;
+  float frequency;
+  float refractive_index;
+  LuminaryJerlovWaterType water_type;
+  bool caustics_active;
+  uint32_t caustics_ris_sample_count;
+  float caustics_domain_scale;
+  bool multiscattering;
+  bool triangle_light_contribution;
+} typedef LumBuiltinOcean;
+
+struct LumBuiltinSky {
+  LuminaryVec3 geometry_offset;
+  float azimuth;
+  float altitude;
+  float moon_azimuth;
+  float moon_altitude;
+  float moon_tex_offset;
+  float sun_strength;
+  float base_density;
+  bool ozone_absorption;
+  uint32_t steps;
+  uint32_t stars_count;
+  uint32_t stars_seed;
+  float stars_intensity;
+  float rayleigh_density;
+  float mie_density;
+  float ozone_density;
+  float rayleigh_falloff;
+  float mie_falloff;
+  float mie_diameter;
+  float ground_visibility;
+  float ozone_layer_thickness;
+  float multiscattering_factor;
+  uint32_t hdri_dim;
+  uint32_t hdri_samples;
+  bool aerial_perspective;
+  LuminaryRGBF constant_color;
+  LuminarySkyMode mode;
+} typedef LumBuiltinSky;
+
+struct LumBuiltinCloudLayer {
+  bool active;
+  float height_max;
+  float height_min;
+  float coverage;
+  float coverage_min;
+  float type;
+  float type_min;
+  float wind_speed;
+  float wind_angle;
+} typedef LumBuiltinCloudLayer;
+
+struct LumBuiltinCloud {
+  bool active;
+  bool initialized;
+  bool atmosphere_scattering;
+  LumBuiltinCloudLayer low;
+  LumBuiltinCloudLayer mid;
+  LumBuiltinCloudLayer top;
+  float offset_x;
+  float offset_z;
+  float density;
+  uint32_t seed;
+  float droplet_diameter;
+  uint32_t steps;
+  uint32_t shadow_steps;
+  float noise_shape_scale;
+  float noise_detail_scale;
+  float noise_weather_scale;
+  float mipmap_bias;
+  uint32_t octaves;
+} typedef LumBuiltinCloud;
+
+struct LumBuiltinFog {
+  bool active;
+  float density;
+  float droplet_diameter;
+  float height;
+  float dist;
+} typedef LumBuiltinFog;
+
+struct LumBuiltinParticles {
+  bool active;
+  uint32_t seed;
+  uint32_t count;
+  LuminaryRGBF albedo;
+  float speed;
+  float direction_altitude;
+  float direction_azimuth;
+  float phase_diameter;
+  float scale;
+  float size;
+  float size_variation;
+} typedef LumBuiltinParticles;
+
+struct LumBuiltinMaterial {
+  LuminaryMaterialBaseSubstrate base_substrate;
+  LuminaryRGBF albedo;
+  float opacity;
+  LuminaryRGBF emission;
+  float emission_scale;
+  float roughness;
+  float roughness_clamp;
+  float refraction_index;
+  bool emission_active;
+  bool thin_walled;
+  bool metallic;
+  bool colored_transparency;
+  bool roughness_as_smoothness;
+  bool normal_map_is_compressed;
+  bool bidirectional_emission;
+  uint32_t albedo_tex;
+  uint32_t luminance_tex;
+  uint32_t roughness_tex;
+  uint32_t metallic_tex;
+  uint32_t normal_tex;
+} typedef LumBuiltinMaterial;
+
+struct LumBuiltinInstance {
+  uint32_t mesh_id;
+  LuminaryVec3 position;
+  LuminaryVec3 rotation;
+  LuminaryVec3 scale;
+} typedef LumBuiltinInstance;
 
 struct LumBuiltinLuminary {
   uint32_t compatibility_version;
