@@ -39,28 +39,26 @@ LuminaryResult lum_function_resolve_generic_address(LumVirtualMachine* vm, const
 // Settings
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_settings(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_settings(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminaryRendererSettings* dst;
+  LumBuiltinSettings* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_settings(host, dst));
+  *dst = vm->host->settings;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_settings(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_settings(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminaryRendererSettings* src;
+  const LumBuiltinSettings* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_settings(host, src));
+  vm->host->settings = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -69,28 +67,26 @@ static LuminaryResult _lum_function_store_settings(LuminaryHost* host, LumVirtua
 // Camera
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_camera(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_camera(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminaryCamera* dst;
+  LumBuiltinCamera* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_camera(host, dst));
+  *dst = vm->host->camera;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_camera(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_camera(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminaryCamera* src;
+  const LumBuiltinCamera* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_camera(host, src));
+  vm->host->camera = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -99,28 +95,26 @@ static LuminaryResult _lum_function_store_camera(LuminaryHost* host, LumVirtualM
 // Ocean
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_ocean(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_ocean(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminaryOcean* dst;
+  LumBuiltinOcean* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_ocean(host, dst));
+  *dst = vm->host->ocean;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_ocean(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_ocean(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminaryOcean* src;
+  const LumBuiltinOcean* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_ocean(host, src));
+  vm->host->ocean = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -129,28 +123,26 @@ static LuminaryResult _lum_function_store_ocean(LuminaryHost* host, LumVirtualMa
 // Sky
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_sky(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_sky(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminarySky* dst;
+  LumBuiltinSky* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_sky(host, dst));
+  *dst = vm->host->sky;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_sky(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_sky(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminarySky* src;
+  const LumBuiltinSky* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_sky(host, src));
+  vm->host->sky = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -159,28 +151,26 @@ static LuminaryResult _lum_function_store_sky(LuminaryHost* host, LumVirtualMach
 // Cloud
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_cloud(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_cloud(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminaryCloud* dst;
+  LumBuiltinCloud* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_cloud(host, dst));
+  *dst = vm->host->cloud;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_cloud(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_cloud(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminaryCloud* src;
+  const LumBuiltinCloud* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_cloud(host, src));
+  vm->host->cloud = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -189,28 +179,26 @@ static LuminaryResult _lum_function_store_cloud(LuminaryHost* host, LumVirtualMa
 // Fog
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_fog(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_fog(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminaryFog* dst;
+  LumBuiltinFog* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_fog(host, dst));
+  *dst = vm->host->fog;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_fog(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_fog(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminaryFog* src;
+  const LumBuiltinFog* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_fog(host, src));
+  vm->host->fog = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -219,28 +207,26 @@ static LuminaryResult _lum_function_store_fog(LuminaryHost* host, LumVirtualMach
 // Particles
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_particles(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_load_particles(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LuminaryParticles* dst;
+  LumBuiltinParticles* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  __FAILURE_HANDLE(luminary_host_get_particles(host, dst));
+  *dst = vm->host->particles;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_particles(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
-  __CHECK_NULL_ARGUMENT(host);
+static LuminaryResult _lum_function_store_particles(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LuminaryParticles* src;
+  const LumBuiltinParticles* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  __FAILURE_HANDLE(luminary_host_set_particles(host, src));
+  vm->host->particles = *src;
 
   return LUMINARY_SUCCESS;
 }

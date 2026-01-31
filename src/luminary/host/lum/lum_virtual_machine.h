@@ -2,9 +2,11 @@
 #define LUMINARY_LUM_VIRTUAL_MACHINE_H
 
 #include "lum_binary.h"
+#include "lum_compatibility_host.h"
 #include "utils.h"
 
 struct LumVirtualMachine {
+  LumCompatibilityHost* host;
   size_t stack_size;
   void* stack_memory;
   size_t constant_memory_size;

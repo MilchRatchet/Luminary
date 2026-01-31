@@ -11,13 +11,13 @@ struct LumFunctionLoadInfo {
   LumMemoryAllocation src;
 } typedef LumFunctionLoadInfo;
 
-typedef LuminaryResult (*LumFunctionLoad)(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionLoadInfo* info);
+typedef LuminaryResult (*LumFunctionLoad)(LumVirtualMachine* vm, const LumFunctionLoadInfo* info);
 
 struct LumFunctionStoreInfo {
   LumMemoryAllocation src;
 } typedef LumFunctionStoreInfo;
 
-typedef LuminaryResult (*LumFunctionStore)(LuminaryHost* host, LumVirtualMachine* vm, const LumFunctionStoreInfo* info);
+typedef LuminaryResult (*LumFunctionStore)(LumVirtualMachine* vm, const LumFunctionStoreInfo* info);
 
 extern const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT];
 extern const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT];

@@ -11,20 +11,20 @@ LuminaryResult lum_virtual_machine_create(LumVirtualMachine** vm) {
   __FAILURE_HANDLE(host_malloc(vm, sizeof(LumVirtualMachine)));
   memset(*vm, 0, sizeof(LumVirtualMachine));
 
+  __FAILURE_HANDLE(lum_compatibility_host_create(&(*vm)->host));
+
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_virtual_machine_execute_nop(LumVirtualMachine* vm, LuminaryHost* host, const LumInstruction* instruction) {
+static LuminaryResult _lum_virtual_machine_execute_nop(LumVirtualMachine* vm, const LumInstruction* instruction) {
   __CHECK_NULL_ARGUMENT(vm);
-  __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instruction);
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_virtual_machine_execute_mov(LumVirtualMachine* vm, LuminaryHost* host, const LumInstruction* instruction) {
+static LuminaryResult _lum_virtual_machine_execute_mov(LumVirtualMachine* vm, const LumInstruction* instruction) {
   __CHECK_NULL_ARGUMENT(vm);
-  __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instruction);
 
   LumBuiltinType type;
@@ -43,9 +43,8 @@ static LuminaryResult _lum_virtual_machine_execute_mov(LumVirtualMachine* vm, Lu
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_virtual_machine_execute_ldg(LumVirtualMachine* vm, LuminaryHost* host, const LumInstruction* instruction) {
+static LuminaryResult _lum_virtual_machine_execute_ldg(LumVirtualMachine* vm, const LumInstruction* instruction) {
   __CHECK_NULL_ARGUMENT(vm);
-  __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instruction);
 
   LumBuiltinType type;
@@ -55,14 +54,13 @@ static LuminaryResult _lum_virtual_machine_execute_ldg(LumVirtualMachine* vm, Lu
   info.dst = instruction->dst;
   info.src = instruction->src;
 
-  __FAILURE_HANDLE(lum_function_tables_ldg[type](host, vm, &info));
+  __FAILURE_HANDLE(lum_function_tables_ldg[type](vm, &info));
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_virtual_machine_execute_stg(LumVirtualMachine* vm, LuminaryHost* host, const LumInstruction* instruction) {
+static LuminaryResult _lum_virtual_machine_execute_stg(LumVirtualMachine* vm, const LumInstruction* instruction) {
   __CHECK_NULL_ARGUMENT(vm);
-  __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instruction);
 
   LumBuiltinType type;
@@ -71,12 +69,12 @@ static LuminaryResult _lum_virtual_machine_execute_stg(LumVirtualMachine* vm, Lu
   LumFunctionStoreInfo info;
   info.src = instruction->src;
 
-  __FAILURE_HANDLE(lum_function_tables_stg[type](host, vm, &info));
+  __FAILURE_HANDLE(lum_function_tables_stg[type](vm, &info));
 
   return LUMINARY_SUCCESS;
 }
 
-typedef LuminaryResult (*LumVirtualMachineInstructionFunc)(LumVirtualMachine* vm, LuminaryHost* host, const LumInstruction* instruction);
+typedef LuminaryResult (*LumVirtualMachineInstructionFunc)(LumVirtualMachine* vm, const LumInstruction* instruction);
 
 static LumVirtualMachineInstructionFunc _lum_virtual_machine_instruction_funcs[LUM_INSTRUCTION_TYPE_COUNT] = {
   [LUM_INSTRUCTION_TYPE_NOP] = (const LumVirtualMachineInstructionFunc) _lum_virtual_machine_execute_nop,
@@ -89,6 +87,9 @@ LuminaryResult lum_virtual_machine_execute(
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(binary);
+
+  // TODO: Version
+  __FAILURE_HANDLE(lum_compatibility_host_init(vm->host, 1));
 
   if (binary->stack_size > vm->stack_size) {
     if (vm->stack_memory) {
@@ -116,8 +117,10 @@ LuminaryResult lum_virtual_machine_execute(
     LumInstructionType type;
     __FAILURE_HANDLE(lum_instruction_get_type(instruction, &type));
 
-    __FAILURE_HANDLE(_lum_virtual_machine_instruction_funcs[type](vm, host, instruction));
+    __FAILURE_HANDLE(_lum_virtual_machine_instruction_funcs[type](vm, instruction));
   }
+
+  __FAILURE_HANDLE(lum_compatibility_host_apply(vm->host, host));
 
   return LUMINARY_SUCCESS;
 }
@@ -125,6 +128,8 @@ LuminaryResult lum_virtual_machine_execute(
 LuminaryResult lum_virtual_machine_destroy(LumVirtualMachine** vm) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(*vm);
+
+  __FAILURE_HANDLE(lum_compatibility_host_destroy(&(*vm)->host));
 
   __FAILURE_HANDLE(host_free(vm));
 
