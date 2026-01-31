@@ -7,7 +7,6 @@ LuminaryResult cloud_get_default(Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(cloud);
 
   cloud->active                = false;
-  cloud->initialized           = false;
   cloud->steps                 = 96;
   cloud->shadow_steps          = 8;
   cloud->atmosphere_scattering = true;

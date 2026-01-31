@@ -271,7 +271,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_sky[] = {
 
 static const LumBuiltinTypeMember _lum_builtin_member_cloud[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, active, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCloud, initialized, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, atmosphere_scattering, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, low, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, mid, 1, LUM_VERSION_CURRENT),
@@ -561,7 +560,6 @@ LuminaryResult lum_builtin_cloud_init(LumBuiltinCloud* cloud, uint32_t version) 
     return LUMINARY_SUCCESS;
 
   cloud->active                = false;
-  cloud->initialized           = false;
   cloud->steps                 = 96;
   cloud->shadow_steps          = 8;
   cloud->atmosphere_scattering = true;

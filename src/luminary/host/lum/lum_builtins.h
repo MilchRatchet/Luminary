@@ -233,7 +233,6 @@ struct LumBuiltinCloudLayer {
 
 struct LumBuiltinCloud {
   bool active;
-  bool initialized;
   bool atmosphere_scattering;
   LumBuiltinCloudLayer low;
   LumBuiltinCloudLayer mid;

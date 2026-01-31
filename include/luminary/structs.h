@@ -296,7 +296,6 @@ LUMINARY_API struct LuminaryCloudLayer {
 
 LUMINARY_API struct LuminaryCloud {
   bool active;
-  bool initialized;
   bool atmosphere_scattering;
   LuminaryCloudLayer low;
   LuminaryCloudLayer mid;
