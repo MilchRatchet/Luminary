@@ -7,7 +7,6 @@
 
 struct LumCompatibilityHost {
   uint32_t version;
-  LumBuiltinLuminary luminary;
   LumBuiltinSettings settings;
   LumBuiltinCamera camera;
   LumBuiltinOcean ocean;

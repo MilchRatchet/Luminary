@@ -251,7 +251,6 @@ const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_PARTICLES]        = (const LumFunctionLoad) _lum_function_load_particles,
   [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionLoad) 0,
   [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionLoad) 0,
-  [LUM_BUILTIN_TYPE_LUMINARY]         = (const LumFunctionLoad) 0,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionLoad) 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionLoad) 0};
 
@@ -271,6 +270,5 @@ const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_PARTICLES]        = (const LumFunctionStore) _lum_function_store_particles,
   [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionStore) 0,
   [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionStore) 0,
-  [LUM_BUILTIN_TYPE_LUMINARY]         = (const LumFunctionStore) 0,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionStore) 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionStore) 0};

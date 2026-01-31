@@ -24,7 +24,6 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = "Material",
   [LUM_BUILTIN_TYPE_INSTANCE]         = "Instance",
   [LUM_BUILTIN_TYPE_STRING]           = "String",
-  [LUM_BUILTIN_TYPE_LUMINARY]         = "Luminary",
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "WavefrontObjFile",
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "AdaptiveSamplingSettings",
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "CloudLayer",
@@ -48,7 +47,6 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(LumBuiltinMaterial),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(LumBuiltinMaterial),
   [LUM_BUILTIN_TYPE_STRING]           = sizeof(uint32_t),
-  [LUM_BUILTIN_TYPE_LUMINARY]         = sizeof(LumBuiltinLuminary),
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(LumBuiltinAdaptiveSampling),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(LumBuiltinCloudLayer)};
@@ -71,7 +69,6 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = "mat",
   [LUM_BUILTIN_TYPE_INSTANCE]         = "ins",
   [LUM_BUILTIN_TYPE_STRING]           = "str",
-  [LUM_BUILTIN_TYPE_LUMINARY]         = "lum",
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "obj",
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "asam",
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "clol"};
@@ -94,7 +91,6 @@ const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = true,
   [LUM_BUILTIN_TYPE_INSTANCE]         = true,
   [LUM_BUILTIN_TYPE_STRING]           = false,
-  [LUM_BUILTIN_TYPE_LUMINARY]         = false,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = false,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = false,
@@ -341,10 +337,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_instance[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinInstance, scale, 1, LUM_VERSION_CURRENT),
 };
 
-static const LumBuiltinTypeMember _lum_builtin_member_luminary[] = {
-  _LUM_BUILTIN_MEMBER(LumBuiltinLuminary, compatibility_version, 1, LUM_VERSION_CURRENT),
-};
-
 static const LumBuiltinTypeMember _lum_builtin_member_adaptive_sampling[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, enable, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, max_sampling_rate, 1, LUM_VERSION_CURRENT),
@@ -384,7 +376,6 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(_lum_builtin_member_material) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(_lum_builtin_member_instance) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_STRING]           = 0,
-  [LUM_BUILTIN_TYPE_LUMINARY]         = sizeof(_lum_builtin_member_luminary) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(_lum_builtin_member_adaptive_sampling) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(_lum_builtin_member_cloud_layer) / sizeof(LumBuiltinTypeMember),
@@ -408,7 +399,6 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = _lum_builtin_member_material,
   [LUM_BUILTIN_TYPE_INSTANCE]         = _lum_builtin_member_instance,
   [LUM_BUILTIN_TYPE_STRING]           = 0,
-  [LUM_BUILTIN_TYPE_LUMINARY]         = _lum_builtin_member_luminary,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = _lum_builtin_member_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = _lum_builtin_member_cloud_layer,

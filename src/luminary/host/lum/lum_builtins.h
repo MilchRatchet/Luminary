@@ -28,7 +28,6 @@ enum LumBuiltinType {
   LUM_BUILTIN_TYPE_MATERIAL,
   LUM_BUILTIN_TYPE_INSTANCE,
   LUM_BUILTIN_TYPE_STRING,
-  LUM_BUILTIN_TYPE_LUMINARY,
   LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE,
   LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,
   LUM_BUILTIN_TYPE_CLOUDLAYER,
@@ -302,10 +301,6 @@ struct LumBuiltinInstance {
   LuminaryVec3 rotation;
   LuminaryVec3 scale;
 } typedef LumBuiltinInstance;
-
-struct LumBuiltinLuminary {
-  uint32_t compatibility_version;
-} typedef LumBuiltinLuminary;
 
 ////////////////////////////////////////////////////////////////////
 // LumBuiltin Default Initializers
