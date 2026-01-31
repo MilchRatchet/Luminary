@@ -70,7 +70,9 @@ LuminaryResult material_manager_destroy(MaterialManager** manager) {
   __CHECK_NULL_ARGUMENT(manager);
   __CHECK_NULL_ARGUMENT(*manager);
 
-  __FAILURE_HANDLE(host_free(&(*manager)->materials));
+  if ((*manager)->materials)
+    __FAILURE_HANDLE(host_free(&(*manager)->materials));
+
   __FAILURE_HANDLE(array_destroy(&(*manager)->cached_updates));
 
   __FAILURE_HANDLE(host_free(manager));

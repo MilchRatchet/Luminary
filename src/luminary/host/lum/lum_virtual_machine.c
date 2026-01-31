@@ -129,6 +129,9 @@ LuminaryResult lum_virtual_machine_destroy(LumVirtualMachine** vm) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(*vm);
 
+  if ((*vm)->stack_memory)
+    __FAILURE_HANDLE(host_free(&(*vm)->stack_memory));
+
   __FAILURE_HANDLE(lum_compatibility_host_destroy(&(*vm)->host));
 
   __FAILURE_HANDLE(host_free(vm));
