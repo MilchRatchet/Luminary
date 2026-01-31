@@ -701,3 +701,259 @@ LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t 
 
   return LUMINARY_SUCCESS;
 }
+
+LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, LuminaryRendererSettings* dst_settings, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(settings);
+  __CHECK_NULL_ARGUMENT(dst_settings);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_settings->width                   = settings->width;
+  dst_settings->height                  = settings->height;
+  dst_settings->max_ray_depth           = settings->max_ray_depth;
+  dst_settings->bridge_max_num_vertices = settings->bridge_max_num_vertices;
+  dst_settings->undersampling           = settings->undersampling;
+  dst_settings->supersampling           = settings->supersampling;
+  dst_settings->shading_mode            = settings->shading_mode;
+  dst_settings->region_x                = settings->region_x;
+  dst_settings->region_y                = settings->region_y;
+  dst_settings->region_width            = settings->region_width;
+  dst_settings->region_height           = settings->region_height;
+
+  dst_settings->adaptive_sampling_settings.enable            = settings->adaptive_sampling_settings.enable;
+  dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
+  dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
+  dst_settings->adaptive_sampling_settings.update_interval   = settings->adaptive_sampling_settings.update_interval;
+  dst_settings->adaptive_sampling_settings.exposure_aware    = settings->adaptive_sampling_settings.exposure_aware;
+  dst_settings->adaptive_sampling_settings.output_mode       = settings->adaptive_sampling_settings.output_mode;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, LuminaryCamera* dst_camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
+  __CHECK_NULL_ARGUMENT(dst_camera);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_camera->pos                          = camera->pos;
+  dst_camera->rotation                     = camera->rotation;
+  dst_camera->aperture_shape               = camera->aperture_shape;
+  dst_camera->aperture_blade_count         = camera->aperture_blade_count;
+  dst_camera->exposure                     = camera->exposure;
+  dst_camera->tonemap                      = camera->tonemap;
+  dst_camera->agx_custom_slope             = camera->agx_custom_slope;
+  dst_camera->agx_custom_power             = camera->agx_custom_power;
+  dst_camera->agx_custom_saturation        = camera->agx_custom_saturation;
+  dst_camera->filter                       = camera->filter;
+  dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
+  dst_camera->bloom_blend                  = camera->bloom_blend;
+  dst_camera->dithering                    = camera->dithering;
+  dst_camera->purkinje                     = camera->purkinje;
+  dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;
+  dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
+  dst_camera->russian_roulette_threshold   = camera->russian_roulette_threshold;
+  dst_camera->use_color_correction         = camera->use_color_correction;
+  dst_camera->color_correction             = camera->color_correction;
+  dst_camera->film_grain                   = camera->film_grain;
+  dst_camera->camera_scale                 = camera->camera_scale;
+  dst_camera->object_distance              = camera->object_distance;
+  dst_camera->use_physical_camera          = camera->use_physical_camera;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_ocean_convert(const LumBuiltinOcean* ocean, LuminaryOcean* dst_ocean, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(ocean);
+  __CHECK_NULL_ARGUMENT(dst_ocean);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_ocean->active                      = ocean->active;
+  dst_ocean->height                      = ocean->height;
+  dst_ocean->amplitude                   = ocean->amplitude;
+  dst_ocean->frequency                   = ocean->frequency;
+  dst_ocean->refractive_index            = ocean->refractive_index;
+  dst_ocean->water_type                  = ocean->water_type;
+  dst_ocean->caustics_active             = ocean->caustics_active;
+  dst_ocean->caustics_ris_sample_count   = ocean->caustics_ris_sample_count;
+  dst_ocean->caustics_domain_scale       = ocean->caustics_domain_scale;
+  dst_ocean->multiscattering             = ocean->multiscattering;
+  dst_ocean->triangle_light_contribution = ocean->triangle_light_contribution;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_sky_convert(const LumBuiltinSky* sky, LuminarySky* dst_sky, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(sky);
+  __CHECK_NULL_ARGUMENT(dst_sky);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_sky->geometry_offset        = sky->geometry_offset;
+  dst_sky->azimuth                = sky->azimuth;
+  dst_sky->altitude               = sky->altitude;
+  dst_sky->moon_azimuth           = sky->moon_azimuth;
+  dst_sky->moon_altitude          = sky->moon_altitude;
+  dst_sky->moon_tex_offset        = sky->moon_tex_offset;
+  dst_sky->sun_strength           = sky->sun_strength;
+  dst_sky->base_density           = sky->base_density;
+  dst_sky->ozone_absorption       = sky->ozone_absorption;
+  dst_sky->steps                  = sky->steps;
+  dst_sky->stars_count            = sky->stars_count;
+  dst_sky->stars_seed             = sky->stars_seed;
+  dst_sky->stars_intensity        = sky->stars_intensity;
+  dst_sky->rayleigh_density       = sky->rayleigh_density;
+  dst_sky->mie_density            = sky->mie_density;
+  dst_sky->ozone_density          = sky->ozone_density;
+  dst_sky->rayleigh_falloff       = sky->rayleigh_falloff;
+  dst_sky->mie_falloff            = sky->mie_falloff;
+  dst_sky->mie_diameter           = sky->mie_diameter;
+  dst_sky->ground_visibility      = sky->ground_visibility;
+  dst_sky->ozone_layer_thickness  = sky->ozone_layer_thickness;
+  dst_sky->multiscattering_factor = sky->multiscattering_factor;
+  dst_sky->hdri_dim               = sky->hdri_dim;
+  dst_sky->hdri_samples           = sky->hdri_samples;
+  dst_sky->aerial_perspective     = sky->aerial_perspective;
+  dst_sky->constant_color         = sky->constant_color;
+  dst_sky->mode                   = sky->mode;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_builtin_cloud_layer_convert(const LumBuiltinCloudLayer* layer, LuminaryCloudLayer* dst_layer, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(layer);
+  __CHECK_NULL_ARGUMENT(dst_layer);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_layer->active       = layer->active;
+  dst_layer->height_max   = layer->height_max;
+  dst_layer->height_min   = layer->height_min;
+  dst_layer->coverage     = layer->coverage;
+  dst_layer->coverage_min = layer->coverage_min;
+  dst_layer->type         = layer->type;
+  dst_layer->type_min     = layer->type_min;
+  dst_layer->wind_speed   = layer->wind_speed;
+  dst_layer->wind_angle   = layer->wind_angle;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_cloud_convert(const LumBuiltinCloud* cloud, LuminaryCloud* dst_cloud, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(cloud);
+  __CHECK_NULL_ARGUMENT(dst_cloud);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_cloud->active                = cloud->active;
+  dst_cloud->atmosphere_scattering = cloud->atmosphere_scattering;
+  dst_cloud->offset_x              = cloud->offset_x;
+  dst_cloud->offset_z              = cloud->offset_z;
+  dst_cloud->density               = cloud->density;
+  dst_cloud->seed                  = cloud->seed;
+  dst_cloud->droplet_diameter      = cloud->droplet_diameter;
+  dst_cloud->steps                 = cloud->steps;
+  dst_cloud->shadow_steps          = cloud->shadow_steps;
+  dst_cloud->noise_shape_scale     = cloud->noise_shape_scale;
+  dst_cloud->noise_detail_scale    = cloud->noise_detail_scale;
+  dst_cloud->noise_weather_scale   = cloud->noise_weather_scale;
+  dst_cloud->mipmap_bias           = cloud->mipmap_bias;
+  dst_cloud->octaves               = cloud->octaves;
+
+  __FAILURE_HANDLE(_lum_builtin_cloud_layer_convert(&cloud->low, &dst_cloud->low, version));
+  __FAILURE_HANDLE(_lum_builtin_cloud_layer_convert(&cloud->mid, &dst_cloud->mid, version));
+  __FAILURE_HANDLE(_lum_builtin_cloud_layer_convert(&cloud->top, &dst_cloud->top, version));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_fog_convert(const LumBuiltinFog* fog, LuminaryFog* dst_fog, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(fog);
+  __CHECK_NULL_ARGUMENT(dst_fog);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_fog->active           = fog->active;
+  dst_fog->density          = fog->density;
+  dst_fog->droplet_diameter = fog->droplet_diameter;
+  dst_fog->height           = fog->height;
+  dst_fog->dist             = fog->dist;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_particles_convert(const LumBuiltinParticles* particles, LuminaryParticles* dst_particles, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(particles);
+  __CHECK_NULL_ARGUMENT(dst_particles);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_particles->active             = particles->active;
+  dst_particles->seed               = particles->seed;
+  dst_particles->count              = particles->count;
+  dst_particles->albedo             = particles->albedo;
+  dst_particles->speed              = particles->speed;
+  dst_particles->direction_altitude = particles->direction_altitude;
+  dst_particles->direction_azimuth  = particles->direction_azimuth;
+  dst_particles->phase_diameter     = particles->phase_diameter;
+  dst_particles->scale              = particles->scale;
+  dst_particles->size               = particles->size;
+  dst_particles->size_variation     = particles->size_variation;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_material_convert(const LumBuiltinMaterial* material, LuminaryMaterial* dst_material, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(material);
+  __CHECK_NULL_ARGUMENT(dst_material);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_material->base_substrate           = material->base_substrate;
+  dst_material->albedo                   = material->albedo;
+  dst_material->opacity                  = material->opacity;
+  dst_material->emission                 = material->emission;
+  dst_material->emission_scale           = material->emission_scale;
+  dst_material->roughness                = material->roughness;
+  dst_material->roughness_clamp          = material->roughness_clamp;
+  dst_material->refraction_index         = material->refraction_index;
+  dst_material->emission_active          = material->emission_active;
+  dst_material->thin_walled              = material->thin_walled;
+  dst_material->metallic                 = material->metallic;
+  dst_material->colored_transparency     = material->colored_transparency;
+  dst_material->roughness_as_smoothness  = material->roughness_as_smoothness;
+  dst_material->normal_map_is_compressed = material->normal_map_is_compressed;
+  dst_material->bidirectional_emission   = material->bidirectional_emission;
+  dst_material->albedo_tex               = material->albedo_tex;
+  dst_material->luminance_tex            = material->luminance_tex;
+  dst_material->roughness_tex            = material->roughness_tex;
+  dst_material->metallic_tex             = material->metallic_tex;
+  dst_material->normal_tex               = material->normal_tex;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_instance_convert(const LumBuiltinInstance* instance, LuminaryInstance* dst_instance, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(instance);
+  __CHECK_NULL_ARGUMENT(dst_instance);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_instance->mesh_id  = instance->mesh_id;
+  dst_instance->position = instance->position;
+  dst_instance->rotation = instance->rotation;
+  dst_instance->scale    = instance->scale;
+
+  return LUMINARY_SUCCESS;
+}

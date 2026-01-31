@@ -321,4 +321,18 @@ LuminaryResult lum_builtin_particles_init(LumBuiltinParticles* particles, uint32
 LuminaryResult lum_builtin_material_init(LumBuiltinMaterial* material, uint32_t version);
 LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t version);
 
+////////////////////////////////////////////////////////////////////
+// LumBuiltin Conversion
+////////////////////////////////////////////////////////////////////
+
+LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, LuminaryRendererSettings* dst_settings, uint32_t version);
+LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, LuminaryCamera* dst_camera, uint32_t version);
+LuminaryResult lum_builtin_ocean_convert(const LumBuiltinOcean* ocean, LuminaryOcean* dst_ocean, uint32_t version);
+LuminaryResult lum_builtin_sky_convert(const LumBuiltinSky* sky, LuminarySky* dst_sky, uint32_t version);
+LuminaryResult lum_builtin_cloud_convert(const LumBuiltinCloud* cloud, LuminaryCloud* dst_cloud, uint32_t version);
+LuminaryResult lum_builtin_fog_convert(const LumBuiltinFog* fog, LuminaryFog* dst_fog, uint32_t version);
+LuminaryResult lum_builtin_particles_convert(const LumBuiltinParticles* particles, LuminaryParticles* dst_particles, uint32_t version);
+LuminaryResult lum_builtin_material_convert(const LumBuiltinMaterial* material, LuminaryMaterial* dst_material, uint32_t version);
+LuminaryResult lum_builtin_instance_convert(const LumBuiltinInstance* instance, LuminaryInstance* dst_instance, uint32_t version);
+
 #endif /* LUMINARY_LUM_BUILTINS_H */
