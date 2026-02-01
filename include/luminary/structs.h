@@ -158,6 +158,27 @@ LUMINARY_API enum LuminaryApertureShape {
   LUMINARY_APERTURE_COUNT
 } typedef LuminaryApertureShape;
 
+LUMINARY_API struct LuminaryCameraThinLens {
+  float fov;
+  float aperture_size;
+} typedef LuminaryCameraThinLens;
+
+LUMINARY_API struct LuminaryCameraPhysical {
+  bool allow_reflections;
+  bool use_spectral_rendering;
+  float focal_length;
+  float front_focal_point;
+  float back_focal_point;
+  float front_principal_point;
+  float back_principal_point;
+  float aperture_point;
+  float aperture_diameter;
+  float exit_pupil_point;
+  float exit_pupil_diameter;
+  float image_plane_distance;
+  float sensor_width;
+} typedef LuminaryCameraPhysical;
+
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
@@ -182,25 +203,8 @@ LUMINARY_API struct LuminaryCamera {
   float camera_scale;
   float object_distance;
   bool use_physical_camera;
-  struct {
-    float fov;
-    float aperture_size;
-  } thin_lens;
-  struct {
-    bool allow_reflections;
-    bool use_spectral_rendering;
-    float focal_length;
-    float front_focal_point;
-    float back_focal_point;
-    float front_principal_point;
-    float back_principal_point;
-    float aperture_point;
-    float aperture_diameter;
-    float exit_pupil_point;
-    float exit_pupil_diameter;
-    float image_plane_distance;
-    float sensor_width;
-  } physical;
+  LuminaryCameraThinLens thin_lens;
+  LuminaryCameraPhysical physical;
 } typedef LuminaryCamera;
 
 ////////////////////////////////////////////////////////////////////

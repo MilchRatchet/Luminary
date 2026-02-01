@@ -31,6 +31,8 @@ enum LumBuiltinType {
   LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE,
   LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,
   LUM_BUILTIN_TYPE_CLOUDLAYER,
+  LUM_BUILTIN_TYPE_CAMERATHINLENS,
+  LUM_BUILTIN_TYPE_CAMERAPHYSICAL,
   LUM_BUILTIN_TYPE_COUNT_VERSION_1,
 
   LUM_BUILTIN_TYPE_COUNT = LUM_BUILTIN_TYPE_COUNT_VERSION_1
@@ -148,6 +150,27 @@ struct LumBuiltinSettings {
   float region_height;
 } typedef LumBuiltinSettings;
 
+struct LumBuiltinCameraThinLens {
+  float fov;
+  float aperture_size;
+} typedef LumBuiltinCameraThinLens;
+
+struct LumBuiltinCameraPhysical {
+  bool allow_reflections;
+  bool use_spectral_rendering;
+  float focal_length;
+  float front_focal_point;
+  float back_focal_point;
+  float front_principal_point;
+  float back_principal_point;
+  float aperture_point;
+  float aperture_diameter;
+  float exit_pupil_point;
+  float exit_pupil_diameter;
+  float image_plane_distance;
+  float sensor_width;
+} typedef LumBuiltinCameraPhysical;
+
 struct LumBuiltinCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
@@ -172,6 +195,8 @@ struct LumBuiltinCamera {
   float camera_scale;
   float object_distance;
   bool use_physical_camera;
+  LumBuiltinCameraThinLens thin_lens;
+  LumBuiltinCameraPhysical physical;
 } typedef LumBuiltinCamera;
 
 struct LumBuiltinOcean {

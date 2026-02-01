@@ -27,6 +27,8 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "WavefrontObjFile",
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "AdaptiveSamplingSettings",
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "CloudLayer",
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = "CameraThinLens",
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = "CameraPhysical",
 };
 
 const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
@@ -49,7 +51,10 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_STRING]           = sizeof(uint32_t),
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(LumBuiltinAdaptiveSampling),
-  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(LumBuiltinCloudLayer)};
+  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(LumBuiltinCloudLayer),
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = sizeof(LumBuiltinCameraThinLens),
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = sizeof(LumBuiltinCameraPhysical),
+};
 
 const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = "",
@@ -71,7 +76,10 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_STRING]           = "str",
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = "obj",
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "asam",
-  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "clol"};
+  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "clol",
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = "camt",
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = "camp",
+};
 
 const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = false,
@@ -94,6 +102,8 @@ const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = false,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = false,
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = false,
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = false,
 };
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum, __macro_min_ver, __macro_max_ver) \
@@ -160,7 +170,9 @@ LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_
     float: LUM_BUILTIN_TYPE_FLOAT,                                                    \
     int32_t: LUM_BUILTIN_TYPE_ENUM,                                                   \
     LumBuiltinAdaptiveSampling: LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,                    \
-    LumBuiltinCloudLayer: LUM_BUILTIN_TYPE_CLOUDLAYER)
+    LumBuiltinCloudLayer: LUM_BUILTIN_TYPE_CLOUDLAYER,                                \
+    LumBuiltinCameraThinLens: LUM_BUILTIN_TYPE_CAMERATHINLENS,                        \
+    LumBuiltinCameraPhysical: LUM_BUILTIN_TYPE_CAMERAPHYSICAL)
 
 #define _LUM_BUILTIN_MEMBER(__macro_base_struct, __macro_member_name, __macro_min_ver, __macro_max_ver) \
   {.type        = _LUM_BUILTIN_C_TYPE_TO_BUILTIN_TYPE(__macro_base_struct, __macro_member_name),        \
@@ -220,6 +232,8 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, camera_scale, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, object_distance, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_physical_camera, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, thin_lens, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, physical, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_ocean[] = {
@@ -358,6 +372,27 @@ static const LumBuiltinTypeMember _lum_builtin_member_cloud_layer[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCloudLayer, wind_angle, 1, LUM_VERSION_CURRENT),
 };
 
+static const LumBuiltinTypeMember _lum_builtin_member_camera_thin_lens[] = {
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraThinLens, fov, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraThinLens, aperture_size, 1, LUM_VERSION_CURRENT),
+};
+
+static const LumBuiltinTypeMember _lum_builtin_member_camera_physical[] = {
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, allow_reflections, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, use_spectral_rendering, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, focal_length, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, front_focal_point, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, back_focal_point, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, front_principal_point, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, back_principal_point, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, aperture_point, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, aperture_diameter, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, exit_pupil_point, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, exit_pupil_diameter, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, image_plane_distance, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, sensor_width, 1, LUM_VERSION_CURRENT),
+};
+
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = 0,
   [LUM_BUILTIN_TYPE_RGBF]             = sizeof(_lum_builtin_member_rgbf) / sizeof(LumBuiltinTypeMember),
@@ -379,6 +414,8 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(_lum_builtin_member_adaptive_sampling) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(_lum_builtin_member_cloud_layer) / sizeof(LumBuiltinTypeMember),
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = sizeof(_lum_builtin_member_camera_thin_lens) / sizeof(LumBuiltinTypeMember),
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = sizeof(_lum_builtin_member_camera_physical) / sizeof(LumBuiltinTypeMember),
 };
 
 const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
@@ -402,6 +439,8 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = _lum_builtin_member_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = _lum_builtin_member_cloud_layer,
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = _lum_builtin_member_camera_thin_lens,
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = _lum_builtin_member_camera_physical,
 };
 
 LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t version) {
@@ -430,6 +469,51 @@ LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t 
                                                                        .update_interval   = 64,
                                                                        .exposure_aware    = true,
                                                                        .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY};
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_builtin_camera_thin_lens_init(LumBuiltinCameraThinLens* camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
+
+  memset(camera, 0, sizeof(LumBuiltinCameraThinLens));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  camera->fov           = 1.0f;
+  camera->aperture_size = 0.0f;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_builtin_camera_physical_init(LumBuiltinCameraPhysical* camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
+
+  memset(camera, 0, sizeof(LumBuiltinCameraPhysical));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  camera->allow_reflections      = false;
+  camera->use_spectral_rendering = false;
+
+  // TODO: This needs to be revised once I have figured out a proper API for this
+
+  const float scale             = 50.53f / 100.0f;
+  const float last_vertex_point = 88.18f * scale;
+
+  camera->focal_length          = 50.53f;
+  camera->front_focal_point     = last_vertex_point - (-22.69f);
+  camera->back_focal_point      = last_vertex_point - 65.18f;
+  camera->front_principal_point = last_vertex_point - 27.84f;
+  camera->back_principal_point  = last_vertex_point - 14.65f;
+  camera->aperture_point        = last_vertex_point - 28.02f;
+  camera->aperture_diameter     = 21.411f;
+  camera->exit_pupil_point      = 0.0f;   // last_vertex_point - 26.55f;
+  camera->exit_pupil_diameter   = 28.0f;  // 34.64f;
+  camera->image_plane_distance  = 65.18f - last_vertex_point;
+  camera->sensor_width          = 20.0f;
 
   return LUMINARY_SUCCESS;
 }
@@ -471,6 +555,9 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->camera_scale                 = 1.0f;
   camera->object_distance              = 1.0f;
   camera->use_physical_camera          = false;
+
+  __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_init(&camera->thin_lens, version));
+  __FAILURE_HANDLE(_lum_builtin_camera_physical_init(&camera->physical, version));
 
   return LUMINARY_SUCCESS;
 }
@@ -721,6 +808,45 @@ LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, 
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _lum_builtin_camera_thin_lens_convert(
+  const LumBuiltinCameraThinLens* camera, LuminaryCameraThinLens* dst_camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
+  __CHECK_NULL_ARGUMENT(dst_camera);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_camera->fov           = camera->fov;
+  dst_camera->aperture_size = camera->aperture_size;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_builtin_camera_physical_convert(
+  const LumBuiltinCameraPhysical* camera, LuminaryCameraPhysical* dst_camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
+  __CHECK_NULL_ARGUMENT(dst_camera);
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  dst_camera->allow_reflections      = camera->allow_reflections;
+  dst_camera->use_spectral_rendering = camera->use_spectral_rendering;
+  dst_camera->focal_length           = camera->focal_length;
+  dst_camera->front_focal_point      = camera->front_focal_point;
+  dst_camera->back_focal_point       = camera->back_focal_point;
+  dst_camera->front_principal_point  = camera->front_principal_point;
+  dst_camera->back_principal_point   = camera->back_principal_point;
+  dst_camera->aperture_point         = camera->aperture_point;
+  dst_camera->aperture_diameter      = camera->aperture_diameter;
+  dst_camera->exit_pupil_point       = camera->exit_pupil_point;
+  dst_camera->exit_pupil_diameter    = camera->exit_pupil_diameter;
+  dst_camera->image_plane_distance   = camera->image_plane_distance;
+  dst_camera->sensor_width           = camera->sensor_width;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, LuminaryCamera* dst_camera, uint32_t version) {
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(dst_camera);
@@ -751,6 +877,9 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->camera_scale                 = camera->camera_scale;
   dst_camera->object_distance              = camera->object_distance;
   dst_camera->use_physical_camera          = camera->use_physical_camera;
+
+  __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_convert(&camera->thin_lens, &dst_camera->thin_lens, version));
+  __FAILURE_HANDLE(_lum_builtin_camera_physical_convert(&camera->physical, &dst_camera->physical, version));
 
   return LUMINARY_SUCCESS;
 }
