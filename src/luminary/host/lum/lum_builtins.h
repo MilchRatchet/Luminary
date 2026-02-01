@@ -42,6 +42,7 @@ extern const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT];
 extern const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT];
 extern const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT];
 extern const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT];
+extern const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT];
 
 ////////////////////////////////////////////////////////////////////
 // LumBuiltin Enums

@@ -1,5 +1,7 @@
 #include "lum_function_tables.h"
 
+#include <string.h>
+
 #include "internal_error.h"
 
 ////////////////////////////////////////////////////////////////////
@@ -31,6 +33,52 @@ LuminaryResult lum_function_resolve_generic_address(LumVirtualMachine* vm, const
     base_ptr = (const uint8_t*) vm->stack_memory;
 
   *ptr = (const void*) (base_ptr + (mem->offset & LUM_MEMORY_OFFSET_MASK));
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// RGBF
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_rgbf(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LuminaryRGBF* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  memset(dst, 0, sizeof(LuminaryRGBF));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_rgbf(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Vec3
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_vec3(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LuminaryVec3* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  memset(dst, 0, sizeof(LuminaryVec3));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_vec3(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
 
   return LUMINARY_SUCCESS;
 }
@@ -232,12 +280,163 @@ static LuminaryResult _lum_function_store_particles(LumVirtualMachine* vm, const
 }
 
 ////////////////////////////////////////////////////////////////////
+// Material
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_material(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinMaterial* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_material(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinMaterial* src;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Instance
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_instance(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinInstance* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_instance(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinInstance* src;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// WavefrontObj
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_wavefrontobj(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_wavefrontobj(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// AdaptiveSampling
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_adaptive_sampling(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinAdaptiveSampling* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  *dst = vm->host->settings.adaptive_sampling_settings;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_adaptive_sampling(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinAdaptiveSampling* src;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  vm->host->settings.adaptive_sampling_settings = *src;
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Camera Thin Lens
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_camera_thin_lens(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinCameraThinLens* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  *dst = vm->host->camera.thin_lens;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_camera_thin_lens(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinCameraThinLens* src;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  vm->host->camera.thin_lens = *src;
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Physical
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_camera_physical(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinCameraPhysical* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  *dst = vm->host->camera.physical;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_camera_physical(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinCameraPhysical* src;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  vm->host->camera.physical = *src;
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
 // Tables
 ////////////////////////////////////////////////////////////////////
 
 const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT] = {
-  [LUM_BUILTIN_TYPE_RGBF]             = (const LumFunctionLoad) 0,
-  [LUM_BUILTIN_TYPE_VEC3]             = (const LumFunctionLoad) 0,
+  [LUM_BUILTIN_TYPE_VOID]             = (const LumFunctionLoad) 0,
+  [LUM_BUILTIN_TYPE_RGBF]             = (const LumFunctionLoad) _lum_function_load_rgbf,
+  [LUM_BUILTIN_TYPE_VEC3]             = (const LumFunctionLoad) _lum_function_load_vec3,
   [LUM_BUILTIN_TYPE_UINT]             = (const LumFunctionLoad) 0,
   [LUM_BUILTIN_TYPE_BOOL]             = (const LumFunctionLoad) 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = (const LumFunctionLoad) 0,
@@ -249,14 +448,19 @@ const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = (const LumFunctionLoad) _lum_function_load_cloud,
   [LUM_BUILTIN_TYPE_FOG]              = (const LumFunctionLoad) _lum_function_load_fog,
   [LUM_BUILTIN_TYPE_PARTICLES]        = (const LumFunctionLoad) _lum_function_load_particles,
-  [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionLoad) 0,
-  [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionLoad) 0,
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionLoad) 0,
-  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionLoad) 0};
+  [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionLoad) _lum_function_load_material,
+  [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionLoad) _lum_function_load_instance,
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionLoad) _lum_function_load_wavefrontobj,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionLoad) _lum_function_load_adaptive_sampling,
+  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = (const LumFunctionLoad) 0,
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = (const LumFunctionLoad) _lum_function_load_camera_thin_lens,
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = (const LumFunctionLoad) _lum_function_load_camera_physical,
+};
 
 const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT] = {
-  [LUM_BUILTIN_TYPE_RGBF]             = (const LumFunctionStore) 0,
-  [LUM_BUILTIN_TYPE_VEC3]             = (const LumFunctionStore) 0,
+  [LUM_BUILTIN_TYPE_VOID]             = (const LumFunctionStore) 0,
+  [LUM_BUILTIN_TYPE_RGBF]             = (const LumFunctionStore) _lum_function_store_rgbf,
+  [LUM_BUILTIN_TYPE_VEC3]             = (const LumFunctionStore) _lum_function_store_vec3,
   [LUM_BUILTIN_TYPE_UINT]             = (const LumFunctionStore) 0,
   [LUM_BUILTIN_TYPE_BOOL]             = (const LumFunctionStore) 0,
   [LUM_BUILTIN_TYPE_FLOAT]            = (const LumFunctionStore) 0,
@@ -268,7 +472,11 @@ const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = (const LumFunctionStore) _lum_function_store_cloud,
   [LUM_BUILTIN_TYPE_FOG]              = (const LumFunctionStore) _lum_function_store_fog,
   [LUM_BUILTIN_TYPE_PARTICLES]        = (const LumFunctionStore) _lum_function_store_particles,
-  [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionStore) 0,
-  [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionStore) 0,
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionStore) 0,
-  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionStore) 0};
+  [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionStore) _lum_function_store_material,
+  [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionStore) _lum_function_store_instance,
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionStore) _lum_function_store_wavefrontobj,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionStore) _lum_function_store_adaptive_sampling,
+  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = (const LumFunctionStore) 0,
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = (const LumFunctionStore) _lum_function_store_camera_thin_lens,
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = (const LumFunctionStore) _lum_function_store_camera_physical,
+};

@@ -539,6 +539,14 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state, con
         return LUMINARY_SUCCESS;
       }
 
+      const bool dst_is_accessible = lum_builtin_types_accessible[context->access.type];
+
+      if (dst_is_accessible == false) {
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(
+          state, token, "type '%s' is not accessible", lum_builtin_types_strings[context->access.type]));
+        return LUMINARY_SUCCESS;
+      }
+
       const bool is_addressable = lum_builtin_types_addressable[context->access.type];
 
       if (is_addressable && context->access.string_constant_object_id == ALLOCATOR_OBJECT_ID_INVALID) {

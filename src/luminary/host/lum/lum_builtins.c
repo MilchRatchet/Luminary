@@ -38,7 +38,7 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_UINT]             = sizeof(uint32_t),
   [LUM_BUILTIN_TYPE_BOOL]             = sizeof(bool),
   [LUM_BUILTIN_TYPE_FLOAT]            = sizeof(float),
-  [LUM_BUILTIN_TYPE_ENUM]             = sizeof(uint32_t),
+  [LUM_BUILTIN_TYPE_ENUM]             = sizeof(int32_t),
   [LUM_BUILTIN_TYPE_SETTINGS]         = sizeof(LumBuiltinSettings),
   [LUM_BUILTIN_TYPE_CAMERA]           = sizeof(LumBuiltinCamera),
   [LUM_BUILTIN_TYPE_OCEAN]            = sizeof(LumBuiltinOcean),
@@ -104,6 +104,31 @@ const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = false,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = false,
   [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = false,
+};
+
+const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT] = {
+  [LUM_BUILTIN_TYPE_VOID]             = false,
+  [LUM_BUILTIN_TYPE_RGBF]             = true,
+  [LUM_BUILTIN_TYPE_VEC3]             = true,
+  [LUM_BUILTIN_TYPE_UINT]             = false,
+  [LUM_BUILTIN_TYPE_BOOL]             = false,
+  [LUM_BUILTIN_TYPE_FLOAT]            = false,
+  [LUM_BUILTIN_TYPE_ENUM]             = false,
+  [LUM_BUILTIN_TYPE_SETTINGS]         = true,
+  [LUM_BUILTIN_TYPE_CAMERA]           = true,
+  [LUM_BUILTIN_TYPE_OCEAN]            = true,
+  [LUM_BUILTIN_TYPE_SKY]              = true,
+  [LUM_BUILTIN_TYPE_CLOUD]            = true,
+  [LUM_BUILTIN_TYPE_FOG]              = true,
+  [LUM_BUILTIN_TYPE_PARTICLES]        = true,
+  [LUM_BUILTIN_TYPE_MATERIAL]         = true,
+  [LUM_BUILTIN_TYPE_INSTANCE]         = true,
+  [LUM_BUILTIN_TYPE_STRING]           = false,
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = true,
+  [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = true,
+  [LUM_BUILTIN_TYPE_CLOUDLAYER]       = false,
+  [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = true,
+  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = true,
 };
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum, __macro_min_ver, __macro_max_ver) \
