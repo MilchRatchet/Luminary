@@ -1,14 +1,18 @@
 #include <string.h>
 
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "utils.h"
+
+#define ARRAY_FLAG_USES_LOCAL_MEMORY 0b1
 
 struct ArrayHeader {
   uint64_t magic;
   uint64_t size_of_element;
   uint32_t num_elements;
   uint32_t allocated_num_elements;
-  uint64_t padding[5];
+  uint64_t flags;
+  uint64_t padding[4];
 } typedef ArrayHeader;
 LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 
@@ -17,11 +21,17 @@ LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 #define ARRAY_HEADER_FREED_MAGIC (420ull)
 
 LuminaryResult _array_create(
-  void** _array, size_t size_of_element, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line) {
+  void** _array, size_t size_of_element, uint32_t num_elements, bool use_local_memory, const char* buf_name, const char* func,
+  uint32_t line) {
   __CHECK_NULL_ARGUMENT(_array);
 
   void* array;
-  __FAILURE_HANDLE(_host_malloc((void**) &array, size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
+  if (use_local_memory) {
+    __FAILURE_HANDLE(_host_malloc_local((void**) &array, size_of_element * num_elements + sizeof(ArrayHeader)));
+  }
+  else {
+    __FAILURE_HANDLE(_host_malloc((void**) &array, size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
+  }
 
   ArrayHeader* header = array;
 
@@ -29,6 +39,7 @@ LuminaryResult _array_create(
   header->size_of_element        = size_of_element;
   header->allocated_num_elements = num_elements;
   header->num_elements           = 0;
+  header->flags                  = (use_local_memory) ? ARRAY_FLAG_USES_LOCAL_MEMORY : 0;
 
   *_array = (void*) (header + 1);
 
@@ -45,7 +56,12 @@ LuminaryResult _array_resize(void** array, size_t num_elements, const char* buf_
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
   }
 
-  __FAILURE_HANDLE(_host_realloc((void**) &header, header->size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
+  if (header->flags & ARRAY_FLAG_USES_LOCAL_MEMORY) {
+    __FAILURE_HANDLE(_host_realloc_local((void**) &header, header->size_of_element * num_elements + sizeof(ArrayHeader)));
+  }
+  else {
+    __FAILURE_HANDLE(_host_realloc((void**) &header, header->size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
+  }
 
   header->allocated_num_elements = num_elements;
   header->num_elements           = (header->num_elements < num_elements) ? header->num_elements : num_elements;
@@ -67,7 +83,12 @@ LuminaryResult _array_destroy(void** array, const char* buf_name, const char* fu
 
   header->magic = ARRAY_HEADER_FREED_MAGIC;
 
-  __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
+  if (header->flags & ARRAY_FLAG_USES_LOCAL_MEMORY) {
+    __FAILURE_HANDLE(_host_free_local((void**) &header));
+  }
+  else {
+    __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
+  }
 
   *array = (void*) 0;
 
