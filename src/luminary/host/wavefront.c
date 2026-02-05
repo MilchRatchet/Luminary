@@ -631,8 +631,8 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   uint32_t uvs_offset;
   __FAILURE_HANDLE(array_get_num_elements(content->uvs, &uvs_offset));
 
-  ARRAY size_t* loaded_mtls;
-  __FAILURE_HANDLE(array_create(&loaded_mtls, sizeof(size_t), 16));
+  LOCAL ARRAY size_t* loaded_mtls;
+  __FAILURE_HANDLE(array_create_local(&loaded_mtls, sizeof(size_t), 16));
 
   uint16_t current_material = 0;
 

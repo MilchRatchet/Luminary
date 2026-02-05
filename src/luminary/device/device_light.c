@@ -85,11 +85,11 @@ struct LightTreeChildNode {
 struct LightTreeWork {
   LOCAL LightTreeFragment* fragments;
   uint32_t fragments_count;
-  ARRAY LightTreeBinaryNode* binary_nodes;
+  LOCAL ARRAY LightTreeBinaryNode* binary_nodes;
   LOCAL LightTreeNode* nodes;
   uint32_t nodes_count;
-  ARRAY DeviceLightTreeRootHeader* root_output;
-  ARRAY DeviceLightTreeNode* nodes_output;
+  LOCAL ARRAY DeviceLightTreeRootHeader* root_output;
+  LOCAL ARRAY DeviceLightTreeNode* nodes_output;
 } typedef LightTreeWork;
 
 struct Bin {
@@ -254,7 +254,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   uint32_t fragments_count           = work->fragments_count;
 
   ARRAY LightTreeBinaryNode* nodes;
-  __FAILURE_HANDLE(array_create(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
+  __FAILURE_HANDLE(array_create_local(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
 
   if (fragments_count == 0) {
     work->binary_nodes = nodes;
@@ -606,16 +606,17 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
     nodes[i] = node;
   }
 
+  __FAILURE_HANDLE(array_destroy(&work->binary_nodes));
+
   work->nodes = nodes;
 
   return LUMINARY_SUCCESS;
 }
 
 struct LightTreeCollapseWork {
-  ARRAY uint32_t* binary_node_indices;
-  ARRAY uint32_t* node_offset;
-  ARRAY DeviceLightTreeRootHeader* root;
-  ARRAY DeviceLightTreeNode* nodes;
+  LOCAL ARRAY uint32_t* binary_node_indices;
+  LOCAL ARRAY DeviceLightTreeRootHeader* root;
+  LOCAL ARRAY DeviceLightTreeNode* nodes;
   uint32_t num_node_jobs;
   LOCAL uint32_t* new_fragments;
   uint32_t triangles_ptr;
@@ -1129,8 +1130,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
   if (work->nodes_count == 0) {
-    __FAILURE_HANDLE(array_create(&work->root_output, sizeof(DeviceLightTreeRootHeader), 0));
-    __FAILURE_HANDLE(array_create(&work->nodes_output, sizeof(DeviceLightTreeNode), 0));
+    __FAILURE_HANDLE(array_create_local(&work->root_output, sizeof(DeviceLightTreeRootHeader), 0));
+    __FAILURE_HANDLE(array_create_local(&work->nodes_output, sizeof(DeviceLightTreeNode), 0));
 
     return LUMINARY_SUCCESS;
   }
@@ -1145,11 +1146,10 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   LightTreeCollapseWork cwork;
   memset(&cwork, 0, sizeof(LightTreeCollapseWork));
 
-  __FAILURE_HANDLE(array_create(&cwork.binary_node_indices, sizeof(uint32_t), node_count));
-  __FAILURE_HANDLE(array_create(&cwork.node_offset, sizeof(uint32_t), node_count));
-  __FAILURE_HANDLE(
-    array_create(&cwork.root, sizeof(DeviceLightTreeRootHeader), 1 + LIGHT_TREE_ROOT_MAX_CHILD_COUNT * LIGHT_TREE_NODE_SECTION_REL_SIZE));
-  __FAILURE_HANDLE(array_create(&cwork.nodes, sizeof(DeviceLightTreeNode), node_count));
+  __FAILURE_HANDLE(array_create_local(&cwork.binary_node_indices, sizeof(uint32_t), node_count));
+  __FAILURE_HANDLE(array_create_local(
+    &cwork.root, sizeof(DeviceLightTreeRootHeader), 1 + LIGHT_TREE_ROOT_MAX_CHILD_COUNT * LIGHT_TREE_NODE_SECTION_REL_SIZE));
+  __FAILURE_HANDLE(array_create_local(&cwork.nodes, sizeof(DeviceLightTreeNode), node_count));
   __FAILURE_HANDLE(host_malloc_local(&cwork.new_fragments, sizeof(uint32_t) * fragments_count));
 
   memset(cwork.new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
@@ -1181,7 +1181,6 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   __FAILURE_HANDLE(host_free_local(&cwork.new_fragments));
   __FAILURE_HANDLE(array_destroy(&cwork.binary_node_indices));
-  __FAILURE_HANDLE(array_destroy(&cwork.node_offset));
 
   work->root_output  = cwork.root;
   work->nodes_output = cwork.nodes;
@@ -1256,11 +1255,20 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 static LuminaryResult _light_tree_clear_work(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
-  __FAILURE_HANDLE(host_free_local(&work->fragments));
-  __FAILURE_HANDLE(array_destroy(&work->binary_nodes));
-  __FAILURE_HANDLE(host_free_local(&work->nodes));
-  __FAILURE_HANDLE(array_destroy(&work->root_output));
-  __FAILURE_HANDLE(array_destroy(&work->nodes_output));
+  if (work->fragments)
+    __FAILURE_HANDLE(host_free_local(&work->fragments));
+
+  if (work->binary_nodes)
+    __FAILURE_HANDLE(array_destroy(&work->binary_nodes));
+
+  if (work->nodes)
+    __FAILURE_HANDLE(host_free_local(&work->nodes));
+
+  if (work->root_output)
+    __FAILURE_HANDLE(array_destroy(&work->root_output));
+
+  if (work->nodes_output)
+    __FAILURE_HANDLE(array_destroy(&work->nodes_output));
 
   return LUMINARY_SUCCESS;
 }
