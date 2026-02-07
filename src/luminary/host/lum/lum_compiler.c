@@ -923,6 +923,8 @@ static LuminaryResult _lum_compiler_handle_separator_initializer_context(LumComp
   __CHECK_NULL_ARGUMENT(state);
   __CHECK_NULL_ARGUMENT(token);
 
+  LumInitializerContext* initializer_context = &state->context_stack[state->stack_ptr].initializer;
+
   switch (token->separator.type) {
     case LUM_SEPARATOR_TYPE_STATEMENT_END: {
       __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of statement"));
@@ -934,7 +936,13 @@ static LuminaryResult _lum_compiler_handle_separator_initializer_context(LumComp
       __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of accessor"));
     } break;
     case LUM_SEPARATOR_TYPE_MEMBER: {
-      uint32_t base_stack_id = state->context_stack[state->stack_ptr].initializer.stack_object_id;
+      uint32_t base_stack_id;
+      if (state->returned_stack_object_id != ALLOCATOR_OBJECT_ID_INVALID) {
+        base_stack_id = state->returned_stack_object_id;
+      }
+      else {
+        base_stack_id = initializer_context->stack_object_id;
+      }
 
       __DEBUG_ASSERT(base_stack_id != ALLOCATOR_OBJECT_ID_INVALID);
 
@@ -943,21 +951,30 @@ static LuminaryResult _lum_compiler_handle_separator_initializer_context(LumComp
       context.member_access.base_stack_object_id = base_stack_id;
 
       state->context_stack[++state->stack_ptr] = context;
+
+      state->returned_stack_object_id = ALLOCATOR_OBJECT_ID_INVALID;
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
       state->returned_stack_object_id = ALLOCATOR_OBJECT_ID_INVALID;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
-      if (state->returned_stack_object_id == ALLOCATOR_OBJECT_ID_INVALID) {
-        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
-        break;
+      uint32_t stack_object_id;
+      if (state->returned_stack_object_id != ALLOCATOR_OBJECT_ID_INVALID) {
+        stack_object_id = state->returned_stack_object_id;
       }
+      else {
+        stack_object_id = initializer_context->stack_object_id;
+      }
+
+      __DEBUG_ASSERT(stack_object_id != ALLOCATOR_OBJECT_ID_INVALID);
 
       LumCompilerContext context;
       context.type                        = LUM_COMPILER_CONTEXT_TYPE_INITIALIZER;
-      context.initializer.stack_object_id = state->returned_stack_object_id;
+      context.initializer.stack_object_id = stack_object_id;
 
       state->context_stack[++state->stack_ptr] = context;
+
+      state->returned_stack_object_id = ALLOCATOR_OBJECT_ID_INVALID;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
       __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
