@@ -2005,11 +2005,11 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
   const Vec128 rotation = vec128_set(-instance->rotation.x, -instance->rotation.y, -instance->rotation.z, instance->rotation.w);
 
   if (instance->fragments) {
-    __FAILURE_HANDLE(array_destroy(&instance->fragments));
+    __FAILURE_HANDLE(array_clear(instance->fragments));
   }
 
   if (instance->bvh_triangles) {
-    __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
+    __FAILURE_HANDLE(array_clear(instance->bvh_triangles));
   }
 
   if (instance->mesh_id == MESH_ID_INVALID)
@@ -2026,8 +2026,13 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
   uint32_t num_cached_materials;
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_cached_materials));
 
-  __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), 16));
-  __FAILURE_HANDLE(array_create(&instance->bvh_triangles, sizeof(LightTreeBVHTriangle), 16));
+  if (instance->fragments == (LightTreeFragment*) 0) {
+    __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), 16));
+  }
+
+  if (instance->bvh_triangles == (LightTreeBVHTriangle*) 0) {
+    __FAILURE_HANDLE(array_create(&instance->bvh_triangles, sizeof(LightTreeBVHTriangle), 16));
+  }
 
   for (uint32_t material_slot_id = 0; material_slot_id < num_materials; material_slot_id++) {
     const uint16_t material_id = mesh->materials[material_slot_id];
