@@ -64,7 +64,6 @@ struct LumMemberAccessContext {
 
 struct LumOperatorContext {
   uint32_t dst_stack_object_id;
-  uint32_t src_object_id;
 } typedef LumOperatorContext;
 
 struct LumInitializerContext {
@@ -334,6 +333,7 @@ struct LumCompilerState {
   LumBinary* binary;
   bool error_occurred;
   ARRAY LumCompilerMessage* messages;
+  bool continue_current_token;
   uint32_t returned_stack_object_id;
   uint32_t stack_ptr;
   LumCompilerContext context_stack[LUM_COMPILER_CONTEXT_STACK_SIZE];
@@ -487,6 +487,9 @@ static LuminaryResult _lum_compiler_emit_stg(LumCompilerState* state, uint32_t s
 static LuminaryResult _lum_compiler_emit_mov(LumCompilerState* state, uint32_t dst_stack_id, uint32_t src_id, bool is_cleanup) {
   __CHECK_NULL_ARGUMENT(state);
 
+  __DEBUG_ASSERT(dst_stack_id != ALLOCATOR_OBJECT_ID_INVALID);
+  __DEBUG_ASSERT(src_id != ALLOCATOR_OBJECT_ID_INVALID);
+
   LumMemoryObject dst_object = state->stack_allocator->allocated_objects[dst_stack_id];
   LumMemoryObject src_object = (src_id & ALLOCATOR_OBJECT_ID_CONSTANT)
                                  ? state->constant_allocator->allocated_objects[src_id & ALLOCATOR_OBJECT_ID_MASK].obj
@@ -572,7 +575,10 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state, con
       state->returned_stack_object_id = context->member_access.member_stack_object_id;
     } break;
     case LUM_COMPILER_CONTEXT_TYPE_OPERATOR: {
-      __FAILURE_HANDLE(_lum_compiler_emit_mov(state, context->operator.dst_stack_object_id, context->operator.src_object_id, false));
+      __FAILURE_HANDLE(_lum_compiler_emit_mov(state, context->operator.dst_stack_object_id, state->returned_stack_object_id, false));
+    } break;
+    case LUM_COMPILER_CONTEXT_TYPE_INITIALIZER: {
+      state->returned_stack_object_id = context->initializer.stack_object_id;
     } break;
     default:
       break;
@@ -587,7 +593,14 @@ static LuminaryResult _lum_compiler_context_finalize_statement(LumCompilerState*
   __CHECK_NULL_ARGUMENT(state);
 
   __FAILURE_HANDLE(array_append(&state->binary->instructions, state->instructions_main));
-  __FAILURE_HANDLE(array_append(&state->binary->instructions, state->instructions_cleanup));
+
+  uint32_t num_cleanup_instructions;
+  __FAILURE_HANDLE(array_get_num_elements(state->instructions_cleanup, &num_cleanup_instructions));
+
+  // Insert the cleanup instruction in reverse order.
+  for (uint32_t instruction_id = 0; instruction_id < num_cleanup_instructions; instruction_id++) {
+    __FAILURE_HANDLE(array_push(&state->binary->instructions, &state->instructions_cleanup[num_cleanup_instructions - 1 - instruction_id]));
+  }
 
   __FAILURE_HANDLE(array_clear(state->instructions_main));
   __FAILURE_HANDLE(array_clear(state->instructions_cleanup));
@@ -738,9 +751,7 @@ static LuminaryResult _lum_compiler_handle_literal_operator_context(LumCompilerS
   uint32_t constant_id;
   __FAILURE_HANDLE(_lum_compiler_constant_allocator_push_literal(state->constant_allocator, &token->literal, &constant_id));
 
-  state->context_stack[state->stack_ptr].operator.src_object_id = constant_id;
-
-  __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
+  state->returned_stack_object_id = constant_id;
 
   return LUMINARY_SUCCESS;
 }
@@ -796,9 +807,10 @@ static LuminaryResult _lum_compiler_handle_operator(LumCompilerState* state, con
   }
 
   context.operator.dst_stack_object_id = state->returned_stack_object_id;
-  context.operator.src_object_id       = ALLOCATOR_OBJECT_ID_INVALID;
 
   state->context_stack[++state->stack_ptr] = context;
+
+  state->returned_stack_object_id = ALLOCATOR_OBJECT_ID_INVALID;
 
   return LUMINARY_SUCCESS;
 }
@@ -895,7 +907,12 @@ static LuminaryResult _lum_compiler_handle_separator_operator_context(LumCompile
       __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
       break;
     case LUM_SEPARATOR_TYPE_ACCESS_BEGIN: {
-      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of accessor"));
+      LumCompilerContext context;
+      context.type                             = LUM_COMPILER_CONTEXT_TYPE_ACCESS;
+      context.access.type                      = LUM_BUILTIN_TYPE_VOID;
+      context.access.string_constant_object_id = ALLOCATOR_OBJECT_ID_INVALID;
+
+      state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_ACCESS_END: {
       __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of accessor"));
@@ -904,13 +921,24 @@ static LuminaryResult _lum_compiler_handle_separator_operator_context(LumCompile
       __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected member_separator"));
     } break;
     case LUM_SEPARATOR_TYPE_LIST: {
-      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected list separato"));
+      __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
+      state->continue_current_token = true;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_BEGIN: {
-      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected begin of initializer"));
+      if (state->returned_stack_object_id == ALLOCATOR_OBJECT_ID_INVALID) {
+        __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "cannot initialize 'null' object"));
+        break;
+      }
+
+      LumCompilerContext context;
+      context.type                        = LUM_COMPILER_CONTEXT_TYPE_INITIALIZER;
+      context.initializer.stack_object_id = state->returned_stack_object_id;
+
+      state->context_stack[++state->stack_ptr] = context;
     } break;
     case LUM_SEPARATOR_TYPE_INITIALIZER_END: {
-      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, token, "unexpected end of initializer"));
+      __FAILURE_HANDLE(_lum_compiler_context_resolve(state, token));
+      state->continue_current_token = true;
     } break;
     default:
       break;
@@ -1048,25 +1076,29 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
       __FAILURE_HANDLE(lum_tokenizer_print(state->tokenizer, token));
     }
 
-    switch (token.type) {
-      case LUM_TOKEN_TYPE_IDENTIFIER:
-        __FAILURE_HANDLE(_lum_compiler_handle_identifier(state, &token));
-        break;
-      case LUM_TOKEN_TYPE_KEYWORD:
-        // No keywords
-        break;
-      case LUM_TOKEN_TYPE_LITERAL:
-        __FAILURE_HANDLE(_lum_compiler_handle_literal(state, &token));
-        break;
-      case LUM_TOKEN_TYPE_OPERATOR:
-        __FAILURE_HANDLE(_lum_compiler_handle_operator(state, &token));
-        break;
-      case LUM_TOKEN_TYPE_SEPARATOR:
-        __FAILURE_HANDLE(_lum_compiler_handle_separator(state, &token));
-        break;
-      default:
-        break;
-    }
+    do {
+      state->continue_current_token = false;
+
+      switch (token.type) {
+        case LUM_TOKEN_TYPE_IDENTIFIER:
+          __FAILURE_HANDLE(_lum_compiler_handle_identifier(state, &token));
+          break;
+        case LUM_TOKEN_TYPE_KEYWORD:
+          // No keywords
+          break;
+        case LUM_TOKEN_TYPE_LITERAL:
+          __FAILURE_HANDLE(_lum_compiler_handle_literal(state, &token));
+          break;
+        case LUM_TOKEN_TYPE_OPERATOR:
+          __FAILURE_HANDLE(_lum_compiler_handle_operator(state, &token));
+          break;
+        case LUM_TOKEN_TYPE_SEPARATOR:
+          __FAILURE_HANDLE(_lum_compiler_handle_separator(state, &token));
+          break;
+        default:
+          break;
+      }
+    } while (state->continue_current_token);
 
     if (state->error_occurred)
       break;

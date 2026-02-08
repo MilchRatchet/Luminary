@@ -9,11 +9,11 @@
 const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = "void",
   [LUM_BUILTIN_TYPE_RGBF]             = "RGBF",
-  [LUM_BUILTIN_TYPE_VEC3]             = "vec3",
+  [LUM_BUILTIN_TYPE_VEC3]             = "Vec3",
   [LUM_BUILTIN_TYPE_UINT]             = "uint",
   [LUM_BUILTIN_TYPE_BOOL]             = "bool",
   [LUM_BUILTIN_TYPE_FLOAT]            = "float",
-  [LUM_BUILTIN_TYPE_ENUM]             = "Enum",
+  [LUM_BUILTIN_TYPE_ENUM]             = "enum",
   [LUM_BUILTIN_TYPE_SETTINGS]         = "Settings",
   [LUM_BUILTIN_TYPE_CAMERA]           = "Camera",
   [LUM_BUILTIN_TYPE_OCEAN]            = "Ocean",
