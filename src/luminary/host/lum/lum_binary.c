@@ -25,7 +25,7 @@ LuminaryResult lum_binary_print(LumBinary* binary) {
     __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to open file \"DebugLUMV5BinaryAssembly.s\"");
   }
 
-  fprintf(file, "======= .data =======\n");
+  fprintf(file, "======= .rodata =======\n");
 
   const uint32_t constant_bytes_per_line = 16;
   const uint8_t* constant_memory_src     = (const uint8_t*) binary->constant_memory;
@@ -42,10 +42,27 @@ LuminaryResult lum_binary_print(LumBinary* binary) {
       fprintf(file, "  ");
     }
 
+    for (uint32_t padding_id = 0; padding_id < 6; padding_id++)
+      fprintf(file, " ");
+
+    byte_id = 0;
+    for (; byte_id < constant_bytes_per_line && byte_offset + byte_id < binary->constant_memory_size; byte_id++) {
+      const char character = (char) constant_memory_src[byte_offset + byte_id];
+
+      if (character >= 32 && character <= 126)
+        fprintf(file, "%c", character);
+      else
+        fprintf(file, ".");
+    }
+
+    for (; byte_id < constant_bytes_per_line; byte_id++) {
+      fprintf(file, "  ");
+    }
+
     fprintf(file, "\n");
   }
 
-  fprintf(file, "======= .text =======\n");
+  fprintf(file, "=======  .text  =======\n");
 
   uint32_t num_instructions;
   __FAILURE_HANDLE(array_get_num_elements(binary->instructions, &num_instructions));
