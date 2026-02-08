@@ -482,18 +482,19 @@ LuminaryResult device_texture_copy_from_mem(DeviceTexture* device_texture, const
 LuminaryResult device_texture_destroy(DeviceTexture** device_texture) {
   __CHECK_NULL_ARGUMENT(device_texture);
 
-  if ((*device_texture)->tex != TEXTURE_OBJECT_INVALID)
+  if ((*device_texture)->tex != TEXTURE_OBJECT_INVALID) {
     CUDA_FAILURE_HANDLE(cuTexObjectDestroy((*device_texture)->tex));
 
-  if ((*device_texture)->is_3D) {
-    CUDA_FAILURE_HANDLE(cuArrayDestroy((*device_texture)->cuda_array));
-  }
-  else {
-    if ((*device_texture)->has_mipmaps) {
-      CUDA_FAILURE_HANDLE(cuMipmappedArrayDestroy((*device_texture)->cuda_mipmapped_array));
+    if ((*device_texture)->is_3D) {
+      CUDA_FAILURE_HANDLE(cuArrayDestroy((*device_texture)->cuda_array));
     }
     else {
-      __FAILURE_HANDLE(device_free(&(*device_texture)->cuda_memory));
+      if ((*device_texture)->has_mipmaps) {
+        CUDA_FAILURE_HANDLE(cuMipmappedArrayDestroy((*device_texture)->cuda_mipmapped_array));
+      }
+      else {
+        __FAILURE_HANDLE(device_free(&(*device_texture)->cuda_memory));
+      }
     }
   }
 
