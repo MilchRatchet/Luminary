@@ -281,11 +281,23 @@ LuminaryResult device_texture_create(DeviceTexture** device_texture, const Textu
 
   log_message("Allocating device texture of dimension %ux%ux%u.", width, height, depth);
 
+  if (width > 0xFFFF || height > 0xFFFF) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension exceeds limits: %ux%u.", width, height);
+  }
+
   __FAILURE_HANDLE(host_malloc(device_texture, sizeof(DeviceTexture)));
   memset(*device_texture, 0, sizeof(DeviceTexture));
 
   bool tex_is_valid;
   __FAILURE_HANDLE(texture_is_valid(texture, &tex_is_valid));
+
+  if (tex_is_valid == false) {
+    memset(*device_texture, 0, sizeof(DeviceTexture));
+    (*device_texture)->status = TEXTURE_STATUS_INVALID;
+    (*device_texture)->tex    = TEXTURE_OBJECT_INVALID;
+
+    return LUMINARY_SUCCESS;
+  }
 
   switch (texture->dim) {
     case TEXTURE_DIMENSION_TYPE_2D: {
@@ -403,18 +415,9 @@ LuminaryResult device_texture_create(DeviceTexture** device_texture, const Textu
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension type is invalid.");
   }
 
-  if (width > 0xFFFF || height > 0xFFFF) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension exceeds limits: %ux%u.", width, height);
-  }
+  CUDA_FAILURE_HANDLE(cuTexObjectCreate(&(*device_texture)->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
 
-  if (tex_is_valid) {
-    CUDA_FAILURE_HANDLE(cuTexObjectCreate(&(*device_texture)->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
-  }
-  else {
-    (*device_texture)->tex = TEXTURE_OBJECT_INVALID;
-  }
-
-  (*device_texture)->status         = tex_is_valid ? TEXTURE_STATUS_NONE : TEXTURE_STATUS_INVALID;
+  (*device_texture)->status         = TEXTURE_STATUS_NONE;
   (*device_texture)->width          = width;
   (*device_texture)->height         = height;
   (*device_texture)->depth          = depth;
@@ -424,7 +427,7 @@ LuminaryResult device_texture_create(DeviceTexture** device_texture, const Textu
   (*device_texture)->num_mip_levels = num_mip_levels;
   (*device_texture)->has_mipmaps    = (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE);
 
-  if (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE && tex_is_valid) {
+  if (texture->mipmap == TEXTURE_MIPMAP_MODE_GENERATE) {
     __FAILURE_HANDLE(_device_texture_generate_mipmaps(*device_texture, &tex_desc, texture->type, device, stream));
   }
 

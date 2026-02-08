@@ -67,7 +67,8 @@ static LuminaryResult _image_load_hdr(Texture* texture, const uint8_t* file_mem,
 
   if (data == (float*) 0) {
     __FAILURE_HANDLE(texture_invalidate(texture));
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load image %s.", file_name);
+    error_message("Failed to load image %s.", file_name);
+    return LUMINARY_SUCCESS;
   }
 
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, data, TEXTURE_DATA_TYPE_FP32, 4));
@@ -87,7 +88,8 @@ static LuminaryResult _image_load_16(Texture* texture, const uint8_t* file_mem, 
 
   if (data == (uint16_t*) 0) {
     __FAILURE_HANDLE(texture_invalidate(texture));
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load image %s.", file_name);
+    error_message("Failed to load image %s.", file_name);
+    return LUMINARY_SUCCESS;
   }
 
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, data, TEXTURE_DATA_TYPE_U16, 4));
@@ -107,7 +109,8 @@ static LuminaryResult _image_load_8(Texture* texture, const uint8_t* file_mem, s
 
   if (data == (uint8_t*) 0) {
     __FAILURE_HANDLE(texture_invalidate(texture));
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load image %s.", file_name);
+    error_message("Failed to load image %s.", file_name);
+    return LUMINARY_SUCCESS;
   }
 
   __FAILURE_HANDLE(texture_fill(texture, width, height, 1, data, TEXTURE_DATA_TYPE_U8, 4));
@@ -127,9 +130,10 @@ LuminaryResult image_load(Texture* texture, const char* path) {
 
   FILE* file = fopen(path, "rb");
 
-  if (!file) {
+  if (file == (FILE*) 0) {
     __FAILURE_HANDLE(texture_invalidate(texture));
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File %s could not be opened!", path);
+    error_message("File %s could not be opened!", path);
+    return LUMINARY_SUCCESS;
   }
 
   // Block size is very important for performance, it seems that the larger this is the better,
