@@ -5,7 +5,7 @@
 #include "math.cuh"
 #include "ocean_utils.cuh"
 #include "particle_utils.cuh"
-#include "sky.cuh"
+#include "sky_integration.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 

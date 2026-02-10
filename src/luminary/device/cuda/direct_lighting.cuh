@@ -11,7 +11,7 @@
 #include "memory.cuh"
 #include "particle_utils.cuh"
 #include "random.cuh"
-#include "sky.cuh"
+#include "sky_integration.cuh"
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////

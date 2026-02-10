@@ -10,7 +10,7 @@
 #include "ocean_utils.cuh"
 #include "post_common.cuh"
 #include "purkinje.cuh"
-#include "sky.cuh"
+#include "sky_integration.cuh"
 #include "sky_utils.cuh"
 #include "tonemap.cuh"
 #include "utils.cuh"
