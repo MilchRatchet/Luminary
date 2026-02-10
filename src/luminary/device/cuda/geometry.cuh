@@ -118,18 +118,13 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     uint16_t new_state = task.state | STATE_FLAG_USE_IGNORE_HANDLE;
 
-    if (device.sky.mode != LUMINARY_SKY_MODE_DEFAULT && is_pass_through == false)
-      new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
-    else
-      new_state |= STATE_FLAG_ALLOW_AMBIENT;
-
-    if (is_delta_distribution == false) {
+    if (is_delta_distribution == false)
       new_state &= ~STATE_FLAG_DELTA_PATH;
-    }
 
     if (is_pass_through == false) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
       new_state &= ~STATE_FLAG_ALLOW_EMISSION;
+      new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
     }
 
     DeviceTask bounce_task;

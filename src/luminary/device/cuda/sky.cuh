@@ -620,7 +620,7 @@ LUMINARY_KERNEL void sky_process_tasks() {
     const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
     const DeviceTask task            = task_load(task_base_address);
 
-    if ((task.state & STATE_FLAG_ALLOW_AMBIENT) == 0)
+    if ((device.sky.mode != LUMINARY_SKY_MODE_DEFAULT) && ((task.state & STATE_FLAG_ALLOW_AMBIENT) == 0))
       continue;
 
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
