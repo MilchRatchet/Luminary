@@ -55,7 +55,7 @@ LuminaryResult lum_file_content_apply(LumFileContent* content, LuminaryHost* hos
     Path* obj_path;
     __FAILURE_HANDLE(path_extend(&obj_path, base_path, content->obj_file_path_strings[obj_file_id]));
 
-    __FAILURE_HANDLE(host_queue_load_obj_file(host, obj_path, &content->wavefront_args));
+    __FAILURE_HANDLE(host_load_obj_file(host, obj_path, &content->wavefront_args));
 
     __FAILURE_HANDLE(luminary_path_destroy(&obj_path));
   }

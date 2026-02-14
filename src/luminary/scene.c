@@ -455,10 +455,8 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(src);
 
-  // This cannot deadlock because propagation only happens caller->host->device.
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock_all(scene));
-  __FAILURE_HANDLE_CRITICAL(scene_lock_all(src));
 
   for (uint32_t type = 0; type < SCENE_ENTITY_TYPE_COUNT; type++) {
     scene->flags[type] |= src->flags[type];
@@ -497,7 +495,6 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   __FAILURE_HANDLE_CRITICAL(scene_apply_changes(src));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
-  __FAILURE_HANDLE(scene_unlock_all(src));
   __FAILURE_HANDLE(scene_unlock_all(scene));
 
   __FAILURE_HANDLE_CHECK_CRITICAL();

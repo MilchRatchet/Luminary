@@ -35,7 +35,7 @@ struct LuminaryHost {
 } typedef LuminaryHost;
 
 LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor descriptor);
-LuminaryResult host_queue_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args);
+LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args);
 LuminaryResult host_update_scene(Host* host);
 
 #endif /* LUMINARY_INTERNAL_HOST_H */

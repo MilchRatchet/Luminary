@@ -37,65 +37,48 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(args);
 
-  WavefrontContent* wavefront_content;
-
-  __FAILURE_HANDLE(wavefront_create(&wavefront_content, args->wavefront_args));
-  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path, host->secondary_work_queue));
-
-  // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
-
-  uint32_t num_meshes_before;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
-
-  uint32_t num_textures_before;
-  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
-
-  // Lock the scene lists because we need to freeze the current material count and then add all the new materials.
-  // This can cause the caller to stall if he performs other list updates.
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
-  ARRAY Material* added_materials;
-  __FAILURE_HANDLE_CRITICAL(array_create(&added_materials, sizeof(Material), 16));
-
-  uint32_t material_offset;
-  __FAILURE_HANDLE_CRITICAL(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
-
-  __FAILURE_HANDLE_CRITICAL(
-    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset, host->mesh_name_dict));
-
-  uint32_t num_added_materials;
-  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(added_materials, &num_added_materials));
-
-  for (uint32_t new_material_id = 0; new_material_id < num_added_materials; new_material_id++) {
-    __FAILURE_HANDLE_CRITICAL(scene_add_entry(host->scene_caller, added_materials + new_material_id, SCENE_ENTITY_MATERIALS));
-  }
+  __FAILURE_HANDLE(host_load_obj_file(host, args->path, &args->wavefront_args));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
-  __FAILURE_HANDLE_CHECK_CRITICAL();
-
-  __FAILURE_HANDLE(array_destroy(&added_materials));
-  __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
-
-  __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
-
-  uint32_t num_meshes_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
-
-  __FAILURE_HANDLE(
-    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
-
-  uint32_t num_textures_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
-
-  __FAILURE_HANDLE(device_manager_add_textures(
-    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
-
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));
   __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostLoadObjArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+struct HostLoadLumArgs {
+  Path* path;
+} typedef HostLoadLumArgs;
+
+static LuminaryResult _host_load_lum_file(Host* host, HostLoadLumArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  LumFile* lum_file;
+  __FAILURE_HANDLE(lum_file_create(&lum_file));
+  __FAILURE_HANDLE(lum_file_parse(lum_file, args->path));
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock_all(host->scene_caller));
+
+  __FAILURE_HANDLE_CRITICAL(lum_file_apply(lum_file, host));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock_all(host->scene_caller));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  __FAILURE_HANDLE(lum_file_destroy(&lum_file));
+
+  // Clean up
+  __FAILURE_HANDLE(luminary_path_destroy(&args->path));
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostLoadLumArgs)));
 
   return LUMINARY_SUCCESS;
 }
@@ -236,6 +219,60 @@ static LuminaryResult _host_enable_device_queue_work(Host* host, HostEnableDevic
 ////////////////////////////////////////////////////////////////////
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
+
+LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(wavefront_args);
+
+  WavefrontContent* wavefront_content;
+
+  __FAILURE_HANDLE(wavefront_create(&wavefront_content, *wavefront_args));
+  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, path, host->secondary_work_queue));
+
+  // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
+
+  uint32_t num_meshes_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
+
+  uint32_t num_textures_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
+
+  ARRAY Material* added_materials;
+  __FAILURE_HANDLE(array_create(&added_materials, sizeof(Material), 16));
+
+  uint32_t material_offset;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
+
+  __FAILURE_HANDLE(
+    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset, host->mesh_name_dict));
+
+  uint32_t num_added_materials;
+  __FAILURE_HANDLE(array_get_num_elements(added_materials, &num_added_materials));
+
+  for (uint32_t new_material_id = 0; new_material_id < num_added_materials; new_material_id++) {
+    __FAILURE_HANDLE(scene_add_entry(host->scene_caller, added_materials + new_material_id, SCENE_ENTITY_MATERIALS));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&added_materials));
+  __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
+
+  __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
+
+  uint32_t num_meshes_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
+
+  __FAILURE_HANDLE(
+    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
+
+  uint32_t num_textures_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
+
+  __FAILURE_HANDLE(device_manager_add_textures(
+    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
+
+  return LUMINARY_SUCCESS;
+}
 
 LuminaryResult host_update_scene(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
@@ -504,7 +541,7 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult host_queue_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args) {
+static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(wavefront_args);
@@ -529,6 +566,28 @@ LuminaryResult host_queue_load_obj_file(Host* host, Path* path, const WavefrontA
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _host_queue_load_lum_file(Host* host, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
+  HostLoadLumArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadLumArgs), (void**) &args));
+
+  __FAILURE_HANDLE(path_copy(&args->path, path));
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Loading Lum File";
+  entry.function   = (QueueEntryFunction) _host_load_lum_file;
+  entry.clear_func = (QueueEntryFunction) 0;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
@@ -536,7 +595,7 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   WavefrontArguments args;
   __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
 
-  __FAILURE_HANDLE(host_queue_load_obj_file(host, path, &args));
+  __FAILURE_HANDLE(_host_queue_load_obj_file(host, path, &args));
 
   return LUMINARY_SUCCESS;
 }
@@ -545,11 +604,7 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
-  LumFile* lum_file;
-  __FAILURE_HANDLE(lum_file_create(&lum_file));
-  __FAILURE_HANDLE(lum_file_parse(lum_file, path));
-  __FAILURE_HANDLE(lum_file_apply(lum_file, host));
-  __FAILURE_HANDLE(lum_file_destroy(&lum_file));
+  __FAILURE_HANDLE(_host_queue_load_lum_file(host, path));
 
   return LUMINARY_SUCCESS;
 }
