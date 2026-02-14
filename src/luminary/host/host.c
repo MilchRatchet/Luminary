@@ -28,6 +28,16 @@ static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
 
+static LuminaryResult _host_start_new_render(Host* host, void* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  LUM_UNUSED(args);
+
+  __FAILURE_HANDLE(scene_set_dirty_flags(host->scene_caller, SCENE_DIRTY_FLAG_INTEGRATION));
+  __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
 struct HostLoadObjArgs {
   Path* path;
   WavefrontArguments wavefront_args;
@@ -44,6 +54,8 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));
@@ -452,9 +464,16 @@ LuminaryResult luminary_host_destroy(Host** host) {
 LuminaryResult luminary_host_start_new_render(LuminaryHost* host) {
   __CHECK_NULL_ARGUMENT(host);
 
-  __FAILURE_HANDLE(scene_set_dirty_flags(host->scene_caller, SCENE_DIRTY_FLAG_INTEGRATION));
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  __FAILURE_HANDLE(host_update_scene(host));
+  entry.name              = "Starting new render";
+  entry.function          = (QueueEntryFunction) _host_start_new_render;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = true;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
   return LUMINARY_SUCCESS;
 }

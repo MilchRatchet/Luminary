@@ -111,7 +111,7 @@ LuminaryResult scene_lock_all_non_blocking(Scene* scene, bool* success) {
   }
 
   if (*success == false) {
-    for (uint32_t mtx_id = 0; mtx_id <= type; mtx_id++) {
+    for (uint32_t mtx_id = 0; mtx_id < type; mtx_id++) {
       __FAILURE_HANDLE(scene_unlock(scene, mtx_id));
     }
   }
@@ -138,7 +138,7 @@ LuminaryResult scene_set_dirty_flags(Scene* scene, SceneDirtyFlags flags) {
   __CHECK_NULL_ARGUMENT(scene);
 
   __FAILURE_HANDLE_LOCK_CRITICAL();
-  __FAILURE_HANDLE_CRITICAL(scene_lock_all(scene))
+  __FAILURE_HANDLE_CRITICAL(scene_lock_all(scene));
 
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= flags;
 
