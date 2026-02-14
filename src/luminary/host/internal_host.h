@@ -31,6 +31,7 @@ struct LuminaryHost {
   Dictionary* mesh_instance_name_dict;
   Dictionary* material_name_dict;
   Dictionary* mesh_name_dict;
+  bool scene_locked_by_caller;
 } typedef LuminaryHost;
 
 LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor descriptor);

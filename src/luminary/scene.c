@@ -77,11 +77,43 @@ LuminaryResult scene_lock(Scene* scene, SceneEntityType entity_mutex) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult scene_lock_non_blocking(Scene* scene, SceneEntityType entity_mutex, bool* success) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(success);
+
+  __FAILURE_HANDLE(mutex_try_lock(scene->mutex[entity_mutex], success));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult scene_lock_all(Scene* scene) {
   __CHECK_NULL_ARGUMENT(scene);
 
   for (uint32_t type = 0; type < SCENE_ENTITY_TYPE_COUNT; type++) {
     __FAILURE_HANDLE(scene_lock(scene, type));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_lock_all_non_blocking(Scene* scene, bool* success) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(success);
+
+  *success = true;
+
+  uint32_t type;
+  for (type = 0; type < SCENE_ENTITY_TYPE_COUNT; type++) {
+    __FAILURE_HANDLE(scene_lock_non_blocking(scene, type, success));
+
+    if (*success == false)
+      break;
+  }
+
+  if (*success == false) {
+    for (uint32_t mtx_id = 0; mtx_id <= type; mtx_id++) {
+      __FAILURE_HANDLE(scene_unlock(scene, mtx_id));
+    }
   }
 
   return LUMINARY_SUCCESS;
@@ -141,34 +173,31 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   __CHECK_NULL_ARGUMENT(object);
   __CHECK_NULL_ARGUMENT(scene_changed);
 
-  __FAILURE_HANDLE_LOCK_CRITICAL();
-  __FAILURE_HANDLE_CRITICAL(scene_lock(scene, scene_entity_to_mutex[entity]))
-
   SceneDirtyFlags flags = 0;
 
   *scene_changed = false;
 
   switch (entity) {
     case SCENE_ENTITY_SETTINGS:
-      __FAILURE_HANDLE_CRITICAL(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &flags));
+      __FAILURE_HANDLE(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &flags));
       break;
     case SCENE_ENTITY_CAMERA:
-      __FAILURE_HANDLE_CRITICAL(camera_check_for_dirty((Camera*) object, &scene->camera, &flags));
+      __FAILURE_HANDLE(camera_check_for_dirty((Camera*) object, &scene->camera, &flags));
       break;
     case SCENE_ENTITY_OCEAN:
-      __FAILURE_HANDLE_CRITICAL(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &flags));
+      __FAILURE_HANDLE(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &flags));
       break;
     case SCENE_ENTITY_SKY:
-      __FAILURE_HANDLE_CRITICAL(sky_check_for_dirty((Sky*) object, &scene->sky, &flags));
+      __FAILURE_HANDLE(sky_check_for_dirty((Sky*) object, &scene->sky, &flags));
       break;
     case SCENE_ENTITY_CLOUD:
-      __FAILURE_HANDLE_CRITICAL(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &flags));
+      __FAILURE_HANDLE(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &flags));
       break;
     case SCENE_ENTITY_FOG:
-      __FAILURE_HANDLE_CRITICAL(fog_check_for_dirty((Fog*) object, &scene->fog, &flags));
+      __FAILURE_HANDLE(fog_check_for_dirty((Fog*) object, &scene->fog, &flags));
       break;
     case SCENE_ENTITY_PARTICLES:
-      __FAILURE_HANDLE_CRITICAL(particles_check_for_dirty((Particles*) object, &scene->particles, &flags));
+      __FAILURE_HANDLE(particles_check_for_dirty((Particles*) object, &scene->particles, &flags));
       break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_update yet.");
@@ -177,16 +206,11 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= flags;
 
   // We need to always update the scene because certain changes might not cause anything to be dirty.
-  __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, object, entity));
+  __FAILURE_HANDLE(scene_update_force(scene, object, entity));
 
   if (flags != 0) {
     *scene_changed = true;
   }
-
-  __FAILURE_HANDLE_UNLOCK_CRITICAL();
-  __FAILURE_HANDLE(scene_unlock(scene, scene_entity_to_mutex[entity]));
-
-  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }

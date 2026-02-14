@@ -112,7 +112,9 @@ struct Scene {
 
 LuminaryResult scene_create(Scene** scene);
 LuminaryResult scene_lock(Scene* scene, SceneEntityType entity_mutex);
+LuminaryResult scene_lock_non_blocking(Scene* scene, SceneEntityType entity_mutex, bool* success);
 LuminaryResult scene_lock_all(Scene* scene);
+LuminaryResult scene_lock_all_non_blocking(Scene* scene, bool* success);
 LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags);
 LuminaryResult scene_set_dirty_flags(Scene* scene, SceneDirtyFlags flags);
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity);

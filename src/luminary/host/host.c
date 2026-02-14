@@ -652,6 +652,33 @@ LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t qu
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_acquire_scene_lock(Host* host, bool* success) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(success);
+
+  if (host->scene_locked_by_caller) {
+    *success = true;
+    return LUMINARY_SUCCESS;
+  }
+
+  scene_lock_all_non_blocking(host->scene_caller, success);
+
+  host->scene_locked_by_caller = *success;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_release_scene_lock(Host* host) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  if (host->scene_locked_by_caller) {
+    __FAILURE_HANDLE(scene_unlock_all(host->scene_caller));
+    host->scene_locked_by_caller = false;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
