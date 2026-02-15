@@ -7,13 +7,14 @@
 #include "utils.h"
 
 struct LumFunctionLoadInfo {
+  LumMemoryAllocation name;
   LumMemoryAllocation dst;
-  LumMemoryAllocation src;
 } typedef LumFunctionLoadInfo;
 
 typedef LuminaryResult (*LumFunctionLoad)(LumVirtualMachine* vm, const LumFunctionLoadInfo* info);
 
 struct LumFunctionStoreInfo {
+  LumMemoryAllocation name;
   LumMemoryAllocation src;
 } typedef LumFunctionStoreInfo;
 

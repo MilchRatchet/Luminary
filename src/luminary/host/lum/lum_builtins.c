@@ -48,8 +48,8 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_PARTICLES]        = sizeof(LumBuiltinParticles),
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(LumBuiltinMaterial),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(LumBuiltinMaterial),
-  [LUM_BUILTIN_TYPE_STRING]           = sizeof(uint32_t),
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
+  [LUM_BUILTIN_TYPE_STRING]           = sizeof(LumBuiltinString),
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = sizeof(LumBuiltinWavefrontObjFile),
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(LumBuiltinAdaptiveSampling),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(LumBuiltinCloudLayer),
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = sizeof(LumBuiltinCameraThinLens),
@@ -194,6 +194,7 @@ LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_
     bool: LUM_BUILTIN_TYPE_BOOL,                                                      \
     float: LUM_BUILTIN_TYPE_FLOAT,                                                    \
     int32_t: LUM_BUILTIN_TYPE_ENUM,                                                   \
+    LumBuiltinString: LUM_BUILTIN_TYPE_STRING,                                        \
     LumBuiltinAdaptiveSampling: LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,                    \
     LumBuiltinCloudLayer: LUM_BUILTIN_TYPE_CLOUDLAYER,                                \
     LumBuiltinCameraThinLens: LUM_BUILTIN_TYPE_CAMERATHINLENS,                        \
@@ -376,6 +377,10 @@ static const LumBuiltinTypeMember _lum_builtin_member_instance[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinInstance, scale, 1, LUM_VERSION_CURRENT),
 };
 
+static const LumBuiltinTypeMember _lum_builtin_member_wavefrontobjfile[] = {
+  _LUM_BUILTIN_MEMBER(LumBuiltinWavefrontObjFile, name_prefix, 1, LUM_VERSION_CURRENT),
+};
+
 static const LumBuiltinTypeMember _lum_builtin_member_adaptive_sampling[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, enable, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, max_sampling_rate, 1, LUM_VERSION_CURRENT),
@@ -436,7 +441,7 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(_lum_builtin_member_material) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(_lum_builtin_member_instance) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_STRING]           = 0,
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = sizeof(_lum_builtin_member_wavefrontobjfile) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(_lum_builtin_member_adaptive_sampling) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(_lum_builtin_member_cloud_layer) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = sizeof(_lum_builtin_member_camera_thin_lens) / sizeof(LumBuiltinTypeMember),
@@ -461,7 +466,7 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_MATERIAL]         = _lum_builtin_member_material,
   [LUM_BUILTIN_TYPE_INSTANCE]         = _lum_builtin_member_instance,
   [LUM_BUILTIN_TYPE_STRING]           = 0,
-  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = 0,
+  [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = _lum_builtin_member_wavefrontobjfile,
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = _lum_builtin_member_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = _lum_builtin_member_cloud_layer,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = _lum_builtin_member_camera_thin_lens,
@@ -800,6 +805,17 @@ LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t 
   instance->scale.x = 1.0f;
   instance->scale.y = 1.0f;
   instance->scale.z = 1.0f;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult lum_builtin_wavefrontobjfile_init(LumBuiltinWavefrontObjFile* file, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(file);
+
+  memset(file, 0, sizeof(LumBuiltinWavefrontObjFile));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
 
   return LUMINARY_SUCCESS;
 }

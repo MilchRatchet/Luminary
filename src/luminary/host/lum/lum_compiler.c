@@ -131,16 +131,45 @@ static LuminaryResult _lum_compiler_constant_allocator_reset(LumCompilerConstant
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _lum_compiler_constant_allocator_push_string_data(
+  LumCompilerConstantAllocator* allocator, const LumTokenLiteral* literal, LumConstantMemoryObject* const_obj) {
+  __CHECK_NULL_ARGUMENT(allocator);
+  __CHECK_NULL_ARGUMENT(literal);
+  __CHECK_NULL_ARGUMENT(const_obj);
+
+  const size_t size = literal->val_string.length + 1;
+
+  const_obj->obj.type              = LUM_BUILTIN_TYPE_VOID;
+  const_obj->obj.allocation.offset = allocator->allocated_bytes | LUM_MEMORY_CONSTANT_MEMORY_SPACE_BIT;
+  const_obj->obj.allocation.size   = size;
+
+  __FAILURE_HANDLE(host_malloc(&const_obj->data, size));
+  memcpy(const_obj->data, literal->val_string.data, size);
+
+  allocator->allocated_bytes += size;
+
+  __FAILURE_HANDLE(array_push(&allocator->allocated_objects, const_obj));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _lum_compiler_constant_allocator_push_literal(
   LumCompilerConstantAllocator* allocator, const LumTokenLiteral* literal, uint32_t* id) {
   __CHECK_NULL_ARGUMENT(allocator);
   __CHECK_NULL_ARGUMENT(literal);
-
-  uint32_t num_objects;
-  __FAILURE_HANDLE(array_get_num_elements(allocator->allocated_objects, &num_objects));
+  __CHECK_NULL_ARGUMENT(id);
 
   const LumBuiltinType type = lum_tokenizer_literal_type_to_builtin[literal->type];
-  const size_t size         = (type != LUM_BUILTIN_TYPE_STRING) ? lum_builtin_types_sizes[type] : literal->val_string.length;
+  const size_t size         = lum_builtin_types_sizes[type];
+
+  LumBuiltinString string_data;
+  if (type == LUM_BUILTIN_TYPE_STRING) {
+    LumConstantMemoryObject string_obj;
+    __FAILURE_HANDLE(_lum_compiler_constant_allocator_push_string_data(allocator, literal, &string_obj));
+
+    string_data.const_mem_address = string_obj.obj.allocation.offset & LUM_MEMORY_OFFSET_MASK;
+    string_data.const_mem_size    = string_obj.obj.allocation.size;
+  }
 
   const void* src;
   switch (literal->type) {
@@ -157,12 +186,15 @@ static LuminaryResult _lum_compiler_constant_allocator_push_literal(
       src = (const void*) &literal->val_enum;
       break;
     case LUM_LITERAL_TYPE_STRING:
-      src = (const void*) literal->val_string.data;
+      src = (const void*) &string_data;
       break;
     default:
       __DEBUG_ASSERT(false);
       break;
   }
+
+  uint32_t num_objects;
+  __FAILURE_HANDLE(array_get_num_elements(allocator->allocated_objects, &num_objects));
 
   bool found_match = false;
 
@@ -179,19 +211,19 @@ static LuminaryResult _lum_compiler_constant_allocator_push_literal(
   if (found_match)
     return LUMINARY_SUCCESS;
 
-  LumConstantMemoryObject obj;
-  obj.obj.type              = type;
-  obj.obj.allocation.offset = allocator->allocated_bytes | LUM_MEMORY_CONSTANT_MEMORY_SPACE_BIT;
-  obj.obj.allocation.size   = size;
+  LumConstantMemoryObject const_obj;
+  const_obj.obj.type              = type;
+  const_obj.obj.allocation.offset = allocator->allocated_bytes | LUM_MEMORY_CONSTANT_MEMORY_SPACE_BIT;
+  const_obj.obj.allocation.size   = size;
 
-  __FAILURE_HANDLE(host_malloc(&obj.data, size));
-  memcpy(obj.data, src, size);
+  __FAILURE_HANDLE(host_malloc(&const_obj.data, size));
+  memcpy(const_obj.data, src, size);
 
   allocator->allocated_bytes += size;
 
   *id = num_objects | ALLOCATOR_OBJECT_ID_CONSTANT;
 
-  __FAILURE_HANDLE(array_push(&allocator->allocated_objects, &obj));
+  __FAILURE_HANDLE(array_push(&allocator->allocated_objects, &const_obj));
 
   return LUMINARY_SUCCESS;
 }
@@ -433,28 +465,28 @@ static LuminaryResult _lum_compiler_state_destroy(LumCompilerState** state) {
 // Instructions
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_compiler_emit_ldg(LumCompilerState* state, uint32_t dst_stack_id, uint32_t src_const_id, bool is_cleanup) {
+static LuminaryResult _lum_compiler_emit_ldg(LumCompilerState* state, uint32_t dst_stack_id, uint32_t string_const_id, bool is_cleanup) {
   __CHECK_NULL_ARGUMENT(state);
 
   LumMemoryObject dst_object = state->stack_allocator->allocated_objects[dst_stack_id];
 
   const bool dst_is_addressable = lum_builtin_types_addressable[dst_object.type];
 
-  LumMemoryAllocation src_allocation;
+  LumMemoryAllocation string_allocation;
   if (dst_is_addressable) {
     LumMemoryObject src_object;
-    __FAILURE_HANDLE(_lum_compiler_constant_allocator_get_memory_object(state->constant_allocator, src_const_id, &src_object));
+    __FAILURE_HANDLE(_lum_compiler_constant_allocator_get_memory_object(state->constant_allocator, string_const_id, &src_object));
 
     __DEBUG_ASSERT(src_object.type == LUM_BUILTIN_TYPE_STRING);
 
-    src_allocation = src_object.allocation;
+    string_allocation = src_object.allocation;
   }
   else {
-    src_allocation = (LumMemoryAllocation) {.offset = 0, .size = 0};
+    string_allocation = (LumMemoryAllocation) {.offset = 0, .size = 0};
   }
 
   LumInstruction instruction;
-  __FAILURE_HANDLE(lum_instruction_encode_ldg(&instruction, dst_object.type, dst_object.allocation, src_allocation));
+  __FAILURE_HANDLE(lum_instruction_encode_ldg(&instruction, dst_object.type, dst_object.allocation, string_allocation));
 
   if (is_cleanup == false) {
     __FAILURE_HANDLE(array_push(&state->instructions_main, &instruction));
@@ -466,13 +498,28 @@ static LuminaryResult _lum_compiler_emit_ldg(LumCompilerState* state, uint32_t d
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_compiler_emit_stg(LumCompilerState* state, uint32_t src_stack_id, bool is_cleanup) {
+static LuminaryResult _lum_compiler_emit_stg(LumCompilerState* state, uint32_t src_stack_id, uint32_t string_const_id, bool is_cleanup) {
   __CHECK_NULL_ARGUMENT(state);
 
   LumMemoryObject src_object = state->stack_allocator->allocated_objects[src_stack_id];
 
+  const bool src_is_addressable = lum_builtin_types_addressable[src_object.type];
+
+  LumMemoryAllocation string_allocation;
+  if (src_is_addressable) {
+    LumMemoryObject src_object;
+    __FAILURE_HANDLE(_lum_compiler_constant_allocator_get_memory_object(state->constant_allocator, string_const_id, &src_object));
+
+    __DEBUG_ASSERT(src_object.type == LUM_BUILTIN_TYPE_STRING);
+
+    string_allocation = src_object.allocation;
+  }
+  else {
+    string_allocation = (LumMemoryAllocation) {.offset = 0, .size = 0};
+  }
+
   LumInstruction instruction;
-  __FAILURE_HANDLE(lum_instruction_encode_stg(&instruction, src_object.type, src_object.allocation));
+  __FAILURE_HANDLE(lum_instruction_encode_stg(&instruction, src_object.type, src_object.allocation, string_allocation));
 
   if (is_cleanup == false) {
     __FAILURE_HANDLE(array_push(&state->instructions_main, &instruction));
@@ -567,7 +614,7 @@ static LuminaryResult _lum_compiler_context_resolve(LumCompilerState* state, con
       __FAILURE_HANDLE(_lum_compiler_stack_allocator_push(state->stack_allocator, context->access.type, &dst_stack_id));
 
       __FAILURE_HANDLE(_lum_compiler_emit_ldg(state, dst_stack_id, context->access.string_constant_object_id, false));
-      __FAILURE_HANDLE(_lum_compiler_emit_stg(state, dst_stack_id, true));
+      __FAILURE_HANDLE(_lum_compiler_emit_stg(state, dst_stack_id, context->access.string_constant_object_id, true));
 
       state->returned_stack_object_id = dst_stack_id;
     } break;

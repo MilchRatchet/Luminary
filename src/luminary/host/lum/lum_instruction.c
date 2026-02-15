@@ -13,9 +13,14 @@ static LuminaryResult _lum_instruction_encode_address(LumMemoryAllocation mem, b
   __CHECK_NULL_ARGUMENT(string);
   __CHECK_NULL_ARGUMENT(offset);
 
-  *offset += sprintf(
-    string + *offset, "%s%%%c[%u + %u]", mem.offset & LUM_MEMORY_CONSTANT_MEMORY_SPACE_BIT ? "constant " : "", is_read ? 'r' : 'w',
-    mem.offset & LUM_MEMORY_OFFSET_MASK, mem.size);
+  if (mem.size != 0) {
+    *offset += sprintf(
+      string + *offset, "%s%%%c[%u + %u]", mem.offset & LUM_MEMORY_CONSTANT_MEMORY_SPACE_BIT ? "constant " : "", is_read ? 'r' : 'w',
+      mem.offset & LUM_MEMORY_OFFSET_MASK, mem.size);
+  }
+  else {
+    *offset += sprintf(string + *offset, "0");
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -103,7 +108,7 @@ static LuminaryResult _lum_instruction_mov_get_args(const LumInstruction* instru
 #define LUM_INSTRUCTION_LDG_TYPE_SHIFT 48
 
 LuminaryResult lum_instruction_encode_ldg(
-  LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation dst, LumMemoryAllocation src) {
+  LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation dst, LumMemoryAllocation string) {
   __CHECK_NULL_ARGUMENT(instruction);
 
   memset(instruction, 0, sizeof(LumInstruction));
@@ -112,7 +117,7 @@ LuminaryResult lum_instruction_encode_ldg(
   instruction->meta |= ((uint64_t) type) << LUM_INSTRUCTION_LDG_TYPE_SHIFT;
 
   instruction->dst = dst;
-  instruction->src = src;
+  instruction->src = string;
 
   __DEBUG_ASSERT(dst.size == lum_builtin_types_sizes[type]);
 
@@ -161,7 +166,8 @@ static LuminaryResult _lum_instruction_ldg_get_mnemonic_suffix(const LumInstruct
 #define LUM_INSTRUCTION_STG_ARG_MASK 0xFF
 #define LUM_INSTRUCTION_STG_TYPE_SHIFT 48
 
-LuminaryResult lum_instruction_encode_stg(LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation src) {
+LuminaryResult lum_instruction_encode_stg(
+  LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation src, LumMemoryAllocation string) {
   __CHECK_NULL_ARGUMENT(instruction);
 
   memset(instruction, 0, sizeof(LumInstruction));
@@ -170,6 +176,7 @@ LuminaryResult lum_instruction_encode_stg(LumInstruction* instruction, LumBuilti
   instruction->meta |= ((uint64_t) type) << LUM_INSTRUCTION_STG_TYPE_SHIFT;
 
   instruction->src = src;
+  instruction->dst = string;
 
   __DEBUG_ASSERT(src.size == lum_builtin_types_sizes[type]);
 
@@ -190,6 +197,8 @@ static LuminaryResult _lum_instruction_stg_get_args(const LumInstruction* instru
   __CHECK_NULL_ARGUMENT(args);
 
   int32_t offset = 0;
+  __FAILURE_HANDLE(_lum_instruction_encode_address(instruction->dst, false, args, &offset));
+  offset += sprintf(args + offset, ", ");
   __FAILURE_HANDLE(_lum_instruction_encode_address(instruction->src, true, args, &offset));
 
   return LUMINARY_SUCCESS;

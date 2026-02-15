@@ -127,6 +127,11 @@ extern const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COU
 // LumBuiltin Struct Definitions
 ////////////////////////////////////////////////////////////////////
 
+struct LumBuiltinString {
+  uint32_t const_mem_address;
+  uint32_t const_mem_size;
+} typedef LumBuiltinString;
+
 struct LumBuiltinAdaptiveSampling {
   bool enable;
   uint32_t max_sampling_rate;
@@ -328,6 +333,10 @@ struct LumBuiltinInstance {
   LuminaryVec3 scale;
 } typedef LumBuiltinInstance;
 
+struct LumBuiltinWavefrontObjFile {
+  LumBuiltinString name_prefix;
+} typedef LumBuiltinWavefrontObjFile;
+
 ////////////////////////////////////////////////////////////////////
 // LumBuiltin Default Initializers
 ////////////////////////////////////////////////////////////////////
@@ -341,6 +350,7 @@ LuminaryResult lum_builtin_fog_init(LumBuiltinFog* fog, uint32_t version);
 LuminaryResult lum_builtin_particles_init(LumBuiltinParticles* particles, uint32_t version);
 LuminaryResult lum_builtin_material_init(LumBuiltinMaterial* material, uint32_t version);
 LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t version);
+LuminaryResult lum_builtin_wavefrontobjfile_init(LumBuiltinWavefrontObjFile* settings, uint32_t version);
 
 ////////////////////////////////////////////////////////////////////
 // LumBuiltin Conversion

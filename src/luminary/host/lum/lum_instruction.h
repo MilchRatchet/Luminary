@@ -35,8 +35,9 @@ LuminaryResult lum_instruction_encode_nop(LumInstruction* instruction);
 LuminaryResult lum_instruction_encode_mov(
   LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation dst, LumMemoryAllocation src);
 LuminaryResult lum_instruction_encode_ldg(
-  LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation dst, LumMemoryAllocation src);
-LuminaryResult lum_instruction_encode_stg(LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation src);
+  LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation dst, LumMemoryAllocation string);
+LuminaryResult lum_instruction_encode_stg(
+  LumInstruction* instruction, LumBuiltinType type, LumMemoryAllocation src, LumMemoryAllocation string);
 
 LuminaryResult lum_instruction_decode_mov(const LumInstruction* instruction, LumBuiltinType* type);
 LuminaryResult lum_instruction_decode_ldg(const LumInstruction* instruction, LumBuiltinType* type);

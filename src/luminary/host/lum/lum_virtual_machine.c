@@ -51,8 +51,8 @@ static LuminaryResult _lum_virtual_machine_execute_ldg(LumVirtualMachine* vm, co
   __FAILURE_HANDLE(lum_instruction_decode_ldg(instruction, &type));
 
   LumFunctionLoadInfo info;
-  info.dst = instruction->dst;
-  info.src = instruction->src;
+  info.dst  = instruction->dst;
+  info.name = instruction->src;
 
   __FAILURE_HANDLE(lum_function_tables_ldg[type](vm, &info));
 
@@ -67,7 +67,8 @@ static LuminaryResult _lum_virtual_machine_execute_stg(LumVirtualMachine* vm, co
   __FAILURE_HANDLE(lum_instruction_decode_stg(instruction, &type));
 
   LumFunctionStoreInfo info;
-  info.src = instruction->src;
+  info.src  = instruction->src;
+  info.name = instruction->dst;
 
   __FAILURE_HANDLE(lum_function_tables_stg[type](vm, &info));
 

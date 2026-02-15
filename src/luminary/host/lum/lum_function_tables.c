@@ -37,6 +37,18 @@ LuminaryResult lum_function_resolve_generic_address(LumVirtualMachine* vm, const
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult lum_function_resolve_string_address(LumVirtualMachine* vm, const LumBuiltinString* string, const char** ptr) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(string);
+  __CHECK_NULL_ARGUMENT(ptr);
+
+  const uint8_t* base_ptr = (const uint8_t*) vm->constant_memory;
+
+  *ptr = (string->const_mem_size > 0) ? (const char*) (base_ptr + string->const_mem_address) : (const char*) 0;
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // RGBF
 ////////////////////////////////////////////////////////////////////
@@ -341,6 +353,12 @@ static LuminaryResult _lum_function_load_wavefrontobj(LumVirtualMachine* vm, con
 static LuminaryResult _lum_function_store_wavefrontobj(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
 
   return LUMINARY_SUCCESS;
 }
