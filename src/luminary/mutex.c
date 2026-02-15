@@ -15,7 +15,7 @@ LuminaryResult mutex_create(Mutex** mutex) {
 
   __FAILURE_HANDLE(host_malloc(mutex, sizeof(Mutex)));
 
-  const int retval = mtx_init((mtx_t*) *mutex, mtx_plain);
+  const int retval = mtx_init((mtx_t*) *mutex, mtx_recursive);
 
   if (retval != thrd_success) {
     __FAILURE_HANDLE(host_free(mutex));
