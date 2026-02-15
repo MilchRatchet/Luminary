@@ -16,6 +16,7 @@ struct WindowEntityPropertiesPassingData {
   Display* display;
   const MouseState* mouse_state;
   const KeyboardState* keyboard_state;
+  bool write_access;
 } typedef WindowEntityPropertiesPassingData;
 
 enum EntityPropertyButtonFunction {
@@ -32,15 +33,17 @@ static bool _window_entity_properties_add_slider(
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
-                         .text         = text,
-                         .center_x     = false,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+        .text         = text,
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
 
     if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
       LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
@@ -59,18 +62,20 @@ static bool _window_entity_properties_add_slider(
 
     if (element_slider(
           data.window, data.display, data.mouse_state, data.keyboard_state,
-          (ElementSliderArgs) {.identifier        = text,
-                               .type              = data_type,
-                               .color             = 0xFFFFFFFF,
-                               .size              = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
-                               .data_binding      = data_binding,
-                               .min               = min,
-                               .max               = max,
-                               .change_rate       = change_rate,
-                               .component_padding = 4,
-                               .margins           = 4,
-                               .center_x          = true,
-                               .center_y          = true})) {
+          (ElementSliderArgs) {
+            .identifier        = text,
+            .type              = data_type,
+            .size              = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+            .data_binding      = data_binding,
+            .min               = min,
+            .max               = max,
+            .change_rate       = change_rate,
+            .component_padding = 4,
+            .margins           = 4,
+            .center_x          = true,
+            .center_y          = true,
+            .write_access      = data.write_access,
+          })) {
       update_data = true;
     }
   }
@@ -86,19 +91,25 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
-                         .text         = text,
-                         .center_x     = false,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+        .text         = text,
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
 
     if (element_checkbox(
           data.window, data.display, data.mouse_state,
-          (ElementCheckBoxArgs) {.size = (ElementSize) {.width = 24, .height = 24}, .data_binding = data_binding})) {
+          (ElementCheckBoxArgs) {
+            .size         = (ElementSize) {.width = 24, .height = 24},
+            .data_binding = data_binding,
+            .write_access = data.write_access,
+          })) {
       update_data = true;
     }
   }
@@ -114,25 +125,30 @@ static bool _window_entity_properties_add_button(WindowEntityPropertiesPassingDa
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
-                         .text         = text,
-                         .center_x     = false,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+        .text         = text,
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
 
     if (element_button(
           data.window, data.display, data.mouse_state,
-          (ElementButtonArgs) {.size         = (ElementSize) {.width = 24, .height = 24},
-                               .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-                               .image        = ELEMENT_BUTTON_IMAGE_SYNC,
-                               .color        = MD_COLOR_GRAY,
-                               .hover_color  = MD_COLOR_ACCENT_LIGHT_2,
-                               .press_color  = MD_COLOR_WHITE,
-                               .tooltip_text = text})) {
+          (ElementButtonArgs) {
+            .size         = (ElementSize) {.width = 24, .height = 24},
+            .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+            .image        = ELEMENT_BUTTON_IMAGE_SYNC,
+            .color        = MD_COLOR_GRAY,
+            .hover_color  = MD_COLOR_ACCENT_LIGHT_2,
+            .press_color  = MD_COLOR_WHITE,
+            .tooltip_text = text,
+            .inactive     = data.write_access == false,
+          })) {
       update_data = true;
     }
   }
@@ -149,23 +165,28 @@ static bool _window_entity_properties_add_dropdown(
   {
     element_text(
       data.window, data.display, data.mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
-                         .text         = text,
-                         .center_x     = false,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+        .text         = text,
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
 
     if (element_dropdown(
           data.window, data.display, data.mouse_state,
-          (ElementDropdownArgs) {.identifier     = text,
-                                 .size           = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
-                                 .selected_index = selected_index,
-                                 .num_strings    = num_strings,
-                                 .strings        = strings})) {
+          (ElementDropdownArgs) {
+            .identifier     = text,
+            .size           = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+            .selected_index = selected_index,
+            .num_strings    = num_strings,
+            .strings        = strings,
+            .write_access   = data.write_access,
+          })) {
       update_data = true;
     }
   }
@@ -181,7 +202,13 @@ static void _window_entity_properties_renderer_settings_action(
   MD_CHECK_NULL_ARGUMENT(host);
 
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
@@ -248,6 +275,8 @@ static void _window_entity_properties_renderer_settings_action(
 
     LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static void _window_entity_properties_camera_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
@@ -256,7 +285,13 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   MD_CHECK_NULL_ARGUMENT(host);
 
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
@@ -368,6 +403,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static void _window_entity_properties_ocean_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
@@ -376,7 +413,13 @@ static void _window_entity_properties_ocean_action(Window* window, Display* disp
   MD_CHECK_NULL_ARGUMENT(host);
 
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminaryOcean ocean;
   LUM_FAILURE_HANDLE(luminary_host_get_ocean(host, &ocean));
@@ -419,6 +462,8 @@ static void _window_entity_properties_ocean_action(Window* window, Display* disp
 
     LUM_FAILURE_HANDLE(luminary_host_set_ocean(host, &ocean));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static void _window_entity_properties_sky_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
@@ -427,7 +472,13 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
   MD_CHECK_NULL_ARGUMENT(host);
 
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminarySky sky;
   LUM_FAILURE_HANDLE(luminary_host_get_sky(host, &sky));
@@ -524,6 +575,8 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
 
     LUM_FAILURE_HANDLE(luminary_host_set_sky(host, &sky));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static bool _window_entity_properties_cloud_layer_action(
@@ -533,8 +586,16 @@ static bool _window_entity_properties_cloud_layer_action(
   MD_CHECK_NULL_ARGUMENT(host);
   MD_CHECK_NULL_ARGUMENT(layer);
 
+  bool write_access;
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &write_access));
+
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+    .write_access   = write_access,
+  };
 
   bool update_data = false;
 
@@ -567,7 +628,13 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
   MD_CHECK_NULL_ARGUMENT(host);
 
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminaryCloud cloud;
   LUM_FAILURE_HANDLE(luminary_host_get_cloud(host, &cloud));
@@ -613,6 +680,8 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_cloud(host, &cloud));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static void _window_entity_properties_fog_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
@@ -620,8 +689,16 @@ static void _window_entity_properties_fog_action(Window* window, Display* displa
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
+  bool write_access;
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &write_access));
+
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+    .write_access   = write_access,
+  };
 
   LuminaryFog fog;
   LUM_FAILURE_HANDLE(luminary_host_get_fog(host, &fog));
@@ -644,6 +721,8 @@ static void _window_entity_properties_fog_action(Window* window, Display* displa
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_fog(host, &fog));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static void _window_entity_properties_particles_action(
@@ -653,7 +732,13 @@ static void _window_entity_properties_particles_action(
   MD_CHECK_NULL_ARGUMENT(host);
 
   WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminaryParticles particles;
   LUM_FAILURE_HANDLE(luminary_host_get_particles(host, &particles));
@@ -688,15 +773,14 @@ static void _window_entity_properties_particles_action(
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_particles(host, &particles));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
 static void _window_entity_properties_material_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
-
-  WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Material", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -718,6 +802,15 @@ static void _window_entity_properties_material_action(Window* window, Display* d
 
     return;
   }
+
+  WindowEntityPropertiesPassingData data = {
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
   LuminaryMaterial material;
   LUM_FAILURE_HANDLE(luminary_host_get_material(host, display->select_pixel_data.material_id, &material));
@@ -782,6 +875,8 @@ static void _window_entity_properties_material_action(Window* window, Display* d
     LUM_FAILURE_HANDLE(luminary_host_set_material(host, display->select_pixel_data.material_id, &material));
   }
 
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
+
   return;
 }
 
@@ -789,9 +884,6 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
-
-  WindowEntityPropertiesPassingData data = {
-    .window = window, .display = display, .mouse_state = mouse_state, .keyboard_state = display->keyboard_state};
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Instance", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -814,6 +906,15 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
     return;
   }
 
+  WindowEntityPropertiesPassingData data = {
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
   LuminaryInstance instance;
   LUM_FAILURE_HANDLE(luminary_host_get_instance(host, display->select_pixel_data.instance_id, &instance));
 
@@ -829,6 +930,8 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_instance(host, display->select_pixel_data.instance_id, &instance));
   }
+
+  LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 
   return;
 }

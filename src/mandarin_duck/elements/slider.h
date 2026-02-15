@@ -23,7 +23,6 @@ struct ElementSliderData {
   int32_t data_sint;
   LuminaryVec3 data_vec3;
   ElementSize size;
-  uint32_t color;
   uint32_t component_padding;
   uint32_t margins;
   bool center_x;
@@ -33,6 +32,7 @@ struct ElementSliderData {
   uint32_t string_component_index;
   bool is_hovered;
   uint32_t hover_component_index;
+  bool write_access;
 } typedef ElementSliderData;
 static_assert(sizeof(ElementSliderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -44,11 +44,11 @@ struct ElementSliderArgs {
   float min;
   float change_rate;
   ElementSize size;
-  uint32_t color;
   uint32_t component_padding;
   uint32_t margins;
   bool center_x;
   bool center_y;
+  bool write_access;
 } typedef ElementSliderArgs;
 
 bool element_slider(

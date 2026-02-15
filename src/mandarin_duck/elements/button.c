@@ -50,6 +50,9 @@ static void _element_button_render_image(Element* button, Display* display) {
 
   uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
 
+  if (data->inactive)
+    color = MD_COLOR_DARKGRAY;
+
   const uint32_t padding_x = button->width >> 1;
   const uint32_t padding_y = button->height >> 1;
 
@@ -94,6 +97,7 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
   data->press_color = args.press_color;
   data->is_hovered  = mouse_result.is_hovered && (args.is_not_interactive == false);
   data->is_down     = mouse_result.is_down && (args.is_not_interactive == false);
+  data->inactive    = args.inactive;
 
   data->shape_size_id = 0;
 
@@ -118,7 +122,7 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
   if (mouse_result.is_hovered) {
     const bool external_clicked_window_is_present = (window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED);
 
-    if (args.tooltip_text && window->external_subwindow && !external_clicked_window_is_present) {
+    if (args.tooltip_text && window->external_subwindow && external_clicked_window_is_present == false) {
       subwindow_tooltip_create(window->external_subwindow, args.tooltip_text, mouse_state->x + 16.0f, mouse_state->y + 16.0f);
 
       window->state_data =
@@ -130,5 +134,5 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
 
   window_push_element(window, &button);
 
-  return mouse_result.is_clicked;
+  return mouse_result.is_clicked && args.inactive == false;
 }

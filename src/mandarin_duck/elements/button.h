@@ -38,6 +38,7 @@ struct ElementButtonData {
   uint32_t press_color;
   bool is_hovered;
   bool is_down;
+  bool inactive;
 } typedef ElementButtonData;
 static_assert(sizeof(ElementButtonData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -50,6 +51,7 @@ struct ElementButtonArgs {
   uint32_t press_color;
   const char* tooltip_text;
   bool is_not_interactive;
+  bool inactive;
 } typedef ElementButtonArgs;
 
 bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args);
