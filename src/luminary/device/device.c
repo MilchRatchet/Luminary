@@ -356,7 +356,7 @@ static LuminaryResult _device_reset_constant_memory_dirty(Device* device) {
 static LuminaryResult _device_update_constant_memory(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  if (!device->constant_memory_dirty.is_dirty)
+  if (device->constant_memory_dirty.is_dirty == false)
     return LUMINARY_SUCCESS;
 
   size_t offset;
@@ -370,8 +370,10 @@ static LuminaryResult _device_update_constant_memory(Device* device) {
     size   = device_cuda_const_memory_sizes[device->constant_memory_dirty.member];
   }
 
-  CUDA_FAILURE_HANDLE(
-    cuMemcpyHtoDAsync_v2(device->cuda_device_const_memory + offset, device->constant_memory + offset, size, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync_v2(
+    device->cuda_device_const_memory + offset, ((STAGING const uint8_t*) device->constant_memory) + offset, size, device->stream_main));
+
+  __FAILURE_HANDLE(_device_reset_constant_memory_dirty(device));
 
   return LUMINARY_SUCCESS;
 }
