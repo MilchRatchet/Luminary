@@ -263,7 +263,10 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   uint32_t pixels_per_thread;
   __FAILURE_HANDLE(device_get_current_pixels_per_thread(device, &pixels_per_thread));
 
-  const uint32_t tasks_per_thread = device->constant_memory->config.num_tasks_per_thread;
+  const DeviceConstantMemory* constant_memory;
+  __FAILURE_HANDLE(device_constant_memory_manager_get_host_buffer(device->constant_memory, &constant_memory));
+
+  const uint32_t tasks_per_thread = constant_memory->config.num_tasks_per_thread;
 
   const uint32_t max_current_resident_tasks_per_thread = min(tasks_per_thread, pixels_per_thread);
 

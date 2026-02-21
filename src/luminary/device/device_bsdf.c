@@ -81,7 +81,8 @@ static LuminaryResult _bsdf_lut_generate_lut(BSDFLUT* lut, DeviceBSDFLUT* device
   dielectric_lut_args.dst     = DEVICE_PTR(dielectric_data);
   dielectric_lut_args.dst_inv = DEVICE_PTR(dielectric_inv_data);
 
-  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
+
   __FAILURE_HANDLE(
     kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_BSDF_GENERATE_SS_LUT], &ss_lut_args, device->stream_main));
   __FAILURE_HANDLE(

@@ -1,6 +1,7 @@
 #include "device_post.h"
 
 #include "device.h"
+#include "device_constant_memory_manager.h"
 #include "device_memory.h"
 #include "internal_error.h"
 #include "kernel.h"
@@ -211,16 +212,19 @@ DEVICE_CTX_FUNC LuminaryResult device_post_apply(DevicePost* post, Device* devic
   __CHECK_NULL_ARGUMENT(post);
   __CHECK_NULL_ARGUMENT(device);
 
-  if (device->constant_memory->settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
+  const DeviceConstantMemory* constant_memory;
+  __FAILURE_HANDLE(device_constant_memory_manager_get_host_buffer(device->constant_memory, &constant_memory));
+
+  if (constant_memory->settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
     return LUMINARY_SUCCESS;
 
-  if (device->constant_memory->settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
+  if (constant_memory->settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
     return LUMINARY_SUCCESS;
 
-  if (device->constant_memory->settings.window_width != device->constant_memory->settings.width)
+  if (constant_memory->settings.window_width != constant_memory->settings.width)
     return LUMINARY_SUCCESS;
 
-  if (device->constant_memory->settings.window_height != device->constant_memory->settings.height)
+  if (constant_memory->settings.window_height != constant_memory->settings.height)
     return LUMINARY_SUCCESS;
 
   if (post->bloom) {

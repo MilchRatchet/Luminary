@@ -67,8 +67,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   DEVICE uint32_t* tri_work_counter;
   __FAILURE_HANDLE(device_malloc(&tri_work_counter, sizeof(uint32_t)));
 
-  // Make sure that all the data is actually present
-  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
   size_t memory_usage = 0;
