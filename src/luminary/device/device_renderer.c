@@ -505,6 +505,8 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
 
     if ((device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0)
       renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE;
+
+    __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
   }
 
   ////////////////////////////////////////////////////////////////////
