@@ -13,7 +13,9 @@ LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(con
   const float exposed_value    = color_luminance(exposed_color);
   const float tonemapped_value = color_luminance(tonemapped_color);
 
-  return (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
+  const float compression = (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
+
+  return compression * compression * compression * compression;
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
@@ -185,7 +187,7 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
 
   if (args.exposure != 0.0f) {
     const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(color, args.exposure);
-    variance *= tonemap_compression * tonemap_compression;
+    variance *= tonemap_compression;
   }
 
   const float block_variance = fabsf(warp_reduce_max<16>(variance));
