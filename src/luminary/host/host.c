@@ -244,20 +244,36 @@ LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArgumen
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
 
+  uint32_t material_offset;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
+
   uint32_t num_meshes_before;
   __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_meshes(wavefront_content, &host->meshes, host->mesh_name_dict, material_offset));
+
+  uint32_t num_meshes_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
+
+  __FAILURE_HANDLE(
+    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
 
   uint32_t num_textures_before;
   __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
 
+  __FAILURE_HANDLE(wavefront_content_get_textures(wavefront_content, &host->textures));
+
+  uint32_t num_textures_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
+
+  __FAILURE_HANDLE(device_manager_add_textures(
+    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
+
   ARRAY Material* added_materials;
   __FAILURE_HANDLE(array_create(&added_materials, sizeof(Material), 16));
 
-  uint32_t material_offset;
-  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
-
-  __FAILURE_HANDLE(
-    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset, host->mesh_name_dict));
+  __FAILURE_HANDLE(wavefront_content_get_materials(wavefront_content, &added_materials, num_textures_before));
+  __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
   uint32_t num_added_materials;
   __FAILURE_HANDLE(array_get_num_elements(added_materials, &num_added_materials));
@@ -267,21 +283,8 @@ LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArgumen
   }
 
   __FAILURE_HANDLE(array_destroy(&added_materials));
-  __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
   __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
-
-  uint32_t num_meshes_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
-
-  __FAILURE_HANDLE(
-    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
-
-  uint32_t num_textures_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
-
-  __FAILURE_HANDLE(device_manager_add_textures(
-    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
 
   return LUMINARY_SUCCESS;
 }

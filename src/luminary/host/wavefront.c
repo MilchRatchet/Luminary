@@ -791,96 +791,16 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, ARRAYPTR Material** materials, ARRAYPTR Texture*** textures) {
-  __CHECK_NULL_ARGUMENT(content);
-  __CHECK_NULL_ARGUMENT(materials);
-
-  uint32_t material_count;
-  __FAILURE_HANDLE(array_get_num_elements(content->materials, &material_count));
-
-  uint32_t texture_offset;
-  __FAILURE_HANDLE(array_get_num_elements(*textures, &texture_offset));
-
-  uint32_t texture_count;
-  __FAILURE_HANDLE(array_get_num_elements(content->texture_instances, &texture_count));
-
-  for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
-    const WavefrontTextureInstance instance = content->texture_instances[tex_id];
-    const Texture* tex                      = content->textures[instance.texture_id];
-
-    __FAILURE_HANDLE(array_push(textures, &tex));
-  }
-
-  __FAILURE_HANDLE(array_resize(&content->texture_instances, 0));
-  __FAILURE_HANDLE(array_resize(&content->textures, 0));
-
-  uint32_t material_id_offset;
-  __FAILURE_HANDLE(array_get_num_elements(*materials, &material_id_offset));
-
-  for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
-    const WavefrontMaterial wavefront_mat = content->materials[mat_id];
-
-    const bool has_albedo_tex    = (wavefront_mat.texture[WF_ALBEDO] != TEXTURE_NONE);
-    const bool has_luminance_tex = (wavefront_mat.texture[WF_LUMINANCE] != TEXTURE_NONE);
-    const bool has_roughness_tex = (wavefront_mat.texture[WF_ROUGHNESS] != TEXTURE_NONE);
-    const bool has_metallic_tex  = (wavefront_mat.texture[WF_METALLIC] != TEXTURE_NONE);
-    const bool has_normal_tex    = (wavefront_mat.texture[WF_NORMAL] != TEXTURE_NONE);
-    const bool has_emission = (wavefront_mat.emission.r > 0.0f) || (wavefront_mat.emission.g > 0.0f) || (wavefront_mat.emission.b > 0.0f);
-
-    Material mat;
-    __FAILURE_HANDLE(material_get_default(&mat));
-
-    mat.base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
-    mat.albedo.r                 = wavefront_mat.diffuse_reflectivity.r;
-    mat.albedo.g                 = wavefront_mat.diffuse_reflectivity.g;
-    mat.albedo.b                 = wavefront_mat.diffuse_reflectivity.b;
-    mat.opacity                  = wavefront_mat.dissolve;
-    mat.emission                 = wavefront_mat.emission;
-    mat.emission_scale           = content->args.emission_scale;
-    mat.refraction_index         = wavefront_mat.refraction_index;
-    mat.roughness                = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
-    mat.roughness_clamp          = 0.25f;
-    mat.roughness_as_smoothness  = content->args.legacy_smoothness;
-    mat.emission_active          = has_luminance_tex || has_emission;
-    mat.thin_walled              = false;
-    mat.normal_map_is_compressed = true;
-    mat.bidirectional_emission   = content->args.force_bidirectional_emission;
-    mat.metallic                 = wavefront_mat.specular_reflectivity.r > 0.5f;
-    mat.albedo_tex               = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
-    mat.luminance_tex            = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
-    mat.roughness_tex            = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
-    mat.metallic_tex             = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
-    mat.normal_tex               = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
-
-    __FAILURE_HANDLE(array_push(materials, &mat));
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
 static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
-LuminaryResult wavefront_convert_content(
-  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials, uint32_t material_offset,
-  Dictionary* mesh_name_dict) {
+LuminaryResult wavefront_content_get_meshes(
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, Dictionary* mesh_name_dict, uint32_t material_offset) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(meshes);
-  __CHECK_NULL_ARGUMENT(textures);
-  __CHECK_NULL_ARGUMENT(materials);
   __CHECK_NULL_ARGUMENT(mesh_name_dict);
 
   if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
-  }
-
-  content->state = WAVEFRONT_CONTENT_STATE_FINISHED;
-
-  uint32_t num_objects;
-  __FAILURE_HANDLE(array_get_num_elements(content->object_names, &num_objects));
-
-  if (num_objects == 0) {
-    warn_message("Wavefront file contained no objects.");
-    return LUMINARY_SUCCESS;
   }
 
   uint32_t triangle_count;
@@ -894,8 +814,6 @@ LuminaryResult wavefront_convert_content(
 
   uint32_t normal_count;
   __FAILURE_HANDLE(array_get_num_elements(content->normals, &normal_count));
-
-  __FAILURE_HANDLE(_wavefront_convert_materials(content, materials, textures));
 
   Mesh* mesh;
   __FAILURE_HANDLE(mesh_create(&mesh));
@@ -1031,6 +949,85 @@ LuminaryResult wavefront_convert_content(
   __FAILURE_HANDLE(dictionary_add_entry(mesh_name_dict, mesh->id, content->object_names[0]));
 
   __FAILURE_HANDLE(array_push(meshes, &mesh));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult wavefront_content_get_textures(WavefrontContent* content, ARRAYPTR Texture*** textures) {
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(textures);
+
+  if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
+  }
+
+  uint32_t texture_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->texture_instances, &texture_count));
+
+  for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
+    const WavefrontTextureInstance instance = content->texture_instances[tex_id];
+    const Texture* tex                      = content->textures[instance.texture_id];
+
+    __FAILURE_HANDLE(array_push(textures, &tex));
+  }
+
+  __FAILURE_HANDLE(array_resize(&content->texture_instances, 0));
+  __FAILURE_HANDLE(array_resize(&content->textures, 0));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult wavefront_content_get_materials(WavefrontContent* content, ARRAYPTR Material** materials, uint32_t texture_offset) {
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(materials);
+
+  if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
+  }
+
+  uint32_t material_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->materials, &material_count));
+
+  uint32_t material_id_offset;
+  __FAILURE_HANDLE(array_get_num_elements(*materials, &material_id_offset));
+
+  for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
+    const WavefrontMaterial wavefront_mat = content->materials[mat_id];
+
+    const bool has_albedo_tex    = (wavefront_mat.texture[WF_ALBEDO] != TEXTURE_NONE);
+    const bool has_luminance_tex = (wavefront_mat.texture[WF_LUMINANCE] != TEXTURE_NONE);
+    const bool has_roughness_tex = (wavefront_mat.texture[WF_ROUGHNESS] != TEXTURE_NONE);
+    const bool has_metallic_tex  = (wavefront_mat.texture[WF_METALLIC] != TEXTURE_NONE);
+    const bool has_normal_tex    = (wavefront_mat.texture[WF_NORMAL] != TEXTURE_NONE);
+    const bool has_emission = (wavefront_mat.emission.r > 0.0f) || (wavefront_mat.emission.g > 0.0f) || (wavefront_mat.emission.b > 0.0f);
+
+    Material mat;
+    __FAILURE_HANDLE(material_get_default(&mat));
+
+    mat.base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
+    mat.albedo.r                 = wavefront_mat.diffuse_reflectivity.r;
+    mat.albedo.g                 = wavefront_mat.diffuse_reflectivity.g;
+    mat.albedo.b                 = wavefront_mat.diffuse_reflectivity.b;
+    mat.opacity                  = wavefront_mat.dissolve;
+    mat.emission                 = wavefront_mat.emission;
+    mat.emission_scale           = content->args.emission_scale;
+    mat.refraction_index         = wavefront_mat.refraction_index;
+    mat.roughness                = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
+    mat.roughness_clamp          = 0.25f;
+    mat.roughness_as_smoothness  = content->args.legacy_smoothness;
+    mat.emission_active          = has_luminance_tex || has_emission;
+    mat.thin_walled              = false;
+    mat.normal_map_is_compressed = true;
+    mat.bidirectional_emission   = content->args.force_bidirectional_emission;
+    mat.metallic                 = wavefront_mat.specular_reflectivity.r > 0.5f;
+    mat.albedo_tex               = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
+    mat.luminance_tex            = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
+    mat.roughness_tex            = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
+    mat.metallic_tex             = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
+    mat.normal_tex               = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
+
+    __FAILURE_HANDLE(array_push(materials, &mat));
+  }
 
   return LUMINARY_SUCCESS;
 }
