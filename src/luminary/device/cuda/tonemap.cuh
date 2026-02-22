@@ -122,9 +122,7 @@ LUMINARY_FUNCTION RGBF agx_inv_conversion(RGBF pixel) {
   agx = max_color(agx, get_color(0.0f, 0.0f, 0.0f));
 
   // This should be sRGB to linear conversion
-  agx.r = SRGB_to_linearRGB(agx.r);
-  agx.g = SRGB_to_linearRGB(agx.g);
-  agx.b = SRGB_to_linearRGB(agx.b);
+  agx = color_sRGB_to_linear(agx);
 
   return agx;
 }
@@ -230,15 +228,12 @@ LUMINARY_FUNCTION RGBF
     pixel = hsv_to_rgb(hsv);
   }
 
-  pixel.r *= device.camera.exposure;
-  pixel.g *= device.camera.exposure;
-  pixel.b *= device.camera.exposure;
+  pixel = scale_color(pixel, device.camera.exposure);
 
   const float grain = device.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 
-  pixel.r = fmaxf(0.0f, pixel.r + grain);
-  pixel.g = fmaxf(0.0f, pixel.g + grain);
-  pixel.b = fmaxf(0.0f, pixel.b + grain);
+  pixel = add_color(pixel, splat_color(grain));
+  pixel = max_color(pixel, splat_color(0.0f));
 
   pixel = tonemap_apply_transform(pixel, agx_params);
 

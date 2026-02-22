@@ -627,9 +627,11 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
 
     const float dither = (device.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
 
-    pixel.r = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.r)));
-    pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.g)));
-    pixel.b = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.b)));
+    pixel = color_linear_to_sRGB(pixel);
+
+    pixel.r = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * pixel.r));
+    pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * pixel.g));
+    pixel.b = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * pixel.b));
 
     ARGB8 converted_pixel;
     converted_pixel.a = 0xFF;

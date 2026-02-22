@@ -1087,6 +1087,26 @@ LUMINARY_FUNCTION float SRGB_to_linearRGB(const float value) {
   }
 }
 
+LUMINARY_FUNCTION RGBF color_linear_to_sRGB(const RGBF color) {
+  RGBF result;
+
+  result.r = linearRGB_to_SRGB(color.r);
+  result.g = linearRGB_to_SRGB(color.g);
+  result.b = linearRGB_to_SRGB(color.b);
+
+  return result;
+}
+
+LUMINARY_FUNCTION RGBF color_sRGB_to_linear(const RGBF color) {
+  RGBF result;
+
+  result.r = SRGB_to_linearRGB(color.r);
+  result.g = SRGB_to_linearRGB(color.g);
+  result.b = SRGB_to_linearRGB(color.b);
+
+  return result;
+}
+
 LUMINARY_FUNCTION float color_luminance(const RGBF v) {
   return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
 }
