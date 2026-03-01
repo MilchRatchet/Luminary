@@ -61,6 +61,7 @@ struct WavefrontArguments {
   bool force_transparency_cutout;
   float emission_scale;
   bool force_bidirectional_emission;
+  const char* name_prefix;
 } typedef WavefrontArguments;
 
 enum WavefrontContentState {
@@ -79,6 +80,8 @@ struct WavefrontContent {
   ARRAY WavefrontMaterial* materials;
   ARRAY Texture** textures;
   ARRAY WavefrontTextureInstance* texture_instances;
+  ARRAY char** texture_names;
+  ARRAY char** material_names;
   ARRAY char** object_names;
 } typedef WavefrontContent;
 
@@ -86,8 +89,9 @@ LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments a
 LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file, Queue* queue);
 LuminaryResult wavefront_content_get_meshes(
   WavefrontContent* content, ARRAYPTR Mesh*** meshes, Dictionary* mesh_name_dict, uint32_t material_offset);
-LuminaryResult wavefront_content_get_textures(WavefrontContent* content, ARRAYPTR Texture*** textures);
-LuminaryResult wavefront_content_get_materials(WavefrontContent* content, ARRAYPTR Material** materials, uint32_t texture_offset);
+LuminaryResult wavefront_content_get_textures(WavefrontContent* content, ARRAYPTR Texture*** textures, Dictionary* texture_name_dict);
+LuminaryResult wavefront_content_get_materials(
+  WavefrontContent* content, ARRAYPTR Material** materials, Dictionary* material_name_dict, uint32_t texture_offset);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 
 LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments);

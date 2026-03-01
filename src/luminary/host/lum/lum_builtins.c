@@ -817,6 +817,8 @@ LuminaryResult lum_builtin_wavefrontobjfile_init(LumBuiltinWavefrontObjFile* fil
   if (version < 1)
     return LUMINARY_SUCCESS;
 
+  file->name_prefix = (LumBuiltinString) {.const_mem_address = LUM_BUILTIN_STRING_INVALID_ADDRESS};
+
   return LUMINARY_SUCCESS;
 }
 

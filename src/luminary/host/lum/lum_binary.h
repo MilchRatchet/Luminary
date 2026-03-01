@@ -5,6 +5,7 @@
 #include "utils.h"
 
 struct LumBinary {
+  Path* source_file_path;
   size_t stack_size;
   ARRAY LumInstruction* instructions;
   void* constant_memory;

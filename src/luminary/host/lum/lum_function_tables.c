@@ -2,7 +2,10 @@
 
 #include <string.h>
 
+#include "host/wavefront.h"
 #include "internal_error.h"
+#include "internal_path.h"
+#include "lum_wavefront.h"
 
 ////////////////////////////////////////////////////////////////////
 // Utils
@@ -347,6 +350,11 @@ static LuminaryResult _lum_function_load_wavefrontobj(LumVirtualMachine* vm, con
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
+  LumBuiltinWavefrontObjFile* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  __FAILURE_HANDLE(lum_builtin_wavefrontobjfile_init(dst, vm->host->version));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -354,11 +362,46 @@ static LuminaryResult _lum_function_store_wavefrontobj(LumVirtualMachine* vm, co
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
+  LumBuiltinWavefrontObjFile* src;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->src, (void**) &src));
+
   const LumBuiltinString* string;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
 
   const char* name;
   __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  Path* obj_path;
+  __FAILURE_HANDLE(path_extend(&obj_path, vm->working_directory, name));
+
+  WavefrontArguments args;
+  __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
+
+  if (src->name_prefix.const_mem_address != LUM_BUILTIN_STRING_INVALID_ADDRESS) {
+    __FAILURE_HANDLE(lum_function_resolve_string_address(vm, &src->name_prefix, &args.name_prefix));
+  }
+
+  WavefrontContent* content;
+  __FAILURE_HANDLE(wavefront_create(&content, args));
+
+  __FAILURE_HANDLE(wavefront_read_file(content, obj_path, vm->work_queue));
+
+  __FAILURE_HANDLE(luminary_path_destroy(&obj_path));
+
+  uint32_t texture_count_before;
+  __FAILURE_HANDLE(array_get_num_elements(vm->host->textures, &texture_count_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_textures(content, &vm->host->textures, vm->host->texture_name_dict));
+
+  uint32_t material_count_before;
+  __FAILURE_HANDLE(array_get_num_elements(vm->host->materials, &material_count_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_meshes(content, &vm->host->meshes, vm->host->mesh_name_dict, material_count_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_versioned_materials(
+    content, &vm->host->materials, vm->host->material_name_dict, texture_count_before, vm->host->version));
+
+  __FAILURE_HANDLE(wavefront_destroy(&content));
 
   return LUMINARY_SUCCESS;
 }

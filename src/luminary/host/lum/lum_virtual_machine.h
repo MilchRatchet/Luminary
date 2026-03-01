@@ -7,6 +7,8 @@
 
 struct LumVirtualMachine {
   LumCompatibilityHost* host;
+  const Path* working_directory;
+  Queue* work_queue;
   size_t stack_size;
   void* stack_memory;
   size_t constant_memory_size;

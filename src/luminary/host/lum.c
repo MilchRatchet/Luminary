@@ -123,6 +123,8 @@ LuminaryResult lum_file_parse(LumFile* file, Path* path) {
       __FAILURE_HANDLE(lum_binary_create(&binary));
       __FAILURE_HANDLE(lum_file_parse_v5(file_handle, binary));
 
+      binary->source_file_path = file->path;
+
       file->parsed_data = (void*) binary;
     } break;
     default:

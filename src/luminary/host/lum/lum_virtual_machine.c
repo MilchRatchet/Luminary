@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "host/internal_host.h"
 #include "internal_error.h"
 #include "lum_function_tables.h"
 
@@ -108,6 +109,10 @@ LuminaryResult lum_virtual_machine_execute(
 
   vm->constant_memory      = binary->constant_memory;
   vm->constant_memory_size = binary->constant_memory_size;
+
+  // TODO: False sharing, create vm state struct
+  vm->working_directory = binary->source_file_path;
+  vm->work_queue        = host->secondary_work_queue;
 
   uint32_t num_instructions;
   __FAILURE_HANDLE(array_get_num_elements(binary->instructions, &num_instructions));

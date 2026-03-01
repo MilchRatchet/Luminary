@@ -3,6 +3,8 @@
 
 #include "dictionary.h"
 #include "lum_builtins.h"
+#include "mesh.h"
+#include "texture.h"
 #include "utils.h"
 
 struct LumCompatibilityHost {
@@ -14,11 +16,14 @@ struct LumCompatibilityHost {
   LumBuiltinCloud cloud;
   LumBuiltinFog fog;
   LumBuiltinParticles particles;
+  ARRAY Mesh** meshes;
   ARRAY LumBuiltinMaterial* materials;
   ARRAY LumBuiltinInstance* mesh_instances;
+  ARRAY Texture** textures;
   Dictionary* mesh_instance_name_dict;
   Dictionary* material_name_dict;
   Dictionary* mesh_name_dict;
+  Dictionary* texture_name_dict;
 } typedef LumCompatibilityHost;
 
 LuminaryResult lum_compatibility_host_create(LumCompatibilityHost** host);
