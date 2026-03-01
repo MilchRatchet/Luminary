@@ -27,6 +27,8 @@ enum LumBuiltinType {
   LUM_BUILTIN_TYPE_CLOUD,
   LUM_BUILTIN_TYPE_FOG,
   LUM_BUILTIN_TYPE_PARTICLES,
+  LUM_BUILTIN_TYPE_MESH,
+  LUM_BUILTIN_TYPE_TEXTURE,
   LUM_BUILTIN_TYPE_MATERIAL,
   LUM_BUILTIN_TYPE_INSTANCE,
   LUM_BUILTIN_TYPE_STRING,
@@ -305,6 +307,14 @@ struct LumBuiltinParticles {
   float size_variation;
 } typedef LumBuiltinParticles;
 
+struct LumBuiltinMesh {
+  uint32_t id;
+} typedef LumBuiltinMesh;
+
+struct LumBuiltinTexture {
+  uint16_t id;
+} typedef LumBuiltinTexture;
+
 struct LumBuiltinMaterial {
   LuminaryMaterialBaseSubstrate base_substrate;
   LuminaryRGBF albedo;
@@ -321,15 +331,15 @@ struct LumBuiltinMaterial {
   bool roughness_as_smoothness;
   bool normal_map_is_compressed;
   bool bidirectional_emission;
-  uint32_t albedo_tex;
-  uint32_t luminance_tex;
-  uint32_t roughness_tex;
-  uint32_t metallic_tex;
-  uint32_t normal_tex;
+  LumBuiltinTexture albedo_tex;
+  LumBuiltinTexture luminance_tex;
+  LumBuiltinTexture roughness_tex;
+  LumBuiltinTexture metallic_tex;
+  LumBuiltinTexture normal_tex;
 } typedef LumBuiltinMaterial;
 
 struct LumBuiltinInstance {
-  uint32_t mesh_id;
+  LumBuiltinMesh mesh;
   LuminaryVec3 position;
   LuminaryVec3 rotation;
   LuminaryVec3 scale;

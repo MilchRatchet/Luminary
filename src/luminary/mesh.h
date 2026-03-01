@@ -3,8 +3,6 @@
 
 #include "utils.h"
 
-#define MESH_ID_INVALID (0xFFFFFFFF)
-
 struct TriangleGeomData {
   float* vertex_buffer;
   float* normal_buffer;

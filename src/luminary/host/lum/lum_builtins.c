@@ -21,6 +21,8 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = "Cloud",
   [LUM_BUILTIN_TYPE_FOG]              = "Fog",
   [LUM_BUILTIN_TYPE_PARTICLES]        = "Particles",
+  [LUM_BUILTIN_TYPE_MESH]             = "Mesh",
+  [LUM_BUILTIN_TYPE_TEXTURE]          = "Texture",
   [LUM_BUILTIN_TYPE_MATERIAL]         = "Material",
   [LUM_BUILTIN_TYPE_INSTANCE]         = "Instance",
   [LUM_BUILTIN_TYPE_STRING]           = "String",
@@ -46,6 +48,8 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = sizeof(LumBuiltinCloud),
   [LUM_BUILTIN_TYPE_FOG]              = sizeof(LumBuiltinFog),
   [LUM_BUILTIN_TYPE_PARTICLES]        = sizeof(LumBuiltinParticles),
+  [LUM_BUILTIN_TYPE_MESH]             = sizeof(LumBuiltinMesh),
+  [LUM_BUILTIN_TYPE_TEXTURE]          = sizeof(LumBuiltinTexture),
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(LumBuiltinMaterial),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(LumBuiltinMaterial),
   [LUM_BUILTIN_TYPE_STRING]           = sizeof(LumBuiltinString),
@@ -71,6 +75,8 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = "clo",
   [LUM_BUILTIN_TYPE_FOG]              = "fog",
   [LUM_BUILTIN_TYPE_PARTICLES]        = "par",
+  [LUM_BUILTIN_TYPE_MESH]             = "mesh",
+  [LUM_BUILTIN_TYPE_TEXTURE]          = "tex",
   [LUM_BUILTIN_TYPE_MATERIAL]         = "mat",
   [LUM_BUILTIN_TYPE_INSTANCE]         = "ins",
   [LUM_BUILTIN_TYPE_STRING]           = "str",
@@ -96,6 +102,8 @@ const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = false,
   [LUM_BUILTIN_TYPE_FOG]              = false,
   [LUM_BUILTIN_TYPE_PARTICLES]        = false,
+  [LUM_BUILTIN_TYPE_MESH]             = true,
+  [LUM_BUILTIN_TYPE_TEXTURE]          = true,
   [LUM_BUILTIN_TYPE_MATERIAL]         = true,
   [LUM_BUILTIN_TYPE_INSTANCE]         = true,
   [LUM_BUILTIN_TYPE_STRING]           = false,
@@ -121,6 +129,8 @@ const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = true,
   [LUM_BUILTIN_TYPE_FOG]              = true,
   [LUM_BUILTIN_TYPE_PARTICLES]        = true,
+  [LUM_BUILTIN_TYPE_MESH]             = true,
+  [LUM_BUILTIN_TYPE_TEXTURE]          = true,
   [LUM_BUILTIN_TYPE_MATERIAL]         = true,
   [LUM_BUILTIN_TYPE_INSTANCE]         = true,
   [LUM_BUILTIN_TYPE_STRING]           = false,
@@ -195,6 +205,8 @@ LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_
     float: LUM_BUILTIN_TYPE_FLOAT,                                                    \
     int32_t: LUM_BUILTIN_TYPE_ENUM,                                                   \
     LumBuiltinString: LUM_BUILTIN_TYPE_STRING,                                        \
+    LumBuiltinMesh: LUM_BUILTIN_TYPE_MESH,                                            \
+    LumBuiltinTexture: LUM_BUILTIN_TYPE_TEXTURE,                                      \
     LumBuiltinAdaptiveSampling: LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,                    \
     LumBuiltinCloudLayer: LUM_BUILTIN_TYPE_CLOUDLAYER,                                \
     LumBuiltinCameraThinLens: LUM_BUILTIN_TYPE_CAMERATHINLENS,                        \
@@ -371,7 +383,7 @@ static const LumBuiltinTypeMember _lum_builtin_member_material[] = {
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_instance[] = {
-  _LUM_BUILTIN_MEMBER(LumBuiltinInstance, mesh_id, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinInstance, mesh, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinInstance, position, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinInstance, rotation, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinInstance, scale, 1, LUM_VERSION_CURRENT),
@@ -438,6 +450,8 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = sizeof(_lum_builtin_member_cloud) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_FOG]              = sizeof(_lum_builtin_member_fog) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_PARTICLES]        = sizeof(_lum_builtin_member_particles) / sizeof(LumBuiltinTypeMember),
+  [LUM_BUILTIN_TYPE_MESH]             = 0,
+  [LUM_BUILTIN_TYPE_TEXTURE]          = 0,
   [LUM_BUILTIN_TYPE_MATERIAL]         = sizeof(_lum_builtin_member_material) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_INSTANCE]         = sizeof(_lum_builtin_member_instance) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_STRING]           = 0,
@@ -463,6 +477,8 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = _lum_builtin_member_cloud,
   [LUM_BUILTIN_TYPE_FOG]              = _lum_builtin_member_fog,
   [LUM_BUILTIN_TYPE_PARTICLES]        = _lum_builtin_member_particles,
+  [LUM_BUILTIN_TYPE_MESH]             = 0,
+  [LUM_BUILTIN_TYPE_TEXTURE]          = 0,
   [LUM_BUILTIN_TYPE_MATERIAL]         = _lum_builtin_member_material,
   [LUM_BUILTIN_TYPE_INSTANCE]         = _lum_builtin_member_instance,
   [LUM_BUILTIN_TYPE_STRING]           = 0,
@@ -784,11 +800,11 @@ LuminaryResult lum_builtin_material_init(LumBuiltinMaterial* material, uint32_t 
   material->colored_transparency     = false;
   material->normal_map_is_compressed = true;
   material->bidirectional_emission   = false;
-  material->albedo_tex               = TEXTURE_NONE;
-  material->luminance_tex            = TEXTURE_NONE;
-  material->roughness_tex            = TEXTURE_NONE;
-  material->metallic_tex             = TEXTURE_NONE;
-  material->normal_tex               = TEXTURE_NONE;
+  material->albedo_tex               = (LumBuiltinTexture) {.id = TEXTURE_ID_INVALID};
+  material->luminance_tex            = (LumBuiltinTexture) {.id = TEXTURE_ID_INVALID};
+  material->roughness_tex            = (LumBuiltinTexture) {.id = TEXTURE_ID_INVALID};
+  material->metallic_tex             = (LumBuiltinTexture) {.id = TEXTURE_ID_INVALID};
+  material->normal_tex               = (LumBuiltinTexture) {.id = TEXTURE_ID_INVALID};
 
   return LUMINARY_SUCCESS;
 }
@@ -801,7 +817,7 @@ LuminaryResult lum_builtin_instance_init(LumBuiltinInstance* instance, uint32_t 
   if (version < 1)
     return LUMINARY_SUCCESS;
 
-  instance->mesh_id = 0;
+  instance->mesh    = (LumBuiltinMesh) {.id = MESH_ID_INVALID};
   instance->scale.x = 1.0f;
   instance->scale.y = 1.0f;
   instance->scale.z = 1.0f;
@@ -1096,11 +1112,11 @@ LuminaryResult lum_builtin_material_convert(const LumBuiltinMaterial* material, 
   dst_material->roughness_as_smoothness  = material->roughness_as_smoothness;
   dst_material->normal_map_is_compressed = material->normal_map_is_compressed;
   dst_material->bidirectional_emission   = material->bidirectional_emission;
-  dst_material->albedo_tex               = material->albedo_tex;
-  dst_material->luminance_tex            = material->luminance_tex;
-  dst_material->roughness_tex            = material->roughness_tex;
-  dst_material->metallic_tex             = material->metallic_tex;
-  dst_material->normal_tex               = material->normal_tex;
+  dst_material->albedo_tex               = material->albedo_tex.id;
+  dst_material->luminance_tex            = material->luminance_tex.id;
+  dst_material->roughness_tex            = material->roughness_tex.id;
+  dst_material->metallic_tex             = material->metallic_tex.id;
+  dst_material->normal_tex               = material->normal_tex.id;
 
   return LUMINARY_SUCCESS;
 }
@@ -1112,7 +1128,7 @@ LuminaryResult lum_builtin_instance_convert(const LumBuiltinInstance* instance, 
   if (version < 1)
     return LUMINARY_SUCCESS;
 
-  dst_instance->mesh_id  = instance->mesh_id;
+  dst_instance->mesh_id  = instance->mesh.id;
   dst_instance->position = instance->position;
   dst_instance->rotation = instance->rotation;
   dst_instance->scale    = instance->scale;

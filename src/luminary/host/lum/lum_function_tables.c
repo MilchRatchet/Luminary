@@ -295,6 +295,72 @@ static LuminaryResult _lum_function_store_particles(LumVirtualMachine* vm, const
 }
 
 ////////////////////////////////////////////////////////////////////
+// Mesh
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_mesh(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinMesh* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  bool found;
+  uint32_t id;
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->mesh_name_dict, name, &id, &found));
+
+  dst->id = (found) ? id : MESH_ID_INVALID;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_mesh(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Texture
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_texture(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinTexture* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  bool found;
+  uint32_t id;
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->texture_name_dict, name, &id, &found));
+
+  dst->id = (found) ? id : TEXTURE_ID_INVALID;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_texture(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
 // Material
 ////////////////////////////////////////////////////////////////////
 
@@ -509,6 +575,8 @@ const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = (const LumFunctionLoad) _lum_function_load_cloud,
   [LUM_BUILTIN_TYPE_FOG]              = (const LumFunctionLoad) _lum_function_load_fog,
   [LUM_BUILTIN_TYPE_PARTICLES]        = (const LumFunctionLoad) _lum_function_load_particles,
+  [LUM_BUILTIN_TYPE_MESH]             = (const LumFunctionLoad) _lum_function_load_mesh,
+  [LUM_BUILTIN_TYPE_TEXTURE]          = (const LumFunctionLoad) _lum_function_load_texture,
   [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionLoad) _lum_function_load_material,
   [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionLoad) _lum_function_load_instance,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionLoad) _lum_function_load_wavefrontobj,
@@ -533,6 +601,8 @@ const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CLOUD]            = (const LumFunctionStore) _lum_function_store_cloud,
   [LUM_BUILTIN_TYPE_FOG]              = (const LumFunctionStore) _lum_function_store_fog,
   [LUM_BUILTIN_TYPE_PARTICLES]        = (const LumFunctionStore) _lum_function_store_particles,
+  [LUM_BUILTIN_TYPE_MESH]             = (const LumFunctionStore) _lum_function_store_mesh,
+  [LUM_BUILTIN_TYPE_TEXTURE]          = (const LumFunctionStore) _lum_function_store_texture,
   [LUM_BUILTIN_TYPE_MATERIAL]         = (const LumFunctionStore) _lum_function_store_material,
   [LUM_BUILTIN_TYPE_INSTANCE]         = (const LumFunctionStore) _lum_function_store_instance,
   [LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE] = (const LumFunctionStore) _lum_function_store_wavefrontobj,

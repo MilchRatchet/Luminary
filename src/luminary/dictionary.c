@@ -136,6 +136,34 @@ LuminaryResult dictionary_remove_entry(Dictionary* dict, uint32_t id) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult dictionary_move_entries(Dictionary* dict, Dictionary* src) {
+  __CHECK_NULL_ARGUMENT(dict);
+  __CHECK_NULL_ARGUMENT(src);
+
+  uint32_t num_entries_before;
+  __FAILURE_HANDLE(array_get_num_elements(dict->entries, &num_entries_before));
+
+  uint32_t num_entries_added;
+  __FAILURE_HANDLE(array_get_num_elements(src->entries, &num_entries_added));
+
+  for (uint32_t entry_id = 0; entry_id < num_entries_added; entry_id++) {
+    DictionaryEntry* entry = src->entries + entry_id;
+
+    for (uint32_t existing_entry_id = 0; existing_entry_id < num_entries_before; existing_entry_id++) {
+      DictionaryEntry* existing_entry = dict->entries + existing_entry_id;
+
+      if (entry->id == existing_entry_id || strcmp(entry->string, existing_entry->string) == 0)
+        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Duplicate dictionary entry (%u, %s)", entry->id, entry->string);
+    }
+
+    __FAILURE_HANDLE(array_push(&dict->entries, entry));
+  }
+
+  __FAILURE_HANDLE(array_clear(src->entries));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult dictionary_destroy(Dictionary** dict) {
   __CHECK_NULL_ARGUMENT(dict);
   __CHECK_NULL_ARGUMENT(*dict);

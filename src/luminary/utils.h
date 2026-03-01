@@ -25,12 +25,15 @@
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
 
-#define TEXTURE_NONE ((uint16_t) 0xffffu)
-
+#define TEXTURE_ID_INVALID 0xFFFF
 #define MATERIAL_ID_INVALID 0xFFFF
+#define MESH_ID_INVALID 0xFFFFFFFF
 #define INSTANCE_ID_INVALID 0xFFFFFFFF
 #define LIGHT_ID_INVALID 0xFFFFFFFF
 #define DEPTH_INVALID -1.0f
+
+// Legacy define
+#define TEXTURE_NONE TEXTURE_ID_INVALID
 
 // Print stats for the work queues
 #define LUMINARY_WORK_QUEUE_STATS_PRINT

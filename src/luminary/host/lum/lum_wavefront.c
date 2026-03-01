@@ -43,11 +43,11 @@ static LuminaryResult _wavefront_content_get_versioned_materials_v1(
     mat.normal_map_is_compressed = true;
     mat.bidirectional_emission   = content->args.force_bidirectional_emission;
     mat.metallic                 = wavefront_mat.specular_reflectivity.r > 0.5f;
-    mat.albedo_tex               = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
-    mat.luminance_tex            = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
-    mat.roughness_tex            = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
-    mat.metallic_tex             = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
-    mat.normal_tex               = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
+    mat.albedo_tex.id            = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
+    mat.luminance_tex.id         = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
+    mat.roughness_tex.id         = has_roughness_tex ? texture_offset + wavefront_mat.texture[WF_ROUGHNESS] : TEXTURE_NONE;
+    mat.metallic_tex.id          = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
+    mat.normal_tex.id            = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
 
     __FAILURE_HANDLE(array_push(materials, &mat));
 

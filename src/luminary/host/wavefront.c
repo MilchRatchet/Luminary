@@ -48,6 +48,35 @@ static WavefrontMaterial _wavefront_get_default_material() {
   return default_material;
 }
 
+static LuminaryResult _wavefront_add_object_name(WavefrontContent* content, const char* name) {
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(name);
+
+  const size_t string_len = strlen(name);
+
+  char* object_name;
+  if (content->args.name_prefix != (const char*) 0) {
+    // TODO: Precompute
+    const size_t prefix_length = strlen(content->args.name_prefix);
+
+    __FAILURE_HANDLE(host_malloc(&object_name, prefix_length + string_len + 1));
+
+    memcpy(object_name, content->args.name_prefix, prefix_length);
+    memcpy(object_name + prefix_length, name, string_len);
+    object_name[prefix_length + string_len] = '\0';
+  }
+  else {
+    __FAILURE_HANDLE(host_malloc(&object_name, string_len + 1));
+
+    memcpy(object_name, name, string_len);
+    object_name[string_len] = '\0';
+  }
+
+  __FAILURE_HANDLE(array_push(&content->object_names, &object_name));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args) {
   __CHECK_NULL_ARGUMENT(content);
 
@@ -780,27 +809,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
       else if (line[0] == 'o') {
         sscanf(line, "%*s %[^\n]", path);
 
-        const size_t string_len = strlen(path);
-
-        char* object_name;
-        if (content->args.name_prefix != (const char*) 0) {
-          // TODO: Precompute
-          const size_t prefix_length = strlen(content->args.name_prefix);
-
-          __FAILURE_HANDLE(host_malloc(&object_name, prefix_length + string_len + 1));
-
-          memcpy(object_name, content->args.name_prefix, prefix_length);
-          memcpy(object_name + prefix_length, path, string_len);
-          object_name[prefix_length + string_len] = '\0';
-        }
-        else {
-          __FAILURE_HANDLE(host_malloc(&object_name, string_len + 1));
-
-          memcpy(object_name, path, string_len);
-          object_name[string_len] = '\0';
-        }
-
-        __FAILURE_HANDLE(array_push(&content->object_names, &object_name));
+        __FAILURE_HANDLE(_wavefront_add_object_name(content, path));
 
         current_object++;
       }
@@ -1015,6 +1024,13 @@ LuminaryResult wavefront_content_get_meshes(
   mesh->data.triangle_count = new_triangle_count;
 
   __FAILURE_HANDLE(array_get_num_elements(*meshes, &mesh->id));
+
+  uint32_t num_mesh_names;
+  __FAILURE_HANDLE(array_get_num_elements(content->object_names, &num_mesh_names));
+
+  if (num_mesh_names == 0) {
+    __FAILURE_HANDLE(_wavefront_add_object_name(content, "__LUMINARY_DEFAULT__"));
+  }
 
   // TODO: Consider parsing multiple objects as multiple meshes :)
   __FAILURE_HANDLE(dictionary_add_entry(mesh_name_dict, mesh->id, content->object_names[0]));
