@@ -371,6 +371,28 @@ static LuminaryResult _lum_function_load_material(LumVirtualMachine* vm, const L
   LumBuiltinMaterial* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  bool found;
+  uint32_t id;
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->material_name_dict, name, &id, &found));
+
+  if (found) {
+    *dst = vm->host->materials[id];
+  }
+  else {
+    __FAILURE_HANDLE(lum_builtin_material_init(dst, vm->host->version));
+
+    __FAILURE_HANDLE(array_get_num_elements(vm->host->materials, &id));
+
+    __FAILURE_HANDLE(array_push(&vm->host->materials, dst));
+    __FAILURE_HANDLE(dictionary_add_entry(vm->host->material_name_dict, id, name));
+  }
+
   return LUMINARY_SUCCESS;
 }
 
@@ -380,6 +402,21 @@ static LuminaryResult _lum_function_store_material(LumVirtualMachine* vm, const 
 
   const LumBuiltinMaterial* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  bool found;
+  uint32_t id;
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->material_name_dict, name, &id, &found));
+
+  if (found == false)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Material '%s' is missing.", name);
+
+  vm->host->materials[id] = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -395,6 +432,28 @@ static LuminaryResult _lum_function_load_instance(LumVirtualMachine* vm, const L
   LumBuiltinInstance* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  bool found;
+  uint32_t id;
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->material_name_dict, name, &id, &found));
+
+  if (found) {
+    *dst = vm->host->mesh_instances[id];
+  }
+  else {
+    __FAILURE_HANDLE(lum_builtin_instance_init(dst, vm->host->version));
+
+    __FAILURE_HANDLE(array_get_num_elements(vm->host->mesh_instances, &id));
+
+    __FAILURE_HANDLE(array_push(&vm->host->mesh_instances, dst));
+    __FAILURE_HANDLE(dictionary_add_entry(vm->host->mesh_instance_name_dict, id, name));
+  }
+
   return LUMINARY_SUCCESS;
 }
 
@@ -404,6 +463,21 @@ static LuminaryResult _lum_function_store_instance(LumVirtualMachine* vm, const 
 
   const LumBuiltinInstance* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  const LumBuiltinString* string;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->name, (const void**) &string));
+
+  const char* name;
+  __FAILURE_HANDLE(lum_function_resolve_string_address(vm, string, &name));
+
+  bool found;
+  uint32_t id;
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->mesh_instance_name_dict, name, &id, &found));
+
+  if (found == false)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Instance '%s' is missing.", name);
+
+  vm->host->mesh_instances[id] = *src;
 
   return LUMINARY_SUCCESS;
 }
