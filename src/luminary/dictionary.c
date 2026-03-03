@@ -136,7 +136,7 @@ LuminaryResult dictionary_remove_entry(Dictionary* dict, uint32_t id) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult dictionary_move_entries(Dictionary* dict, Dictionary* src) {
+LuminaryResult dictionary_move_entries(Dictionary* dict, Dictionary* src, uint32_t id_offset) {
   __CHECK_NULL_ARGUMENT(dict);
   __CHECK_NULL_ARGUMENT(src);
 
@@ -148,6 +148,8 @@ LuminaryResult dictionary_move_entries(Dictionary* dict, Dictionary* src) {
 
   for (uint32_t entry_id = 0; entry_id < num_entries_added; entry_id++) {
     DictionaryEntry* entry = src->entries + entry_id;
+
+    entry->id += id_offset;
 
     for (uint32_t existing_entry_id = 0; existing_entry_id < num_entries_before; existing_entry_id++) {
       DictionaryEntry* existing_entry = dict->entries + existing_entry_id;

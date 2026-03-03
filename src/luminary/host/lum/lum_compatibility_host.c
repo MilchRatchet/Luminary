@@ -77,12 +77,8 @@ LuminaryResult lum_compatibility_host_apply(LumCompatibilityHost* host, Luminary
   __FAILURE_HANDLE(lum_builtin_particles_convert(&host->particles, &particles, host->version));
   __FAILURE_HANDLE(luminary_host_set_particles(dst_host, &particles));
 
-  // TODO: Use API
-  __FAILURE_HANDLE(array_append(&dst_host->meshes, host->meshes));
-  __FAILURE_HANDLE(array_append(&dst_host->textures, host->textures));
-
-  __FAILURE_HANDLE(dictionary_move_entries(dst_host->mesh_name_dict, host->mesh_name_dict));
-  __FAILURE_HANDLE(dictionary_move_entries(dst_host->texture_name_dict, host->texture_name_dict));
+  __FAILURE_HANDLE(host_add_meshes(dst_host, host->meshes, host->mesh_name_dict));
+  __FAILURE_HANDLE(host_add_textures(dst_host, host->textures, host->texture_name_dict));
 
   uint32_t material_count;
   __FAILURE_HANDLE(array_get_num_elements(host->materials, &material_count));

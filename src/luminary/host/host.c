@@ -308,6 +308,46 @@ LuminaryResult host_update_scene(Host* host) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult host_add_meshes(Host* host, ARRAY Mesh** meshes, Dictionary* mesh_name_dict) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(meshes);
+  __CHECK_NULL_ARGUMENT(mesh_name_dict);
+
+  uint32_t num_meshes_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
+
+  __FAILURE_HANDLE(array_append(&host->meshes, meshes));
+  __FAILURE_HANDLE(dictionary_move_entries(host->mesh_name_dict, mesh_name_dict, num_meshes_before));
+
+  uint32_t num_meshes_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
+
+  __FAILURE_HANDLE(
+    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult host_add_textures(Host* host, ARRAY Texture** textures, Dictionary* texture_name_dict) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(textures);
+  __CHECK_NULL_ARGUMENT(texture_name_dict);
+
+  uint32_t num_textures_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
+
+  __FAILURE_HANDLE(array_append(&host->textures, textures));
+  __FAILURE_HANDLE(dictionary_move_entries(host->texture_name_dict, texture_name_dict, num_textures_before));
+
+  uint32_t num_textures_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
+
+  __FAILURE_HANDLE(device_manager_add_textures(
+    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(object);
