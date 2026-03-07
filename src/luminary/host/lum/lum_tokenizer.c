@@ -190,7 +190,11 @@ static bool _lum_tokenizer_is_literal(LumTokenizer* tokenizer, LumToken* token, 
   if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH - 1)
     return false;
 
-  const bool is_number = code[0] >= '0' && code[0] <= '9';
+  bool is_number = code[0] >= '0' && code[0] <= '9';
+
+  if (is_number == false && num_chars > 1) {
+    is_number = code[0] == '-' && code[1] >= '0' && code[1] <= '9';
+  }
 
   if (is_number) {
     char literal_string[LUM_IDENTIFIER_MAX_LENGTH];
