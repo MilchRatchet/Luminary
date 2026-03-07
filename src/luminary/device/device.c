@@ -131,7 +131,7 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   props->max_threads_per_sm = (uint32_t) max_threads_per_sm;
 
   const uint32_t max_actual_blocks_per_sm = min(props->max_blocks_per_sm, props->max_threads_per_sm / THREADS_PER_BLOCK);
-  props->optimal_block_count              = max_actual_blocks_per_sm * props->sm_count;
+  props->optimal_block_count              = max_actual_blocks_per_sm * props->sm_count * 4;
 
   CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
 
@@ -332,20 +332,28 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   // Start by computing how well this pixel count fits to the recommended tasks per thread.
   uint32_t tasks_per_thread = RECOMMENDED_TASKS_PER_THREAD;
-  uint32_t total_task_count;
+  uint32_t total_task_count = thread_count * tasks_per_thread;
 
   while (tasks_per_thread < MAXIMUM_TASKS_PER_THREAD) {
-    total_task_count = thread_count * tasks_per_thread;
-
     const uint32_t tile_count       = (internal_pixel_count + total_task_count - 1) / total_task_count;
     const uint32_t stale_tail_tasks = tile_count * total_task_count - internal_pixel_count;
 
-    // If the number of resident tasks in the last tile is above a threshold, then accept this tasks per thread.
-    if (total_task_count - stale_tail_tasks > thread_count * MINIMUM_TASKS_PER_THREAD)
+    if (tile_count > 1) {
+      // If the number of resident tasks in the last tile is above a threshold, then accept this tasks per thread.
+      if (total_task_count - stale_tail_tasks > thread_count * MINIMUM_TASKS_PER_THREAD)
+        break;
+    }
+    else {
+      // If the recommended count only requires a single tile, simply compute the minimum number of tasks required to achieve 1 tile.
+      tasks_per_thread = (internal_pixel_count + thread_count - 1) / thread_count;
       break;
+    }
 
     tasks_per_thread++;
+    total_task_count = thread_count * tasks_per_thread;
   }
+
+  total_task_count = thread_count * tasks_per_thread;
 
   DeviceWorkBuffersAllocInfo alloc_info;
   alloc_info.external_pixel_count  = external_pixel_count;
