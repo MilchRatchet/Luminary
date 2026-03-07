@@ -71,16 +71,20 @@ LuminaryResult lum_file_content_apply(LumFileContent* content, LuminaryHost* hos
   for (uint32_t instance_id = 0; instance_id < num_instances_added; instance_id++) {
     MeshInstance instance = content->instances[instance_id];
 
-    // Account for any meshes that were loaded prior to loading this lum file.
-    instance.mesh_id += mesh_id_offset;
+    if (instance.mesh_id != MESH_ID_INVALID) {
+      instance.active = true;
+
+      // Account for any meshes that were loaded prior to loading this lum file.
+      instance.mesh_id += mesh_id_offset;
+    }
 
     uint32_t new_id;
     __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES, &new_id));
 
     char name[1024];
-    sprintf(name, "__UNNAMEDMATERIAL__%u", new_id);
+    sprintf(name, "__UNNAMEDINSTANCE__%u", new_id);
 
-    __FAILURE_HANDLE(dictionary_add_entry(host->material_name_dict, new_id, name));
+    __FAILURE_HANDLE(dictionary_add_entry(host->mesh_instance_name_dict, new_id, name));
 
     // We have added an instance, so the scene is dirty and we need to queue the propagation
     __FAILURE_HANDLE(host_update_scene(host));
