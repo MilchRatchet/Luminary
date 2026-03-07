@@ -90,6 +90,9 @@ extern "C" __global__ void __raygen__optix() {
   // Store Result
   ////////////////////////////////////////////////////////////////////
 
+  if (color_any(accumulated_light) == false)
+    return;
+
   const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
   accumulated_light = mul_color(accumulated_light, record_unpack(throughput.record));
