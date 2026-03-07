@@ -127,7 +127,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t index, bool* scene_changed);
 LuminaryResult scene_get_entry_count(const Scene* scene, SceneEntity entity, uint32_t* count);
-LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity);
+LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t* id);
 LuminaryResult scene_get_list_changes(Scene* scene, ARRAYPTR void** object, SceneEntity entity);
 LuminaryResult scene_apply_changes(Scene* scene);
 LuminaryResult scene_propagate_changes(Scene* scene, Scene* src);

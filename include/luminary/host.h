@@ -132,7 +132,6 @@ LUMINARY_API LuminaryResult luminary_host_get_material_from_name(LuminaryHost* h
 
 LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint32_t id, LuminaryInstance* instance);
 LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, uint32_t id, const LuminaryInstance* instance);
-LUMINARY_API LuminaryResult luminary_host_new_instance(LuminaryHost* host, uint32_t* id);
 LUMINARY_API LuminaryResult luminary_host_get_instance_from_name(LuminaryHost* host, const char* name, uint32_t* id);
 
 LUMINARY_API LuminaryResult luminary_host_get_mesh_from_name(LuminaryHost* host, const char* name, uint32_t* id);

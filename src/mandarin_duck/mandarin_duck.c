@@ -35,7 +35,7 @@ static void _mandarin_duck_handle_file_drop(MandarinDuck* duck, LuminaryHost* ho
     LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
 
     uint32_t instance_id;
-    LUM_FAILURE_HANDLE(luminary_host_new_instance(host, &instance_id));
+    LUM_FAILURE_HANDLE(luminary_host_get_instance_from_name(host, file_drop.file_path, &instance_id));
 
     LuminaryInstance instance;
     LUM_FAILURE_HANDLE(luminary_host_get_instance(host, instance_id, &instance));

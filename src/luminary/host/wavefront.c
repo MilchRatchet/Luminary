@@ -144,11 +144,18 @@ LuminaryResult wavefront_destroy(WavefrontContent** content) {
 
   for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
     __FAILURE_HANDLE(texture_destroy(&(*content)->textures[texture_id]));
-    __FAILURE_HANDLE(host_free(&(*content)->texture_names[texture_id]));
   }
 
   __FAILURE_HANDLE(array_destroy(&(*content)->textures));
   __FAILURE_HANDLE(array_destroy(&(*content)->texture_instances));
+
+  uint32_t num_texture_names;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->texture_names, &num_texture_names));
+
+  for (uint32_t texture_id = 0; texture_id < num_texture_names; texture_id++) {
+    __FAILURE_HANDLE(host_free(&(*content)->texture_names[texture_id]));
+  }
+
   __FAILURE_HANDLE(array_destroy(&(*content)->texture_names));
 
   uint32_t num_objects;
@@ -158,8 +165,16 @@ LuminaryResult wavefront_destroy(WavefrontContent** content) {
     __FAILURE_HANDLE(host_free(&(*content)->object_names[object_id]));
   }
 
-  __FAILURE_HANDLE(array_destroy(&(*content)->material_names));
   __FAILURE_HANDLE(array_destroy(&(*content)->object_names));
+
+  uint32_t num_materials;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->material_names, &num_materials));
+
+  for (uint32_t material_id = 0; material_id < num_materials; material_id++) {
+    __FAILURE_HANDLE(host_free(&(*content)->material_names[material_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*content)->material_names));
 
   __FAILURE_HANDLE(host_free(content));
 
@@ -1064,15 +1079,14 @@ LuminaryResult wavefront_content_get_textures(WavefrontContent* content, ARRAYPT
 
   __FAILURE_HANDLE(array_resize(&content->textures, 0));
   __FAILURE_HANDLE(array_resize(&content->texture_instances, 0));
-  __FAILURE_HANDLE(array_resize(&content->texture_names, 0));
 
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult wavefront_content_get_materials(
-  WavefrontContent* content, ARRAYPTR Material** materials, Dictionary* material_name_dict, uint32_t texture_offset) {
+  WavefrontContent* content, Scene* scene, Dictionary* material_name_dict, uint32_t texture_offset) {
   __CHECK_NULL_ARGUMENT(content);
-  __CHECK_NULL_ARGUMENT(materials);
+  __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(material_name_dict);
 
   if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
@@ -1082,8 +1096,8 @@ LuminaryResult wavefront_content_get_materials(
   uint32_t material_count;
   __FAILURE_HANDLE(array_get_num_elements(content->materials, &material_count));
 
-  uint32_t material_id_offset;
-  __FAILURE_HANDLE(array_get_num_elements(*materials, &material_id_offset));
+  __FAILURE_HANDLE(scene_lock(scene, SCENE_ENTITY_TYPE_LIST));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
 
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
@@ -1096,7 +1110,7 @@ LuminaryResult wavefront_content_get_materials(
     const bool has_emission = (wavefront_mat.emission.r > 0.0f) || (wavefront_mat.emission.g > 0.0f) || (wavefront_mat.emission.b > 0.0f);
 
     Material mat;
-    __FAILURE_HANDLE(material_get_default(&mat));
+    __FAILURE_HANDLE_CRITICAL(material_get_default(&mat));
 
     mat.base_substrate           = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE;
     mat.albedo.r                 = wavefront_mat.diffuse_reflectivity.r;
@@ -1120,10 +1134,15 @@ LuminaryResult wavefront_content_get_materials(
     mat.metallic_tex             = has_metallic_tex ? texture_offset + wavefront_mat.texture[WF_METALLIC] : TEXTURE_NONE;
     mat.normal_tex               = has_normal_tex ? texture_offset + wavefront_mat.texture[WF_NORMAL] : TEXTURE_NONE;
 
-    __FAILURE_HANDLE(array_push(materials, &mat));
-
-    __FAILURE_HANDLE(dictionary_add_entry(material_name_dict, material_id_offset + mat_id, content->material_names[mat_id]));
+    uint32_t new_id;
+    __FAILURE_HANDLE_CRITICAL(scene_add_entry(scene, &mat, SCENE_ENTITY_MATERIALS, &new_id));
+    __FAILURE_HANDLE_CRITICAL(dictionary_add_entry(material_name_dict, new_id, content->material_names[mat_id]));
   }
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock(scene, SCENE_ENTITY_TYPE_LIST));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }

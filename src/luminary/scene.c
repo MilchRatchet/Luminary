@@ -648,9 +648,10 @@ LuminaryResult scene_get_entry_count(const Scene* scene, SceneEntity entity, uin
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity) {
+LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t* new_id) {
   __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(object);
+  __CHECK_NULL_ARGUMENT(new_id);
 
   switch (entity) {
     case SCENE_ENTITY_MATERIALS: {
@@ -675,6 +676,8 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
       memcpy(&update.material, object, sizeof(Material));
 
       __FAILURE_HANDLE(array_push(&scene->material_updates, &update));
+
+      *new_id = material_id;
 
       scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_MATERIALS;
     } break;
@@ -714,6 +717,8 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
       memcpy(&update.instance, object, sizeof(MeshInstance));
 
       __FAILURE_HANDLE(array_push(&scene->instance_updates, &update));
+
+      *new_id = instance_id;
 
       scene->flags[SCENE_ENTITY_TYPE_LIST] |= SCENE_DIRTY_FLAG_INSTANCES;
     } break;

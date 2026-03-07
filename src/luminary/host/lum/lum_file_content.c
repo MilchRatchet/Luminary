@@ -11,6 +11,7 @@
 #include "particles.h"
 #include "settings.h"
 #include "sky.h"
+#include "stdio.h"
 
 LuminaryResult lum_file_content_create(LumFileContent** _content) {
   __CHECK_NULL_ARGUMENT(_content);
@@ -73,7 +74,13 @@ LuminaryResult lum_file_content_apply(LumFileContent* content, LuminaryHost* hos
     // Account for any meshes that were loaded prior to loading this lum file.
     instance.mesh_id += mesh_id_offset;
 
-    __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES));
+    uint32_t new_id;
+    __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES, &new_id));
+
+    char name[1024];
+    sprintf(name, "__UNNAMEDMATERIAL__%u", new_id);
+
+    __FAILURE_HANDLE(dictionary_add_entry(host->material_name_dict, new_id, name));
 
     // We have added an instance, so the scene is dirty and we need to queue the propagation
     __FAILURE_HANDLE(host_update_scene(host));

@@ -47,10 +47,11 @@ LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
 
   memset(instance, 0, sizeof(MeshInstance));
 
-  instance->active  = true;
+  instance->active  = false;
   instance->scale.x = 1.0f;
   instance->scale.y = 1.0f;
   instance->scale.z = 1.0f;
+  instance->mesh_id = MESH_ID_INVALID;
 
   return LUMINARY_SUCCESS;
 }
@@ -99,7 +100,7 @@ LuminaryResult mesh_instance_from_public_api_instance(MeshInstance* mesh_instanc
   mesh_instance->translation = instance->position;
   mesh_instance->scale       = instance->scale;
   mesh_instance->rotation    = instance->rotation;
-  mesh_instance->active      = true;
+  mesh_instance->active      = (instance->mesh_id != MESH_ID_INVALID);
 
   return LUMINARY_SUCCESS;
 }

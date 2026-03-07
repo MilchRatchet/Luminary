@@ -1705,10 +1705,11 @@ static LuminaryResult _light_tree_update_cache_instance(
   bool previous_mesh_has_emission = false;
 
   if (cache->active != instance->active) {
-    cache->active     = instance->active;
-    instance_is_dirty = true;
+    cache->active   = instance->active;
+    cache->is_dirty = true;
   }
-  else if (!cache->active) {
+
+  if (cache->active == false) {
     // Skip further processing if this instance is inactive.
     return LUMINARY_SUCCESS;
   }
@@ -2000,6 +2001,9 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
 
   LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
 
+  if (instance->active == false)
+    return LUMINARY_SUCCESS;
+
   const Vec128 offset   = vec128_set(instance->translation.x, instance->translation.y, instance->translation.z, 0.0f);
   const Vec128 scale    = vec128_set(instance->scale.x, instance->scale.y, instance->scale.z, 1.0f);
   const Vec128 rotation = vec128_set(-instance->rotation.x, -instance->rotation.y, -instance->rotation.z, instance->rotation.w);
@@ -2012,8 +2016,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
     __FAILURE_HANDLE(array_clear(instance->bvh_triangles));
   }
 
-  if (instance->mesh_id == MESH_ID_INVALID)
-    return LUMINARY_SUCCESS;
+  __DEBUG_ASSERT(instance->mesh_id != MESH_ID_INVALID);
 
   const LightTreeCacheMesh* mesh = tree->cache.meshes + instance->mesh_id;
 
