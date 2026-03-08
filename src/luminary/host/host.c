@@ -8,6 +8,7 @@
 #include "internal_host.h"
 #include "internal_path.h"
 #include "lum.h"
+#include "lum/lum_serializer.h"
 #include "material.h"
 #include "mesh.h"
 #include "png.h"
@@ -1185,7 +1186,7 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle handle, LuminaryPath* path) {
+LuminaryResult luminary_host_save_png(Host* host, LuminaryOutputHandle handle, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
@@ -1219,6 +1220,19 @@ LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle h
   entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_save_as_lumV5(Host* host, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
+  LumSerializer* serializer;
+  __FAILURE_HANDLE(lum_serializer_create(&serializer));
+  __FAILURE_HANDLE(lum_serializer_serialize(serializer, host));
+  __FAILURE_HANDLE(lum_serializer_store(serializer, path));
+  __FAILURE_HANDLE(lum_serializer_destroy(&serializer));
 
   return LUMINARY_SUCCESS;
 }

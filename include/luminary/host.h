@@ -142,6 +142,8 @@ LUMINARY_API LuminaryResult luminary_host_get_num_instances(LuminaryHost* host, 
 
 LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle handle, LuminaryPath* path);
 
+LUMINARY_API LuminaryResult luminary_host_save_as_lumV5(LuminaryHost* host, LuminaryPath* path);
+
 /*
  * Calling this function will cause a rebuild of the sky HDRI and a restart of integration.
  * @param host Host instance.
