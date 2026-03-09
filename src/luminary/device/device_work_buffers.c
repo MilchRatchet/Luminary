@@ -107,7 +107,7 @@ LuminaryResult device_work_buffers_update(DeviceWorkBuffers* buffers, const Devi
   }
 
   if (info->max_concurrent_blocks != buffers->allocated_max_concurrent_blocks) {
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_swap, info->max_concurrent_blocks * 4 * THREADS_PER_BLOCK * sizeof(float)));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->frame_swap, info->max_concurrent_blocks * 4 * MAX_THREADS_PER_BLOCK * sizeof(float)));
 
     buffers->allocated_max_concurrent_blocks = info->max_concurrent_blocks;
     *buffers_have_changed                    = true;

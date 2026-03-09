@@ -5,7 +5,7 @@
 #include "utils.h"
 
 #define LUMINARY_MAX_NUM_DEVICES 4
-#define THREADS_PER_BLOCK 128
+#define MAX_THREADS_PER_BLOCK 128
 
 #define WARP_SIZE_LOG 5
 #define WARP_SIZE (1 << WARP_SIZE_LOG)

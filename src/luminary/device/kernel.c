@@ -110,8 +110,32 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
   CUDA_FAILURE_HANDLE(
     cuKernelGetAttribute((int*) &shared_memory_size, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, (*kernel)->cuda_kernel, device->cuda_device));
 
-  (*kernel)->shared_memory_size  = shared_memory_size;
-  (*kernel)->default_block_count = device->properties.optimal_block_count;
+  (*kernel)->shared_memory_size = shared_memory_size;
+
+  uint32_t optimal_block_size = MAX_THREADS_PER_BLOCK;
+
+  // We can only optimize the block size if we don't do inter-warp operations.
+  if (shared_memory_size == 0) {
+    uint32_t optimal_resident_threads = 0;
+
+    // cuOccupancyMaxPotentialBlockSize always just returns 128 even when it is possible to use smaller blocks.
+    for (uint32_t block_size = WARP_SIZE; block_size <= MAX_THREADS_PER_BLOCK; block_size *= 2) {
+      uint32_t num_blocks;
+      CUDA_FAILURE_HANDLE(
+        cuOccupancyMaxActiveBlocksPerMultiprocessor((int*) &num_blocks, (CUfunction) (*kernel)->cuda_kernel, block_size, 0));
+
+      const uint32_t num_threads = block_size * num_blocks;
+
+      if (num_threads <= optimal_resident_threads)
+        break;
+
+      optimal_block_size       = block_size;
+      optimal_resident_threads = num_threads;
+    }
+  }
+
+  (*kernel)->optimal_block_size  = optimal_block_size;
+  (*kernel)->default_block_count = device->properties.optimal_block_count * (MAX_THREADS_PER_BLOCK / (*kernel)->optimal_block_size);
 
   return LUMINARY_SUCCESS;
 }
@@ -121,7 +145,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream) {
 
   CUlaunchConfig launch_config;
 
-  launch_config.blockDimX      = THREADS_PER_BLOCK;
+  launch_config.blockDimX      = kernel->optimal_block_size;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
   launch_config.gridDimX       = kernel->default_block_count;
@@ -142,7 +166,7 @@ LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CU
 
   CUlaunchConfig launch_config;
 
-  launch_config.blockDimX      = THREADS_PER_BLOCK;
+  launch_config.blockDimX      = MAX_THREADS_PER_BLOCK;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
   launch_config.gridDimX       = kernel->default_block_count;

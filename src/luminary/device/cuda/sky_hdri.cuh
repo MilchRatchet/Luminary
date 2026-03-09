@@ -105,7 +105,7 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
 
   __syncwarp();
 
-  __shared__ float shared_thread_values[THREADS_PER_BLOCK];
+  __shared__ float shared_thread_values[MAX_THREADS_PER_BLOCK];
 
   shared_thread_values[THREAD_ID_IN_BLOCK] = (num_samples_thread > 0) ? color_thread.r / num_samples_thread : 0.0f;
 

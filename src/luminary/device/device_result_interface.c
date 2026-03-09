@@ -196,7 +196,8 @@ static LuminaryResult _device_result_interface_update_buffer(
       device->work_buffers->frame_swap, ((float*) src) + element_offset, 0, num_elements_this_iteration * sizeof(float),
       device->stream_main));
 
-    const uint32_t num_blocks_this_iteration = (num_elements_this_iteration + (4 * THREADS_PER_BLOCK - 1)) / (4 * THREADS_PER_BLOCK);
+    const uint32_t num_blocks_this_iteration =
+      (num_elements_this_iteration + (4 * MAX_THREADS_PER_BLOCK - 1)) / (4 * MAX_THREADS_PER_BLOCK);
 
     KernelArgsBufferAdd args;
     args.dst          = (void*) DEVICE_CUPTR_OFFSET(dst, element_offset * sizeof(float));
@@ -204,7 +205,7 @@ static LuminaryResult _device_result_interface_update_buffer(
     args.num_elements = num_elements_this_iteration;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_BUFFER_ADD], THREADS_PER_BLOCK, 1, 1, num_blocks_this_iteration, 1, 1, &args,
+      device->cuda_kernels[CUDA_KERNEL_TYPE_BUFFER_ADD], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks_this_iteration, 1, 1, &args,
       device->stream_main));
 
     num_remaining_elements -= num_elements_this_iteration;

@@ -130,7 +130,7 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   props->max_blocks_per_sm  = (uint32_t) max_blocks_per_sm;
   props->max_threads_per_sm = (uint32_t) max_threads_per_sm;
 
-  const uint32_t max_actual_blocks_per_sm = min(props->max_blocks_per_sm, props->max_threads_per_sm / THREADS_PER_BLOCK);
+  const uint32_t max_actual_blocks_per_sm = min(props->max_blocks_per_sm, props->max_threads_per_sm / MAX_THREADS_PER_BLOCK);
   props->optimal_block_count              = max_actual_blocks_per_sm * props->sm_count * 4;
 
   CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
@@ -328,7 +328,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   const uint32_t external_pixel_count     = (internal_pixel_count >> (constant_memory->settings.supersampling * 2));
   const uint32_t gbuffer_meta_pixel_count = external_pixel_count >> 2;
 
-  const uint32_t thread_count = THREADS_PER_BLOCK * device->properties.optimal_block_count;
+  const uint32_t thread_count = MAX_THREADS_PER_BLOCK * device->properties.optimal_block_count;
 
   // Start by computing how well this pixel count fits to the recommended tasks per thread.
   uint32_t tasks_per_thread = RECOMMENDED_TASKS_PER_THREAD;
@@ -663,7 +663,7 @@ LuminaryResult device_get_allocated_task_count(Device* device, uint32_t* task_co
   const DeviceConstantMemory* constant_memory;
   __FAILURE_HANDLE(device_constant_memory_manager_get_host_buffer(device->constant_memory, &constant_memory));
 
-  const uint32_t num_threads = constant_memory->config.num_blocks * THREADS_PER_BLOCK;
+  const uint32_t num_threads = constant_memory->config.num_blocks * MAX_THREADS_PER_BLOCK;
 
   *task_count = num_threads * constant_memory->config.num_tasks_per_thread;
 
@@ -677,7 +677,7 @@ LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pi
   const DeviceConstantMemory* constant_memory;
   __FAILURE_HANDLE(device_constant_memory_manager_get_host_buffer(device->constant_memory, &constant_memory));
 
-  const uint32_t num_threads = constant_memory->config.num_blocks * THREADS_PER_BLOCK;
+  const uint32_t num_threads = constant_memory->config.num_blocks * MAX_THREADS_PER_BLOCK;
   const uint32_t num_pixels  = constant_memory->settings.width * constant_memory->settings.height;
 
   const uint32_t num_current_pixels = num_pixels >> ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT);

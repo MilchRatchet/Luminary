@@ -307,10 +307,10 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
 
   const uint32_t num_pixels = hdri->width * hdri->height;
 
-  const uint32_t num_blocks = (num_pixels * 32 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  const uint32_t num_blocks = (num_pixels * 32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
   __FAILURE_HANDLE(kernel_execute_custom(
-    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
+    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
 
   __FAILURE_HANDLE(device_download2D(
     hdri->color_tex->data, device_hdri->color_tex->cuda_memory, device_hdri->color_tex->pitch, hdri->width * sizeof(RGBAF), hdri->height,

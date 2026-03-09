@@ -41,7 +41,7 @@ LUMINARY_KERNEL void process_trace_tasks() {
   uint16_t offset                 = 0;
 
   uint2 traversal_stack[STACK_SIZE];
-  __shared__ uint2 traversal_stack_sm[THREADS_PER_BLOCK][STACK_SIZE_SM];
+  __shared__ uint2 traversal_stack_sm[MAX_THREADS_PER_BLOCK][STACK_SIZE_SM];
 
   unsigned int hit_id;
   float depth;

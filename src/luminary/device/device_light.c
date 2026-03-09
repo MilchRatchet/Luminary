@@ -1973,10 +1973,11 @@ static LuminaryResult _light_tree_integrate(LightTree* tree, Device* device) {
   args.lights_count    = num_tasks;
 
   // Every thread handles two microtriangles. Every warp handles 1 light.
-  const uint32_t num_blocks = (num_tasks * (LIGHT_NUM_MICROTRIANGLES >> 1) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  const uint32_t num_blocks = (num_tasks * (LIGHT_NUM_MICROTRIANGLES >> 1) + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
   __FAILURE_HANDLE(kernel_execute_custom(
-    device->cuda_kernels[CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
+    device->cuda_kernels[CUDA_KERNEL_TYPE_LIGHT_COMPUTE_INTENSITY], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
+    device->stream_main));
 
   __FAILURE_HANDLE(
     device_download(tree->integrator.intensities, tree->integrator.device_intensities, 0, sizeof(float) * num_tasks, device->stream_main));
