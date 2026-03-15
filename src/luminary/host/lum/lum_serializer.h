@@ -7,6 +7,7 @@ struct LumSerializer {
   char* serialized_data;
   size_t serialized_data_allocated_size;
   size_t serialized_data_length;
+  uint32_t current_scope_depth;
 } typedef LumSerializer;
 
 LuminaryResult lum_serializer_create(LumSerializer** serializer);
