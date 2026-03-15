@@ -1,7 +1,6 @@
 #ifndef LUMINARY_HOST_OUTPUT_HANDLER_H
 #define LUMINARY_HOST_OUTPUT_HANDLER_H
 
-#include "mutex.h"
 #include "output_descriptor.h"
 #include "utils.h"
 

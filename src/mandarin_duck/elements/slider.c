@@ -181,6 +181,10 @@ static void _element_slider_update_data(Element* slider, void* dst, uint32_t sub
 
 bool element_slider(
   Window* window, Display* display, const MouseState* mouse_state, const KeyboardState* keyboard_state, ElementSliderArgs args) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element slider;

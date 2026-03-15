@@ -3,7 +3,6 @@
 
 #include "camera.h"
 #include "mesh.h"
-#include "mutex.h"
 #include "sample_count.h"
 #include "utils.h"
 

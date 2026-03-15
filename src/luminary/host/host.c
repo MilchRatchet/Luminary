@@ -1197,7 +1197,7 @@ LuminaryResult luminary_host_save_png(Host* host, LuminaryOutputHandle handle, P
   __FAILURE_HANDLE(output_handler_acquire(host->output_handler, handle));
 
   const char* file_path_string;
-  __FAILURE_HANDLE(path_apply(path, (const char*) 0, &file_path_string));
+  __FAILURE_HANDLE(luminary_path_apply(path, (const char*) 0, &file_path_string));
 
   const size_t path_length = strlen(file_path_string);
 

@@ -50,4 +50,6 @@ typedef LuminaryThreadStatus ThreadStatus;
 typedef LuminaryPath Path;
 typedef LuminaryImage Image;
 
+typedef LuminaryMutex Mutex;
+
 #endif /* LUMINARY_INTERNAL_API_RESOLVE */

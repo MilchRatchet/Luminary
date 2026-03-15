@@ -7,6 +7,7 @@
 #include "elements/checkbox.h"
 #include "elements/color.h"
 #include "elements/dropdown.h"
+#include "elements/file_dialog.h"
 #include "elements/separator.h"
 #include "elements/slider.h"
 #include "elements/text.h"
@@ -193,6 +194,56 @@ static bool _window_entity_properties_add_dropdown(
   window_pop_section(data.window);
 
   return update_data;
+}
+
+static bool _window_entity_properties_add_file_dialog(
+  WindowEntityPropertiesPassingData data, const char* text, FileDialogHandler* handler, const char* window_title) {
+  bool update_data = false;
+
+  window_push_section(data.window, 32, 0);
+  {
+    element_text(
+      data.window, data.display, data.mouse_state,
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
+        .text         = text,
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
+
+    element_file_dialog(
+      data.window, data.display, data.mouse_state,
+      (ElementFileDialogArgs) {
+        .file_dialog_handler = handler,
+        .window_title        = window_title,
+        .size                = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+      });
+  }
+  window_pop_section(data.window);
+
+  return update_data;
+}
+
+static void _window_entity_properties_scene_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  WindowEntityPropertiesPassingData data = {
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+  };
+
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Scene", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  _window_entity_properties_add_file_dialog(data, "Scene File Path", display->working_directory, "Select scene file path");
 }
 
 static void _window_entity_properties_renderer_settings_action(

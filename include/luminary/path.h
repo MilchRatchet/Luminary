@@ -26,6 +26,19 @@ typedef struct LuminaryPath LuminaryPath;
 
 LUMINARY_API LuminaryResult luminary_path_create(LuminaryPath** path);
 LUMINARY_API LuminaryResult luminary_path_set_from_string(LuminaryPath* path, const char* string);
+
+/*
+ * Returns an ASCII encoded string corresponding to the given path. If override_path is not null,
+ * then if override is an absolute override_path override will be returned, else a string containing the absolute
+ * path given by interpreting override_path relative to the given path. The string must not be freed and is only valid until
+ * the next path_* function call on this path object.
+ * @param path Path instance.
+ * @param override_path String containing a path. Optional.
+ * @param string The destination the address of the string will be written to.
+ *               If the computed path is empty, an empty string will be returned.
+ */
+LUMINARY_API LuminaryResult luminary_path_apply(LuminaryPath* path, const char* override_path, const char** string);
+
 LUMINARY_API LuminaryResult luminary_path_destroy(LuminaryPath** path);
 
 #endif /* LUMINARY_PATH_H */

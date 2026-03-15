@@ -362,7 +362,7 @@ static LuminaryResult _wavefront_parse_map(
     texture_instance.texture_id = texture_id;
 
     const char* tex_file_path;
-    __FAILURE_HANDLE(path_apply(mtl_file_path, path, &tex_file_path));
+    __FAILURE_HANDLE(luminary_path_apply(mtl_file_path, path, &tex_file_path));
 
     Texture* tex;
     __FAILURE_HANDLE(texture_create(&tex));
@@ -399,7 +399,7 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
   __CHECK_NULL_ARGUMENT(mtl_file_path);
 
   const char* mtl_file_path_string;
-  __FAILURE_HANDLE(path_apply(mtl_file_path, (const char*) 0, &mtl_file_path_string));
+  __FAILURE_HANDLE(luminary_path_apply(mtl_file_path, (const char*) 0, &mtl_file_path_string));
 
   log_message("Reading *.mtl file (%s)", mtl_file_path_string);
   FILE* file = fopen(mtl_file_path_string, "r");
@@ -713,7 +713,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   content->state = WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT;
 
   const char* file_path_string;
-  __FAILURE_HANDLE(path_apply(wavefront_file_path, (const char*) 0, &file_path_string));
+  __FAILURE_HANDLE(luminary_path_apply(wavefront_file_path, (const char*) 0, &file_path_string));
 
   log_message("Reading *.obj file (%s)", file_path_string);
   FILE* file = fopen(file_path_string, "r");

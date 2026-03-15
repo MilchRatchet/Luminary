@@ -265,7 +265,7 @@ static LuminaryResult _path_apply_override(Path* path, const char* override) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult path_apply(Path* path, const char* override, const char** string) {
+LuminaryResult luminary_path_apply(Path* path, const char* override, const char** string) {
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(string);
 

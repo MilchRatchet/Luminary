@@ -5,7 +5,6 @@
 #include "dictionary.h"
 #include "host_output_handler.h"
 #include "mesh.h"
-#include "mutex.h"
 #include "output_descriptor.h"
 #include "queue_worker.h"
 #include "scene.h"

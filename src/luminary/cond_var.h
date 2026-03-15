@@ -1,7 +1,6 @@
 #ifndef LUMINARY_COND_VAR_H
 #define LUMINARY_COND_VAR_H
 
-#include "mutex.h"
 #include "utils.h"
 
 struct ConditionVariable;

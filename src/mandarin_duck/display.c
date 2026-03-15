@@ -193,6 +193,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   text_renderer_create(&display->text_renderer);
   render_region_create(&display->region);
   display_zoom_handler_create(&display->zoom_handler);
+  file_dialog_handler_create(&display->working_directory);
 
   _display_handle_display_change(display);
   _display_handle_resize(display);
@@ -787,6 +788,7 @@ void display_destroy(Display** display) {
   text_renderer_destroy(&(*display)->text_renderer);
   render_region_destroy(&(*display)->region);
   display_zoom_handler_destroy(&(*display)->zoom_handler);
+  file_dialog_handler_destroy(&(*display)->working_directory);
 
   LUM_FAILURE_HANDLE(host_free(display));
 

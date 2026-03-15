@@ -38,12 +38,12 @@ static void _element_button_render_circle(Element* button, Display* display) {
 }
 
 static const char* _button_image_string[ELEMENT_BUTTON_IMAGE_COUNT] = {
-  [ELEMENT_BUTTON_IMAGE_CHECK] = "\ue5ca",    [ELEMENT_BUTTON_IMAGE_SETTINGS] = "\ue8b8",      [ELEMENT_BUTTON_IMAGE_CAMERA] = "\ue412",
-  [ELEMENT_BUTTON_IMAGE_WAVES] = "\ue176",    [ELEMENT_BUTTON_IMAGE_SUN] = "\uf157",           [ELEMENT_BUTTON_IMAGE_CLOUD] = "\ue2bd",
-  [ELEMENT_BUTTON_IMAGE_MIST] = "\ue188",     [ELEMENT_BUTTON_IMAGE_PRECIPITATION] = "\ue810", [ELEMENT_BUTTON_IMAGE_MATERIAL] = "\uef8f",
-  [ELEMENT_BUTTON_IMAGE_INSTANCE] = "\uead3", [ELEMENT_BUTTON_IMAGE_MOVE] = "\ue89f",          [ELEMENT_BUTTON_IMAGE_SELECT] = "\uf706",
-  [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4",    [ELEMENT_BUTTON_IMAGE_SYNC] = "\ue627",          [ELEMENT_BUTTON_IMAGE_REGION] = "\ue5d0",
-  [ELEMENT_BUTTON_IMAGE_ERROR] = "\ue000",    [ELEMENT_BUTTON_IMAGE_STAR] = "\ue838"};
+  [ELEMENT_BUTTON_IMAGE_CHECK] = "\ue5ca",    [ELEMENT_BUTTON_IMAGE_SCENE] = "\ue3f7",    [ELEMENT_BUTTON_IMAGE_SETTINGS] = "\ue8b8",
+  [ELEMENT_BUTTON_IMAGE_CAMERA] = "\ue412",   [ELEMENT_BUTTON_IMAGE_WAVES] = "\ue176",    [ELEMENT_BUTTON_IMAGE_SUN] = "\uf157",
+  [ELEMENT_BUTTON_IMAGE_CLOUD] = "\ue3dd",    [ELEMENT_BUTTON_IMAGE_MIST] = "\ue188",     [ELEMENT_BUTTON_IMAGE_PRECIPITATION] = "\ue810",
+  [ELEMENT_BUTTON_IMAGE_MATERIAL] = "\uef8f", [ELEMENT_BUTTON_IMAGE_INSTANCE] = "\uead3", [ELEMENT_BUTTON_IMAGE_MOVE] = "\ue89f",
+  [ELEMENT_BUTTON_IMAGE_SELECT] = "\uf706",   [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4",    [ELEMENT_BUTTON_IMAGE_SYNC] = "\ue627",
+  [ELEMENT_BUTTON_IMAGE_REGION] = "\ue5d0",   [ELEMENT_BUTTON_IMAGE_ERROR] = "\ue000",    [ELEMENT_BUTTON_IMAGE_STAR] = "\ue838"};
 
 static void _element_button_render_image(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
@@ -77,6 +77,10 @@ static void _element_button_render_func(Element* button, Display* display) {
 }
 
 bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element button;

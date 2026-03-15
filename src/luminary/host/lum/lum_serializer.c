@@ -134,7 +134,7 @@ LuminaryResult lum_serializer_store(LumSerializer* serializer, Path* path) {
   __CHECK_NULL_ARGUMENT(path);
 
   const char* file_path_string;
-  __FAILURE_HANDLE(path_apply(path, (const char*) 0, &file_path_string));
+  __FAILURE_HANDLE(luminary_path_apply(path, (const char*) 0, &file_path_string));
 
   FILE* file = fopen(file_path_string, "wb");
 

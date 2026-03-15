@@ -1,12 +1,11 @@
-#include "mutex.h"
-
 #include <math.h>
 #include <threads.h>
 #include <time.h>
 
 #include "internal_error.h"
+#include "utils.h"
 
-struct Mutex {
+struct LuminaryMutex {
   mtx_t _mutex;
 };
 

@@ -2,7 +2,6 @@
 
 #include "cond_var.h"
 #include "internal_error.h"
-#include "mutex.h"
 #include "utils.h"
 
 struct LuminaryQueue {
