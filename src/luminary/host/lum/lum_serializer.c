@@ -74,7 +74,8 @@ static LuminaryResult _lum_serializer_serialize_literal(LumSerializer* serialize
       __FAILURE_HANDLE(_lum_serializer_write(serializer, "%f", value));
     } break;
     case LUM_BUILTIN_TYPE_ENUM: {
-      // TODO: ENUMS
+      uint32_t value = *(uint32_t*) data;
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, "%u", value));
     } break;
     default: {
       const uint32_t member_count = lum_builtin_types_member_counts[type];
@@ -95,7 +96,13 @@ static LuminaryResult _lum_serializer_serialize_struct(LumSerializer* serializer
   __CHECK_NULL_ARGUMENT(data);
 
   // TODO: Addressables, probably a separate function
-  __FAILURE_HANDLE(_lum_serializer_write(serializer, "[%s]\n", lum_builtin_types_strings[type]));
+  if (serializer->current_scope_depth > 0) {
+    __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+  }
+  else {
+    __FAILURE_HANDLE(_lum_serializer_write(serializer, "[%s]\n", lum_builtin_types_strings[type]));
+  }
+
   __FAILURE_HANDLE(_lum_serializer_indent(serializer));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "{\n"));
 
@@ -110,8 +117,10 @@ static LuminaryResult _lum_serializer_serialize_struct(LumSerializer* serializer
     if (member->max_version < LUM_VERSION_CURRENT)
       continue;
 
+    const bool member_is_struct = lum_builtin_types_member_counts[member->type] > 0;
+
     __FAILURE_HANDLE(_lum_serializer_indent(serializer));
-    __FAILURE_HANDLE(_lum_serializer_write(serializer, ".%s = ", member->name));
+    __FAILURE_HANDLE(_lum_serializer_write(serializer, (member_is_struct) ? ".%s " : ".%s = ", member->name));
     __FAILURE_HANDLE(_lum_serializer_serialize_literal(serializer, member->type, ((const char*) data) + member->offset));
     __FAILURE_HANDLE(_lum_serializer_write(serializer, ",\n"));
   }

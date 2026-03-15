@@ -303,17 +303,19 @@ LuminaryResult host_add_meshes(Host* host, ARRAY Mesh** meshes, Dictionary* mesh
   __CHECK_NULL_ARGUMENT(meshes);
   __CHECK_NULL_ARGUMENT(mesh_name_dict);
 
+  uint32_t num_added_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(meshes, &num_added_meshes));
+
+  if (num_added_meshes == 0)
+    return LUMINARY_SUCCESS;
+
   uint32_t num_meshes_before;
   __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
 
   __FAILURE_HANDLE(array_append(&host->meshes, meshes));
   __FAILURE_HANDLE(dictionary_move_entries(host->mesh_name_dict, mesh_name_dict, num_meshes_before));
 
-  uint32_t num_meshes_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
-
-  __FAILURE_HANDLE(
-    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
+  __FAILURE_HANDLE(device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_added_meshes));
 
   return LUMINARY_SUCCESS;
 }
@@ -323,17 +325,20 @@ LuminaryResult host_add_textures(Host* host, ARRAY Texture** textures, Dictionar
   __CHECK_NULL_ARGUMENT(textures);
   __CHECK_NULL_ARGUMENT(texture_name_dict);
 
+  uint32_t num_added_textures;
+  __FAILURE_HANDLE(array_get_num_elements(textures, &num_added_textures));
+
+  if (num_added_textures == 0)
+    return LUMINARY_SUCCESS;
+
   uint32_t num_textures_before;
   __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
 
   __FAILURE_HANDLE(array_append(&host->textures, textures));
   __FAILURE_HANDLE(dictionary_move_entries(host->texture_name_dict, texture_name_dict, num_textures_before));
 
-  uint32_t num_textures_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
-
-  __FAILURE_HANDLE(device_manager_add_textures(
-    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
+  __FAILURE_HANDLE(
+    device_manager_add_textures(host->device_manager, (const Texture**) host->textures + num_textures_before, num_added_textures));
 
   return LUMINARY_SUCCESS;
 }

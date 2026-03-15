@@ -489,6 +489,19 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = _lum_builtin_member_camera_physical,
 };
 
+LuminaryResult lum_builtin_assignment_is_valid(LumBuiltinType dst_type, LumBuiltinType src_type, bool* is_assignable) {
+  __CHECK_NULL_ARGUMENT(is_assignable);
+
+  if (dst_type == LUM_BUILTIN_TYPE_ENUM && src_type == LUM_BUILTIN_TYPE_UINT) {
+    *is_assignable = true;
+    return LUMINARY_SUCCESS;
+  }
+
+  *is_assignable = dst_type == src_type;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t version) {
   __CHECK_NULL_ARGUMENT(settings);
 

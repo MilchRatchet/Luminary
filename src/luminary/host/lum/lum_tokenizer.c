@@ -326,6 +326,13 @@ LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken*
       continue;
     }
 
+    // Tab
+    if (current_char == '\t') {
+      tokenizer->col++;
+      tokenizer->read_offset++;
+      continue;
+    }
+
     // Carriage return
     if (current_char == '\r') {
       tokenizer->read_offset++;

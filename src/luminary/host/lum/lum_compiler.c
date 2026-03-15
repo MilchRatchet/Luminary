@@ -788,7 +788,10 @@ static LuminaryResult _lum_compiler_handle_literal_operator_context(LumCompilerS
   const LumBuiltinType lhs_type = state->stack_allocator->allocated_objects[lhs_stack_id].type;
   const LumBuiltinType rhs_type = lum_tokenizer_literal_type_to_builtin[token->literal.type];
 
-  if (lhs_type != rhs_type) {
+  bool valid_assignment;
+  __FAILURE_HANDLE(lum_builtin_assignment_is_valid(lhs_type, rhs_type, &valid_assignment));
+
+  if (valid_assignment == false) {
     __FAILURE_HANDLE(_lum_compiler_state_add_error_message(
       state, token, "a value of type '%s' cannot be assigned to an entity of type '%s'", lum_builtin_types_strings[rhs_type],
       lum_builtin_types_strings[lhs_type]));
@@ -1150,6 +1153,10 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
     if (state->error_occurred)
       break;
   } while (token.type != LUM_TOKEN_TYPE_EOF);
+
+  if (state->stack_ptr != LUM_COMPILER_CONTEXT_STACK_EMPTY) {
+    __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, &token, "unexpected end of file"));
+  }
 
   uint32_t message_count;
   __FAILURE_HANDLE(array_get_num_elements(state->messages, &message_count));
