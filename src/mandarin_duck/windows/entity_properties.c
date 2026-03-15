@@ -242,8 +242,6 @@ static void _window_entity_properties_scene_action(Window* window, Display* disp
   };
 
   element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Scene", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
-
-  _window_entity_properties_add_file_dialog(data, "Scene File Path", display->working_directory, "Select scene file path");
 }
 
 static void _window_entity_properties_renderer_settings_action(

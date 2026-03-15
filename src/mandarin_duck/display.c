@@ -193,7 +193,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   text_renderer_create(&display->text_renderer);
   render_region_create(&display->region);
   display_zoom_handler_create(&display->zoom_handler);
-  file_dialog_handler_create(&display->working_directory);
+  file_dialog_handler_create(&display->scene_file_path);
 
   _display_handle_display_change(display);
   _display_handle_resize(display);
@@ -478,6 +478,65 @@ static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
   LUM_FAILURE_HANDLE(luminary_host_request_output(host, properties, &display->output_promise_handle));
 }
 
+static void _display_save_scene(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  if (display->queued_save_scene == false)
+    return;
+
+  if (display->scene_file_path->dialog_open)
+    return;
+
+  LuminaryPath* path;
+  file_dialog_handler_try_acquire_path(display->scene_file_path, &path);
+
+  if (path == (LuminaryPath*) 0)
+    return;
+
+  bool is_empty;
+  LUM_FAILURE_HANDLE(luminary_path_get_is_empty(path, &is_empty));
+
+  if (is_empty == false) {
+    LUM_FAILURE_HANDLE(luminary_host_save_as_lumV5(host, path));
+  }
+
+  file_dialog_handler_release_path(display->scene_file_path);
+
+  display->queued_save_scene = false;
+}
+
+static void _display_query_scene_path(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  display->queued_save_scene = true;
+
+  const bool shift_down = display->keyboard_state->keys[SDL_SCANCODE_LSHIFT].down;
+
+  if (shift_down == false) {
+    LuminaryPath* path;
+    file_dialog_handler_try_acquire_path(display->scene_file_path, &path);
+
+    if (path == (LuminaryPath*) 0)
+      return;
+
+    bool is_empty;
+    LUM_FAILURE_HANDLE(luminary_path_get_is_empty(path, &is_empty));
+
+    file_dialog_handler_release_path(display->scene_file_path);
+
+    if (is_empty == false)
+      return;
+  }
+
+  FileDialogHandlerOpenArgs open_args;
+  open_args.sdl_window   = display->sdl_window;
+  open_args.dialog_title = "Select scene file path";
+
+  file_dialog_handler_open_dialog(display->scene_file_path, &open_args);
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -493,6 +552,16 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   if (display->keyboard_state->keys[SDL_SCANCODE_F2].phase == KEY_PHASE_PRESSED) {
     _display_generate_screenshot(display, host);
   }
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_S].phase == KEY_PHASE_PRESSED) {
+    const bool ctrl_down = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
+
+    if (ctrl_down) {
+      _display_query_scene_path(display, host);
+    }
+  }
+
+  _display_save_scene(display, host);
 
   if (display->awaiting_pixel_query_result) {
     display->awaiting_pixel_query_result = false;
@@ -788,7 +857,7 @@ void display_destroy(Display** display) {
   text_renderer_destroy(&(*display)->text_renderer);
   render_region_destroy(&(*display)->region);
   display_zoom_handler_destroy(&(*display)->zoom_handler);
-  file_dialog_handler_destroy(&(*display)->working_directory);
+  file_dialog_handler_destroy(&(*display)->scene_file_path);
 
   LUM_FAILURE_HANDLE(host_free(display));
 

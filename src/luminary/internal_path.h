@@ -11,6 +11,7 @@ struct LuminaryPath {
   char* working_dir;
   char* file_path;
   char* output;
+  bool is_empty;
 } typedef LuminaryPath;
 
 /*

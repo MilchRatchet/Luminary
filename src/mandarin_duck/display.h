@@ -72,7 +72,8 @@ struct Display {
   RenderRegion* region;
   const uint32_t* splash_screen;
   DisplayZoomHandler* zoom_handler;
-  FileDialogHandler* working_directory;
+  FileDialogHandler* scene_file_path;
+  bool queued_save_scene;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);

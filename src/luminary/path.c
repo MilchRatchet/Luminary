@@ -32,6 +32,7 @@ LuminaryResult luminary_path_create(Path** _path) {
   path->working_dir_len         = 0;
   path->file_path_len           = 0;
   path->output_memory_available = 0;
+  path->is_empty                = true;
 
   *_path = path;
 
@@ -53,6 +54,7 @@ LuminaryResult path_copy(Path** path, const Path* src_path) {
   (*path)->working_dir = (*path)->memory;
   (*path)->file_path   = (*path)->working_dir + (*path)->working_dir_len + 1;
   (*path)->output      = (*path)->file_path + (*path)->file_path_len + 1;
+  (*path)->is_empty    = src_path->is_empty;
 
   return LUMINARY_SUCCESS;
 }
@@ -111,6 +113,8 @@ LuminaryResult path_extend(Path** path, const Path* src_path, const char* extens
     (*path)->output_memory_available = PATH_BUFFER_SIZE - (*path)->working_dir_len - (*path)->file_path_len - 2;
   }
 
+  (*path)->is_empty = false;
+
   return LUMINARY_SUCCESS;
 }
 
@@ -149,6 +153,8 @@ LuminaryResult luminary_path_set_from_string(Path* path, const char* string) {
   path->output = path->file_path + file_path_len + 1;
 
   path->output_memory_available = PATH_BUFFER_SIZE - working_dir_len - file_path_len - 2;
+
+  path->is_empty = false;
 
   return LUMINARY_SUCCESS;
 }
@@ -269,6 +275,9 @@ LuminaryResult luminary_path_apply(Path* path, const char* override, const char*
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(string);
 
+  if (path->is_empty)
+    *string = "";
+
   if (override) {
     __FAILURE_HANDLE(_path_apply_override(path, override));
   }
@@ -277,6 +286,23 @@ LuminaryResult luminary_path_apply(Path* path, const char* override, const char*
   }
 
   *string = path->output;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_path_clear(Path* path) {
+  __CHECK_NULL_ARGUMENT(path);
+
+  path->is_empty = true;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_path_get_is_empty(Path* path, bool* is_empty) {
+  __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(is_empty);
+
+  *is_empty = path->is_empty;
 
   return LUMINARY_SUCCESS;
 }
