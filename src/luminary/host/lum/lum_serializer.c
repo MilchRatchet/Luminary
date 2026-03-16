@@ -30,16 +30,22 @@ static LuminaryResult _lum_serializer_write(LumSerializer* serializer, const cha
 
   const size_t offset = serializer->serialized_data_length;
 
-  int size = vsnprintf(serializer->serialized_data + offset, serializer->serialized_data_allocated_size - offset, format, args);
+  int string_length = vsnprintf(serializer->serialized_data + offset, serializer->serialized_data_allocated_size - offset, format, args);
 
-  if (size + offset > serializer->serialized_data_allocated_size) {
-    serializer->serialized_data_allocated_size = (size + offset) * 2;
+  if (string_length < 0)
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "vsnprintf returned error code %d", string_length);
+
+  // vsnprintf returns size excluding the NULL terminator but for allocation reasons we care about the size including the NULL terminator.
+  int required_size = string_length + 1;
+
+  if (required_size + offset > serializer->serialized_data_allocated_size) {
+    serializer->serialized_data_allocated_size = (required_size + offset) * 2;
     __FAILURE_HANDLE(host_realloc(&serializer->serialized_data, serializer->serialized_data_allocated_size));
 
     vsnprintf(serializer->serialized_data + offset, serializer->serialized_data_allocated_size - offset, format, args);
   }
 
-  serializer->serialized_data_length += size;
+  serializer->serialized_data_length += string_length;
 
   va_end(args);
 
@@ -120,7 +126,7 @@ static LuminaryResult _lum_serializer_serialize_struct(LumSerializer* serializer
     const bool member_is_struct = lum_builtin_types_member_counts[member->type] > 0;
 
     __FAILURE_HANDLE(_lum_serializer_indent(serializer));
-    __FAILURE_HANDLE(_lum_serializer_write(serializer, (member_is_struct) ? ".%s " : ".%s = ", member->name));
+    __FAILURE_HANDLE(_lum_serializer_write(serializer, (member_is_struct) ? ".%s" : ".%s = ", member->name));
     __FAILURE_HANDLE(_lum_serializer_serialize_literal(serializer, member->type, ((const char*) data) + member->offset));
     __FAILURE_HANDLE(_lum_serializer_write(serializer, ",\n"));
   }
