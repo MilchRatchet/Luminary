@@ -39,11 +39,6 @@ static LuminaryResult _host_start_new_render(Host* host, void* args) {
   return LUMINARY_SUCCESS;
 }
 
-struct HostLoadObjArgs {
-  Path* path;
-  WavefrontArguments wavefront_args;
-} typedef HostLoadObjArgs;
-
 static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(args);
@@ -276,6 +271,15 @@ LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArgumen
 
   __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
 
+  // Add obj file to history
+  HostLoadObjArgs args;
+  memset(&args, 0, sizeof(HostLoadObjArgs));
+
+  args.wavefront_args = *wavefront_args;
+  __FAILURE_HANDLE(path_copy(&args.path, path));
+
+  __FAILURE_HANDLE(array_push(&host->loaded_obj_files, &args));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -400,6 +404,8 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_name_dict));
   __FAILURE_HANDLE(dictionary_create(&(*host)->texture_name_dict));
 
+  __FAILURE_HANDLE(array_create(&(*host)->loaded_obj_files, sizeof(HostLoadObjArgs), 16));
+
   DeviceManagerCreateInfo device_manager_create_info;
   device_manager_create_info.device_mask = info.device_mask;
 
@@ -453,6 +459,15 @@ LuminaryResult luminary_host_destroy(Host** host) {
   ////////////////////////////////////////////////////////////////////
   // Destroy member
   ////////////////////////////////////////////////////////////////////
+
+  uint32_t num_loaded_objs;
+  __FAILURE_HANDLE(array_get_num_elements((*host)->loaded_obj_files, &num_loaded_objs));
+
+  for (uint32_t obj_id = 0; obj_id < num_loaded_objs; obj_id++) {
+    __FAILURE_HANDLE(luminary_path_destroy(&(*host)->loaded_obj_files[obj_id].path));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*host)->loaded_obj_files));
 
   __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
 

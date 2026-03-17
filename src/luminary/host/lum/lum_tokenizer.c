@@ -86,6 +86,9 @@ static uint32_t _lum_literal_parse_string(LumTokenizer* tokenizer, LumToken* tok
       break;
     }
 
+    // TODO: Figure out if LumV5 should support escape sequences in strings. My feeling is that they are useless
+    // for our purpose. The issue is that they cause issues with Windows file paths.
+#if 0
     // Escape Sequence
     if (code[read_chars] == '\\') {
       read_chars++;
@@ -115,6 +118,7 @@ static uint32_t _lum_literal_parse_string(LumTokenizer* tokenizer, LumToken* tok
       read_chars++;
       continue;
     }
+#endif
 
     if (write_offset == tokenizer->allocated_string_mem) {
       tokenizer->allocated_string_mem *= 2;

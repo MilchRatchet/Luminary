@@ -11,8 +11,12 @@
 #include "texture.h"
 #include "thread.h"
 #include "utils.h"
+#include "wavefront.h"
 
-struct WavefrontArguments typedef WavefrontArguments;
+struct HostLoadObjArgs {
+  Path* path;
+  WavefrontArguments wavefront_args;
+} typedef HostLoadObjArgs;
 
 struct LuminaryHost {
   DeviceManager* device_manager;
@@ -32,6 +36,7 @@ struct LuminaryHost {
   Dictionary* mesh_name_dict;
   Dictionary* texture_name_dict;
   bool scene_locked_by_caller;
+  ARRAY HostLoadObjArgs* loaded_obj_files;
 } typedef LuminaryHost;
 
 LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor descriptor);

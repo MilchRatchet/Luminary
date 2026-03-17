@@ -132,8 +132,15 @@ extern const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COU
 ////////////////////////////////////////////////////////////////////
 
 struct LumBuiltinString {
-  uint32_t const_mem_address;
-  uint32_t const_mem_size;
+  union {
+    // Virtual Machine Representation
+    struct {
+      uint32_t const_mem_address;
+      uint32_t const_mem_size;
+    };
+    // Serializer Representation
+    const char* string_ptr;
+  };
 } typedef LumBuiltinString;
 
 struct LumBuiltinAdaptiveSampling {
