@@ -1884,7 +1884,9 @@ static LuminaryResult _light_tree_queue_texture_integrations(LightTree* tree, co
 
   const LightTreeCacheMesh* mesh = tree->cache.meshes + mesh_id;
 
-  if (!mesh->has_emission)
+  // Skip meshes that are not references. Meshes without instances are not even guaranteed to be present on
+  // the GPU.
+  if (mesh->has_emission == false || mesh->instance_count == 0)
     return LUMINARY_SUCCESS;
 
   uint32_t num_materials;
