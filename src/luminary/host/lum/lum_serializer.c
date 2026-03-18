@@ -87,11 +87,17 @@ static LuminaryResult _lum_serializer_serialize_literal(LumSerializer* serialize
       LumBuiltinString string = *(LumBuiltinString*) data;
       __FAILURE_HANDLE(_lum_serializer_write(serializer, "\"%s\"", (string.string_ptr != (const char*) 0) ? string.string_ptr : ""));
     } break;
+    case LUM_BUILTIN_TYPE_MESH: {
+      // TODO
+    } break;
+    case LUM_BUILTIN_TYPE_TEXTURE: {
+      // TODO
+    } break;
     default: {
       const uint32_t member_count = lum_builtin_types_member_counts[type];
 
       if (member_count == 0)
-        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Builtin type '%s' cannot be written as a literal.");
+        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Builtin type '%s' cannot be written as a literal.", lum_builtin_types_strings[type]);
 
       // Type is struct
       __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, type, data, (const char*) 0));
@@ -163,11 +169,16 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "Luminary\nVersion 5\n\n"));
 
+  // TODO: This is bust, this is getting is data from the caller scene when it should be using the host scene
+  // TODO: Use critical section failure handles
+
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "# This file was automatically created by Luminary.\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "# Please read the documentation before making changes.\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
+
+  __FAILURE_HANDLE(scene_lock(host->scene_host, SCENE_ENTITY_TYPE_GLOBAL));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -258,6 +269,54 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
     __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_WAVEFRONTOBJFILE, (const void*) &obj_file, obj_path));
   }
+
+  __FAILURE_HANDLE(scene_unlock(host->scene_host, SCENE_ENTITY_TYPE_GLOBAL));
+
+  __FAILURE_HANDLE(scene_lock(host->scene_host, SCENE_ENTITY_TYPE_LIST));
+
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "# Instances\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+
+  uint32_t num_instances;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_host, SCENE_ENTITY_INSTANCES, &num_instances));
+
+  for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
+    MeshInstance instance;
+    __FAILURE_HANDLE(scene_get_entry(host->scene_host, &instance, SCENE_ENTITY_INSTANCES, instance_id));
+
+    const char* name;
+    bool found = false;
+    __FAILURE_HANDLE(dictionary_find_by_id(host->mesh_instance_name_dict, instance_id, &name, &found));
+
+    __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_INSTANCE, (const void*) &instance, name));
+    __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+  }
+
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "# Materials\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
+  __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+
+  uint32_t num_materials;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_host, SCENE_ENTITY_MATERIALS, &num_materials));
+
+  for (uint32_t material_id = 0; material_id < num_materials; material_id++) {
+    Material material;
+    __FAILURE_HANDLE(scene_get_entry(host->scene_host, &material, SCENE_ENTITY_MATERIALS, material_id));
+
+    const char* name;
+    bool found = false;
+    __FAILURE_HANDLE(dictionary_find_by_id(host->material_name_dict, material_id, &name, &found));
+
+    __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_MATERIAL, (const void*) &material, name));
+    __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
+  }
+
+  __FAILURE_HANDLE(scene_unlock(host->scene_host, SCENE_ENTITY_TYPE_LIST));
 
   return LUMINARY_SUCCESS;
 }
