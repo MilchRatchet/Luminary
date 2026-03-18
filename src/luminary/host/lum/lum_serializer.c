@@ -9,14 +9,34 @@
 #include "internal_path.h"
 #include "lum_builtins.h"
 
-static LuminaryResult _lum_serializer_serialize_literal(LumSerializer* serializer, LumBuiltinType type, const void* data);
-static LuminaryResult _lum_serializer_serialize_struct(LumSerializer* serializer, LumBuiltinType type, const void* data, const char* name);
-
 LuminaryResult lum_serializer_create(LumSerializer** serializer) {
   __CHECK_NULL_ARGUMENT(serializer);
 
   __FAILURE_HANDLE(host_malloc(serializer, sizeof(LumSerializer)));
   memset(*serializer, 0, sizeof(LumSerializer));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_serializer_addressable_literal_is_valid(
+  LumSerializer* serializer, LumBuiltinType type, const void* data, bool* is_valid) {
+  __CHECK_NULL_ARGUMENT(serializer);
+  __CHECK_NULL_ARGUMENT(data);
+  __CHECK_NULL_ARGUMENT(is_valid);
+
+  switch (type) {
+    case LUM_BUILTIN_TYPE_MESH: {
+      LumBuiltinMesh mesh = *(LumBuiltinMesh*) data;
+      *is_valid           = mesh.id != MESH_ID_INVALID;
+    } break;
+    case LUM_BUILTIN_TYPE_TEXTURE: {
+      LumBuiltinTexture tex = *(LumBuiltinTexture*) data;
+      *is_valid             = tex.id != TEXTURE_ID_INVALID;
+    } break;
+    default: {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Builtin type '%s' is not a addressable literal.", lum_builtin_types_strings[type]);
+    } break;
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -87,20 +107,31 @@ static LuminaryResult _lum_serializer_serialize_literal(LumSerializer* serialize
       LumBuiltinString string = *(LumBuiltinString*) data;
       __FAILURE_HANDLE(_lum_serializer_write(serializer, "\"%s\"", (string.string_ptr != (const char*) 0) ? string.string_ptr : ""));
     } break;
+    default: {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Builtin type '%s' cannot be written as a literal.", lum_builtin_types_strings[type]);
+    } break;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_serializer_serialize_addressable_literal(LumSerializer* serializer, LumBuiltinType type, const void* data) {
+  __CHECK_NULL_ARGUMENT(serializer);
+  __CHECK_NULL_ARGUMENT(data);
+
+  switch (type) {
     case LUM_BUILTIN_TYPE_MESH: {
       // TODO
+      LumBuiltinMesh mesh = *(LumBuiltinMesh*) data;
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, "[%s \"%s\"]", lum_builtin_types_strings[type], "TODO"));
     } break;
     case LUM_BUILTIN_TYPE_TEXTURE: {
       // TODO
+      LumBuiltinTexture tex = *(LumBuiltinTexture*) data;
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, "[%s \"%s\"]", lum_builtin_types_strings[type], "TODO"));
     } break;
     default: {
-      const uint32_t member_count = lum_builtin_types_member_counts[type];
-
-      if (member_count == 0)
-        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Builtin type '%s' cannot be written as a literal.", lum_builtin_types_strings[type]);
-
-      // Type is struct
-      __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, type, data, (const char*) 0));
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Builtin type '%s' is not a addressable literal.", lum_builtin_types_strings[type]);
     } break;
   }
 
@@ -139,12 +170,34 @@ static LuminaryResult _lum_serializer_serialize_struct(LumSerializer* serializer
     if (member->max_version < LUM_VERSION_CURRENT)
       continue;
 
-    const bool member_is_struct = lum_builtin_types_member_counts[member->type] > 0;
+    const bool member_is_struct      = lum_builtin_types_member_counts[member->type] > 0;
+    const bool member_is_addressable = lum_builtin_types_addressable[member->type];
 
-    __FAILURE_HANDLE(_lum_serializer_indent(serializer));
-    __FAILURE_HANDLE(_lum_serializer_write(serializer, (member_is_struct) ? ".%s" : ".%s = ", member->name));
-    __FAILURE_HANDLE(_lum_serializer_serialize_literal(serializer, member->type, ((const char*) data) + member->offset));
-    __FAILURE_HANDLE(_lum_serializer_write(serializer, ",\n"));
+    if (member_is_struct) {
+      __FAILURE_HANDLE(_lum_serializer_indent(serializer));
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, ".%s", member->name));
+      __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, member->type, ((const char*) data) + member->offset, (const char*) 0));
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, ",\n"));
+    }
+    else if (member_is_addressable) {
+      bool is_valid;
+      __FAILURE_HANDLE(
+        _lum_serializer_addressable_literal_is_valid(serializer, member->type, ((const char*) data) + member->offset, &is_valid));
+
+      if (is_valid == false)
+        continue;
+
+      __FAILURE_HANDLE(_lum_serializer_indent(serializer));
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, ".%s = ", member->name));
+      __FAILURE_HANDLE(_lum_serializer_serialize_addressable_literal(serializer, member->type, ((const char*) data) + member->offset));
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, ",\n"));
+    }
+    else {
+      __FAILURE_HANDLE(_lum_serializer_indent(serializer));
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, ".%s = ", member->name));
+      __FAILURE_HANDLE(_lum_serializer_serialize_literal(serializer, member->type, ((const char*) data) + member->offset));
+      __FAILURE_HANDLE(_lum_serializer_write(serializer, ",\n"));
+    }
   }
 
   serializer->current_scope_depth--;
@@ -171,6 +224,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   // TODO: This is bust, this is getting is data from the caller scene when it should be using the host scene
   // TODO: Use critical section failure handles
+  // TODO: Im dumb, I need to pass in the builtin types and not the Luminary types
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "# This file was automatically created by Luminary.\n"));
