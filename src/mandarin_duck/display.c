@@ -57,6 +57,8 @@ static void _display_handle_display_change(Display* display) {
     break;
   }
 
+  SDL_free(displays);
+
   rect.w = rect.w - 2 * DISPLAY_SCREEN_MARGIN;
   rect.h = rect.h - 2 * DISPLAY_SCREEN_MARGIN;
 
@@ -460,7 +462,9 @@ static void _display_generate_screenshot_name(const char* output_directory, char
   timeinfo = *localtime(&rawtime);
   strftime(time_string, 2048, "%Y-%m-%d-%H-%M-%S", &timeinfo);
 
-  sprintf(string, "%s/Snap-%s-%05u-%07.1fs.png", output_directory, time_string, image.meta_data.sample_count, image.meta_data.time);
+  const char* dir = (output_directory != (const char*) 0) ? output_directory : ".";
+
+  sprintf(string, "%s/Snap-%s-%05u-%07.1fs.png", dir, time_string, image.meta_data.sample_count, image.meta_data.time);
 }
 
 static void _display_generate_screenshot(Display* display, LuminaryHost* host) {

@@ -359,6 +359,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |=
     _window_entity_properties_add_slider(data, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
 
+  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Lens", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
   update_data |= _window_entity_properties_add_checkbox(data, "Physical", &camera.use_physical_camera);
 
   if (camera.use_physical_camera) {
@@ -394,6 +396,15 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
   }
 
+  element_separator(
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  update_data |=
+    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  update_data |=
+    _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
+
   update_data |= _window_entity_properties_add_slider(
     data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
@@ -413,12 +424,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Local Error Minimization", &camera.use_local_error_minimization);
-
-  update_data |=
-    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
-  update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
-  update_data |=
-    _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
 
   if (camera.use_physical_camera == false) {
     update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
@@ -555,23 +560,44 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
     case LUMINARY_SKY_MODE_DEFAULT:
     default:
       element_separator(
-        window, mouse_state,
-        (ElementSeparatorArgs) {.text = "Atmosphere and Celestials", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+        window, mouse_state, (ElementSeparatorArgs) {.text = "General", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
       update_data |= _window_entity_properties_add_slider(
         data, "Geometry Offset", &sky.geometry_offset, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+
+      element_separator(
+        window, mouse_state, (ElementSeparatorArgs) {.text = "Sun", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
       update_data |=
         _window_entity_properties_add_slider(data, "Azimuth", &sky.azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
       update_data |=
         _window_entity_properties_add_slider(data, "Altitude", &sky.altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-      update_data |= _window_entity_properties_add_slider(
-        data, "Moon Azimuth", &sky.moon_azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-      update_data |= _window_entity_properties_add_slider(
-        data, "Moon Altitude", &sky.moon_altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-      update_data |= _window_entity_properties_add_slider(
-        data, "Moon Texture Offset", &sky.moon_tex_offset, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
       update_data |=
-        _window_entity_properties_add_slider(data, "Sun Intensity", &sky.sun_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+        _window_entity_properties_add_slider(data, "Intensity", &sky.sun_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+      element_separator(
+        window, mouse_state, (ElementSeparatorArgs) {.text = "Moon", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+      update_data |=
+        _window_entity_properties_add_slider(data, "Azimuth", &sky.moon_azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Altitude", &sky.moon_altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+      update_data |= _window_entity_properties_add_slider(
+        data, "Texture Offset", &sky.moon_tex_offset, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+
+      element_separator(
+        window, mouse_state, (ElementSeparatorArgs) {.text = "Stars", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+      update_data |=
+        _window_entity_properties_add_slider(data, "Seed", &sky.stars_seed, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Count", &sky.stars_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+      update_data |=
+        _window_entity_properties_add_slider(data, "Intensity", &sky.stars_intensity, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+      element_separator(
+        window, mouse_state, (ElementSeparatorArgs) {.text = "Atmosphere", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
       update_data |=
         _window_entity_properties_add_slider(data, "Density", &sky.base_density, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
@@ -603,13 +629,6 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
         data, "Ground Visibility", &sky.ground_visibility, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
       update_data |= _window_entity_properties_add_slider(
         data, "Multiscattering Factor", &sky.multiscattering_factor, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-
-      update_data |=
-        _window_entity_properties_add_slider(data, "Stars Seed", &sky.stars_seed, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
-      update_data |=
-        _window_entity_properties_add_slider(data, "Stars Count", &sky.stars_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
-      update_data |= _window_entity_properties_add_slider(
-        data, "Stars Intensity", &sky.stars_intensity, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
       update_data |= _window_entity_properties_add_checkbox(data, "Aerial Perspective", &sky.aerial_perspective);
       break;
@@ -987,6 +1006,7 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
 
 static void (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) = {
+  [WINDOW_ENTITY_PROPERTIES_TYPE_SCENE]     = _window_entity_properties_scene_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]  = _window_entity_properties_renderer_settings_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA]    = _window_entity_properties_camera_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_OCEAN]     = _window_entity_properties_ocean_action,

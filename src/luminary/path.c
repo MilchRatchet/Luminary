@@ -140,7 +140,11 @@ LuminaryResult luminary_path_set_from_string(Path* path, const char* string) {
   }
 
   path->working_dir = path->memory;
-  memcpy(path->working_dir, working_dir, working_dir_len);
+
+  // memcpy with NULL src is UB even if size is 0.
+  if (working_dir != (const char*) 0)
+    memcpy(path->working_dir, working_dir, working_dir_len);
+
   path->working_dir[working_dir_len] = '\0';
 
   path->working_dir_len = working_dir_len;

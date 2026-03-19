@@ -265,6 +265,8 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const DeviceMe
     size_t compact_size;
     __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
 
+    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
     __FAILURE_HANDLE(device_free(&accel_emit_buffer));
     __FAILURE_HANDLE(device_free(&temp_buffer));
 

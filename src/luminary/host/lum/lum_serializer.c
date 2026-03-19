@@ -48,6 +48,9 @@ static LuminaryResult _lum_serializer_write(LumSerializer* serializer, const cha
   va_list args;
   va_start(args, format);
 
+  va_list args_copy;
+  va_copy(args_copy, args);
+
   const size_t offset = serializer->serialized_data_length;
 
   int string_length = vsnprintf(serializer->serialized_data + offset, serializer->serialized_data_allocated_size - offset, format, args);
@@ -62,11 +65,12 @@ static LuminaryResult _lum_serializer_write(LumSerializer* serializer, const cha
     serializer->serialized_data_allocated_size = (required_size + offset) * 2;
     __FAILURE_HANDLE(host_realloc(&serializer->serialized_data, serializer->serialized_data_allocated_size));
 
-    vsnprintf(serializer->serialized_data + offset, serializer->serialized_data_allocated_size - offset, format, args);
+    vsnprintf(serializer->serialized_data + offset, serializer->serialized_data_allocated_size - offset, format, args_copy);
   }
 
   serializer->serialized_data_length += string_length;
 
+  va_end(args_copy);
   va_end(args);
 
   return LUMINARY_SUCCESS;

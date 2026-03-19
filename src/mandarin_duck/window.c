@@ -250,6 +250,9 @@ void window_push_section(Window* window, uint32_t size, uint32_t padding) {
 
   window->context_stack_ptr++;
 
+  if (window->context_stack_ptr >= WINDOW_MAX_CONTEXT_DEPTH)
+    crash_message("Exceeded window max stack depth.");
+
   WindowContext* new_context = window->context_stack + window->context_stack_ptr;
 
   memcpy(new_context, context, sizeof(WindowContext));
@@ -268,9 +271,8 @@ void window_push_section(Window* window, uint32_t size, uint32_t padding) {
 void window_pop_section(Window* window) {
   MD_CHECK_NULL_ARGUMENT(window);
 
-  if (window->context_stack_ptr == 0) {
+  if (window->context_stack_ptr == 0)
     crash_message("No window context to pop.");
-  }
 
   window->context_stack_ptr--;
 }

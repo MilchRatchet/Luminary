@@ -1,5 +1,6 @@
 #include "queue_worker.h"
 
+#include "host_intrinsics.h"
 #include "internal_error.h"
 #include "string.h"
 
@@ -37,6 +38,7 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
       __FAILURE_HANDLE(entry.deferring_func(args->worker_context, entry.args, &defer_execution));
       if (defer_execution) {
         __FAILURE_HANDLE(queue_push(args->queue, &entry));
+        host_intrin_thread_yield();
         continue;
       }
     }

@@ -388,6 +388,10 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
     const size_t gbuffer_size = sizeof(GBufferMetaData) * gbuffer_meta_pixel_count;
 
+    if (device->gbuffer_meta_dst != (GBufferMetaData*) 0) {
+      __FAILURE_HANDLE(device_free_staging(&device->gbuffer_meta_dst));
+    }
+
     __FAILURE_HANDLE(device_malloc_staging(&device->gbuffer_meta_dst, gbuffer_size, DEVICE_MEMORY_STAGING_FLAG_NONE));
     memset(device->gbuffer_meta_dst, 0, gbuffer_size);
 
@@ -578,6 +582,7 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
     if (device->optix_kernels[kernel_id]->available == false) {
       warn_message("Deactivating %s because an OptiX kernel is missing.", device->properties.name);
       device->state = DEVICE_STATE_UNAVAILABLE;
+      CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
       return LUMINARY_SUCCESS;
     }
   }

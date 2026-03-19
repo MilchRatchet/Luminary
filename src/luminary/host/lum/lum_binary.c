@@ -5,6 +5,8 @@
 
 #include "internal_error.h"
 
+// #define LUMINARY_PRINT_BINARY
+
 LuminaryResult lum_binary_create(LumBinary** binary) {
   __CHECK_NULL_ARGUMENT(binary);
 
@@ -18,6 +20,8 @@ LuminaryResult lum_binary_create(LumBinary** binary) {
 
 LuminaryResult lum_binary_print(LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(binary);
+
+#ifdef LUMINARY_PRINT_BINARY
 
   FILE* file = fopen("DebugLUMV5BinaryAssembly.s", "wb");
 
@@ -95,6 +99,8 @@ LuminaryResult lum_binary_print(LumBinary* binary) {
   }
 
   fclose(file);
+
+#endif /* LUMINARY_PRINT_BINARY */
 
   return LUMINARY_SUCCESS;
 }

@@ -1,11 +1,13 @@
 #ifndef LUMINARY_HOST_INTRINSICS_H
 #define LUMINARY_HOST_INTRINSICS_H
 
-#include <immintrin.h>
 #include <math.h>
 #include <stdbool.h>
 
+#ifdef LUMINARY_TARGET_ARCH_X86
 #define LUMINARY_X86_INTRINSICS
+#include <immintrin.h>
+#endif /* LUMINARY_TARGET_ARCH_X86 */
 
 struct Vec128 {
   union {
@@ -210,6 +212,14 @@ inline Vec128 vec128_rotate_quaternion(const Vec128 a, const Vec128 q) {
   result        = vec128_add(result, vec128_scale(cross, 2.0f * q.w));
 
   return result;
+}
+
+inline void host_intrin_thread_yield() {
+#ifdef LUMINARY_X86_INTRINSICS
+  _mm_pause();
+#else
+  // Nothing :(
+#endif
 }
 
 #endif /* LUMINARY_HOST_INTRINSICS_H */

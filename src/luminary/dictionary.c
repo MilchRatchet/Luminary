@@ -154,7 +154,7 @@ LuminaryResult dictionary_move_entries(Dictionary* dict, Dictionary* src, uint32
     for (uint32_t existing_entry_id = 0; existing_entry_id < num_entries_before; existing_entry_id++) {
       DictionaryEntry* existing_entry = dict->entries + existing_entry_id;
 
-      if (entry->id == existing_entry_id || strcmp(entry->string, existing_entry->string) == 0)
+      if (entry->id == existing_entry->id || strcmp(entry->string, existing_entry->string) == 0)
         __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Duplicate dictionary entry (%u, %s)", entry->id, entry->string);
     }
 

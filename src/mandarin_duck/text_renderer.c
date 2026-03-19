@@ -43,7 +43,11 @@ static TTF_Font* _text_renderer_load_font(const char* font_location, const float
   SDL_SetFloatProperty(sdl_properties, TTF_PROP_FONT_CREATE_SIZE_FLOAT, size);
   SDL_SetNumberProperty(sdl_properties, TTF_PROP_FONT_CREATE_VERTICAL_DPI_NUMBER, 72);
 
-  return TTF_OpenFontWithProperties(sdl_properties);
+  TTF_Font* font = TTF_OpenFontWithProperties(sdl_properties);
+
+  SDL_DestroyProperties(sdl_properties);
+
+  return font;
 }
 
 void text_renderer_create(TextRenderer** text_renderer) {
@@ -79,6 +83,8 @@ static TTF_Text* _text_renderer_acquire_text_instance(
 
   if (use_cache) {
     hash_string(&hash, text);
+
+    // TODO: Hash collisions cause wrong strings to be displayed. We also need a strcmp somehow.
 
     uint32_t entry = hash.hash & TEXT_RENDERER_CACHE_SIZE_MASK;
 
@@ -156,14 +162,17 @@ void text_renderer_render(
 
   TTF_SetTextColor(text_instance, (color >> 16) & 0xFF, (color >> 8) & 0xFF, (color >> 0) & 0xFF, (color >> 24) & 0xFF);
 
+  int32_t draw_x = (int32_t) x;
+  int32_t draw_y = (int32_t) y;
+
   if (center_x) {
-    x = x - (width >> 1);
-    x += font_offset_x[font_id];
+    draw_x = draw_x - (width >> 1);
+    draw_x += font_offset_x[font_id];
   }
 
   if (center_y) {
-    y = y - (height >> 1);
-    y += font_offset_y[font_id];
+    draw_y = draw_y - (height >> 1);
+    draw_y += font_offset_y[font_id];
   }
 
   if (text_width) {
@@ -171,19 +180,22 @@ void text_renderer_render(
     *text_width = (uint32_t) width;
   }
 
-  TTF_DrawSurfaceText(text_instance, x, y, display->sdl_surface);
+  TTF_DrawSurfaceText(text_instance, draw_x, draw_y, display->sdl_surface);
 
   _text_renderer_release_text_instance(text_renderer, text_instance, hash, use_cache, loaded_from_cache);
 
   // For some reason, the text sometimes has 0 opacity so we need to overwrite the opacity here
-  int32_t blit_width  = ((x + width) <= display->width) ? width : display->width - x;
-  int32_t blit_height = ((y + height) <= display->height) ? height : display->height - y;
+  int32_t x_start = (draw_x > 0) ? draw_x : 0;
+  int32_t y_start = (draw_y > 0) ? draw_y : 0;
+
+  int32_t x_end = (draw_x + width <= (int32_t) display->width) ? draw_x + width : (int32_t) display->width;
+  int32_t y_end = (draw_y + height <= (int32_t) display->height) ? draw_y + height : (int32_t) display->height;
 
   uint8_t* dst = display->buffer;
 
-  for (int32_t y_offset = 0; y_offset < blit_height; y_offset++) {
-    for (int32_t x_offset = 0; x_offset < blit_width; x_offset++) {
-      dst[(x + x_offset) * 4 + (y + y_offset) * display->pitch + 3] = 0xFF;
+  for (int32_t y_offset = y_start; y_offset < y_end; y_offset++) {
+    for (int32_t x_offset = x_start; x_offset < x_end; x_offset++) {
+      dst[x_offset * 4 + y_offset * display->pitch + 3] = 0xFF;
     }
   }
 }

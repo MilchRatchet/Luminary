@@ -597,7 +597,7 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   device->state = (enable) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
 
   HostEnableDeviceArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostEnableDeviceArgs), (void**) &args));
 
   args->enable    = enable;
   args->device_id = device_id;

@@ -149,7 +149,7 @@ static void _argument_parser_parse_argument(ArgumentParser* parser, const char* 
 void argument_parser_create(ArgumentParser** parser) {
   MD_CHECK_NULL_ARGUMENT(parser);
 
-  host_malloc(parser, sizeof(ArgumentParser));
+  LUM_FAILURE_HANDLE(host_malloc(parser, sizeof(ArgumentParser)));
   memset(*parser, 0, sizeof(ArgumentParser));
 
   LUM_FAILURE_HANDLE(array_create(&(*parser)->descriptors, sizeof(ArgumentDescriptor), 16));

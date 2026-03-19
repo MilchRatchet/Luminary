@@ -111,7 +111,9 @@ LuminaryResult _array_push(void** array, void* object, const char* buf_name, con
   }
 
   if (header->num_elements == header->allocated_num_elements) {
-    __FAILURE_HANDLE(_array_resize(array, header->allocated_num_elements * 2, buf_name, func, line));
+    uint32_t new_allocated_num_elements = (header->allocated_num_elements > 0) ? header->allocated_num_elements * 2 : 1;
+
+    __FAILURE_HANDLE(_array_resize(array, new_allocated_num_elements, buf_name, func, line));
     header = ((ArrayHeader*) (*array)) - 1;
   }
 

@@ -192,6 +192,7 @@ static float _fast_strtof(const char* restrict str, char** restrict str_end) {
     sign = -1.0f;
   }
 
+  // In the name of speed, we assume valid input.
   double res = 0.0;
   while (*str >= '0') {
     res = res * 10.0 + ((double) (*(str++) - '0'));

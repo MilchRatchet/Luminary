@@ -82,6 +82,8 @@ bool file_dialog_handler_open_dialog(FileDialogHandler* handler, const FileDialo
 
   handler->dialog_open = true;
 
+  LUM_FAILURE_HANDLE(mutex_unlock(handler->mutex));
+
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetStringProperty(sdl_properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, args->dialog_title);
   SDL_SetPointerProperty(sdl_properties, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, args->sdl_window);
@@ -92,7 +94,7 @@ bool file_dialog_handler_open_dialog(FileDialogHandler* handler, const FileDialo
   SDL_ShowFileDialogWithProperties(
     SDL_FILEDIALOG_SAVEFILE, (SDL_DialogFileCallback) _file_dialog_handler_sdl_callback, (void*) handler, sdl_properties);
 
-  LUM_FAILURE_HANDLE(mutex_unlock(handler->mutex));
+  SDL_DestroyProperties(sdl_properties);
 
   return true;
 }

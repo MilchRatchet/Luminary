@@ -10,6 +10,16 @@
 #include "internal_array.h"
 #include "sky_defines.h"
 
+// Determine architecture
+#if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64)
+#define LUMINARY_TARGET_ARCH_X86
+#elif defined(__CUDACC__)  // We can't check for __CUDA_ARCH__ here, it seems some part of the compilation step doesn't define it in NVCC
+#define LUMINARY_TARGET_ARCH_NVGPU
+#else
+#define LUMINARY_TARGET_ARCH_UNKNOWN
+#error "Target architecture is not supported.";
+#endif
+
 #ifndef PI
 #define PI 3.141592653589f
 #endif
