@@ -55,13 +55,13 @@ static LuminaryResult _wavefront_add_object_name(WavefrontContent* content, cons
   const size_t string_len = strlen(name);
 
   char* object_name;
-  if (content->args.name_prefix != (const char*) 0) {
+  if (content->args->name_prefix != (const char*) 0) {
     // TODO: Precompute
-    const size_t prefix_length = strlen(content->args.name_prefix);
+    const size_t prefix_length = strlen(content->args->name_prefix);
 
     __FAILURE_HANDLE(host_malloc(&object_name, prefix_length + string_len + 1));
 
-    memcpy(object_name, content->args.name_prefix, prefix_length);
+    memcpy(object_name, content->args->name_prefix, prefix_length);
     memcpy(object_name + prefix_length, name, string_len);
     object_name[prefix_length + string_len] = '\0';
   }
@@ -77,7 +77,7 @@ static LuminaryResult _wavefront_add_object_name(WavefrontContent* content, cons
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args) {
+LuminaryResult wavefront_create(WavefrontContent** content, const WavefrontArguments* args) {
   __CHECK_NULL_ARGUMENT(content);
 
   __FAILURE_HANDLE(host_malloc(content, sizeof(WavefrontContent)));
@@ -108,13 +108,13 @@ LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments a
   const size_t name_len    = strlen(default_name);
 
   char* default_material_name;
-  if (args.name_prefix != (const char*) 0) {
+  if (args->name_prefix != (const char*) 0) {
     // TODO: Precompute
-    const size_t prefix_length = strlen(args.name_prefix);
+    const size_t prefix_length = strlen(args->name_prefix);
 
     __FAILURE_HANDLE(host_malloc(&default_material_name, prefix_length + name_len + 1));
 
-    memcpy(default_material_name, args.name_prefix, prefix_length);
+    memcpy(default_material_name, args->name_prefix, prefix_length);
     memcpy(default_material_name + prefix_length, default_name, name_len);
     default_material_name[prefix_length + name_len] = '\0';
   }
@@ -440,13 +440,13 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
       const size_t name_len = strlen(name);
 
       char* material_name;
-      if (content->args.name_prefix != (const char*) 0) {
+      if (content->args->name_prefix != (const char*) 0) {
         // TODO: Precompute
-        const size_t prefix_length = strlen(content->args.name_prefix);
+        const size_t prefix_length = strlen(content->args->name_prefix);
 
         __FAILURE_HANDLE(host_malloc(&material_name, prefix_length + name_len + 1));
 
-        memcpy(material_name, content->args.name_prefix, prefix_length);
+        memcpy(material_name, content->args->name_prefix, prefix_length);
         memcpy(material_name + prefix_length, name, name_len);
         material_name[prefix_length + name_len] = '\0';
       }
@@ -519,9 +519,9 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
 
       float emission[3];
       if (read_float_line(value, 3, emission) == 3) {
-        content->materials[current_material_ptr].emission.r = emission[0] * content->args.emission_scale;
-        content->materials[current_material_ptr].emission.g = emission[1] * content->args.emission_scale;
-        content->materials[current_material_ptr].emission.b = emission[2] * content->args.emission_scale;
+        content->materials[current_material_ptr].emission.r = emission[0] * content->args->emission_scale;
+        content->materials[current_material_ptr].emission.g = emission[1] * content->args->emission_scale;
+        content->materials[current_material_ptr].emission.b = emission[2] * content->args->emission_scale;
       }
       else {
         warn_message("Expected three values in emission in *.mtl file but didn't find three numbers. Line: %s.", line);
@@ -1119,15 +1119,15 @@ LuminaryResult wavefront_content_get_materials(
     mat.albedo.b                 = wavefront_mat.diffuse_reflectivity.b;
     mat.opacity                  = wavefront_mat.dissolve;
     mat.emission                 = wavefront_mat.emission;
-    mat.emission_scale           = content->args.emission_scale;
+    mat.emission_scale           = content->args->emission_scale;
     mat.refraction_index         = wavefront_mat.refraction_index;
     mat.roughness                = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
     mat.roughness_clamp          = 0.25f;
-    mat.roughness_as_smoothness  = content->args.legacy_smoothness;
+    mat.roughness_as_smoothness  = content->args->legacy_smoothness;
     mat.emission_active          = has_luminance_tex || has_emission;
     mat.thin_walled              = false;
     mat.normal_map_is_compressed = true;
-    mat.bidirectional_emission   = content->args.force_bidirectional_emission;
+    mat.bidirectional_emission   = content->args->force_bidirectional_emission;
     mat.metallic                 = wavefront_mat.specular_reflectivity.r > 0.5f;
     mat.albedo_tex               = has_albedo_tex ? texture_offset + wavefront_mat.texture[WF_ALBEDO] : TEXTURE_NONE;
     mat.luminance_tex            = has_luminance_tex ? texture_offset + wavefront_mat.texture[WF_LUMINANCE] : TEXTURE_NONE;
@@ -1157,6 +1157,53 @@ LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments) {
   arguments->force_transparency_cutout    = false;
   arguments->emission_scale               = 1.0f;
   arguments->force_bidirectional_emission = false;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult wavefront_arguments_create(WavefrontArguments** arguments) {
+  __CHECK_NULL_ARGUMENT(arguments);
+
+  __FAILURE_HANDLE(host_malloc(arguments, sizeof(WavefrontArguments)));
+  memset(*arguments, 0, sizeof(WavefrontArguments));
+
+  (*arguments)->legacy_smoothness            = false;
+  (*arguments)->force_transparency_cutout    = false;
+  (*arguments)->emission_scale               = 1.0f;
+  (*arguments)->force_bidirectional_emission = false;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult wavefront_arguments_set_prefix(WavefrontArguments* arguments, const char* prefix) {
+  __CHECK_NULL_ARGUMENT(arguments);
+
+  if (arguments->name_prefix)
+    __FAILURE_HANDLE(host_free(&arguments->name_prefix));
+
+  if (prefix == (const char*) 0)
+    return LUMINARY_SUCCESS;
+
+  size_t size = strlen(prefix);
+
+  char* allocated_prefix;
+  __FAILURE_HANDLE(host_malloc(&allocated_prefix, size + 1));
+
+  memcpy(allocated_prefix, prefix, size);
+  allocated_prefix[size] = '\0';
+
+  arguments->name_prefix = allocated_prefix;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult wavefront_arguments_destroy(WavefrontArguments** arguments) {
+  __CHECK_NULL_ARGUMENT(arguments);
+
+  if ((*arguments)->name_prefix)
+    __FAILURE_HANDLE(host_free(&(*arguments)->name_prefix));
+
+  __FAILURE_HANDLE(host_free(arguments));
 
   return LUMINARY_SUCCESS;
 }

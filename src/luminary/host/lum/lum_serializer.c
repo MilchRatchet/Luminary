@@ -244,8 +244,7 @@ static LuminaryResult _lum_serializer_serialize_obj_files(LumSerializer* seriali
 
   for (uint32_t obj_id = 0; obj_id < num_obj_files; obj_id++) {
     LumBuiltinWavefrontObjFile obj_file;
-
-    obj_file.name_prefix.string_ptr = host->loaded_obj_files[obj_id].wavefront_args.name_prefix;
+    obj_file.name_prefix.string_ptr = host->loaded_obj_files[obj_id].wavefront_args->name_prefix;
 
     const char* obj_path;
     __FAILURE_HANDLE(luminary_path_apply(host->loaded_obj_files[obj_id].path, (const char*) 0, &obj_path));

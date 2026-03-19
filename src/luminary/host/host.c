@@ -46,7 +46,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
-  __FAILURE_HANDLE(host_load_obj_file(host, args->path, &args->wavefront_args));
+  __FAILURE_HANDLE(host_load_obj_file(host, args->path, args->wavefront_args));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
@@ -228,14 +228,14 @@ static LuminaryResult _host_enable_device_queue_work(Host* host, HostEnableDevic
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args) {
+LuminaryResult host_load_obj_file(Host* host, Path* path, WavefrontArguments* wavefront_args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(wavefront_args);
 
   WavefrontContent* wavefront_content;
 
-  __FAILURE_HANDLE(wavefront_create(&wavefront_content, *wavefront_args));
+  __FAILURE_HANDLE(wavefront_create(&wavefront_content, wavefront_args));
   __FAILURE_HANDLE(wavefront_read_file(wavefront_content, path, host->secondary_work_queue));
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
@@ -275,7 +275,7 @@ LuminaryResult host_load_obj_file(Host* host, Path* path, const WavefrontArgumen
   HostLoadObjArgs args;
   memset(&args, 0, sizeof(HostLoadObjArgs));
 
-  args.wavefront_args = *wavefront_args;
+  args.wavefront_args = wavefront_args;
   __FAILURE_HANDLE(path_copy(&args.path, path));
 
   __FAILURE_HANDLE(array_push(&host->loaded_obj_files, &args));
@@ -465,6 +465,7 @@ LuminaryResult luminary_host_destroy(Host** host) {
 
   for (uint32_t obj_id = 0; obj_id < num_loaded_objs; obj_id++) {
     __FAILURE_HANDLE(luminary_path_destroy(&(*host)->loaded_obj_files[obj_id].path));
+    __FAILURE_HANDLE(wavefront_arguments_destroy(&(*host)->loaded_obj_files[obj_id].wavefront_args));
   }
 
   __FAILURE_HANDLE(array_destroy(&(*host)->loaded_obj_files));
@@ -615,7 +616,7 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, const WavefrontArguments* wavefront_args) {
+static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments* wavefront_args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(wavefront_args);
@@ -625,7 +626,7 @@ static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, const Wa
 
   __FAILURE_HANDLE(path_copy(&args->path, path));
 
-  args->wavefront_args = *wavefront_args;
+  args->wavefront_args = wavefront_args;
 
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
@@ -666,10 +667,10 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
-  WavefrontArguments args;
-  __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
+  WavefrontArguments* args;
+  __FAILURE_HANDLE(wavefront_arguments_create(&args));
 
-  __FAILURE_HANDLE(_host_queue_load_obj_file(host, path, &args));
+  __FAILURE_HANDLE(_host_queue_load_obj_file(host, path, args));
 
   return LUMINARY_SUCCESS;
 }

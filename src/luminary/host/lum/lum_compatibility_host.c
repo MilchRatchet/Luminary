@@ -15,10 +15,13 @@ LuminaryResult lum_compatibility_host_create(LumCompatibilityHost** host) {
   __FAILURE_HANDLE(array_create(&(*host)->materials, sizeof(LumBuiltinMaterial), 16));
   __FAILURE_HANDLE(array_create(&(*host)->mesh_instances, sizeof(LumBuiltinInstance), 16));
   __FAILURE_HANDLE(array_create(&(*host)->textures, sizeof(Texture*), 16));
+
   __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_instance_name_dict));
   __FAILURE_HANDLE(dictionary_create(&(*host)->material_name_dict));
   __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_name_dict));
   __FAILURE_HANDLE(dictionary_create(&(*host)->texture_name_dict));
+
+  __FAILURE_HANDLE(array_create(&(*host)->obj_files, sizeof(HostLoadObjArgs), 16));
 
   return LUMINARY_SUCCESS;
 }
@@ -126,12 +129,23 @@ LuminaryResult lum_compatibility_host_apply(LumCompatibilityHost* host, Luminary
     __FAILURE_HANDLE(luminary_host_set_instance(dst_host, host_instance_id, &instance));
   }
 
+  __FAILURE_HANDLE(array_append(&dst_host->loaded_obj_files, host->obj_files));
+  __FAILURE_HANDLE(array_clear(host->obj_files));
+
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult lum_compatibility_host_destroy(LumCompatibilityHost** host) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(*host);
+
+  uint32_t num_obj_files;
+  __FAILURE_HANDLE(array_get_num_elements((*host)->obj_files, &num_obj_files));
+
+  for (uint32_t obj_id = 0; obj_id < num_obj_files; obj_id++) {
+    __FAILURE_HANDLE(luminary_path_destroy(&(*host)->obj_files[obj_id].path));
+    __FAILURE_HANDLE(wavefront_arguments_destroy(&(*host)->obj_files[obj_id].wavefront_args));
+  }
 
   __FAILURE_HANDLE(array_destroy(&(*host)->meshes));
   __FAILURE_HANDLE(array_destroy(&(*host)->materials));
@@ -141,6 +155,7 @@ LuminaryResult lum_compatibility_host_destroy(LumCompatibilityHost** host) {
   __FAILURE_HANDLE(dictionary_destroy(&(*host)->material_name_dict));
   __FAILURE_HANDLE(dictionary_destroy(&(*host)->mesh_name_dict));
   __FAILURE_HANDLE(dictionary_destroy(&(*host)->texture_name_dict));
+  __FAILURE_HANDLE(array_destroy(&(*host)->obj_files));
 
   __FAILURE_HANDLE(host_free(host));
 

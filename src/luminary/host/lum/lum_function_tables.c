@@ -520,14 +520,26 @@ static LuminaryResult _lum_function_store_wavefrontobj(LumVirtualMachine* vm, co
   Path* obj_path;
   __FAILURE_HANDLE(path_extend(&obj_path, vm->working_directory, name));
 
-  WavefrontArguments args;
-  __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
+  WavefrontArguments* args;
+  __FAILURE_HANDLE(wavefront_arguments_create(&args));
 
   if (src->name_prefix.const_mem_address != LUM_BUILTIN_STRING_INVALID_ADDRESS) {
-    __FAILURE_HANDLE(lum_function_resolve_string_address(vm, &src->name_prefix, &args.name_prefix));
+    const char* name_prefix;
+    __FAILURE_HANDLE(lum_function_resolve_string_address(vm, &src->name_prefix, &name_prefix));
+
+    __FAILURE_HANDLE(wavefront_arguments_set_prefix(args, name_prefix));
   }
 
-  // TODO: Wavefront file must be added to the history
+  // Create entry for history
+
+  HostLoadObjArgs obj_file_for_history;
+  obj_file_for_history.wavefront_args = args;
+
+  __FAILURE_HANDLE(path_copy(&obj_file_for_history.path, obj_path));
+
+  __FAILURE_HANDLE(array_push(&vm->host->obj_files, &obj_file_for_history));
+
+  // Load OBJ
 
   WavefrontContent* content;
   __FAILURE_HANDLE(wavefront_create(&content, args));

@@ -6,7 +6,7 @@
 
 struct LumFileContent {
   ARRAY char** obj_file_path_strings;
-  WavefrontArguments wavefront_args;
+  WavefrontArguments* wavefront_args;
   RendererSettings settings;
   Camera camera;
   Ocean ocean;

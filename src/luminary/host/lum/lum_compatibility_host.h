@@ -2,6 +2,7 @@
 #define LUMINARY_LUM_COMPATIBILITY_HOST_H
 
 #include "dictionary.h"
+#include "host/internal_host.h"
 #include "lum_builtins.h"
 #include "mesh.h"
 #include "texture.h"
@@ -24,6 +25,7 @@ struct LumCompatibilityHost {
   Dictionary* material_name_dict;
   Dictionary* mesh_name_dict;
   Dictionary* texture_name_dict;
+  ARRAY HostLoadObjArgs* obj_files;
 } typedef LumCompatibilityHost;
 
 LuminaryResult lum_compatibility_host_create(LumCompatibilityHost** host);

@@ -32,14 +32,7 @@ struct WavefrontTriangle {
   uint16_t object;
 } typedef WavefrontTriangle;
 
-enum WavefrontTextureType {
-  WF_ALBEDO    = 0,
-  WF_LUMINANCE = 1,
-  WF_ROUGHNESS = 2,
-  WF_METALLIC  = 3,
-  WF_NORMAL    = 4,
-  WF_TEX_TYPE_COUNT
-} typedef WavefrontTextureType;
+enum WavefrontTextureType { WF_ALBEDO, WF_LUMINANCE, WF_ROUGHNESS, WF_METALLIC, WF_NORMAL, WF_TEX_TYPE_COUNT } typedef WavefrontTextureType;
 
 struct WavefrontMaterial {
   size_t hash;
@@ -72,7 +65,7 @@ enum WavefrontContentState {
 } typedef WavefrontContentState;
 
 struct WavefrontContent {
-  WavefrontArguments args;
+  const WavefrontArguments* args;
   WavefrontContentState state;
   ARRAY WavefrontVertex* vertices;
   ARRAY WavefrontNormal* normals;
@@ -86,7 +79,7 @@ struct WavefrontContent {
   ARRAY char** object_names;
 } typedef WavefrontContent;
 
-LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args);
+LuminaryResult wavefront_create(WavefrontContent** content, const WavefrontArguments* args);
 LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file, Queue* queue);
 LuminaryResult wavefront_content_get_meshes(
   WavefrontContent* content, ARRAYPTR Mesh*** meshes, Dictionary* mesh_name_dict, uint32_t material_offset);
@@ -95,6 +88,8 @@ LuminaryResult wavefront_content_get_materials(
   WavefrontContent* content, Scene* scene, Dictionary* material_name_dict, uint32_t texture_offset);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 
-LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments);
+LuminaryResult wavefront_arguments_create(WavefrontArguments** arguments);
+LuminaryResult wavefront_arguments_set_prefix(WavefrontArguments* arguments, const char* prefix);
+LuminaryResult wavefront_arguments_destroy(WavefrontArguments** arguments);
 
 #endif /* WAVEFRONT_H */
