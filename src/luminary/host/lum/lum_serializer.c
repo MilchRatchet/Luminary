@@ -226,7 +226,6 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "Luminary\nVersion 5\n\n"));
 
-  // TODO: This is bust, this is getting is data from the caller scene when it should be using the host scene
   // TODO: Use critical section failure handles
   // TODO: Im dumb, I need to pass in the builtin types and not the Luminary types
 
@@ -245,7 +244,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   RendererSettings settings;
-  __FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &settings, SCENE_ENTITY_SETTINGS));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_SETTINGS, (const void*) &settings, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
@@ -255,7 +254,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   Camera camera;
-  __FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &camera, SCENE_ENTITY_CAMERA));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_CAMERA, (const void*) &camera, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
@@ -265,7 +264,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   Ocean ocean;
-  __FAILURE_HANDLE(luminary_host_get_ocean(host, &ocean));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &ocean, SCENE_ENTITY_OCEAN));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_OCEAN, (const void*) &ocean, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
@@ -275,7 +274,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   Sky sky;
-  __FAILURE_HANDLE(luminary_host_get_sky(host, &sky));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &sky, SCENE_ENTITY_SKY));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_SKY, (const void*) &sky, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
@@ -285,7 +284,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   Cloud cloud;
-  __FAILURE_HANDLE(luminary_host_get_cloud(host, &cloud));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &cloud, SCENE_ENTITY_CLOUD));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_CLOUD, (const void*) &cloud, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
@@ -295,7 +294,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   Fog fog;
-  __FAILURE_HANDLE(luminary_host_get_fog(host, &fog));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &fog, SCENE_ENTITY_FOG));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_FOG, (const void*) &fog, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
@@ -305,7 +304,7 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
 
   Particles particles;
-  __FAILURE_HANDLE(luminary_host_get_particles(host, &particles));
+  __FAILURE_HANDLE(scene_get(host->scene_host, &particles, SCENE_ENTITY_PARTICLES));
   __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_PARTICLES, (const void*) &particles, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
