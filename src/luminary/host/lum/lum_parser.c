@@ -25,7 +25,7 @@ LuminaryResult lum_parser_execute(LumParser* parser, const char* code, LumBinary
   LumCompilerCompileInfo info;
   info.binary             = binary;
   info.code               = code;
-  info.print_parsed_token = true;
+  info.print_parsed_token = false;
 
   __FAILURE_HANDLE(lum_compiler_compile(compiler, &info));
 
