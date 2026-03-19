@@ -390,4 +390,14 @@ LuminaryResult lum_builtin_particles_convert(const LumBuiltinParticles* particle
 LuminaryResult lum_builtin_material_convert(const LumBuiltinMaterial* material, LuminaryMaterial* dst_material, uint32_t version);
 LuminaryResult lum_builtin_instance_convert(const LumBuiltinInstance* instance, LuminaryInstance* dst_instance, uint32_t version);
 
+LuminaryResult lum_builtin_settings_serialize(const LuminaryRendererSettings* settings, LumBuiltinSettings* dst_settings);
+LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBuiltinCamera* dst_camera);
+LuminaryResult lum_builtin_ocean_serialize(const LuminaryOcean* ocean, LumBuiltinOcean* dst_ocean);
+LuminaryResult lum_builtin_sky_serialize(const LuminarySky* sky, LumBuiltinSky* dst_sky);
+LuminaryResult lum_builtin_cloud_serialize(const LuminaryCloud* cloud, LumBuiltinCloud* dst_cloud);
+LuminaryResult lum_builtin_fog_serialize(const LuminaryFog* fog, LumBuiltinFog* dst_fog);
+LuminaryResult lum_builtin_particles_serialize(const LuminaryParticles* particles, LumBuiltinParticles* dst_particles);
+LuminaryResult lum_builtin_material_serialize(const LuminaryMaterial* material, LumBuiltinMaterial* dst_material);
+LuminaryResult lum_builtin_instance_serialize(const LuminaryInstance* instance, LumBuiltinInstance* dst_instance);
+
 #endif /* LUMINARY_LUM_BUILTINS_H */

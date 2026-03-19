@@ -227,7 +227,6 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "Luminary\nVersion 5\n\n"));
 
   // TODO: Use critical section failure handles
-  // TODO: Im dumb, I need to pass in the builtin types and not the Luminary types
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "# This file was automatically created by Luminary.\n"));
@@ -245,7 +244,12 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   RendererSettings settings;
   __FAILURE_HANDLE(scene_get(host->scene_host, &settings, SCENE_ENTITY_SETTINGS));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_SETTINGS, (const void*) &settings, (const char*) 0));
+
+  LumBuiltinSettings builtin_settings;
+  __FAILURE_HANDLE(lum_builtin_settings_serialize(&settings, &builtin_settings));
+
+  __FAILURE_HANDLE(
+    _lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_SETTINGS, (const void*) &builtin_settings, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -255,7 +259,11 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   Camera camera;
   __FAILURE_HANDLE(scene_get(host->scene_host, &camera, SCENE_ENTITY_CAMERA));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_CAMERA, (const void*) &camera, (const char*) 0));
+
+  LumBuiltinCamera builtin_camera;
+  __FAILURE_HANDLE(lum_builtin_camera_serialize(&camera, &builtin_camera));
+
+  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_CAMERA, (const void*) &builtin_camera, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -265,7 +273,11 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   Ocean ocean;
   __FAILURE_HANDLE(scene_get(host->scene_host, &ocean, SCENE_ENTITY_OCEAN));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_OCEAN, (const void*) &ocean, (const char*) 0));
+
+  LumBuiltinOcean builtin_ocean;
+  __FAILURE_HANDLE(lum_builtin_ocean_serialize(&ocean, &builtin_ocean));
+
+  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_OCEAN, (const void*) &builtin_ocean, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -275,7 +287,11 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   Sky sky;
   __FAILURE_HANDLE(scene_get(host->scene_host, &sky, SCENE_ENTITY_SKY));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_SKY, (const void*) &sky, (const char*) 0));
+
+  LumBuiltinSky builtin_sky;
+  __FAILURE_HANDLE(lum_builtin_sky_serialize(&sky, &builtin_sky));
+
+  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_SKY, (const void*) &builtin_sky, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -285,7 +301,11 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   Cloud cloud;
   __FAILURE_HANDLE(scene_get(host->scene_host, &cloud, SCENE_ENTITY_CLOUD));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_CLOUD, (const void*) &cloud, (const char*) 0));
+
+  LumBuiltinCloud builtin_cloud;
+  __FAILURE_HANDLE(lum_builtin_cloud_serialize(&cloud, &builtin_cloud));
+
+  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_CLOUD, (const void*) &builtin_cloud, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -295,7 +315,11 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   Fog fog;
   __FAILURE_HANDLE(scene_get(host->scene_host, &fog, SCENE_ENTITY_FOG));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_FOG, (const void*) &fog, (const char*) 0));
+
+  LumBuiltinFog builtin_fog;
+  __FAILURE_HANDLE(lum_builtin_fog_serialize(&fog, &builtin_fog));
+
+  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_FOG, (const void*) &builtin_fog, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -305,7 +329,12 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
 
   Particles particles;
   __FAILURE_HANDLE(scene_get(host->scene_host, &particles, SCENE_ENTITY_PARTICLES));
-  __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_PARTICLES, (const void*) &particles, (const char*) 0));
+
+  LumBuiltinParticles builtin_particles;
+  __FAILURE_HANDLE(lum_builtin_particles_serialize(&particles, &builtin_particles));
+
+  __FAILURE_HANDLE(
+    _lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_PARTICLES, (const void*) &builtin_particles, (const char*) 0));
 
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   __FAILURE_HANDLE(_lum_serializer_write(serializer, "#==============================================================\n"));
@@ -348,7 +377,13 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
     bool found = false;
     __FAILURE_HANDLE(dictionary_find_by_id(host->mesh_instance_name_dict, instance_id, &name, &found));
 
-    __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_INSTANCE, (const void*) &instance, name));
+    LuminaryInstance lum_instance;
+    __FAILURE_HANDLE(mesh_instance_to_public_api_instance(&lum_instance, &instance));
+
+    LumBuiltinInstance builtin_instance;
+    __FAILURE_HANDLE(lum_builtin_instance_serialize(&lum_instance, &builtin_instance));
+
+    __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_INSTANCE, (const void*) &builtin_instance, name));
     __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   }
 
@@ -369,7 +404,10 @@ LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host) {
     bool found = false;
     __FAILURE_HANDLE(dictionary_find_by_id(host->material_name_dict, material_id, &name, &found));
 
-    __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_MATERIAL, (const void*) &material, name));
+    LumBuiltinMaterial builtin_material;
+    __FAILURE_HANDLE(lum_builtin_material_serialize(&material, &builtin_material));
+
+    __FAILURE_HANDLE(_lum_serializer_serialize_struct(serializer, LUM_BUILTIN_TYPE_MATERIAL, (const void*) &builtin_material, name));
     __FAILURE_HANDLE(_lum_serializer_write(serializer, "\n"));
   }
 
