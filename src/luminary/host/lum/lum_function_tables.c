@@ -527,6 +527,8 @@ static LuminaryResult _lum_function_store_wavefrontobj(LumVirtualMachine* vm, co
     __FAILURE_HANDLE(lum_function_resolve_string_address(vm, &src->name_prefix, &args.name_prefix));
   }
 
+  // TODO: Wavefront file must be added to the history
+
   WavefrontContent* content;
   __FAILURE_HANDLE(wavefront_create(&content, args));
 
