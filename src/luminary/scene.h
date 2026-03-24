@@ -3,7 +3,6 @@
 
 #include "camera.h"
 #include "mesh.h"
-#include "mutex.h"
 #include "sample_count.h"
 #include "utils.h"
 
@@ -112,7 +111,9 @@ struct Scene {
 
 LuminaryResult scene_create(Scene** scene);
 LuminaryResult scene_lock(Scene* scene, SceneEntityType entity_mutex);
+LuminaryResult scene_lock_non_blocking(Scene* scene, SceneEntityType entity_mutex, bool* success);
 LuminaryResult scene_lock_all(Scene* scene);
+LuminaryResult scene_lock_all_non_blocking(Scene* scene, bool* success);
 LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags);
 LuminaryResult scene_set_dirty_flags(Scene* scene, SceneDirtyFlags flags);
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity);
@@ -125,7 +126,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t index, bool* scene_changed);
 LuminaryResult scene_get_entry_count(const Scene* scene, SceneEntity entity, uint32_t* count);
-LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity);
+LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t* id);
 LuminaryResult scene_get_list_changes(Scene* scene, ARRAYPTR void** object, SceneEntity entity);
 LuminaryResult scene_apply_changes(Scene* scene);
 LuminaryResult scene_propagate_changes(Scene* scene, Scene* src);

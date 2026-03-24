@@ -1,6 +1,7 @@
 #define QOI_IMPLEMENTATION
 #include "qoi/qoi.h"
 
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "qoi.h"
 #include "texture.h"
@@ -42,8 +43,8 @@ LuminaryResult store_ARGB8_qoi(const char* filename, const ARGB8* image, const i
   __CHECK_NULL_ARGUMENT(filename);
   __CHECK_NULL_ARGUMENT(image);
 
-  uint8_t* buffer;
-  __FAILURE_HANDLE(host_malloc(&buffer, width * height * sizeof(RGB8)));
+  LOCAL uint8_t* buffer;
+  __FAILURE_HANDLE(host_malloc_local(&buffer, width * height * sizeof(RGB8)));
 
   RGB8* buffer_rgb8 = (RGB8*) buffer;
   for (int i = 0; i < height * width; i++) {
@@ -54,7 +55,7 @@ LuminaryResult store_ARGB8_qoi(const char* filename, const ARGB8* image, const i
 
   const int ret = store_as_qoi(filename, buffer, width, height, QOI_COLORTYPE_TRUECOLOR);
 
-  __FAILURE_HANDLE(host_free(&buffer));
+  __FAILURE_HANDLE(host_free_local(&buffer));
 
   if (ret) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "QOI returned error: %d.", ret);

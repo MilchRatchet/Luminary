@@ -133,6 +133,8 @@ LuminaryResult texture_is_valid(const Texture* texture, bool* is_valid) {
   __CHECK_NULL_ARGUMENT(texture);
 
   *is_valid = texture->status != TEXTURE_STATUS_INVALID;
+  *is_valid &= texture->width > 0;
+  *is_valid &= texture->height > 0;
 
   return LUMINARY_SUCCESS;
 }

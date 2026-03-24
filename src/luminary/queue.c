@@ -2,7 +2,6 @@
 
 #include "cond_var.h"
 #include "internal_error.h"
-#include "mutex.h"
 #include "utils.h"
 
 struct LuminaryQueue {
@@ -53,12 +52,9 @@ LuminaryResult _queue_create(
 LuminaryResult queue_push(Queue* queue, void* object) {
   __CHECK_NULL_ARGUMENT(queue);
   __CHECK_NULL_ARGUMENT(object);
+  __CHECK_NULL_ARGUMENT(queue->buffer);
 
-  if (!queue->buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
-  }
-
-  if (queue->elements_in_queue == queue->element_count) {
+  if (queue->elements_in_queue >= queue->element_count) {
     __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
   }
 
@@ -225,7 +221,7 @@ LuminaryResult _queue_destroy(Queue** queue, const char* buf_name, const char* f
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
-  if ((*queue)->write_ptr != (*queue)->read_ptr) {
+  if ((*queue)->elements_in_queue != 0) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue is not empty.");
   }
 

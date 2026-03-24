@@ -4,6 +4,8 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 
+#include "host_intrinsics.h"
+
 #define SpinLockObject _Atomic bool
 
 // https://rigtorp.se/spinlock/
@@ -15,7 +17,7 @@ inline void spinlock_lock(SpinLockObject* lock) {
     }
 
     while (atomic_load_explicit(lock, memory_order_relaxed)) {
-      __asm("pause");
+      host_intrin_thread_yield();
     }
   }
 }
@@ -34,10 +36,10 @@ inline void spinlock_counter_pop(SpinLockCounter* lock) {
   uint32_t expected;
   for (;;) {
     while ((expected = atomic_load_explicit(lock, memory_order_relaxed)) == 0) {
-      __asm("pause");
+      host_intrin_thread_yield();
     }
 
-    if (atomic_compare_exchange_weak_explicit(lock, &expected, expected - 1, memory_order_acquire, memory_order_acquire)) {
+    if (atomic_compare_exchange_weak_explicit(lock, &expected, expected - 1, memory_order_release, memory_order_relaxed)) {
       break;
     }
   }
@@ -47,9 +49,9 @@ inline void spinlock_counter_push(SpinLockCounter* lock) {
   atomic_fetch_add_explicit(lock, 1, memory_order_release);
 }
 
-inline void spinlock_count_wait_zero(SpinLockCounter* lock) {
-  while (atomic_load_explicit(lock, memory_order_relaxed) != 0) {
-    __asm("pause");
+inline void spinlock_counter_wait_zero(SpinLockCounter* lock) {
+  while (atomic_load_explicit(lock, memory_order_acquire) != 0) {
+    host_intrin_thread_yield();
   }
 }
 

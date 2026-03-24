@@ -8,6 +8,8 @@
 #include "internal_host.h"
 #include "internal_path.h"
 #include "lum.h"
+#include "lum/lum_serializer.h"
+#include "material.h"
 #include "mesh.h"
 #include "png.h"
 #include "wavefront.h"
@@ -27,74 +29,64 @@ static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
 
-struct HostLoadObjArgs {
-  Path* path;
-  WavefrontArguments wavefront_args;
-} typedef HostLoadObjArgs;
+static LuminaryResult _host_start_new_render(Host* host, void* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  LUM_UNUSED(args);
+
+  __FAILURE_HANDLE(scene_set_dirty_flags(host->scene_caller, SCENE_DIRTY_FLAG_INTEGRATION));
+  __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
 
 static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(args);
 
-  WavefrontContent* wavefront_content;
-
-  __FAILURE_HANDLE(wavefront_create(&wavefront_content, args->wavefront_args));
-  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path, host->secondary_work_queue));
-
-  // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
-
-  uint32_t num_meshes_before;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
-
-  uint32_t num_textures_before;
-  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
-
-  // Lock the scene lists because we need to freeze the current material count and then add all the new materials.
-  // This can cause the caller to stall if he performs other list updates.
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
-  ARRAY Material* added_materials;
-  __FAILURE_HANDLE_CRITICAL(array_create(&added_materials, sizeof(Material), 16));
-
-  uint32_t material_offset;
-  __FAILURE_HANDLE_CRITICAL(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
-
-  __FAILURE_HANDLE_CRITICAL(
-    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset));
-
-  uint32_t num_added_materials;
-  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(added_materials, &num_added_materials));
-
-  for (uint32_t new_material_id = 0; new_material_id < num_added_materials; new_material_id++) {
-    __FAILURE_HANDLE_CRITICAL(scene_add_entry(host->scene_caller, added_materials + new_material_id, SCENE_ENTITY_MATERIALS));
-  }
+  __FAILURE_HANDLE(host_load_obj_file(host, args->path, args->wavefront_args));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
   __FAILURE_HANDLE_CHECK_CRITICAL();
 
-  __FAILURE_HANDLE(array_destroy(&added_materials));
-  __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
-
-  __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
-
-  uint32_t num_meshes_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
-
-  __FAILURE_HANDLE(
-    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
-
-  uint32_t num_textures_after;
-  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
-
-  __FAILURE_HANDLE(device_manager_add_textures(
-    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
-
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));
   __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostLoadObjArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+struct HostLoadLumArgs {
+  Path* path;
+} typedef HostLoadLumArgs;
+
+static LuminaryResult _host_load_lum_file(Host* host, HostLoadLumArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  LumFile* lum_file;
+  __FAILURE_HANDLE(lum_file_create(&lum_file));
+  __FAILURE_HANDLE(lum_file_parse(lum_file, args->path));
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock_all(host->scene_caller));
+
+  __FAILURE_HANDLE_CRITICAL(lum_file_apply(lum_file, host));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock_all(host->scene_caller));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  __FAILURE_HANDLE(lum_file_destroy(&lum_file));
+
+  // Clean up
+  __FAILURE_HANDLE(luminary_path_destroy(&args->path));
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostLoadLumArgs)));
 
   return LUMINARY_SUCCESS;
 }
@@ -236,7 +228,62 @@ static LuminaryResult _host_enable_device_queue_work(Host* host, HostEnableDevic
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _host_update_scene(Host* host) {
+LuminaryResult host_load_obj_file(Host* host, Path* path, WavefrontArguments* wavefront_args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(wavefront_args);
+
+  WavefrontContent* wavefront_content;
+
+  __FAILURE_HANDLE(wavefront_create(&wavefront_content, wavefront_args));
+  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, path, host->secondary_work_queue));
+
+  // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
+
+  uint32_t material_offset;
+  __FAILURE_HANDLE(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
+
+  uint32_t num_meshes_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_meshes(wavefront_content, &host->meshes, host->mesh_name_dict, material_offset));
+
+  uint32_t num_meshes_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
+
+  __FAILURE_HANDLE(
+    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
+
+  uint32_t num_textures_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_textures(wavefront_content, &host->textures, host->texture_name_dict));
+
+  uint32_t num_textures_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_after));
+
+  __FAILURE_HANDLE(device_manager_add_textures(
+    host->device_manager, (const Texture**) host->textures + num_textures_before, num_textures_after - num_textures_before));
+
+  __FAILURE_HANDLE(wavefront_content_get_materials(wavefront_content, host->scene_caller, host->material_name_dict, num_textures_before));
+
+  __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
+
+  __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
+
+  // Add obj file to history
+  HostLoadObjArgs args;
+  memset(&args, 0, sizeof(HostLoadObjArgs));
+
+  args.wavefront_args = wavefront_args;
+  __FAILURE_HANDLE(path_copy(&args.path, path));
+
+  __FAILURE_HANDLE(array_push(&host->loaded_obj_files, &args));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult host_update_scene(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
 
   QueueEntry entry;
@@ -255,6 +302,51 @@ static LuminaryResult _host_update_scene(Host* host) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult host_add_meshes(Host* host, ARRAY Mesh** meshes, Dictionary* mesh_name_dict) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(meshes);
+  __CHECK_NULL_ARGUMENT(mesh_name_dict);
+
+  uint32_t num_added_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(meshes, &num_added_meshes));
+
+  if (num_added_meshes == 0)
+    return LUMINARY_SUCCESS;
+
+  uint32_t num_meshes_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
+
+  __FAILURE_HANDLE(array_append(&host->meshes, meshes));
+  __FAILURE_HANDLE(dictionary_move_entries(host->mesh_name_dict, mesh_name_dict, num_meshes_before));
+
+  __FAILURE_HANDLE(device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_added_meshes));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult host_add_textures(Host* host, ARRAY Texture** textures, Dictionary* texture_name_dict) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(textures);
+  __CHECK_NULL_ARGUMENT(texture_name_dict);
+
+  uint32_t num_added_textures;
+  __FAILURE_HANDLE(array_get_num_elements(textures, &num_added_textures));
+
+  if (num_added_textures == 0)
+    return LUMINARY_SUCCESS;
+
+  uint32_t num_textures_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &num_textures_before));
+
+  __FAILURE_HANDLE(array_append(&host->textures, textures));
+  __FAILURE_HANDLE(dictionary_move_entries(host->texture_name_dict, texture_name_dict, num_textures_before));
+
+  __FAILURE_HANDLE(
+    device_manager_add_textures(host->device_manager, (const Texture**) host->textures + num_textures_before, num_added_textures));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(object);
@@ -264,7 +356,7 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
 
   // If there are no changes, skip the propagation to avoid hammering the queue.
   if (scene_changed) {
-    __FAILURE_HANDLE(_host_update_scene(host));
+    __FAILURE_HANDLE(host_update_scene(host));
   }
 
   return LUMINARY_SUCCESS;
@@ -279,7 +371,7 @@ static LuminaryResult _host_set_scene_entity_entry(Host* host, void* object, Sce
 
   // If there are no changes, skip the propagation to avoid hammering the queue.
   if (scene_changed) {
-    __FAILURE_HANDLE(_host_update_scene(host));
+    __FAILURE_HANDLE(host_update_scene(host));
   }
 
   return LUMINARY_SUCCESS;
@@ -306,6 +398,13 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   __FAILURE_HANDLE(queue_create(&(*host)->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(queue_create(&(*host)->secondary_work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&(*host)->ringbuffer, HOST_RINGBUFFER_SIZE));
+
+  __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_instance_name_dict));
+  __FAILURE_HANDLE(dictionary_create(&(*host)->material_name_dict));
+  __FAILURE_HANDLE(dictionary_create(&(*host)->mesh_name_dict));
+  __FAILURE_HANDLE(dictionary_create(&(*host)->texture_name_dict));
+
+  __FAILURE_HANDLE(array_create(&(*host)->loaded_obj_files, sizeof(HostLoadObjArgs), 16));
 
   DeviceManagerCreateInfo device_manager_create_info;
   device_manager_create_info.device_mask = info.device_mask;
@@ -361,7 +460,22 @@ LuminaryResult luminary_host_destroy(Host** host) {
   // Destroy member
   ////////////////////////////////////////////////////////////////////
 
+  uint32_t num_loaded_objs;
+  __FAILURE_HANDLE(array_get_num_elements((*host)->loaded_obj_files, &num_loaded_objs));
+
+  for (uint32_t obj_id = 0; obj_id < num_loaded_objs; obj_id++) {
+    __FAILURE_HANDLE(luminary_path_destroy(&(*host)->loaded_obj_files[obj_id].path));
+    __FAILURE_HANDLE(wavefront_arguments_destroy(&(*host)->loaded_obj_files[obj_id].wavefront_args));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*host)->loaded_obj_files));
+
   __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
+
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->mesh_instance_name_dict));
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->material_name_dict));
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->mesh_name_dict));
+  __FAILURE_HANDLE(dictionary_destroy(&(*host)->texture_name_dict));
 
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
@@ -406,9 +520,16 @@ LuminaryResult luminary_host_destroy(Host** host) {
 LuminaryResult luminary_host_start_new_render(LuminaryHost* host) {
   __CHECK_NULL_ARGUMENT(host);
 
-  __FAILURE_HANDLE(scene_set_dirty_flags(host->scene_caller, SCENE_DIRTY_FLAG_INTEGRATION));
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
 
-  __FAILURE_HANDLE(_host_update_scene(host));
+  entry.name              = "Starting new render";
+  entry.function          = (QueueEntryFunction) _host_start_new_render;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = true;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
   return LUMINARY_SUCCESS;
 }
@@ -477,7 +598,7 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   device->state = (enable) ? DEVICE_STATE_ENABLED : DEVICE_STATE_DISABLED;
 
   HostEnableDeviceArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostEnableDeviceArgs), (void**) &args));
 
   args->enable    = enable;
   args->device_id = device_id;
@@ -495,9 +616,10 @@ LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t devi
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments wavefront_args) {
+static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments* wavefront_args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(wavefront_args);
 
   HostLoadObjArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
@@ -519,12 +641,34 @@ static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, Wavefron
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _host_queue_load_lum_file(Host* host, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
+  HostLoadLumArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadLumArgs), (void**) &args));
+
+  __FAILURE_HANDLE(path_copy(&args->path, path));
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Loading Lum File";
+  entry.function   = (QueueEntryFunction) _host_load_lum_file;
+  entry.clear_func = (QueueEntryFunction) 0;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
-  WavefrontArguments args;
-  __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
+  WavefrontArguments* args;
+  __FAILURE_HANDLE(wavefront_arguments_create(&args));
 
   __FAILURE_HANDLE(_host_queue_load_obj_file(host, path, args));
 
@@ -535,71 +679,7 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
-  LumFileContent* content;
-  __FAILURE_HANDLE(lum_content_create(&content));
-
-  ////////////////////////////////////////////////////////////////////
-  // Read lum file
-  ////////////////////////////////////////////////////////////////////
-
-  Path* lum_path;
-  __FAILURE_HANDLE(path_copy(&lum_path, path));
-
-  __FAILURE_HANDLE(lum_read_file(lum_path, content));
-
-  __FAILURE_HANDLE(luminary_path_destroy(&lum_path));
-
-  ////////////////////////////////////////////////////////////////////
-  // Load meshes
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t mesh_id_offset;
-  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &mesh_id_offset));
-
-  uint32_t num_obj_files_to_load;
-  __FAILURE_HANDLE(array_get_num_elements(content->obj_file_path_strings, &num_obj_files_to_load));
-
-  for (uint32_t obj_file_id = 0; obj_file_id < num_obj_files_to_load; obj_file_id++) {
-    Path* obj_path;
-    __FAILURE_HANDLE(path_extend(&obj_path, path, content->obj_file_path_strings[obj_file_id]));
-
-    __FAILURE_HANDLE(_host_queue_load_obj_file(host, obj_path, content->wavefront_args));
-
-    __FAILURE_HANDLE(luminary_path_destroy(&obj_path));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Add instances
-  ////////////////////////////////////////////////////////////////////
-
-  uint32_t num_instances_added;
-  __FAILURE_HANDLE(array_get_num_elements(content->instances, &num_instances_added));
-
-  for (uint32_t instance_id = 0; instance_id < num_instances_added; instance_id++) {
-    MeshInstance instance = content->instances[instance_id];
-
-    // Account for any meshes that were loaded prior to loading this lum file.
-    instance.mesh_id += mesh_id_offset;
-
-    __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES));
-
-    // We have added an instance, so the scene is dirty and we need to queue the propagation
-    __FAILURE_HANDLE(_host_update_scene(host));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Update global scene entities
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(luminary_host_set_settings(host, &content->settings));
-  __FAILURE_HANDLE(luminary_host_set_camera(host, &content->camera));
-  __FAILURE_HANDLE(luminary_host_set_ocean(host, &content->ocean));
-  __FAILURE_HANDLE(luminary_host_set_sky(host, &content->sky));
-  __FAILURE_HANDLE(luminary_host_set_cloud(host, &content->cloud));
-  __FAILURE_HANDLE(luminary_host_set_fog(host, &content->fog));
-  __FAILURE_HANDLE(luminary_host_set_particles(host, &content->particles));
-
-  __FAILURE_HANDLE(lum_content_destroy(&content));
+  __FAILURE_HANDLE(_host_queue_load_lum_file(host, path));
 
   return LUMINARY_SUCCESS;
 }
@@ -698,6 +778,33 @@ LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t qu
   }
 
   __FAILURE_HANDLE(thread_status_get_time(queue_worker->thread_status, time));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_acquire_scene_lock(Host* host, bool* success) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(success);
+
+  if (host->scene_locked_by_caller) {
+    *success = true;
+    return LUMINARY_SUCCESS;
+  }
+
+  scene_lock_all_non_blocking(host->scene_caller, success);
+
+  host->scene_locked_by_caller = *success;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_release_scene_lock(Host* host) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  if (host->scene_locked_by_caller) {
+    __FAILURE_HANDLE(scene_unlock_all(host->scene_caller));
+    host->scene_locked_by_caller = false;
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -846,6 +953,41 @@ LuminaryResult luminary_host_set_material(Host* host, uint16_t id, const Luminar
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_material_from_name(Host* host, const char* name, uint16_t* id) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(id);
+
+  uint32_t dict_id;
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->material_name_dict, name, &dict_id, &found));
+
+  if (found) {
+    __DEBUG_ASSERT(dict_id < 0x10000);
+
+    *id = (uint16_t) dict_id;
+
+    return LUMINARY_SUCCESS;
+  }
+
+  Material mat;
+  __FAILURE_HANDLE(material_get_default(&mat));
+
+  uint32_t new_id;
+  __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mat, SCENE_ENTITY_MATERIALS, &new_id));
+
+  if (new_id >= MATERIAL_ID_INVALID)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Exceeded max number of materials.");
+
+  __FAILURE_HANDLE(dictionary_add_entry(host->material_name_dict, new_id, name));
+
+  *id = (uint16_t) new_id;
+
+  __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
@@ -858,29 +1000,58 @@ LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInsta
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_set_instance(Host* host, const LuminaryInstance* instance) {
+LuminaryResult luminary_host_set_instance(Host* host, uint32_t id, const LuminaryInstance* instance) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
 
   MeshInstance mesh_instance;
   __FAILURE_HANDLE(mesh_instance_from_public_api_instance(&mesh_instance, instance));
 
-  __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) &mesh_instance, SCENE_ENTITY_INSTANCES, mesh_instance.id));
+  __FAILURE_HANDLE(_host_set_scene_entity_entry(host, (void*) &mesh_instance, SCENE_ENTITY_INSTANCES, id));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_new_instance(Host* host, LuminaryInstance* instance) {
+LuminaryResult luminary_host_get_instance_from_name(LuminaryHost* host, const char* name, uint32_t* id) {
   __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(instance);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(id);
 
-  MeshInstance mesh_instance;
-  __FAILURE_HANDLE(mesh_instance_get_default(&mesh_instance));
+  uint32_t dict_id;
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->mesh_instance_name_dict, name, &dict_id, &found));
 
-  __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &mesh_instance, SCENE_ENTITY_INSTANCES));
-  __FAILURE_HANDLE(_host_update_scene(host));
+  if (found) {
+    *id = dict_id;
+    return LUMINARY_SUCCESS;
+  }
 
-  __FAILURE_HANDLE(mesh_instance_to_public_api_instance(instance, &mesh_instance));
+  MeshInstance instance;
+  __FAILURE_HANDLE(mesh_instance_get_default(&instance));
+
+  uint32_t new_id;
+  __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES, &new_id));
+
+  __FAILURE_HANDLE(dictionary_add_entry(host->mesh_instance_name_dict, new_id, name));
+
+  *id = new_id;
+
+  __FAILURE_HANDLE(host_update_scene(host));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_mesh_from_name(LuminaryHost* host, const char* name, uint32_t* id) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(name);
+  __CHECK_NULL_ARGUMENT(id);
+
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->mesh_name_dict, name, id, &found));
+
+  if (found == false) {
+    *id = MESH_ID_INVALID;
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -1036,7 +1207,7 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle handle, LuminaryPath* path) {
+LuminaryResult luminary_host_save_png(Host* host, LuminaryOutputHandle handle, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
@@ -1047,7 +1218,7 @@ LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle h
   __FAILURE_HANDLE(output_handler_acquire(host->output_handler, handle));
 
   const char* file_path_string;
-  __FAILURE_HANDLE(path_apply(path, (const char*) 0, &file_path_string));
+  __FAILURE_HANDLE(luminary_path_apply(path, (const char*) 0, &file_path_string));
 
   const size_t path_length = strlen(file_path_string);
 
@@ -1074,11 +1245,24 @@ LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle h
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_save_as_lumV5(Host* host, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
+  LumSerializer* serializer;
+  __FAILURE_HANDLE(lum_serializer_create(&serializer));
+  __FAILURE_HANDLE(lum_serializer_serialize(serializer, host));
+  __FAILURE_HANDLE(lum_serializer_store(serializer, path));
+  __FAILURE_HANDLE(lum_serializer_destroy(&serializer));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_request_sky_hdri_build(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(scene_set_hdri_dirty(host->scene_caller));
-  __FAILURE_HANDLE(_host_update_scene(host));
+  __FAILURE_HANDLE(host_update_scene(host));
 
   return LUMINARY_SUCCESS;
 }

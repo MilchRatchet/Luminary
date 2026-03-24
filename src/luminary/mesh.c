@@ -9,8 +9,7 @@
 #include "internal_error.h"
 
 // TODO: Make per host instance
-static uint32_t mesh_id_counter     = 0;
-static uint32_t instance_id_counter = 0;
+static uint32_t mesh_id_counter = 0;
 
 LuminaryResult mesh_create(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
@@ -23,29 +22,8 @@ LuminaryResult mesh_create(Mesh** mesh) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult mesh_set_name(Mesh* mesh, const char* name) {
-  __CHECK_NULL_ARGUMENT(mesh);
-  __CHECK_NULL_ARGUMENT(name);
-
-  const size_t string_length = strlen(name);
-
-  if (mesh->name) {
-    __FAILURE_HANDLE(host_free(&mesh->name));
-  }
-
-  __FAILURE_HANDLE(host_malloc(&mesh->name, string_length + 1));
-
-  memcpy(mesh->name, name, string_length);
-  mesh->name[string_length] = '\0';
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult mesh_destroy(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
-
-  if ((*mesh)->name)
-    __FAILURE_HANDLE(host_free(&(*mesh)->name));
 
   if ((*mesh)->data.vertex_buffer)
     __FAILURE_HANDLE(host_free(&(*mesh)->data.vertex_buffer));
@@ -69,11 +47,11 @@ LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
 
   memset(instance, 0, sizeof(MeshInstance));
 
-  instance->active  = true;
-  instance->id      = instance_id_counter++;
+  instance->active  = false;
   instance->scale.x = 1.0f;
   instance->scale.y = 1.0f;
   instance->scale.z = 1.0f;
+  instance->mesh_id = MESH_ID_INVALID;
 
   return LUMINARY_SUCCESS;
 }
@@ -118,12 +96,11 @@ LuminaryResult mesh_instance_from_public_api_instance(MeshInstance* mesh_instanc
   __CHECK_NULL_ARGUMENT(mesh_instance);
   __CHECK_NULL_ARGUMENT(instance);
 
-  mesh_instance->id          = instance->id;
   mesh_instance->mesh_id     = instance->mesh_id;
   mesh_instance->translation = instance->position;
   mesh_instance->scale       = instance->scale;
   mesh_instance->rotation    = instance->rotation;
-  mesh_instance->active      = true;
+  mesh_instance->active      = (instance->mesh_id != MESH_ID_INVALID);
 
   return LUMINARY_SUCCESS;
 }
@@ -132,8 +109,7 @@ LuminaryResult mesh_instance_to_public_api_instance(LuminaryInstance* instance, 
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(mesh_instance);
 
-  const LuminaryInstance converted_instance = (LuminaryInstance) {.id       = mesh_instance->id,
-                                                                  .mesh_id  = mesh_instance->mesh_id,
+  const LuminaryInstance converted_instance = (LuminaryInstance) {.mesh_id  = mesh_instance->mesh_id,
                                                                   .position = mesh_instance->translation,
                                                                   .scale    = mesh_instance->scale,
                                                                   .rotation = mesh_instance->rotation};

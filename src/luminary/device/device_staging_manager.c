@@ -53,8 +53,8 @@ LuminaryResult device_staging_manager_register_direct_access(
   size_t used_memory   = size;
 
   if (buffer_offset + size > STAGING_BUFFER_SIZE) {
-    buffer_offset = 0;
     used_memory += STAGING_BUFFER_SIZE - buffer_offset;
+    buffer_offset = 0;
   }
 
   bool emergency_staging_required = false;
@@ -104,7 +104,7 @@ LuminaryResult device_staging_manager_register(
     __FAILURE_HANDLE(
       device_staging_manager_register_direct_access(staging_manager, dst, dst_offset, STAGING_BUFFER_SIZE, &direct_access_buffer));
 
-    memcpy(direct_access_buffer, src, size);
+    memcpy(direct_access_buffer, src, STAGING_BUFFER_SIZE);
 
     src = (void const*) (((uint8_t const*) src) + STAGING_BUFFER_SIZE);
     dst_offset += STAGING_BUFFER_SIZE;

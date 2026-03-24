@@ -97,6 +97,9 @@ LuminaryResult optix_bvh_instance_cache_update(
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
     const MeshInstanceProcessedUpdate* update = instance_updates + update_id;
 
+    if (update->instance.active == false)
+      continue;
+
     if (update->instance_id >= num_instances_after)
       num_instances_after = update->instance_id + 1;
   }
@@ -127,6 +130,9 @@ LuminaryResult optix_bvh_instance_cache_update(
   // Stage the new optix instances
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
     const MeshInstanceProcessedUpdate* update = instance_updates + update_id;
+
+    if (update->instance.active == false)
+      continue;
 
     for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
       OptixInstance* direct_access_buffer;
@@ -258,6 +264,8 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const DeviceMe
 
     size_t compact_size;
     __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
+
+    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
     __FAILURE_HANDLE(device_free(&accel_emit_buffer));
     __FAILURE_HANDLE(device_free(&temp_buffer));

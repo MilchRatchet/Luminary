@@ -10,6 +10,16 @@
 #include "internal_array.h"
 #include "sky_defines.h"
 
+// Determine architecture
+#if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64)
+#define LUMINARY_TARGET_ARCH_X86
+#elif defined(__CUDACC__)  // We can't check for __CUDA_ARCH__ here, it seems some part of the compilation step doesn't define it in NVCC
+#define LUMINARY_TARGET_ARCH_NVGPU
+#else
+#define LUMINARY_TARGET_ARCH_UNKNOWN
+#error "Target architecture is not supported.";
+#endif
+
 #ifndef PI
 #define PI 3.141592653589f
 #endif
@@ -25,18 +35,28 @@
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
 
-#define TEXTURE_NONE ((uint16_t) 0xffffu)
-
+#define TEXTURE_ID_INVALID 0xFFFF
 #define MATERIAL_ID_INVALID 0xFFFF
+#define MESH_ID_INVALID 0xFFFFFFFF
 #define INSTANCE_ID_INVALID 0xFFFFFFFF
 #define LIGHT_ID_INVALID 0xFFFFFFFF
 #define DEPTH_INVALID -1.0f
+
+// Legacy define
+#define TEXTURE_NONE TEXTURE_ID_INVALID
 
 // Print stats for the work queues
 #define LUMINARY_WORK_QUEUE_STATS_PRINT
 #define LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD 0.01
 
 enum VolumeType { VOLUME_TYPE_NONE, VOLUME_TYPE_FOG, VOLUME_TYPE_OCEAN } typedef VolumeType;
+
+struct RGBAF {
+  float r;
+  float g;
+  float b;
+  float a;
+} typedef RGBAF;
 
 struct Quaternion {
   float x;

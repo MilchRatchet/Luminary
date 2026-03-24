@@ -16,7 +16,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->shading_mode                  = settings->shading_mode;
   device_settings->bridge_max_num_vertices       = settings->bridge_max_num_vertices;
   device_settings->supersampling                 = settings->supersampling;
-  device_settings->adaptive_sampling_output_mode = settings->adaptive_sampling_output_mode;
+  device_settings->adaptive_sampling_output_mode = settings->adaptive_sampling_settings.output_mode;
 
   device_settings->width  = settings->width << settings->supersampling;
   device_settings->height = settings->height << settings->supersampling;
@@ -298,7 +298,7 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->albedo_r       = _device_struct_convert_float01_to_uint16(material->albedo.r);
   device_material->albedo_g       = _device_struct_convert_float01_to_uint16(material->albedo.g);
   device_material->albedo_b       = _device_struct_convert_float01_to_uint16(material->albedo.b);
-  device_material->albedo_a       = _device_struct_convert_float01_to_uint16(material->albedo.a);
+  device_material->opacity        = _device_struct_convert_float01_to_uint16(material->opacity);
   device_material->emission_r     = _device_struct_convert_float01_to_uint16(emission.r);
   device_material->emission_g     = _device_struct_convert_float01_to_uint16(emission.g);
   device_material->emission_b     = _device_struct_convert_float01_to_uint16(emission.b);

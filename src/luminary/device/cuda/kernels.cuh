@@ -10,7 +10,7 @@
 #include "ocean_utils.cuh"
 #include "post_common.cuh"
 #include "purkinje.cuh"
-#include "sky.cuh"
+#include "sky_integration.cuh"
 #include "sky_utils.cuh"
 #include "tonemap.cuh"
 #include "utils.cuh"
@@ -627,9 +627,11 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
 
     const float dither = (device.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
 
-    pixel.r = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.r)));
-    pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.g)));
-    pixel.b = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.b)));
+    pixel = color_linear_to_sRGB(pixel);
+
+    pixel.r = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * pixel.r));
+    pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * pixel.g));
+    pixel.b = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * pixel.b));
 
     ARGB8 converted_pixel;
     converted_pixel.a = 0xFF;
@@ -644,7 +646,7 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
 }
 
 LUMINARY_KERNEL void buffer_add(const KernelArgsBufferAdd args) {
-  static_assert(THREADS_PER_BLOCK == 128, "This assumes this threads per blocks value.");
+  static_assert(MAX_THREADS_PER_BLOCK == 128, "This assumes this threads per blocks value.");
   uint32_t offset = THREAD_ID * 4;
 
   if (offset >= args.num_elements)

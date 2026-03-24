@@ -17,7 +17,10 @@ inline float _ui_renderer_rand(const uint32_t offset, const uint32_t phi) {
 
   const uint32_t i = 0x3F800000u | (v >> 9);
 
-  return (*(float*) &i) - 1.0f;
+  float ret_val;
+  memcpy(&ret_val, &i, sizeof(float));
+
+  return ret_val - 1.0f;
 }
 
 ////////////////////////////////////////////////////////////////////

@@ -1,8 +1,10 @@
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "internal_error.h"
-#include "lum.h"
+#include "lum/lum_file_content.h"
+#include "mesh.h"
 
 #define LINE_SIZE 4096
 #define CURRENT_VERSION 4
@@ -683,7 +685,7 @@ static LuminaryResult parse_particle_settings(Particles* particle, char* line) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
+LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
   char* line;
 
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
@@ -746,10 +748,10 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     content->camera.bloom_blend = 0.0f;
   }
 
-  content->wavefront_args.legacy_smoothness            = legacy_settings.legacy_smoothness;
-  content->wavefront_args.force_transparency_cutout    = legacy_settings.force_transparency_cutout;
-  content->wavefront_args.emission_scale               = legacy_settings.emission_scale;
-  content->wavefront_args.force_bidirectional_emission = true;
+  content->wavefront_args->legacy_smoothness            = legacy_settings.legacy_smoothness;
+  content->wavefront_args->force_transparency_cutout    = legacy_settings.force_transparency_cutout;
+  content->wavefront_args->emission_scale               = legacy_settings.emission_scale;
+  content->wavefront_args->force_bidirectional_emission = true;
 
   __FAILURE_HANDLE(host_free(&line));
 

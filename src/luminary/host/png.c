@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "texture.h"
 #include "utils.h"
@@ -207,8 +208,8 @@ LuminaryResult png_store(
   }
 
   /* Adding filter byte at the beginning of each scanline */
-  uint8_t* filtered_image;
-  __FAILURE_HANDLE(host_malloc(&filtered_image, image_length + height));
+  LOCAL uint8_t* filtered_image;
+  __FAILURE_HANDLE(host_malloc_local(&filtered_image, image_length + height));
 
   for (uint32_t i = 0; i < height; i++) {
     filtered_image[i * width * bytes_per_pixel + i] = 0;
@@ -223,8 +224,8 @@ LuminaryResult png_store(
   _png_write_gAMA_chunk_to_file(file);
   _png_write_cHRM_chunk_to_file(file);
 
-  uint8_t* compressed_image;
-  __FAILURE_HANDLE(host_malloc(&compressed_image, image_length + height));
+  LOCAL uint8_t* compressed_image;
+  __FAILURE_HANDLE(host_malloc_local(&compressed_image, image_length + height));
 
   z_stream defstream;
   defstream.zalloc = Z_NULL;
@@ -249,8 +250,8 @@ LuminaryResult png_store(
 
   fclose(file);
 
-  __FAILURE_HANDLE(host_free(&compressed_image));
-  __FAILURE_HANDLE(host_free(&filtered_image));
+  __FAILURE_HANDLE(host_free_local(&compressed_image));
+  __FAILURE_HANDLE(host_free_local(&filtered_image));
 
   return LUMINARY_SUCCESS;
 }
@@ -728,25 +729,23 @@ LuminaryResult png_load_from_file(Texture* texture, const char* filename) {
   const size_t block_size = 16 * 1024 * 1024;
   size_t file_length      = 0;
 
-  uint8_t* file_mem;
-  __FAILURE_HANDLE(host_malloc(&file_mem, block_size));
+  LOCAL uint8_t* file_mem;
+  __FAILURE_HANDLE(host_malloc_local(&file_mem, block_size));
 
   size_t read_size;
 
   while (read_size = fread(file_mem + file_length, 1, block_size, file), read_size == block_size) {
     file_length += block_size;
-    __FAILURE_HANDLE(host_realloc(&file_mem, file_length + block_size));
+    __FAILURE_HANDLE(host_realloc_local(&file_mem, file_length + block_size));
   }
 
   fclose(file);
 
   file_length += read_size;
 
-  __FAILURE_HANDLE(host_realloc(&file_mem, file_length));
-
   __FAILURE_HANDLE(png_load(texture, file_mem, file_length, filename));
 
-  __FAILURE_HANDLE(host_free(&file_mem));
+  __FAILURE_HANDLE(host_free_local(&file_mem));
 
   return LUMINARY_SUCCESS;
 }

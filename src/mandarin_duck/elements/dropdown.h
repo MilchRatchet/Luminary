@@ -9,6 +9,7 @@
 struct ElementDropdownData {
   char text[256];
   bool is_hovered;
+  bool write_access;
 } typedef ElementDropdownData;
 static_assert(sizeof(ElementDropdownData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -18,6 +19,7 @@ struct ElementDropdownArgs {
   uint32_t* selected_index;
   uint32_t num_strings;
   char** strings;
+  bool write_access;
 } typedef ElementDropdownArgs;
 
 bool element_dropdown(Window* window, Display* display, const MouseState* mouse_state, ElementDropdownArgs args);

@@ -88,6 +88,23 @@ LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, Lum
 
 LUMINARY_API LuminaryResult luminary_host_get_pixel_info(LuminaryHost* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result);
 
+/*
+ * Acquires a lock on the scene. This function will succeed even if an active lock is owned by the caller. This function will return true if
+ * and only if the caller owns a lock on the scene after the execution of this function.
+ * Luminary will be unable to complete certain internal procedures while the caller owns the lock, thus it is recommended to minimize lock
+ * time.
+ * @param host Host instance.
+ * @param success The destination the success status will be written to.
+ */
+LUMINARY_API LuminaryResult luminary_host_acquire_scene_lock(LuminaryHost* host, bool* success);
+
+/*
+ * Releases any previously by the caller acquired locks on the scene. This function will succeed even if no active lock is owned by the
+ * caller.
+ * @param host Host instance.
+ */
+LUMINARY_API LuminaryResult luminary_host_release_scene_lock(LuminaryHost* host);
+
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, const LuminaryRendererSettings* settings);
 
@@ -111,16 +128,21 @@ LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, cons
 
 LUMINARY_API LuminaryResult luminary_host_get_material(LuminaryHost* host, uint16_t id, LuminaryMaterial* material);
 LUMINARY_API LuminaryResult luminary_host_set_material(LuminaryHost* host, uint16_t id, const LuminaryMaterial* material);
+LUMINARY_API LuminaryResult luminary_host_get_material_from_name(LuminaryHost* host, const char* name, uint16_t* id);
 
 LUMINARY_API LuminaryResult luminary_host_get_instance(LuminaryHost* host, uint32_t id, LuminaryInstance* instance);
-LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, const LuminaryInstance* instance);
-LUMINARY_API LuminaryResult luminary_host_new_instance(LuminaryHost* host, LuminaryInstance* instance);
+LUMINARY_API LuminaryResult luminary_host_set_instance(LuminaryHost* host, uint32_t id, const LuminaryInstance* instance);
+LUMINARY_API LuminaryResult luminary_host_get_instance_from_name(LuminaryHost* host, const char* name, uint32_t* id);
+
+LUMINARY_API LuminaryResult luminary_host_get_mesh_from_name(LuminaryHost* host, const char* name, uint32_t* id);
 
 LUMINARY_API LuminaryResult luminary_host_get_num_meshes(LuminaryHost* host, uint32_t* num_meshes);
 LUMINARY_API LuminaryResult luminary_host_get_num_materials(LuminaryHost* host, uint32_t* num_materials);
 LUMINARY_API LuminaryResult luminary_host_get_num_instances(LuminaryHost* host, uint32_t* num_instances);
 
 LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle handle, LuminaryPath* path);
+
+LUMINARY_API LuminaryResult luminary_host_save_as_lumV5(LuminaryHost* host, LuminaryPath* path);
 
 /*
  * Calling this function will cause a rebuild of the sky HDRI and a restart of integration.

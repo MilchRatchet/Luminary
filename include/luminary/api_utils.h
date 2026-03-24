@@ -36,13 +36,6 @@ LUMINARY_API struct LuminaryRGBF {
   float b;
 } typedef LuminaryRGBF;
 
-LUMINARY_API struct LuminaryRGBAF {
-  float r;
-  float g;
-  float b;
-  float a;
-} typedef LuminaryRGBAF;
-
 LUMINARY_API struct LuminaryARGB8 {
   uint8_t b;
   uint8_t g;

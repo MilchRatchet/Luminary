@@ -59,7 +59,7 @@ void _log_init(void) {
   enable_windows_virtual_terminal_sequence();
 
   // This is not allowed to fail.
-  const int retval = mtx_init(&mutex, mtx_plain);
+  const int retval = mtx_init(&mutex, mtx_recursive);
 
   if (retval != thrd_success) {
     puts("Failed to initialize the mutex for the Luminary logger.");
@@ -136,14 +136,27 @@ static void manage_print_buffer(const int desired_space) {
 }
 
 static int format_string(const char* format, va_list args) {
-  int size = vsnprintf(print_buffer, print_buffer_size, format, args);
+  va_list args_copy;
+  va_copy(args_copy, args);
 
-  if (size > print_buffer_size) {
-    manage_print_buffer(size);
-    vsnprintf(print_buffer, print_buffer_size, format, args);
+  int string_length = vsnprintf(print_buffer, print_buffer_size, format, args);
+
+  if (string_length < 0)
+    exit_program();
+
+  // vsnprintf returns size excluding the NULL terminator but for allocation reasons we care about the size including the NULL
+  // terminator.
+  int required_size = string_length + 1;
+
+  if (required_size > print_buffer_size) {
+    manage_print_buffer(required_size);
+    vsnprintf(print_buffer, print_buffer_size, format, args_copy);
   }
 
-  return size;
+  va_end(args_copy);
+  va_end(args);
+
+  return string_length;
 }
 
 static void write_to_log_buffer(const size_t size) {
@@ -171,7 +184,7 @@ void luminary_print_log(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
-  va_end(args);
+
   write_to_log_buffer(size);
 
   mtx_unlock(&mutex);
@@ -186,7 +199,6 @@ void luminary_print_info(bool log, const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
-  va_end(args);
 
   if (log)
     write_to_log_buffer(size);
@@ -211,7 +223,6 @@ void luminary_print_info_inline(bool log, const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
-  va_end(args);
 
   if (log)
     write_to_log_buffer(size);
@@ -236,7 +247,7 @@ void luminary_print_warn(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
-  va_end(args);
+
   write_to_log_buffer(size);
 
   if (volatile_line)
@@ -259,7 +270,7 @@ void luminary_print_error(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
-  va_end(args);
+
   write_to_log_buffer(size);
 
   if (volatile_line)
@@ -282,7 +293,7 @@ void luminary_print_crash(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
-  va_end(args);
+
   write_to_log_buffer(size);
 
   if (volatile_line)

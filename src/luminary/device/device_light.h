@@ -118,8 +118,8 @@ LuminaryResult light_tree_create(LightTree** tree);
  * This requires that all meshes, materials and textures are already synced with the device.
  */
 LuminaryResult light_tree_update_cache_mesh(LightTree* tree, const Mesh* mesh);
-LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstance* instance);
-LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material* material);
+LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstanceUpdate* instance_update);
+LuminaryResult light_tree_update_cache_material(LightTree* tree, const MaterialUpdate* material_update);
 
 DEVICE_CTX_FUNC LuminaryResult light_tree_build(LightTree* tree, Device* device);
 DEVICE_CTX_FUNC LuminaryResult light_tree_unload_integrator(LightTree* tree);

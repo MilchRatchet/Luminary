@@ -2,32 +2,28 @@
 #define LUMINARY_LUM_FUNCTION_TABLES_H
 
 #include "lum_builtins.h"
+#include "lum_instruction.h"
+#include "lum_virtual_machine.h"
 #include "utils.h"
 
-struct LumFunctionOperand {
-  uint8_t register_id;
-} typedef LumFunctionOperand;
+struct LumFunctionLoadInfo {
+  LumMemoryAllocation name;
+  LumMemoryAllocation dst;
+} typedef LumFunctionLoadInfo;
 
-struct LumFunctionSignature {
-  LumBuiltinType dst;
-  LumBuiltinType src_0;
-  LumBuiltinType src_1;
-  LumBuiltinType src_2;
-  LumBuiltinType src_3;
-} typedef LumFunctionSignature;
+typedef LuminaryResult (*LumFunctionLoad)(LumVirtualMachine* vm, const LumFunctionLoadInfo* info);
 
-// TODO:
-typedef void (*LumFunction)(
-  LumFunctionOperand* dst, const LumFunctionOperand* src_a, const LumFunctionOperand* src_b, const LumFunctionOperand* src_c);
+struct LumFunctionStoreInfo {
+  LumMemoryAllocation name;
+  LumMemoryAllocation src;
+} typedef LumFunctionStoreInfo;
 
-struct LumFunctionEntry {
-  const char* name;
-  const LumFunction* func;
-  bool is_static;
-  LumFunctionSignature signature;
-} typedef LumFunctionEntry;
+typedef LuminaryResult (*LumFunctionStore)(LumVirtualMachine* vm, const LumFunctionStoreInfo* info);
 
-extern const LumFunctionEntry* lum_function_tables[LUM_BUILTIN_TYPE_COUNT];
-extern const uint32_t lum_function_tables_count[LUM_BUILTIN_TYPE_COUNT];
+extern const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT];
+extern const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT];
+
+LuminaryResult lum_function_resolve_stack_address(LumVirtualMachine* vm, const LumMemoryAllocation* mem, void** ptr);
+LuminaryResult lum_function_resolve_generic_address(LumVirtualMachine* vm, const LumMemoryAllocation* mem, const void** ptr);
 
 #endif /* LUMINARY_LUM_FUNCTION_TABLES_H */

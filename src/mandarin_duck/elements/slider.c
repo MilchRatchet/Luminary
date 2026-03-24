@@ -26,7 +26,7 @@ static void _element_slider_render_float(Element* slider, Display* display) {
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
-  const uint32_t text_color = (data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+  const uint32_t text_color = (data->write_access) ? ((data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE) : MD_COLOR_DARKGRAY;
 
   uint32_t text_width;
   text_renderer_render(
@@ -59,7 +59,7 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
   const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
-  const uint32_t text_color = (data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+  const uint32_t text_color = (data->write_access) ? ((data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE) : MD_COLOR_DARKGRAY;
 
   uint32_t text_width;
   text_renderer_render(
@@ -101,7 +101,10 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
     const uint32_t padding_x = data->center_x ? component_size_padded >> 1 : component_size_padded;
     const uint32_t padding_y = data->center_y ? slider->height >> 1 : 0;
 
-    const uint32_t text_color = (data->is_hovered && data->hover_component_index == component) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+    const bool component_is_hovered = data->is_hovered && data->hover_component_index == component;
+
+    const uint32_t text_color =
+      (data->write_access) ? (component_is_hovered ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE) : MD_COLOR_DARKGRAY;
 
     text_renderer_render(
       display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, text_color, x_offset + padding_x, slider->y + padding_y,
@@ -178,6 +181,10 @@ static void _element_slider_update_data(Element* slider, void* dst, uint32_t sub
 
 bool element_slider(
   Window* window, Display* display, const MouseState* mouse_state, const KeyboardState* keyboard_state, ElementSliderArgs args) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element slider;
@@ -189,13 +196,13 @@ bool element_slider(
   ElementSliderData* data = (ElementSliderData*) &slider.data;
 
   data->type              = args.type;
-  data->color             = args.color;
   data->size              = args.size;
   data->component_padding = args.component_padding;
   data->margins           = args.margins;
   data->center_x          = args.center_x;
   data->center_y          = args.center_y;
   data->string_edit_mode  = false;
+  data->write_access      = args.write_access;
 
   const bool is_integer_type = (args.type == ELEMENT_SLIDER_DATA_TYPE_UINT || args.type == ELEMENT_SLIDER_DATA_TYPE_SINT);
 
@@ -218,7 +225,7 @@ bool element_slider(
     case ELEMENT_SLIDER_DATA_TYPE_FLOAT:
       data->data_float = *(float*) args.data_binding;
 
-      if (use_slider) {
+      if (use_slider && args.write_access) {
         mouse_change_rate *= (1.0f + sqrtf(fabsf(data->data_float)));
 
         data->data_float += mouse_state->x_motion * mouse_change_rate * 0.001f;
@@ -237,7 +244,7 @@ bool element_slider(
     case ELEMENT_SLIDER_DATA_TYPE_RGB:
       data->data_vec3 = *(LuminaryVec3*) args.data_binding;
 
-      if (use_slider) {
+      if (use_slider && args.write_access) {
         float* value = ((float*) &data->data_vec3) + window->state_data.subelement_index;
         *value += mouse_state->x_motion * mouse_change_rate * 0.001f;
         *value = fminf(args.max, fmaxf(args.min, *value));
@@ -251,7 +258,7 @@ bool element_slider(
     data->hover_component_index = window->state_data.subelement_index;
   }
 
-  if (use_string) {
+  if (use_string && args.write_access) {
     data->string_edit_mode = true;
 
     if (keyboard_state->keys[SDL_SCANCODE_RETURN].down || window->state_data.force_string_mode_exit) {
@@ -385,7 +392,7 @@ bool element_slider(
     data->hover_component_index = _element_slider_get_subelement_index(window, mouse_state, &slider);
   }
 
-  if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
+  if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE && args.write_access) {
     window->state_data.element_hash     = slider.hash;
     window->state_data.subelement_index = data->hover_component_index;
 
@@ -425,11 +432,11 @@ bool element_slider(
     data->string_component_index = window->state_data.subelement_index;
   }
 
-  if (updated_data) {
+  if (updated_data && args.write_access) {
     _element_slider_update_data(&slider, args.data_binding, window->state_data.subelement_index);
   }
 
   window_push_element(window, &slider);
 
-  return updated_data;
+  return updated_data && args.write_access;
 }

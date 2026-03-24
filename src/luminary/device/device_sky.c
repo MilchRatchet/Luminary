@@ -2,6 +2,7 @@
 
 #include "device.h"
 #include "device_texture.h"
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "kernel_args.h"
 #include "sky.h"
@@ -93,7 +94,8 @@ static LuminaryResult _sky_lut_generate_lut(SkyLUT* lut, DeviceSkyLUT* device_lu
   __FAILURE_HANDLE(device_struct_texture_object_convert(device_lut->transmittance_low, &multiscattering_lut_args.transmission_low_tex));
   __FAILURE_HANDLE(device_struct_texture_object_convert(device_lut->transmittance_high, &multiscattering_lut_args.transmission_high_tex));
 
-  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
+
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_TRANSMITTANCE_LUT], &transmission_lut_args, device->stream_main));
   __FAILURE_HANDLE(kernel_execute_custom(
@@ -284,6 +286,8 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
   __CHECK_NULL_ARGUMENT(hdri);
   __CHECK_NULL_ARGUMENT(device);
 
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
+
   DeviceSkyHDRI* device_hdri = device->sky_hdri;
 
   hdri->id++;
@@ -303,10 +307,10 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
 
   const uint32_t num_pixels = hdri->width * hdri->height;
 
-  const uint32_t num_blocks = (num_pixels * 32 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  const uint32_t num_blocks = (num_pixels * 32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
   __FAILURE_HANDLE(kernel_execute_custom(
-    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
+    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args, device->stream_main));
 
   __FAILURE_HANDLE(device_download2D(
     hdri->color_tex->data, device_hdri->color_tex->cuda_memory, device_hdri->color_tex->pitch, hdri->width * sizeof(RGBAF), hdri->height,
@@ -355,8 +359,6 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
         __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
         __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->width * sizeof(float) * hdri->shadow_tex->height));
       }
-
-      __FAILURE_HANDLE(device_sync_constant_memory(device));
 
       __FAILURE_HANDLE(_sky_hdri_compute(hdri, device));
     }
@@ -490,11 +492,11 @@ static LuminaryResult _sky_stars_generate(SkyStars* stars) {
 
   srand(stars->seed);
 
-  Star* star_buffer;
-  __FAILURE_HANDLE(host_malloc(&star_buffer, sizeof(Star) * stars->count));
+  LOCAL Star* star_buffer;
+  __FAILURE_HANDLE(host_malloc_local(&star_buffer, sizeof(Star) * stars->count));
 
-  uint32_t* counts;
-  __FAILURE_HANDLE(host_malloc(&counts, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y));
+  LOCAL uint32_t* counts;
+  __FAILURE_HANDLE(host_malloc_local(&counts, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y));
 
   memset(counts, 0, sizeof(uint32_t) * STARS_GRID_X * STARS_GRID_Y);
 
@@ -539,8 +541,8 @@ static LuminaryResult _sky_stars_generate(SkyStars* stars) {
     stars->data[o + c] = s;
   }
 
-  __FAILURE_HANDLE(host_free(&star_buffer));
-  __FAILURE_HANDLE(host_free(&counts));
+  __FAILURE_HANDLE(host_free_local(&star_buffer));
+  __FAILURE_HANDLE(host_free_local(&counts));
 
   return LUMINARY_SUCCESS;
 }

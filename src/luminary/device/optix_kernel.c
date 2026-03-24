@@ -8,6 +8,7 @@
 #include "ceb.h"
 #include "device.h"
 #include "device_memory.h"
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "utils.h"
 
@@ -163,8 +164,8 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
   pipeline_compile_options.allowOpacityMicromaps            = true;
 
-  char* log;
-  __FAILURE_HANDLE(host_malloc(&log, OPTIX_LOG_SIZE));
+  LOCAL char* log;
+  __FAILURE_HANDLE(host_malloc_local(&log, OPTIX_LOG_SIZE));
   memset(log, 0, OPTIX_LOG_SIZE);
 
   size_t log_size = OPTIX_LOG_SIZE;
@@ -215,7 +216,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
       &(*kernel)->pipeline),
     log, log_size);
 
-  __FAILURE_HANDLE(host_free(&log));
+  __FAILURE_HANDLE(host_free_local(&log));
 
   ////////////////////////////////////////////////////////////////////
   // Shader Binding Table Creation
@@ -262,13 +263,16 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   uint32_t pixels_per_thread;
   __FAILURE_HANDLE(device_get_current_pixels_per_thread(device, &pixels_per_thread));
 
-  const uint32_t tasks_per_thread = device->constant_memory->config.num_tasks_per_thread;
+  const DeviceConstantMemory* constant_memory;
+  __FAILURE_HANDLE(device_constant_memory_manager_get_host_buffer(device->constant_memory, &constant_memory));
+
+  const uint32_t tasks_per_thread = constant_memory->config.num_tasks_per_thread;
 
   const uint32_t max_current_resident_tasks_per_thread = min(tasks_per_thread, pixels_per_thread);
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
     kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
-    THREADS_PER_BLOCK, device->properties.optimal_block_count, max_current_resident_tasks_per_thread));
+    MAX_THREADS_PER_BLOCK, device->properties.optimal_block_count, max_current_resident_tasks_per_thread));
 
   return LUMINARY_SUCCESS;
 }

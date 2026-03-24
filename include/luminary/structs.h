@@ -38,22 +38,31 @@ struct LuminaryHostCreateInfo {
 
 // 3 bits reserved
 LUMINARY_API enum LuminaryShadingMode {
-  LUMINARY_SHADING_MODE_DEFAULT        = 0,
-  LUMINARY_SHADING_MODE_ALBEDO         = 1,
-  LUMINARY_SHADING_MODE_DEPTH          = 2,
-  LUMINARY_SHADING_MODE_NORMAL         = 3,
-  LUMINARY_SHADING_MODE_IDENTIFICATION = 4,
-  LUMINARY_SHADING_MODE_LIGHTS         = 5,
+  LUMINARY_SHADING_MODE_DEFAULT,
+  LUMINARY_SHADING_MODE_ALBEDO,
+  LUMINARY_SHADING_MODE_DEPTH,
+  LUMINARY_SHADING_MODE_NORMAL,
+  LUMINARY_SHADING_MODE_IDENTIFICATION,
+  LUMINARY_SHADING_MODE_LIGHTS,
   LUMINARY_SHADING_MODE_COUNT
 } typedef LuminaryShadingMode;
 
 LUMINARY_API enum LuminaryAdaptiveSamplingOutputMode {
-  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY              = 0,
-  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE            = 1,
-  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR               = 2,
-  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION = 3,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR,
+  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION,
   LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT
 } typedef LuminaryAdaptiveSamplingOutputMode;
+
+struct LuminaryAdaptiveSamplingSettings {
+  bool enable;
+  uint32_t max_sampling_rate;
+  uint32_t avg_sampling_rate;
+  uint32_t update_interval;
+  bool exposure_aware;
+  LuminaryAdaptiveSamplingOutputMode output_mode;
+} typedef LuminaryAdaptiveSamplingSettings;
 
 LUMINARY_API struct LuminaryRendererSettings {
   uint32_t width;
@@ -62,12 +71,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t bridge_max_num_vertices;
   uint32_t undersampling;
   uint32_t supersampling;
-  bool enable_adaptive_sampling;
-  uint32_t adaptive_sampling_max_sampling_rate;
-  uint32_t adaptive_sampling_avg_sampling_rate;
-  uint32_t adaptive_sampling_update_interval;
-  bool adaptive_sampling_exposure_aware;
-  LuminaryAdaptiveSamplingOutputMode adaptive_sampling_output_mode;
+  LuminaryAdaptiveSamplingSettings adaptive_sampling_settings;
   LuminaryShadingMode shading_mode;
   float region_x;
   float region_y;
@@ -154,6 +158,27 @@ LUMINARY_API enum LuminaryApertureShape {
   LUMINARY_APERTURE_COUNT
 } typedef LuminaryApertureShape;
 
+LUMINARY_API struct LuminaryCameraThinLens {
+  float fov;
+  float aperture_size;
+} typedef LuminaryCameraThinLens;
+
+LUMINARY_API struct LuminaryCameraPhysical {
+  bool allow_reflections;
+  bool use_spectral_rendering;
+  float focal_length;
+  float front_focal_point;
+  float back_focal_point;
+  float front_principal_point;
+  float back_principal_point;
+  float aperture_point;
+  float aperture_diameter;
+  float exit_pupil_point;
+  float exit_pupil_diameter;
+  float image_plane_distance;
+  float sensor_width;
+} typedef LuminaryCameraPhysical;
+
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
@@ -171,10 +196,6 @@ LUMINARY_API struct LuminaryCamera {
   bool purkinje;
   float purkinje_kappa1;
   float purkinje_kappa2;
-  float wasd_speed;
-  float mouse_speed;
-  bool smooth_movement;
-  float smoothing_factor;
   float russian_roulette_threshold;
   bool use_color_correction;
   LuminaryRGBF color_correction;
@@ -182,25 +203,8 @@ LUMINARY_API struct LuminaryCamera {
   float camera_scale;
   float object_distance;
   bool use_physical_camera;
-  struct {
-    float fov;
-    float aperture_size;
-  } thin_lens;
-  struct {
-    bool allow_reflections;
-    bool use_spectral_rendering;
-    float focal_length;
-    float front_focal_point;
-    float back_focal_point;
-    float front_principal_point;
-    float back_principal_point;
-    float aperture_point;
-    float aperture_diameter;
-    float exit_pupil_point;
-    float exit_pupil_diameter;
-    float image_plane_distance;
-    float sensor_width;
-  } physical;
+  LuminaryCameraThinLens thin_lens;
+  LuminaryCameraPhysical physical;
 } typedef LuminaryCamera;
 
 ////////////////////////////////////////////////////////////////////
@@ -296,7 +300,6 @@ LUMINARY_API struct LuminaryCloudLayer {
 
 LUMINARY_API struct LuminaryCloud {
   bool active;
-  bool initialized;
   bool atmosphere_scattering;
   LuminaryCloudLayer low;
   LuminaryCloudLayer mid;
@@ -356,9 +359,9 @@ enum LuminaryMaterialBaseSubstrate {
 } typedef LuminaryMaterialBaseSubstrate;
 
 LUMINARY_API struct LuminaryMaterial {
-  uint32_t id;
   LuminaryMaterialBaseSubstrate base_substrate;
-  LuminaryRGBAF albedo;
+  LuminaryRGBF albedo;
+  float opacity;
   LuminaryRGBF emission;
   float emission_scale;
   float roughness;
@@ -383,7 +386,6 @@ LUMINARY_API struct LuminaryMaterial {
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_API struct LuminaryInstance {
-  uint32_t id;
   uint32_t mesh_id;
   LuminaryVec3 position;
   LuminaryVec3 rotation;

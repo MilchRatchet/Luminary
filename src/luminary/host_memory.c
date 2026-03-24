@@ -158,6 +158,9 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
 
   struct HostMemoryHeader* header = (struct HostMemoryHeader*) malloc((uint64_t) size + sizeof(struct HostMemoryHeader));
 
+  if (header == (struct HostMemoryHeader*) 0)
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to realloc host memory.");
+
   memset(header, 0, sizeof(struct HostMemoryHeader));
 
   header->magic = HOST_MEMORY_HEADER_MAGIC;
@@ -198,7 +201,12 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
   _debug_memory_allocation_remove(*ptr, buf_name, func, line, header->size);
 #endif /* LUMINARY_MEMORY_DEBUG */
 
-  header = realloc(header, (uint64_t) size + sizeof(struct HostMemoryHeader));
+  struct HostMemoryHeader* new_header = realloc(header, (uint64_t) size + sizeof(struct HostMemoryHeader));
+
+  if (new_header == (struct HostMemoryHeader*) 0)
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to realloc host memory.");
+
+  header = new_header;
 
   header->size = size;
 

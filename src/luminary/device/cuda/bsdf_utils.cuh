@@ -514,7 +514,7 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
   if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(params.flags) == false)
     return splat_color(0.0f);
 
-  const float ior       = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
+  const float ior       = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
   float term;
@@ -546,6 +546,7 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
         break;
       case BSDF_SAMPLING_DIFFUSE:
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(ctx.NdotL);
+        break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
                / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);

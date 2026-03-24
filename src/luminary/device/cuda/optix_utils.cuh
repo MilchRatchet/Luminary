@@ -44,53 +44,53 @@ static LUMINARY_FUNCTION void optixKernelFunctionGeometryTrace(
   const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
   const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, const OptixTraceStatus status,
   OptixKernelFunctionGeometryTracePayload& payload) {
-  const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
-  optixTrace(
-    OPTIX_TRACE_PAYLOAD_ID(GEOMETRY_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(GEOMETRY_TRACE), 0, 0, payload.v0, payload.v1, payload.v2);
+  if (status == OPTIX_TRACE_STATUS_EXECUTE)
+    optixTrace(
+      OPTIX_TRACE_PAYLOAD_ID(GEOMETRY_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
+      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(GEOMETRY_TRACE), 0, 0, payload.v0, payload.v1, payload.v2);
 }
 
 static LUMINARY_FUNCTION void optixKernelFunctionParticleTrace(
   const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
   const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, const OptixTraceStatus status,
   OptixKernelFunctionParticleTracePayload& payload) {
-  const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
-  optixTrace(
-    OPTIX_TRACE_PAYLOAD_ID(PARTICLE_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(PARTICLE_TRACE), 0, 0, payload.v0, payload.v1);
+  if (status == OPTIX_TRACE_STATUS_EXECUTE)
+    optixTrace(
+      OPTIX_TRACE_PAYLOAD_ID(PARTICLE_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
+      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(PARTICLE_TRACE), 0, 0, payload.v0, payload.v1);
 }
 
 static LUMINARY_FUNCTION void optixKernelFunctionShadowTrace(
   const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
   const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, const OptixTraceStatus status,
   OptixKernelFunctionShadowTracePayload& payload) {
-  const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
-  optixTrace(
-    OPTIX_TRACE_PAYLOAD_ID(SHADOW_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
-    payload.v3, payload.v4, payload.v5, payload.v6);
+  if (status == OPTIX_TRACE_STATUS_EXECUTE)
+    optixTrace(
+      OPTIX_TRACE_PAYLOAD_ID(SHADOW_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin, tmax,
+      rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2, payload.v3,
+      payload.v4, payload.v5, payload.v6);
 }
 
 static LUMINARY_FUNCTION void optixKernelFunctionShadowSunTrace(
   const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
   const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, const OptixTraceStatus status,
   OptixKernelFunctionShadowSunTracePayload& payload) {
-  const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
-  optixTrace(
-    OPTIX_TRACE_PAYLOAD_ID(SHADOW_SUN_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
-    payload.v3, payload.v4);
+  if (status == OPTIX_TRACE_STATUS_EXECUTE)
+    optixTrace(
+      OPTIX_TRACE_PAYLOAD_ID(SHADOW_SUN_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
+      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
+      payload.v3, payload.v4);
 }
 
 static LUMINARY_FUNCTION void optixKernelFunctionLightBSDFTrace(
   const OptixTraversableHandle handle, const vec3 origin, const vec3 ray, const float tmin, const float tmax, const float rayTime,
   const OptixVisibilityMask visibilityMask, const uint32_t rayFlags, const OptixTraceStatus status,
   OptixKernelFunctionLightBSDFTracePayload& payload) {
-  const float actual_tmax = (status == OPTIX_TRACE_STATUS_EXECUTE) ? tmax : -1.0f;
-  optixTrace(
-    OPTIX_TRACE_PAYLOAD_ID(LIGHT_BSDF_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-    actual_tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(LIGHT_BSDF_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
-    payload.v3, payload.v4);
+  if (status == OPTIX_TRACE_STATUS_EXECUTE)
+    optixTrace(
+      OPTIX_TRACE_PAYLOAD_ID(LIGHT_BSDF_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
+      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(LIGHT_BSDF_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
+      payload.v3, payload.v4);
 }
 
 ////////////////////////////////////////////////////////////////////

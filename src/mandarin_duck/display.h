@@ -6,6 +6,7 @@
 
 #include "camera_handler.h"
 #include "display_zoom_handler.h"
+#include "file_dialog_handler.h"
 #include "keyboard_state.h"
 #include "mouse_state.h"
 #include "render_region.h"
@@ -71,6 +72,8 @@ struct Display {
   RenderRegion* region;
   const uint32_t* splash_screen;
   DisplayZoomHandler* zoom_handler;
+  FileDialogHandler* scene_file_path;
+  bool queued_save_scene;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);

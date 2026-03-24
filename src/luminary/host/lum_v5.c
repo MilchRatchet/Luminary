@@ -6,9 +6,9 @@
 #include "lum/lum_parser.h"
 #include "lum/lum_virtual_machine.h"
 
-LuminaryResult lum_parse_file_v5(FILE* file, LumFileContent* content) {
+LuminaryResult lum_file_parse_v5(FILE* file, LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(file);
-  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(binary);
 
   size_t read_chars = 0;
   size_t file_size  = 4096;
@@ -32,15 +32,9 @@ LuminaryResult lum_parse_file_v5(FILE* file, LumFileContent* content) {
   LumParser* parser;
   __FAILURE_HANDLE(lum_parser_create(&parser));
 
-  LumBinary* binary;
-  __FAILURE_HANDLE(lum_binary_create(&binary));
-
   __FAILURE_HANDLE(lum_parser_execute(parser, code, binary));
 
   __FAILURE_HANDLE(lum_binary_print(binary));
-
-  // TODO: Pass binary to caller, LuminaryHost then stores the binary and queues it for execution
-  __FAILURE_HANDLE(lum_binary_destroy(&binary));
 
   __FAILURE_HANDLE(lum_parser_destroy(&parser));
 

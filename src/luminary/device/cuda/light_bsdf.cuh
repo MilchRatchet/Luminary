@@ -29,7 +29,12 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
 
   const uint32_t base_substrate = mat_ctx.params.flags & MATERIAL_FLAG_BASE_SUBSTRATE_MASK;
 
-  const bool include_refraction = (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
+  bool include_refraction = false;
+  if (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT) {
+    const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx.params);
+
+    include_refraction = ior != 1.0f;
+  }
 
   uint32_t num_techniques = 0;
   num_techniques += 1;                           // Microfacet reflection

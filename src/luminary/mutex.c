@@ -1,12 +1,11 @@
-#include "mutex.h"
-
 #include <math.h>
 #include <threads.h>
 #include <time.h>
 
 #include "internal_error.h"
+#include "utils.h"
 
-struct Mutex {
+struct LuminaryMutex {
   mtx_t _mutex;
 };
 
@@ -15,7 +14,7 @@ LuminaryResult mutex_create(Mutex** mutex) {
 
   __FAILURE_HANDLE(host_malloc(mutex, sizeof(Mutex)));
 
-  const int retval = mtx_init((mtx_t*) *mutex, mtx_plain);
+  const int retval = mtx_init((mtx_t*) *mutex, mtx_recursive | mtx_timed);
 
   if (retval != thrd_success) {
     __FAILURE_HANDLE(host_free(mutex));

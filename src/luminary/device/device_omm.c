@@ -1,6 +1,7 @@
 #include "device_omm.h"
 
 #include "device.h"
+#include "host_local_memory.h"
 #include "internal_error.h"
 #include "kernel_args.h"
 
@@ -46,12 +47,12 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   // OMM construction
   ////////////////////////////////////////////////////////////////////
 
-  uint32_t* triangles_per_level;
-  __FAILURE_HANDLE(host_malloc(&triangles_per_level, sizeof(uint32_t) * max_num_levels));
+  LOCAL uint32_t* triangles_per_level;
+  __FAILURE_HANDLE(host_malloc_local(&triangles_per_level, sizeof(uint32_t) * max_num_levels));
   memset(triangles_per_level, 0, sizeof(uint32_t) * max_num_levels);
 
-  void** data;
-  __FAILURE_HANDLE(host_malloc(&data, sizeof(DEVICE void*) * max_num_levels));
+  LOCAL void** data;
+  __FAILURE_HANDLE(host_malloc_local(&data, sizeof(DEVICE void*) * max_num_levels));
 
   DEVICE void* triangle_level_buffer;
   __FAILURE_HANDLE(device_malloc(&triangle_level_buffer, total_tri_count));
@@ -66,8 +67,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   DEVICE uint32_t* tri_work_counter;
   __FAILURE_HANDLE(device_malloc(&tri_work_counter, sizeof(uint32_t)));
 
-  // Make sure that all the data is actually present
-  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
   size_t memory_usage = 0;
@@ -139,11 +139,11 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   triangles_per_level[num_levels - 1] += remaining_triangles;
 
   size_t final_array_size = 0;
-  size_t* array_offset_per_level;
-  __FAILURE_HANDLE(host_malloc(&array_offset_per_level, sizeof(size_t) * num_levels));
+  LOCAL size_t* array_offset_per_level;
+  __FAILURE_HANDLE(host_malloc_local(&array_offset_per_level, sizeof(size_t) * num_levels));
 
-  size_t* array_size_per_level;
-  __FAILURE_HANDLE(host_malloc(&array_size_per_level, sizeof(size_t) * num_levels));
+  LOCAL size_t* array_size_per_level;
+  __FAILURE_HANDLE(host_malloc_local(&array_size_per_level, sizeof(size_t) * num_levels));
 
   for (uint32_t i = 0; i < num_levels; i++) {
     const size_t state_size = OMM_STATE_SIZE(i, format);
@@ -161,13 +161,13 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   // Description setup
   ////////////////////////////////////////////////////////////////////
 
-  uint8_t* triangle_level;
-  __FAILURE_HANDLE(host_malloc(&triangle_level, total_tri_count * sizeof(uint8_t)));
+  LOCAL uint8_t* triangle_level;
+  __FAILURE_HANDLE(host_malloc_local(&triangle_level, total_tri_count * sizeof(uint8_t)));
 
   __FAILURE_HANDLE(device_download(triangle_level, triangle_level_buffer, 0, total_tri_count * sizeof(uint8_t), device->stream_main));
 
-  OptixOpacityMicromapDesc* desc;
-  __FAILURE_HANDLE(host_malloc(&desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
+  LOCAL OptixOpacityMicromapDesc* desc;
+  __FAILURE_HANDLE(host_malloc_local(&desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
 
   for (uint32_t i = 0; i < total_tri_count; i++) {
     const uint32_t level = triangle_level[i] & (~OMM_REFINEMENT_NEEDED_FLAG);
@@ -181,9 +181,9 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
     array_offset_per_level[level] += state_size;
   }
 
-  __FAILURE_HANDLE(host_free(&triangle_level));
-  __FAILURE_HANDLE(host_free(&array_offset_per_level));
-  __FAILURE_HANDLE(host_free(&array_size_per_level));
+  __FAILURE_HANDLE(host_free_local(&triangle_level));
+  __FAILURE_HANDLE(host_free_local(&array_offset_per_level));
+  __FAILURE_HANDLE(host_free_local(&array_size_per_level));
 
   DEVICE void* desc_buffer;
   __FAILURE_HANDLE(device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * total_tri_count));
@@ -204,7 +204,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   __FAILURE_HANDLE(
     kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_OMM_GATHER_ARRAY_FORMAT_4], &gather_args, device->stream_main));
 
-  __FAILURE_HANDLE(host_free(&desc));
+  __FAILURE_HANDLE(host_free_local(&desc));
 
   __FAILURE_HANDLE(device_free(&triangle_level_buffer));
   __FAILURE_HANDLE(device_free(&triangle_data_offset));
@@ -213,14 +213,14 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
     __FAILURE_HANDLE(device_free(&data[i]));
   }
 
-  __FAILURE_HANDLE(host_free(&data));
+  __FAILURE_HANDLE(host_free_local(&data));
 
   ////////////////////////////////////////////////////////////////////
   // Histogram setup
   ////////////////////////////////////////////////////////////////////
 
-  OptixOpacityMicromapHistogramEntry* histogram;
-  __FAILURE_HANDLE(host_malloc(&histogram, sizeof(OptixOpacityMicromapHistogramEntry) * num_levels));
+  LOCAL OptixOpacityMicromapHistogramEntry* histogram;
+  __FAILURE_HANDLE(host_malloc_local(&histogram, sizeof(OptixOpacityMicromapHistogramEntry) * num_levels));
 
   for (uint32_t i = 0; i < num_levels; i++) {
     histogram[i].count            = triangles_per_level[i];
@@ -241,7 +241,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
     usage[i].format           = format;
   }
 
-  __FAILURE_HANDLE(host_free(&triangles_per_level));
+  __FAILURE_HANDLE(host_free_local(&triangles_per_level));
 
   ////////////////////////////////////////////////////////////////////
   // OMM array construction
@@ -279,7 +279,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   __FAILURE_HANDLE(device_free(&desc_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
   __FAILURE_HANDLE(device_free(&omm_array));
-  __FAILURE_HANDLE(host_free(&histogram));
+  __FAILURE_HANDLE(host_free_local(&histogram));
 
   ////////////////////////////////////////////////////////////////////
   // BVH input construction

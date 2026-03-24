@@ -15,7 +15,7 @@ static void _element_dropdown_render_func(Element* dropdown, Display* display) {
   const uint32_t padding_x = dropdown->width >> 1;
   const uint32_t padding_y = dropdown->height >> 1;
 
-  const uint32_t text_color = (data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE;
+  const uint32_t text_color = (data->write_access) ? ((data->is_hovered) ? MD_COLOR_ACCENT_LIGHT_2 : MD_COLOR_WHITE) : MD_COLOR_DARKGRAY;
 
   text_renderer_render(
     display->text_renderer, display, data->text, TEXT_RENDERER_FONT_REGULAR, text_color, dropdown->x + padding_x, dropdown->y + padding_y,
@@ -61,9 +61,10 @@ bool element_dropdown(Window* window, Display* display, const MouseState* mouse_
   ElementMouseResult mouse_result;
   element_apply_context(&dropdown, context, &args.size, mouse_state, &mouse_result);
 
-  data->is_hovered = mouse_result.is_hovered;
+  data->is_hovered   = mouse_result.is_hovered;
+  data->write_access = args.write_access;
 
-  if (mouse_result.is_pressed && window->external_subwindow && !external_clicked_window_is_present) {
+  if (mouse_result.is_pressed && window->external_subwindow && external_clicked_window_is_present == false && args.write_access) {
     subwindow_dropdown_create(window->external_subwindow, selected_index, dropdown.width, dropdown.x, dropdown.y + dropdown.height);
 
     for (uint32_t string_id = 0; string_id < args.num_strings; string_id++) {
@@ -87,5 +88,5 @@ bool element_dropdown(Window* window, Display* display, const MouseState* mouse_
 
   window_push_element(window, &dropdown);
 
-  return selection_changed || mouse_result.is_clicked;
+  return (selection_changed || mouse_result.is_clicked) && args.write_access;
 }

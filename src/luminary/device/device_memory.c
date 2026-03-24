@@ -211,13 +211,13 @@ LuminaryResult device_download2D(
   struct DeviceMemoryHeader* src_header = (struct DeviceMemoryHeader*) src;
 
   if (src_header->magic != DEVICE_MEMORY_HEADER_MAGIC) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Destination is not device memory.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Source is not device memory.");
   }
 
   if (src_pitch * src_height > src_header->size) {
     __RETURN_ERROR(
       LUMINARY_ERROR_API_EXCEPTION,
-      "Download exceeds allocated device memory. %llu bytes are allocated and 2D upload would cover %llu bytes.", src_header->size,
+      "Download exceeds allocated device memory. %llu bytes are allocated and 2D download would cover %llu bytes.", src_header->size,
       src_pitch * src_height);
   }
 

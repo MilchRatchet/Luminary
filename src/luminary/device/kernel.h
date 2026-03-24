@@ -68,6 +68,7 @@ struct CUDAKernel {
   uint32_t shared_memory_size;
   size_t param_size;
   uint32_t default_block_count;
+  uint32_t optimal_block_size;
 } typedef CUDAKernel;
 
 DEVICE_CTX_FUNC LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type);

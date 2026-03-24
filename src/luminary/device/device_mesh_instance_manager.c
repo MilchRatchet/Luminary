@@ -210,6 +210,9 @@ LuminaryResult device_mesh_instance_manager_update(
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
     const uint32_t mesh_id = shared_manager->cached_updates[update_id].mesh_id;
 
+    if (mesh_id == MESH_ID_INVALID)
+      continue;
+
     bool mesh_data_has_changed;
     __FAILURE_HANDLE(device_mesh_process(manager->meshes[mesh_id], device, &mesh_data_has_changed));
   }

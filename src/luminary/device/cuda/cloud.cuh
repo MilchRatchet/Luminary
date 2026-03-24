@@ -3,7 +3,7 @@
 
 #include "cloud_utils.cuh"
 #include "math.cuh"
-#include "sky.cuh"
+#include "sky_integration.cuh"
 #include "sky_utils.cuh"
 #include "utils.cuh"
 

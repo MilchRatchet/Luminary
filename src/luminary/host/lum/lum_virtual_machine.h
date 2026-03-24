@@ -2,23 +2,26 @@
 #define LUMINARY_LUM_VIRTUAL_MACHINE_H
 
 #include "lum_binary.h"
+#include "lum_compatibility_host.h"
 #include "utils.h"
 
-#define LUM_VIRTUAL_MACHINE_NUM_REGISTERS 0x100
-
 struct LumVirtualMachine {
+  LumCompatibilityHost* host;
+  const Path* working_directory;
+  Queue* work_queue;
   size_t stack_size;
   void* stack_memory;
-  size_t register_map[LUM_VIRTUAL_MACHINE_NUM_REGISTERS];
+  size_t constant_memory_size;
+  const void* constant_memory;
 } typedef LumVirtualMachine;
 
-struct LumVirtualMachineExecutionArgs {
-  LumBinaryEntryPoint entry_point;
-} typedef LumVirtualMachineExecutionArgs;
+struct LumVirtualMachineExecutionInfo {
+  bool debug_mode;
+} typedef LumVirtualMachineExecutionInfo;
 
 LuminaryResult lum_virtual_machine_create(LumVirtualMachine** vm);
 LuminaryResult lum_virtual_machine_execute(
-  LumVirtualMachine* vm, LuminaryHost* host, const LumBinary* binary, LumVirtualMachineExecutionArgs args);
+  LumVirtualMachine* vm, LuminaryHost* host, const LumBinary* binary, const LumVirtualMachineExecutionInfo* info);
 LuminaryResult lum_virtual_machine_destroy(LumVirtualMachine** vm);
 
 #endif /* LUMINARY_LUM_VIRTUAL_MACHINE_H */

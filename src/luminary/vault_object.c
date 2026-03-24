@@ -103,7 +103,7 @@ LuminaryResult vault_object_destroy(VaultObject** object) {
   }
 
   if (spinlock_is_locked(&(*object)->spinlock)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Tried to create handle for a locked object.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Tried to destroy handle for a locked object.");
   }
 
   __FAILURE_HANDLE(host_free(object));

@@ -38,17 +38,20 @@ static void _element_button_render_circle(Element* button, Display* display) {
 }
 
 static const char* _button_image_string[ELEMENT_BUTTON_IMAGE_COUNT] = {
-  [ELEMENT_BUTTON_IMAGE_CHECK] = "\ue5ca",    [ELEMENT_BUTTON_IMAGE_SETTINGS] = "\ue8b8",      [ELEMENT_BUTTON_IMAGE_CAMERA] = "\ue412",
-  [ELEMENT_BUTTON_IMAGE_WAVES] = "\ue176",    [ELEMENT_BUTTON_IMAGE_SUN] = "\uf157",           [ELEMENT_BUTTON_IMAGE_CLOUD] = "\ue2bd",
-  [ELEMENT_BUTTON_IMAGE_MIST] = "\ue188",     [ELEMENT_BUTTON_IMAGE_PRECIPITATION] = "\ue810", [ELEMENT_BUTTON_IMAGE_MATERIAL] = "\uef8f",
-  [ELEMENT_BUTTON_IMAGE_INSTANCE] = "\uead3", [ELEMENT_BUTTON_IMAGE_MOVE] = "\ue89f",          [ELEMENT_BUTTON_IMAGE_SELECT] = "\uf706",
-  [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4",    [ELEMENT_BUTTON_IMAGE_SYNC] = "\ue627",          [ELEMENT_BUTTON_IMAGE_REGION] = "\ue5d0",
-  [ELEMENT_BUTTON_IMAGE_ERROR] = "\ue000",    [ELEMENT_BUTTON_IMAGE_STAR] = "\ue838"};
+  [ELEMENT_BUTTON_IMAGE_CHECK] = "\ue5ca",    [ELEMENT_BUTTON_IMAGE_SCENE] = "\ue3f7",    [ELEMENT_BUTTON_IMAGE_SETTINGS] = "\ue8b8",
+  [ELEMENT_BUTTON_IMAGE_CAMERA] = "\ue412",   [ELEMENT_BUTTON_IMAGE_WAVES] = "\ue176",    [ELEMENT_BUTTON_IMAGE_SUN] = "\uf157",
+  [ELEMENT_BUTTON_IMAGE_CLOUD] = "\ue3dd",    [ELEMENT_BUTTON_IMAGE_MIST] = "\ue188",     [ELEMENT_BUTTON_IMAGE_PRECIPITATION] = "\ue810",
+  [ELEMENT_BUTTON_IMAGE_MATERIAL] = "\uef8f", [ELEMENT_BUTTON_IMAGE_INSTANCE] = "\uead3", [ELEMENT_BUTTON_IMAGE_MOVE] = "\ue89f",
+  [ELEMENT_BUTTON_IMAGE_SELECT] = "\uf706",   [ELEMENT_BUTTON_IMAGE_FOCUS] = "\ue3b4",    [ELEMENT_BUTTON_IMAGE_SYNC] = "\ue627",
+  [ELEMENT_BUTTON_IMAGE_REGION] = "\ue5d0",   [ELEMENT_BUTTON_IMAGE_ERROR] = "\ue000",    [ELEMENT_BUTTON_IMAGE_STAR] = "\ue838"};
 
 static void _element_button_render_image(Element* button, Display* display) {
   ElementButtonData* data = (ElementButtonData*) &button->data;
 
   uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
+
+  if (data->inactive)
+    color = MD_COLOR_DARKGRAY;
 
   const uint32_t padding_x = button->width >> 1;
   const uint32_t padding_y = button->height >> 1;
@@ -74,6 +77,10 @@ static void _element_button_render_func(Element* button, Display* display) {
 }
 
 bool element_button(Window* window, Display* display, const MouseState* mouse_state, ElementButtonArgs args) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
   Element button;
@@ -94,6 +101,7 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
   data->press_color = args.press_color;
   data->is_hovered  = mouse_result.is_hovered && (args.is_not_interactive == false);
   data->is_down     = mouse_result.is_down && (args.is_not_interactive == false);
+  data->inactive    = args.inactive;
 
   data->shape_size_id = 0;
 
@@ -118,7 +126,7 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
   if (mouse_result.is_hovered) {
     const bool external_clicked_window_is_present = (window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED);
 
-    if (args.tooltip_text && window->external_subwindow && !external_clicked_window_is_present) {
+    if (args.tooltip_text && window->external_subwindow && external_clicked_window_is_present == false) {
       subwindow_tooltip_create(window->external_subwindow, args.tooltip_text, mouse_state->x + 16.0f, mouse_state->y + 16.0f);
 
       window->state_data =
@@ -130,5 +138,5 @@ bool element_button(Window* window, Display* display, const MouseState* mouse_st
 
   window_push_element(window, &button);
 
-  return mouse_result.is_clicked;
+  return mouse_result.is_clicked && args.inactive == false;
 }

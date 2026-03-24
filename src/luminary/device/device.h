@@ -5,6 +5,7 @@
 #include "device_adaptive_sampler.h"
 #include "device_bsdf.h"
 #include "device_cloud.h"
+#include "device_constant_memory_manager.h"
 #include "device_embedded_data.h"
 #include "device_light.h"
 #include "device_material_manager.h"
@@ -59,12 +60,6 @@ struct DeviceProperties {
   uint32_t optimal_block_count;
 } typedef DeviceProperties;
 
-struct DeviceConstantMemoryDirtyProperties {
-  bool is_dirty;
-  bool update_everything;
-  DeviceConstantMemoryMember member;
-} typedef DeviceConstantMemoryDirtyProperties;
-
 struct DeviceOptixProperties {
   uint32_t max_trace_depth;
   uint32_t max_traversable_graph_depth;
@@ -104,10 +99,9 @@ struct Device {
   CUstream stream_callbacks;
   CUevent event_queue_render;
   CUevent event_queue_gbuffer_meta;
-  STAGING DeviceConstantMemory* constant_memory;
-  DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceStagingManager* staging_manager;
+  DeviceConstantMemoryManager* constant_memory;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
   DeviceSkyStars* sky_stars;
@@ -153,7 +147,6 @@ LuminaryResult device_update_dynamic_const_mem(
   Device* device, DeviceSampleAllocation sample_allocation, uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
 LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id);
 LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth);
-LuminaryResult device_sync_constant_memory(Device* device);
 LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_add_mesh(Device* device, const Mesh* mesh);
 LuminaryResult device_update_instances(Device* device, const MeshInstanceManager* instance_manager);

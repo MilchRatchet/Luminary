@@ -3,8 +3,6 @@
 
 #include "utils.h"
 
-#define MESH_ID_INVALID (0xFFFFFFFF)
-
 struct TriangleGeomData {
   float* vertex_buffer;
   float* normal_buffer;
@@ -15,12 +13,10 @@ struct TriangleGeomData {
 
 struct Mesh {
   uint32_t id;
-  char* name;
   TriangleGeomData data;
 } typedef Mesh;
 
 struct MeshInstance {
-  uint32_t id;
   uint32_t mesh_id;
   vec3 translation;
   vec3 scale;
@@ -29,7 +25,6 @@ struct MeshInstance {
 } typedef MeshInstance;
 
 LuminaryResult mesh_create(Mesh** mesh);
-LuminaryResult mesh_set_name(Mesh* mesh, const char* name);
 LuminaryResult mesh_destroy(Mesh** mesh);
 
 LuminaryResult mesh_instance_get_default(MeshInstance* instance);

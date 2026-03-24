@@ -11,7 +11,7 @@
 #include "memory.cuh"
 #include "particle_utils.cuh"
 #include "random.cuh"
-#include "sky.cuh"
+#include "sky_integration.cuh"
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
@@ -386,6 +386,14 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 template <MaterialType TYPE>
 LUMINARY_FUNCTION DeviceTaskDirectLightAmbient
   direct_lighting_ambient_create_task(const MaterialContext<TYPE>& ctx, const BSDFSampleInfo<TYPE>& bounce_sample, const PathID& path_id) {
+  // Avoid double counting for pass through rays.
+  if (bsdf_is_pass_through_ray(ctx, bounce_sample)) {
+    DeviceTaskDirectLightAmbient task;
+    task.light_color = PACKED_RECORD_BLACK;
+
+    return task;
+  }
+
   ////////////////////////////////////////////////////////////////////
   // Compute ambient color
   ////////////////////////////////////////////////////////////////////

@@ -24,10 +24,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->agx_custom_power             = 1.0f;
   camera->agx_custom_saturation        = 1.0f;
   camera->filter                       = LUMINARY_FILTER_NONE;
-  camera->wasd_speed                   = 1.0f;
-  camera->mouse_speed                  = 1.0f;
-  camera->smooth_movement              = 0;
-  camera->smoothing_factor             = 0.1f;
   camera->purkinje                     = 1;
   camera->purkinje_kappa1              = 0.2f;
   camera->purkinje_kappa2              = 0.29f;

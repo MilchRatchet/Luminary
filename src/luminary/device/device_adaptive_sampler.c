@@ -148,7 +148,7 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   }
 
   const uint32_t num_adaptive_sampling_blocks = sampler->render_width * sampler->render_height;
-  const uint32_t warps_per_block              = THREADS_PER_BLOCK >> WARP_SIZE_LOG;
+  const uint32_t warps_per_block              = MAX_THREADS_PER_BLOCK >> WARP_SIZE_LOG;
 
   CUDA_FAILURE_HANDLE(cuMemsetD32Async(DEVICE_CUPTR(sampler->variance_sum_buffer), 0, 1, device->stream_main));
 
@@ -161,10 +161,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     args.exposure           = sampler->exposure;
 
     // Half a warp per adaptive sampler block
-    const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG - 1)) + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG - 1)) + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_BLOCK_REDUCE_VARIANCE], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_BLOCK_REDUCE_VARIANCE], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
       device->stream_main));
   }
 
@@ -177,10 +177,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     args.max_sampling_rate            = sampler->max_sampling_rate;
     args.avg_sampling_rate            = sampler->avg_sampling_rate;
 
-    const uint32_t num_blocks = (num_adaptive_sampling_blocks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const uint32_t num_blocks = (num_adaptive_sampling_blocks + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_SAMPLE_COUNTS], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_SAMPLE_COUNTS], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
       &args, device->stream_main));
   }
 
@@ -198,8 +198,8 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     const uint32_t num_blocks = (((num_adaptive_sampling_blocks + WARP_SIZE - 1) >> WARP_SIZE_LOG) + warps_per_block - 1) / warps_per_block;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_TOTAL_TASK_COUNTS], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
-      &args, device->stream_main));
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_STAGE_TOTAL_TASK_COUNTS], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1,
+      1, &args, device->stream_main));
   }
 
   __FAILURE_HANDLE(device_download(
@@ -422,11 +422,11 @@ LuminaryResult device_adaptive_sampler_ensure_stage(
     args.stage_id                     = stage_id;
     args.dst                          = DEVICE_PTR(sampler->stage_prefix_mips[0]);
 
-    const uint32_t num_blocks = (num_adaptive_sampling_blocks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const uint32_t num_blocks = (num_adaptive_sampling_blocks + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TASKS_PER_BLOCK], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
-      device->stream_main));
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TASKS_PER_BLOCK], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
+      &args, device->stream_main));
   }
 
   for (uint32_t mip_id = 0; mip_id < sampler->num_prefix_mips - 1; mip_id++) {
@@ -436,10 +436,10 @@ LuminaryResult device_adaptive_sampler_ensure_stage(
     args.thread_count      = (num_adaptive_sampling_blocks + (1u << WARP_SIZE_LOG * mip_id) - 1) >> (WARP_SIZE_LOG * mip_id);
     args.warp_count        = (num_adaptive_sampling_blocks + (1u << WARP_SIZE_LOG * (mip_id + 1)) - 1) >> (WARP_SIZE_LOG * (mip_id + 1));
 
-    const uint32_t num_blocks = (args.thread_count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const uint32_t num_blocks = (args.thread_count + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_BLOCK_SUM], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_BLOCK_SUM], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
       device->stream_main));
   }
 
@@ -450,10 +450,10 @@ LuminaryResult device_adaptive_sampler_ensure_stage(
     args.thread_count      = (num_adaptive_sampling_blocks + (1u << WARP_SIZE_LOG * (mip_id - 1)) - 1) >> (WARP_SIZE_LOG * (mip_id - 1));
     args.warp_count        = (num_adaptive_sampling_blocks + (1u << WARP_SIZE_LOG * mip_id) - 1) >> (WARP_SIZE_LOG * mip_id);
 
-    const uint32_t num_blocks = (args.thread_count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const uint32_t num_blocks = (args.thread_count + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_PREFIX_SUM], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_PREFIX_SUM], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
       device->stream_main));
   }
 
@@ -468,11 +468,11 @@ LuminaryResult device_adaptive_sampler_ensure_stage(
     args.tasks_per_tile   = tasks_per_tile;
     args.tile_count       = tile_count;
 
-    const uint32_t num_blocks = (subtile_count + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    const uint32_t num_blocks = (subtile_count + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TILE_BLOCK_RANGES], THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
-      device->stream_main));
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_COMPUTE_TILE_BLOCK_RANGES], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
+      &args, device->stream_main));
   }
 
   sampler->allocated_stage_id = stage_id;

@@ -209,7 +209,7 @@ static LuminaryResult _device_output_generate_output(
   return LUMINARY_SUCCESS;
 }
 
-static bool _device_output_recurring_needs_queueing(DeviceOutput* output, const uint32_t current_sample_count) {
+static bool _device_output_recurring_needs_queueing(DeviceOutput* output) {
   __CHECK_NULL_ARGUMENT(output);
 
   if (output->recurring_outputs_enabled == false)
@@ -242,7 +242,7 @@ LuminaryResult device_output_will_output(DeviceOutput* output, DeviceRenderer* r
 
   bool generate_output = false;
 
-  generate_output |= _device_output_recurring_needs_queueing(output, aggregate_sample_count);
+  generate_output |= _device_output_recurring_needs_queueing(output);
 
   uint32_t num_output_requests;
   __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
@@ -265,7 +265,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __FAILURE_HANDLE(device_output_wait_for_completion(output, device->stream_main));
 
   // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
-  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
 
   uint32_t aggregate_sample_count;
   __FAILURE_HANDLE(device_renderer_get_total_executed_samples(device->renderer, &aggregate_sample_count));
@@ -282,7 +282,7 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   CUDA_FAILURE_HANDLE(cuEventRecord(output->event_output_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_output, output->event_output_ready, CU_EVENT_WAIT_DEFAULT));
 
-  if (_device_output_recurring_needs_queueing(output, aggregate_sample_count) == true) {
+  if (_device_output_recurring_needs_queueing(output) == true) {
     __DEBUG_ASSERT(output->width > 0 && output->height > 0);
 
     output->recurring_output_is_dirty = false;

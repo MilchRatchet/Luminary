@@ -5,7 +5,7 @@
 static void _element_checkbox_render_func(Element* checkbox, Display* display) {
   ElementCheckBoxData* data = (ElementCheckBoxData*) &checkbox->data;
 
-  const uint32_t background_color = (data->data) ? MD_COLOR_ACCENT_2 : MD_COLOR_BLACK;
+  const uint32_t background_color = (data->data) ? MD_COLOR_ACCENT_2 : ((data->write_access) ? MD_COLOR_BLACK : MD_COLOR_DARKGRAY);
   const UIRendererBackgroundMode background_mode =
     (data->data) ? UI_RENDERER_BACKGROUND_MODE_OPAQUE : UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT;
 
@@ -17,9 +17,11 @@ static void _element_checkbox_render_func(Element* checkbox, Display* display) {
     const uint32_t padding_x = (checkbox->width >> 1) - 1;
     const uint32_t padding_y = (checkbox->width >> 1) + 2;
 
+    const uint32_t check_color = (data->write_access) ? MD_COLOR_WHITE : MD_COLOR_DARKGRAY;
+
     text_renderer_render(
-      display->text_renderer, display, "\ue5ca", TEXT_RENDERER_FONT_MATERIAL, MD_COLOR_WHITE, checkbox->x + padding_x,
-      checkbox->y + padding_y, true, true, true, (uint32_t*) 0);
+      display->text_renderer, display, "\ue5ca", TEXT_RENDERER_FONT_MATERIAL, check_color, checkbox->x + padding_x, checkbox->y + padding_y,
+      true, true, true, (uint32_t*) 0);
   }
 }
 
@@ -36,14 +38,15 @@ bool element_checkbox(Window* window, Display* display, const MouseState* mouse_
 
   ElementCheckBoxData* data = (ElementCheckBoxData*) &checkbox.data;
 
-  data->size = args.size;
+  data->size         = args.size;
+  data->write_access = args.write_access;
 
   ElementMouseResult mouse_result;
   element_apply_context(&checkbox, context, &args.size, mouse_state, &mouse_result);
 
   data->data = *(bool*) args.data_binding;
 
-  if (mouse_result.is_clicked) {
+  if (mouse_result.is_clicked && args.write_access) {
     data->data                 = !data->data;
     *(bool*) args.data_binding = data->data;
 
@@ -59,5 +62,5 @@ bool element_checkbox(Window* window, Display* display, const MouseState* mouse_
 
   window_push_element(window, &checkbox);
 
-  return mouse_result.is_clicked;
+  return mouse_result.is_clicked && args.write_access;
 }

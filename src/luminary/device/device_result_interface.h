@@ -3,7 +3,6 @@
 
 #include "device_memory.h"
 #include "device_utils.h"
-#include "mutex.h"
 
 struct Device typedef Device;
 

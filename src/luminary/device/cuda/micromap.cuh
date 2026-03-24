@@ -29,7 +29,7 @@ LUMINARY_FUNCTION OMMTextureTriangle micromap_get_ommtexturetriangle(const uint3
   omm_triangle.tex_id = __ldg(&device.ptrs.materials[tri.material_id].albedo_tex);
 
   if (omm_triangle.tex_id == TEXTURE_NONE) {
-    omm_triangle.is_invisible = __ldg(&device.ptrs.materials[tri.material_id].albedo_a) == 0;
+    omm_triangle.is_invisible = __ldg(&device.ptrs.materials[tri.material_id].opacity) == 0;
   }
   else {
     omm_triangle.is_invisible = false;

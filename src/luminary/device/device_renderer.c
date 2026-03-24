@@ -50,7 +50,7 @@ LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceR
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
@@ -133,7 +133,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
@@ -180,7 +180,7 @@ static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+static LuminaryResult _device_renderer_build_kernel_queue(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
@@ -505,6 +505,8 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
 
     if ((device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0)
       renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_FIRST_SAMPLE;
+
+    __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -530,8 +532,11 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   if (renderer->tile_id >= tile_count)
     return LUMINARY_SUCCESS;
 
+  const DeviceConstantMemory* constant_memory;
+  __FAILURE_HANDLE(device_constant_memory_manager_get_host_buffer(device->constant_memory, &constant_memory));
+
   // Query only during the first sample and if enough samples have been computed after this iteration.
-  const bool allow_gbuffer_meta_query = undersampling_stage <= (1 + device->constant_memory->settings.supersampling);
+  const bool allow_gbuffer_meta_query = undersampling_stage <= (1 + constant_memory->settings.supersampling);
 
   ////////////////////////////////////////////////////////////////////
   // Setup work

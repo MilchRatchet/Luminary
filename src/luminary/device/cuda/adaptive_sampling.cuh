@@ -13,7 +13,9 @@ LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(con
   const float exposed_value    = color_luminance(exposed_color);
   const float tonemapped_value = color_luminance(tonemapped_color);
 
-  return (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
+  const float compression = (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
+
+  return compression * compression * compression * compression;
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
@@ -75,18 +77,19 @@ LUMINARY_FUNCTION uint32_t adapative_sampling_get_sample_offset(const uint32_t x
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_sample_count_from_block_index(const uint32_t adaptive_sampling_block) {
-  const uint32_t adaptive_sampling_counts = device.ptrs.stage_sample_counts[adaptive_sampling_block];
+  const uint32_t this_stage_id            = device.state.sample_allocation.stage_id;
+  const uint32_t adaptive_sampling_counts = (this_stage_id > 0) ? device.ptrs.stage_sample_counts[adaptive_sampling_block] : 0;
 
   uint32_t count = device.state.adaptive_sampling_accumulated_stages[0];
 
-  for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
+  LUMINARY_ASSUME(this_stage_id <= ADAPTIVE_SAMPLER_NUM_STAGES);
+
+  for (uint32_t stage_id = 0; stage_id < this_stage_id; stage_id++) {
     const uint32_t stage_sample_offset = device.state.adaptive_sampling_accumulated_stages[stage_id + 1];
     const uint32_t stage_sample_count  = adaptive_sampling_get_stage_sample_count(adaptive_sampling_counts, stage_id);
 
     count += stage_sample_offset * stage_sample_count;
   }
-
-  const uint32_t this_stage_id = device.state.sample_allocation.stage_id;
 
   if (this_stage_id > 0) {
     count += ((adaptive_sampling_counts >> ((this_stage_id - 1) * 8)) & 0xFF) + 1;
@@ -184,7 +187,7 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
 
   if (args.exposure != 0.0f) {
     const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(color, args.exposure);
-    variance *= tonemap_compression * tonemap_compression;
+    variance *= tonemap_compression;
   }
 
   const float block_variance = fabsf(warp_reduce_max<16>(variance));

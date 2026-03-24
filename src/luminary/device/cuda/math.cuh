@@ -8,6 +8,34 @@
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
+// Fast Math
+////////////////////////////////////////////////////////////////////
+
+// This seems to be slower than MUFU.SIN on Ampere.
+LUMINARY_FUNCTION float lum_fast_sinf(float x) {
+  // Wrap x into [-PI, PI]
+  // FMUL   R1 = (x * 0.15915493667125701904f)
+  // FRND   R2 = R1
+  // FFMA   R3 = R2 * (-6.2831854820251464844f) + x
+  // FADD   R4 = R3 + (-3.1415927410125732422f)
+  x = x - floorf(x * (1.0f / (2.0f * PI))) * (2.0f * PI);
+  x = x - PI;
+
+  // FFMA can take the abs of an input operand for free.
+  const float abs_x = fabsf(x);
+
+  // MOV    R0 = (0.405284735f)
+  // FFMA   R1 = (|x| * (-R0) + 1.27323954f)
+  // FMUL   R2 = (x * R1)
+  x = x * (1.27323954f - 0.405284735f * abs_x);
+  return x;
+}
+
+LUMINARY_FUNCTION float lum_fast_cosf(const float x) {
+  return lum_fast_sinf(x + (0.5f * PI));
+}
+
+////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////
 
@@ -1057,6 +1085,26 @@ LUMINARY_FUNCTION float SRGB_to_linearRGB(const float value) {
   else {
     return powf((value + 0.055f) / 1.055f, 2.4f);
   }
+}
+
+LUMINARY_FUNCTION RGBF color_linear_to_sRGB(const RGBF color) {
+  RGBF result;
+
+  result.r = linearRGB_to_SRGB(color.r);
+  result.g = linearRGB_to_SRGB(color.g);
+  result.b = linearRGB_to_SRGB(color.b);
+
+  return result;
+}
+
+LUMINARY_FUNCTION RGBF color_sRGB_to_linear(const RGBF color) {
+  RGBF result;
+
+  result.r = SRGB_to_linearRGB(color.r);
+  result.g = SRGB_to_linearRGB(color.g);
+  result.b = SRGB_to_linearRGB(color.b);
+
+  return result;
 }
 
 LUMINARY_FUNCTION float color_luminance(const RGBF v) {

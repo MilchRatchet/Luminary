@@ -32,6 +32,7 @@
 #include <luminary/array.h>
 #include <luminary/host_memory.h>
 #include <luminary/log.h>
+#include <luminary/mutex.h>
 #include <luminary/queue.h>
 #include <luminary/ringbuffer.h>
 #include <luminary/thread_status.h>

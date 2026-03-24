@@ -9,12 +9,14 @@
 struct ElementCheckBoxData {
   bool data;
   ElementSize size;
+  bool write_access;
 } typedef ElementCheckBoxData;
 static_assert(sizeof(ElementCheckBoxData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
 struct ElementCheckBoxArgs {
   void* data_binding;
   ElementSize size;
+  bool write_access;
 } typedef ElementCheckBoxArgs;
 
 bool element_checkbox(Window* window, Display* display, const MouseState* mouse_state, ElementCheckBoxArgs args);
