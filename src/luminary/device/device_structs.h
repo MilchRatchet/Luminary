@@ -19,8 +19,9 @@ struct DeviceRendererSettings {
   uint16_t window_y;
   uint16_t window_width;
   uint16_t window_height;
+  float russian_roulette_threshold;
 } typedef DeviceRendererSettings;
-LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x10u);
+LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x14u);
 
 struct DeviceCameraMedium {
   float design_ior;
@@ -54,7 +55,6 @@ struct DeviceCamera {
   float exposure;
   float purkinje_kappa1;
   float purkinje_kappa2;
-  float russian_roulette_threshold;
   float film_grain;
   float camera_scale;
   float object_distance;
@@ -80,7 +80,7 @@ struct DeviceCamera {
     } thin_lens;
   };
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x6Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x68u);
 
 struct DeviceOcean {
   uint32_t active : 1;

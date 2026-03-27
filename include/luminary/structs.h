@@ -77,6 +77,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   float region_y;
   float region_width;
   float region_height;
+  float russian_roulette_threshold;
 } typedef LuminaryRendererSettings;
 
 LUMINARY_API struct LuminaryDeviceInfo {
@@ -196,7 +197,6 @@ LUMINARY_API struct LuminaryCamera {
   bool purkinje;
   float purkinje_kappa1;
   float purkinje_kappa2;
-  float russian_roulette_threshold;
   bool use_color_correction;
   LuminaryRGBF color_correction;
   float film_grain;

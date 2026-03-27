@@ -34,6 +34,11 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
     device_settings->window_height = settings->region_height * device_settings->height;
   }
 
+  // Scale so that 1.0f is a good default value
+  const float russian_roulette_scale = 0.1f;
+
+  device_settings->russian_roulette_threshold = settings->russian_roulette_threshold * russian_roulette_scale;
+
   return LUMINARY_SUCCESS;
 }
 
@@ -71,16 +76,14 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
     device_camera->thin_lens.aperture_size = camera->thin_lens.aperture_size;
   }
 
-  device_camera->pos      = camera->pos;
-  device_camera->rotation = rotation_euler_angles_to_quaternion(camera->rotation);
-
-  device_camera->exposure                   = expf(camera->exposure);
-  device_camera->purkinje_kappa1            = camera->purkinje_kappa1;
-  device_camera->purkinje_kappa2            = camera->purkinje_kappa2;
-  device_camera->russian_roulette_threshold = camera->russian_roulette_threshold;
-  device_camera->film_grain                 = camera->film_grain;
-  device_camera->camera_scale               = camera->camera_scale;
-  device_camera->object_distance            = camera->object_distance;
+  device_camera->pos             = camera->pos;
+  device_camera->rotation        = rotation_euler_angles_to_quaternion(camera->rotation);
+  device_camera->exposure        = expf(camera->exposure);
+  device_camera->purkinje_kappa1 = camera->purkinje_kappa1;
+  device_camera->purkinje_kappa2 = camera->purkinje_kappa2;
+  device_camera->film_grain      = camera->film_grain;
+  device_camera->camera_scale    = camera->camera_scale;
+  device_camera->object_distance = camera->object_distance;
 
   return LUMINARY_SUCCESS;
 }

@@ -16,10 +16,12 @@ LUMINARY_FUNCTION bool task_russian_roulette(const DeviceTask task, const uint8_
 
   const float value = color_importance(record);
 
+  const float threshold = device.settings.russian_roulette_threshold;
+
   // Inf and NaN are handled in the temporal accumulation.
-  if (value < device.camera.russian_roulette_threshold) {
+  if (value < threshold) {
     // Clamp probability to avoid fireflies. Always remove paths that carry no light at all.
-    const float p = (value > 0.0f) ? fmaxf(value / device.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP) : 0.0f;
+    const float p = (value > 0.0f) ? fmaxf(value / threshold, RUSSIAN_ROULETTE_CLAMP) : 0.0f;
     if (random_1D(RANDOM_TARGET_RUSSIAN_ROULETTE, task.path_id) > p) {
       accepted = false;
     }

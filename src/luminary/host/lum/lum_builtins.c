@@ -244,6 +244,7 @@ static const LumBuiltinTypeMember _lum_builtin_member_settings[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_y, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_width, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_height, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, russian_roulette_threshold, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
@@ -263,7 +264,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa1, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa2, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, russian_roulette_threshold, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_color_correction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, color_correction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, film_grain, 1, LUM_VERSION_CURRENT),
@@ -522,12 +522,16 @@ LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t 
   settings->region_width            = 1.0f;
   settings->region_height           = 1.0f;
 
-  settings->adaptive_sampling_settings = (LumBuiltinAdaptiveSampling) {.enable            = true,
-                                                                       .max_sampling_rate = 256,
-                                                                       .avg_sampling_rate = 2,
-                                                                       .update_interval   = 64,
-                                                                       .exposure_aware    = true,
-                                                                       .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY};
+  settings->russian_roulette_threshold = 1.0f;
+
+  settings->adaptive_sampling_settings = (LumBuiltinAdaptiveSampling) {
+    .enable            = true,
+    .max_sampling_rate = 256,
+    .avg_sampling_rate = 2,
+    .update_interval   = 64,
+    .exposure_aware    = true,
+    .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
+  };
 
   return LUMINARY_SUCCESS;
 }
@@ -605,7 +609,6 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->purkinje                     = 1;
   camera->purkinje_kappa1              = 0.2f;
   camera->purkinje_kappa2              = 0.29f;
-  camera->russian_roulette_threshold   = 0.1f;
   camera->use_color_correction         = 0;
   camera->color_correction.r           = 0.0f;
   camera->color_correction.g           = 0.0f;
@@ -870,6 +873,8 @@ LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, 
   dst_settings->region_width            = settings->region_width;
   dst_settings->region_height           = settings->region_height;
 
+  dst_settings->russian_roulette_threshold = settings->russian_roulette_threshold;
+
   dst_settings->adaptive_sampling_settings.enable            = settings->adaptive_sampling_settings.enable;
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
   dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
@@ -942,7 +947,6 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->purkinje                     = camera->purkinje;
   dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
-  dst_camera->russian_roulette_threshold   = camera->russian_roulette_threshold;
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
   dst_camera->film_grain                   = camera->film_grain;
@@ -1165,6 +1169,8 @@ LuminaryResult lum_builtin_settings_serialize(const LuminaryRendererSettings* se
   dst_settings->region_width            = settings->region_width;
   dst_settings->region_height           = settings->region_height;
 
+  dst_settings->russian_roulette_threshold = settings->russian_roulette_threshold;
+
   dst_settings->adaptive_sampling_settings.enable            = settings->adaptive_sampling_settings.enable;
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
   dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
@@ -1226,7 +1232,6 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->purkinje                     = camera->purkinje;
   dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
-  dst_camera->russian_roulette_threshold   = camera->russian_roulette_threshold;
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
   dst_camera->film_grain                   = camera->film_grain;

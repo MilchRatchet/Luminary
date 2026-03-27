@@ -247,8 +247,9 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* RUSSIANR */
     case 5930749542479910226u:
-      sscanf(value, "%f\n", &camera->russian_roulette_threshold);
-      break;
+      // Legacy, no longer a camera property
+      // sscanf(value, "%f\n", &camera->russian_roulette_threshold);
+      // break;
     /* FIREFLYC */
     case 4852993938162862406u:
       // Legacy

@@ -61,22 +61,23 @@ static bool _window_entity_properties_add_slider(
       window_margin(data.window, 4);
     }
 
-    if (element_slider(
-          data.window, data.display, data.mouse_state, data.keyboard_state,
-          (ElementSliderArgs) {
-            .identifier        = text,
-            .type              = data_type,
-            .size              = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
-            .data_binding      = data_binding,
-            .min               = min,
-            .max               = max,
-            .change_rate       = change_rate,
-            .component_padding = 4,
-            .margins           = 4,
-            .center_x          = true,
-            .center_y          = true,
-            .write_access      = data.write_access,
-          })) {
+    if (
+      element_slider(
+        data.window, data.display, data.mouse_state, data.keyboard_state,
+        (ElementSliderArgs) {
+          .identifier        = text,
+          .type              = data_type,
+          .size              = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+          .data_binding      = data_binding,
+          .min               = min,
+          .max               = max,
+          .change_rate       = change_rate,
+          .component_padding = 4,
+          .margins           = 4,
+          .center_x          = true,
+          .center_y          = true,
+          .write_access      = data.write_access,
+        })) {
       update_data = true;
     }
   }
@@ -104,13 +105,14 @@ static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassing
         .is_clickable = false,
       });
 
-    if (element_checkbox(
-          data.window, data.display, data.mouse_state,
-          (ElementCheckBoxArgs) {
-            .size         = (ElementSize) {.width = 24, .height = 24},
-            .data_binding = data_binding,
-            .write_access = data.write_access,
-          })) {
+    if (
+      element_checkbox(
+        data.window, data.display, data.mouse_state,
+        (ElementCheckBoxArgs) {
+          .size         = (ElementSize) {.width = 24, .height = 24},
+          .data_binding = data_binding,
+          .write_access = data.write_access,
+        })) {
       update_data = true;
     }
   }
@@ -138,18 +140,19 @@ static bool _window_entity_properties_add_button(WindowEntityPropertiesPassingDa
         .is_clickable = false,
       });
 
-    if (element_button(
-          data.window, data.display, data.mouse_state,
-          (ElementButtonArgs) {
-            .size         = (ElementSize) {.width = 24, .height = 24},
-            .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
-            .image        = ELEMENT_BUTTON_IMAGE_SYNC,
-            .color        = MD_COLOR_GRAY,
-            .hover_color  = MD_COLOR_ACCENT_LIGHT_2,
-            .press_color  = MD_COLOR_WHITE,
-            .tooltip_text = text,
-            .inactive     = data.write_access == false,
-          })) {
+    if (
+      element_button(
+        data.window, data.display, data.mouse_state,
+        (ElementButtonArgs) {
+          .size         = (ElementSize) {.width = 24, .height = 24},
+          .shape        = ELEMENT_BUTTON_SHAPE_IMAGE,
+          .image        = ELEMENT_BUTTON_IMAGE_SYNC,
+          .color        = MD_COLOR_GRAY,
+          .hover_color  = MD_COLOR_ACCENT_LIGHT_2,
+          .press_color  = MD_COLOR_WHITE,
+          .tooltip_text = text,
+          .inactive     = data.write_access == false,
+        })) {
       update_data = true;
     }
   }
@@ -178,16 +181,17 @@ static bool _window_entity_properties_add_dropdown(
         .is_clickable = false,
       });
 
-    if (element_dropdown(
-          data.window, data.display, data.mouse_state,
-          (ElementDropdownArgs) {
-            .identifier     = text,
-            .size           = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
-            .selected_index = selected_index,
-            .num_strings    = num_strings,
-            .strings        = strings,
-            .write_access   = data.write_access,
-          })) {
+    if (
+      element_dropdown(
+        data.window, data.display, data.mouse_state,
+        (ElementDropdownArgs) {
+          .identifier     = text,
+          .size           = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+          .selected_index = selected_index,
+          .num_strings    = num_strings,
+          .strings        = strings,
+          .write_access   = data.write_access,
+        })) {
       update_data = true;
     }
   }
@@ -292,6 +296,9 @@ static void _window_entity_properties_renderer_settings_action(
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Supersampling", &settings.supersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 3.0f, 1.0f);
+
+  update_data |= _window_entity_properties_add_slider(
+    data, "Russian Roulette Threshold", &settings.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Adaptive Sampling", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -404,9 +411,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
-
-  update_data |= _window_entity_properties_add_slider(
-    data, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -858,15 +862,16 @@ static void _window_entity_properties_material_action(Window* window, Display* d
   if (!material_is_selected) {
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                         .text         = "No material is selected.",
-                         .center_x     = true,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+        .text         = "No material is selected.",
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false});
 
     return;
   }
@@ -961,15 +966,16 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
   if (!instance_is_selected) {
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                         .text         = "No instance is selected.",
-                         .center_x     = true,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+        .text         = "No instance is selected.",
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false});
 
     return;
   }

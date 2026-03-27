@@ -6,17 +6,18 @@
 LuminaryResult settings_get_default(RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(settings);
 
-  settings->width                   = 2560;
-  settings->height                  = 1440;
-  settings->max_ray_depth           = 4;
-  settings->bridge_max_num_vertices = 15;
-  settings->undersampling           = 2;
-  settings->supersampling           = 1;
-  settings->shading_mode            = LUMINARY_SHADING_MODE_DEFAULT;
-  settings->region_x                = 0.0f;
-  settings->region_y                = 0.0f;
-  settings->region_width            = 1.0f;
-  settings->region_height           = 1.0f;
+  settings->width                      = 2560;
+  settings->height                     = 1440;
+  settings->max_ray_depth              = 4;
+  settings->bridge_max_num_vertices    = 15;
+  settings->undersampling              = 2;
+  settings->supersampling              = 1;
+  settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
+  settings->region_x                   = 0.0f;
+  settings->region_y                   = 0.0f;
+  settings->region_width               = 1.0f;
+  settings->region_height              = 1.0f;
+  settings->russian_roulette_threshold = 1.0f;
 
   settings->adaptive_sampling_settings = (LuminaryAdaptiveSamplingSettings) {.enable            = true,
                                                                              .max_sampling_rate = 256,
@@ -70,6 +71,8 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
   __SETTINGS_CHECK_DIRTY(region_y, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(region_width, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(region_height, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+
+  __SETTINGS_CHECK_DIRTY(russian_roulette_threshold, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   return LUMINARY_SUCCESS;
 }
