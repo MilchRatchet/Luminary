@@ -34,7 +34,7 @@ LuminaryResult device_abort_set(DeviceAbort* abort, Device* device, bool set_abo
 
   // This is a trick to make the CUDA driver submit the commandbuffer containing the upload immediately.
   if (set_abort == false)
-    CUDA_FAILURE_HANDLE(cuStreamQuery(device->stream_abort));
+    cuStreamQuery(device->stream_abort);
 
   return LUMINARY_SUCCESS;
 }
