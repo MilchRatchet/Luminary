@@ -6,36 +6,37 @@
 #include "../device_utils.h"
 #include "../kernel_args.h"
 
-// Part of compile configuration
-#ifndef LUMINARY_MIN_BLOCKS_PER_SM
-#define LUMINARY_MIN_BLOCKS_PER_SM 1
-#endif /* LUMINARY_MIN_BLOCKS_PER_SM */
-
-#define NUM_WARPS (NUM_THREADS >> WARP_SIZE_LOG)
-
 #ifndef OPTIX_KERNEL
+
+#define NUM_BLOCKS (gridDim.x)
 #define THREADS_PER_BLOCK (blockDim.x)
 #define THREAD_ID_IN_BLOCK (threadIdx.x)
 #define BLOCK_ID (blockIdx.x)
 #define THREAD_ID (THREAD_ID_IN_BLOCK + BLOCK_ID * THREADS_PER_BLOCK)
+
+// Part of compile configuration
+#ifndef LUMINARY_MIN_BLOCKS_PER_SM
+#error "LUMINARY_MIN_BLOCKS_PER_SM is not defined!"
+#endif /* LUMINARY_MIN_BLOCKS_PER_SM */
+
+#define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(MAX_THREADS_PER_BLOCK, LUMINARY_MIN_BLOCKS_PER_SM)
+#define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
+
 #else /* !OPTIX_KERNEL */
+
+#define NUM_BLOCKS (optixGetLaunchDimensions().y)
 #define THREADS_PER_BLOCK (optixGetLaunchDimensions().x)
 #define THREAD_ID_IN_BLOCK (optixGetLaunchIndex().x)
 #define BLOCK_ID (optixGetLaunchIndex().y)
 #define THREAD_ID (optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
-#endif /* OPTIX_KERNEL */
-
-#define NUM_THREADS (MAX_THREADS_PER_BLOCK * device.config.num_blocks)
-
-#ifdef OPTIX_KERNEL
 #define TASK_ID optixGetLaunchIndex().z
+
 #endif /* OPTIX_KERNEL */
 
+#define NUM_THREADS (THREADS_PER_BLOCK * NUM_BLOCKS)
+#define NUM_WARPS (NUM_THREADS >> WARP_SIZE_LOG)
 #define THREAD_ID_IN_WARP (THREAD_ID & WARP_SIZE_MASK)
 #define WARP_ID (THREAD_ID >> WARP_SIZE_LOG)
-
-#define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(MAX_THREADS_PER_BLOCK, LUMINARY_MIN_BLOCKS_PER_SM)
-#define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
 #define LUMINARY_FUNCTION __device__ __forceinline__
 #define LUMINARY_FUNCTION_NO_INLINE __device__ __noinline__
