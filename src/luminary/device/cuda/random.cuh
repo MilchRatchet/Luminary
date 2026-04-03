@@ -8,6 +8,7 @@
 #define BLUENOISE_TEX_DIM_MASK 0xFF
 
 #define RANDOM_LENS_MAX_INTERSECTIONS 32
+#define RANDOM_LENS_MAX_SAMPLES 32
 
 #define RANDOM_SET_LIGHT_SUN_COUNT 2
 #define RANDOM_SET_LIGHT_GEO_COUNT 2
@@ -22,8 +23,9 @@
       RANDOM_TARGET_ALLOCATION_START_##__name + RANDOM_TARGET_ALLOCATION_SIZE_##__name * (__set_count),
 
 enum RandomTarget : uint16_t {
-  RANDOM_ALLOCATE(LENS_METHOD, RANDOM_LENS_MAX_INTERSECTIONS, 1)                                        //
-  RANDOM_ALLOCATE(LENS, 1, 1)                                                                           //
+  RANDOM_ALLOCATE(LENS_METHOD, RANDOM_LENS_MAX_SAMPLES* RANDOM_LENS_MAX_INTERSECTIONS, 1)               //
+  RANDOM_ALLOCATE(LENS, RANDOM_LENS_MAX_SAMPLES, 1)                                                     //
+  RANDOM_ALLOCATE(LENS_RESAMPLING, 1, 1)                                                                //
   RANDOM_ALLOCATE(LENS_BLADE, 1, 1)                                                                     //
   RANDOM_ALLOCATE(LENS_WAVELENGTH, 1, 1)                                                                //
   RANDOM_ALLOCATE(BSDF_REFLECTION, 1, RANDOM_SET_BSDF_COUNT)                                            //
