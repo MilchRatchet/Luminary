@@ -21,8 +21,6 @@ struct AdaptiveSamplerSetupInfo {
   uint32_t render_height;
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
-  bool exposure_aware;
-  float exposure;
 } typedef AdaptiveSamplerSetupInfo;
 
 struct AdaptiveSampler {
@@ -41,7 +39,6 @@ struct AdaptiveSampler {
   DEVICE float* variance_sum_buffer;
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
-  float exposure;
   CUevent stage_build_event;
 } typedef AdaptiveSampler;
 

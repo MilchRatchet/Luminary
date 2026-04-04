@@ -398,7 +398,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_adaptive_sampling[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, max_sampling_rate, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, avg_sampling_rate, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, update_interval, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, exposure_aware, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, output_mode, 1, LUM_VERSION_CURRENT),
 };
 
@@ -529,7 +528,6 @@ LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t 
     .max_sampling_rate = 256,
     .avg_sampling_rate = 2,
     .update_interval   = 64,
-    .exposure_aware    = true,
     .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
   };
 
@@ -879,7 +877,6 @@ LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, 
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
   dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
   dst_settings->adaptive_sampling_settings.update_interval   = settings->adaptive_sampling_settings.update_interval;
-  dst_settings->adaptive_sampling_settings.exposure_aware    = settings->adaptive_sampling_settings.exposure_aware;
   dst_settings->adaptive_sampling_settings.output_mode       = settings->adaptive_sampling_settings.output_mode;
 
   return LUMINARY_SUCCESS;
@@ -1175,7 +1172,6 @@ LuminaryResult lum_builtin_settings_serialize(const LuminaryRendererSettings* se
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
   dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
   dst_settings->adaptive_sampling_settings.update_interval   = settings->adaptive_sampling_settings.update_interval;
-  dst_settings->adaptive_sampling_settings.exposure_aware    = settings->adaptive_sampling_settings.exposure_aware;
   dst_settings->adaptive_sampling_settings.output_mode       = settings->adaptive_sampling_settings.output_mode;
 
   return LUMINARY_SUCCESS;

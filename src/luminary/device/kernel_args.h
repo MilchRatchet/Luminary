@@ -198,7 +198,6 @@ struct KernelArgsAdaptiveSamplingBlockReduceVariance {
   float* dst_sum_variance;
   uint32_t width;
   uint32_t current_stage_id;
-  float exposure;
 } typedef KernelArgsAdaptiveSamplingBlockReduceVariance;
 
 struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {

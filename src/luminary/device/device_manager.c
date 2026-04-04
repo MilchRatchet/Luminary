@@ -452,8 +452,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
     setup_info.enabled           = scene->settings.adaptive_sampling_settings.enable;
     setup_info.max_sampling_rate = scene->settings.adaptive_sampling_settings.max_sampling_rate;
     setup_info.avg_sampling_rate = scene->settings.adaptive_sampling_settings.avg_sampling_rate;
-    setup_info.exposure_aware    = scene->settings.adaptive_sampling_settings.exposure_aware;
-    setup_info.exposure          = expf(scene->camera.exposure);
 
     __FAILURE_HANDLE_CRITICAL(device_get_internal_resolution(main_device, &setup_info.width, &setup_info.height));
     __FAILURE_HANDLE_CRITICAL(device_get_internal_render_resolution(main_device, &setup_info.render_width, &setup_info.render_height));

@@ -15,7 +15,11 @@ LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(con
 
   const float compression = (exposed_value > 0.0f) ? tonemapped_value / exposed_value : 1.0f;
 
-  return compression * compression * compression * compression;
+  return compression * compression;
+}
+
+LUMINARY_FUNCTION float adaptive_sampling_compute_coefficient_of_variation(const float variance, const float mean) {
+  return variance / (mean * mean + FLT_EPSILON);
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
@@ -182,15 +186,11 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   const uint32_t x = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x + device.settings.window_x;
   const uint32_t y = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y + device.settings.window_y;
 
-  RGBF color;
-  float variance = adaptive_sampling_get_pixel_variance_and_color(x, y, denominator, color);
+  float luminance;
+  const float variance        = adaptive_sampling_get_pixel_variance(x, y, denominator, luminance);
+  const float coeff_variation = adaptive_sampling_compute_coefficient_of_variation(variance, luminance);
 
-  if (args.exposure != 0.0f) {
-    const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(color, args.exposure);
-    variance *= tonemap_compression;
-  }
-
-  const float block_variance = fabsf(warp_reduce_max<16>(variance));
+  const float block_variance = fabsf(warp_reduce_max<16>(coeff_variation));
 
   if ((THREAD_ID & (WARP_SIZE_MASK >> 1)) == 0) {
     args.dst_block_variance[adaptive_sampling_block] = block_variance;

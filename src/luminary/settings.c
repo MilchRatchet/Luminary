@@ -19,12 +19,13 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->region_height              = 1.0f;
   settings->russian_roulette_threshold = 1.0f;
 
-  settings->adaptive_sampling_settings = (LuminaryAdaptiveSamplingSettings) {.enable            = true,
-                                                                             .max_sampling_rate = 256,
-                                                                             .avg_sampling_rate = 2,
-                                                                             .update_interval   = 64,
-                                                                             .exposure_aware    = true,
-                                                                             .output_mode = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY};
+  settings->adaptive_sampling_settings = (LuminaryAdaptiveSamplingSettings) {
+    .enable            = true,
+    .max_sampling_rate = 256,
+    .avg_sampling_rate = 2,
+    .update_interval   = 64,
+    .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
+  };
 
   return LUMINARY_SUCCESS;
 }
@@ -59,7 +60,6 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_settings.max_sampling_rate, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_settings.avg_sampling_rate, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_settings.update_interval, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __SETTINGS_CHECK_DIRTY(adaptive_sampling_settings.exposure_aware, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
     __SETTINGS_CHECK_DIRTY(adaptive_sampling_settings.output_mode, SCENE_DIRTY_FLAG_OUTPUT);
   }
 

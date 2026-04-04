@@ -148,7 +148,6 @@ struct LumBuiltinAdaptiveSampling {
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
   uint32_t update_interval;
-  bool exposure_aware;
   LuminaryAdaptiveSamplingOutputMode output_mode;
 } typedef LumBuiltinAdaptiveSampling;
 

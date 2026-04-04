@@ -152,27 +152,20 @@ LUMINARY_KERNEL void accumulation_generate_result() {
           result.b = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + index) * normalization;
         }
       } break;
-      case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE: {
-        float luminance;
-        const float variance = adaptive_sampling_get_pixel_variance(x, y, normalization, luminance);
-
-        result = splat_color(128.0f * variance);
-      } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR: {
-        RGBF color;
-        const float variance = adaptive_sampling_get_pixel_variance_and_color(x, y, normalization, color);
+        float luminance;
+        const float variance        = adaptive_sampling_get_pixel_variance(x, y, normalization, luminance);
+        const float coeff_variation = adaptive_sampling_compute_coefficient_of_variation(variance, luminance);
 
-        const float tonemap_compression = adaptive_sampling_compute_tonemap_compression_factor(color, device.camera.exposure);
+        // Relative standard error (RSE)
+        const float rse = sqrtf(normalization) * coeff_variation;
 
-        const float mse = sqrtf(variance * normalization) * tonemap_compression;
-
-        const float value = 1024.0f * mse;
+        const float value = 0.125f * 0.125f * 0.125f * rse * device.camera.exposure;
         const float red   = __saturatef(2.0f * value);
         const float green = __saturatef(2.0f * (value - 0.5f));
         const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
 
         result = get_color(red, green, blue);
-
       } break;
       case LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION: {
         const uint32_t tasks_per_pixel = adaptive_sampling_get_current_tasks_per_pixel(x, y);

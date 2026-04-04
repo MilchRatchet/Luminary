@@ -49,7 +49,6 @@ LUMINARY_API enum LuminaryShadingMode {
 
 LUMINARY_API enum LuminaryAdaptiveSamplingOutputMode {
   LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
-  LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_VARIANCE,
   LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_ERROR,
   LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION,
   LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT
@@ -60,7 +59,6 @@ struct LuminaryAdaptiveSamplingSettings {
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
   uint32_t update_interval;
-  bool exposure_aware;
   LuminaryAdaptiveSamplingOutputMode output_mode;
 } typedef LuminaryAdaptiveSamplingSettings;
 
