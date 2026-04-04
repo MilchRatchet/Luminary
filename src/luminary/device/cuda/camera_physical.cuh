@@ -52,7 +52,8 @@ struct CameraSimulationState {
   float probability_density;
   float wavelength;
   bool is_forward;
-  bool has_reflected;  // Biased optimization: Only allow one pair of reflections
+  bool has_retro_reflected;  // Biased optimization: Only allow one pair of reflections
+  bool has_forward_reflected;
 } typedef CameraSimulationState;
 
 struct CameraSimulationResult {
@@ -60,6 +61,7 @@ struct CameraSimulationResult {
   vec3 ray;
   float throughput;
   float probability_density;
+  bool has_reflected;
 } typedef CameraSimulationResult;
 
 LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
@@ -146,6 +148,8 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   if (camera_simulation_intersect_medium_cylinder(state.origin, state.ray, state.throughput, dist, state.cylindrical_radius, state.ior)) {
     dist = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
 
+    state.has_forward_reflected = true;
+
     if (dist == FLT_MAX) {
       state.throughput = 0.0f;
       return 0;
@@ -187,7 +191,7 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
 
   bool allow_reflection = false;
   if constexpr (ALLOW_REFLECTIONS) {
-    allow_reflection = (interface_id != 0 || iteration != 0) && ((state.has_reflected == false) || (state.is_forward == false));
+    allow_reflection = (interface_id != 0 || iteration != 0) && ((state.has_retro_reflected == false) || (state.is_forward == false));
   }
 
   const bool allow_refraction = interface_id != 0 || iteration == 0;
@@ -206,10 +210,12 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
     if (allow_refraction && allow_reflection) {
       const float random = random_1D(RANDOM_TARGET_LENS_METHOD + iteration + sample_id * RANDOM_LENS_MAX_INTERSECTIONS, path_id);
 
-      sampled_refraction = random >= fresnel;
+      probality = 1.0f / device.camera.physical.num_interfaces;
+
+      sampled_refraction = random >= probality;
 
       throughput = (sampled_refraction) ? 1.0f - fresnel : fresnel;
-      probality  = throughput;
+      probality  = (sampled_refraction) ? 1.0f - probality : probality;
     }
     else if (allow_reflection) {
       throughput         = fresnel;
@@ -226,11 +232,11 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   state.throughput *= throughput;
   state.probability_density *= probality;
 
-  state.ray                = sampled_refraction ? refraction : reflection;
-  state.ior                = sampled_refraction ? medium_ior : state.ior;
-  state.cylindrical_radius = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
-  state.is_forward         = sampled_refraction ? state.is_forward : !state.is_forward;
-  state.has_reflected      = sampled_refraction ? state.has_reflected : true;
+  state.ray                 = sampled_refraction ? refraction : reflection;
+  state.ior                 = sampled_refraction ? medium_ior : state.ior;
+  state.cylindrical_radius  = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
+  state.is_forward          = sampled_refraction ? state.is_forward : !state.is_forward;
+  state.has_retro_reflected = sampled_refraction ? state.has_retro_reflected : true;
 
   return state.is_forward ? 1 : -1;
 }
@@ -239,15 +245,16 @@ template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 LUMINARY_FUNCTION CameraSimulationResult camera_simulation_trace(
   const vec3 sensor_point, const vec3 initial_direction, const float wavelength, const PathID& path_id, uint32_t sample_id) {
   CameraSimulationState state;
-  state.origin              = sensor_point;
-  state.ray                 = initial_direction;
-  state.ior                 = IOR_AIR;
-  state.cylindrical_radius  = FLT_MAX;
-  state.throughput          = 1.0f;
-  state.probability_density = 1.0f;
-  state.wavelength          = wavelength;
-  state.is_forward          = true;
-  state.has_reflected       = false;
+  state.origin                = sensor_point;
+  state.ray                   = initial_direction;
+  state.ior                   = IOR_AIR;
+  state.cylindrical_radius    = FLT_MAX;
+  state.throughput            = 1.0f;
+  state.probability_density   = 1.0f;
+  state.wavelength            = wavelength;
+  state.is_forward            = true;
+  state.has_retro_reflected   = false;
+  state.has_forward_reflected = false;
 
   // There are num_interfaces + 1 media.
   const uint32_t num_interfaces = device.camera.physical.num_interfaces;
@@ -271,6 +278,7 @@ LUMINARY_FUNCTION CameraSimulationResult camera_simulation_trace(
   result.ray                 = state.ray;
   result.throughput          = state.throughput;
   result.probability_density = state.probability_density;
+  result.has_reflected       = state.has_retro_reflected || state.has_forward_reflected;
 
   return result;
 }
@@ -297,7 +305,11 @@ LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_i
     const CameraSimulationResult simulation_result =
       camera_simulation_trace<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(sensor_point, initial_direction, wavelength, path_id, sample_id);
 
-    const float target          = (simulation_result.throughput > 0.0f) ? 1.0f : 0.0f;
+    float target = (simulation_result.throughput > 0.0f) ? 1.0f : 0.0f;
+
+    if (simulation_result.has_reflected)
+      target *= 128.0f;
+
     const float sampling_weight = pupil_sampling_weight / (RANDOM_LENS_MAX_SAMPLES * simulation_result.probability_density);
 
     if (ris_reservoir_add_sample(ris_reservoir, target, sampling_weight))
