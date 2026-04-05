@@ -80,13 +80,14 @@ LuminaryResult lens_library_get_template_data(LuminaryLensTemplate template, flo
   if (template == LUMINARY_LENS_TEMPLATE_THIN_LENS)
     return LUMINARY_SUCCESS;
 
-  // In hindsight, this is wrong, just scaling the radius will change the way the camera works.
-  // Instead, this scale should used to distort space during traversal.
   const float scale = focal_length / data->design_focal_length;
   for (uint32_t interface_id = 0; interface_id < data->num_interfaces; interface_id++) {
     data->interfaces[interface_id].radius *= scale;
     data->interfaces[interface_id].vertex *= scale;
   }
+
+  data->aperture_point *= scale;
+  data->exit_pupil_point *= scale;
 
   return LUMINARY_SUCCESS;
 }

@@ -15,12 +15,11 @@ LuminaryResult physical_camera_create(PhysicalCamera** physical_camera) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, LuminaryLensTemplate lens_template) {
+LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(physical_camera);
 
-  // TODO: Remove focal length
   LensTemplateData template_data;
-  __FAILURE_HANDLE(lens_library_get_template_data(lens_template, 50.53f, &template_data));
+  __FAILURE_HANDLE(lens_library_get_template_data(camera->lens_template, camera->lens[camera->lens_template].focal_length, &template_data));
 
   if (physical_camera->num_allocated_interfaces < template_data.num_interfaces) {
     if (physical_camera->camera_interfaces)
@@ -41,7 +40,7 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, Luminar
   physical_camera->exit_pupil_point    = template_data.exit_pupil_point;
   physical_camera->exit_pupil_diameter = template_data.exit_pupil_diameter;
 
-  if (lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS)
+  if (camera->lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS)
     return LUMINARY_SUCCESS;
 
   for (uint32_t interface_id = 0; interface_id < physical_camera->num_interfaces; interface_id++) {

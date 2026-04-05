@@ -17,7 +17,7 @@ struct PhysicalCamera {
 } typedef PhysicalCamera;
 
 LuminaryResult physical_camera_create(PhysicalCamera** physical_camera);
-LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, LuminaryLensTemplate lens_template);
+LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const Camera* camera);
 LuminaryResult physical_camera_destroy(PhysicalCamera** physical_camera);
 
 struct DevicePhysicalCameraPtrs {

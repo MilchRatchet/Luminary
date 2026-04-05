@@ -95,7 +95,8 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
     __CAMERA_CHECK_DIRTY(aperture_blade_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   }
 
-  __CAMERA_CHECK_DIRTY(lens[input->lens_template].focal_length, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(
+    lens[input->lens_template].focal_length, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
   __CAMERA_CHECK_DIRTY(lens[input->lens_template].aperture_diameter, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(lens[input->lens_template].sensor_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
