@@ -170,7 +170,7 @@ LUMINARY_API struct LuminaryCameraThinLens {
 
 LUMINARY_API struct LuminaryCameraLens {
   float focal_length;
-  float aperture_diameter;
+  float aperture_stop;
   float sensor_distance;
 } typedef LuminaryCameraLens;
 

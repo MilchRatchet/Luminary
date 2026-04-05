@@ -59,8 +59,9 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->use_local_error_minimization     = camera->use_local_error_minimization;
   device_camera->use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
 
-  device_camera->lens.focal_length    = camera->lens[camera->lens_template].focal_length;
-  device_camera->lens.aperture_radius = camera->lens[camera->lens_template].aperture_diameter * 0.5f;
+  device_camera->lens.focal_length = camera->lens[camera->lens_template].focal_length;
+  device_camera->lens.aperture_radius =
+    (camera->lens[camera->lens_template].focal_length / camera->lens[camera->lens_template].aperture_stop) * 0.5f;
   device_camera->lens.sensor_distance =
     (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) ? camera->lens[camera->lens_template].sensor_distance : 1.0f;
 

@@ -377,7 +377,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider(
     data, "Focal Length", &camera.lens[lens_template].focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   update_data |= _window_entity_properties_add_slider(
-    data, "Aperture Stop Diameter", &camera.lens[lens_template].aperture_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    data, "Aperture Stop", &camera.lens[lens_template].aperture_stop, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, FLT_MAX, 1.0f);
   update_data |= _window_entity_properties_add_slider(
     data, "Sensor Distance", &camera.lens[lens_template].sensor_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 

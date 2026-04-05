@@ -30,7 +30,7 @@ struct LensTemplateData {
 
 struct LensTemplateDefaults {
   float focal_length;
-  float aperture_diameter;
+  float aperture_stop;
   float sensor_distance;
 } typedef LensTemplateDefaults;
 

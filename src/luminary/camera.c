@@ -43,9 +43,9 @@ LuminaryResult camera_get_default(Camera* camera) {
     __FAILURE_HANDLE(lens_library_get_template_defaults((LuminaryLensTemplate) template_id, &defaults));
 
     camera->lens[template_id] = (LuminaryCameraLens) {
-      .focal_length      = defaults.focal_length,
-      .aperture_diameter = defaults.aperture_diameter,
-      .sensor_distance   = defaults.sensor_distance,
+      .focal_length    = defaults.focal_length,
+      .aperture_stop   = defaults.aperture_stop,
+      .sensor_distance = defaults.sensor_distance,
     };
   }
 
@@ -97,7 +97,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
 
   __CAMERA_CHECK_DIRTY(
     lens[input->lens_template].focal_length, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
-  __CAMERA_CHECK_DIRTY(lens[input->lens_template].aperture_diameter, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(lens[input->lens_template].aperture_stop, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(lens[input->lens_template].sensor_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   __CAMERA_CHECK_DIRTY(sensor.diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);

@@ -57,15 +57,15 @@ struct LensTemplateInternalData {
 static const LensTemplateDefaults _template_defaults[LUMINARY_LENS_TEMPLATE_COUNT] = {
   [LUMINARY_LENS_TEMPLATE_THIN_LENS] =
     {
-      .aperture_diameter = 0.0f,
-      .focal_length      = 10.0f,
-      .sensor_distance   = 10.0f,
+      .aperture_stop   = 1.0f,
+      .focal_length    = 10.0f,
+      .sensor_distance = 10.0f,
     },
   [LUMINARY_LENS_TEMPLATE_PHYSICAL_A] =
     {
-      .focal_length      = 50.53f,
-      .aperture_diameter = 42.822f,
-      .sensor_distance   = 20.622646f,
+      .focal_length    = 50.53f,
+      .aperture_stop   = 1.2f,
+      .sensor_distance = 20.622646f,
     },
 };
 
