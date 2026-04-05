@@ -16,6 +16,8 @@ enum ElementSliderDataType {
   ELEMENT_SLIDER_DATA_TYPE_RGB
 } typedef ElementSliderDataType;
 
+typedef void (*SliderValueStringifyFunc)(char* text, const void* data, ElementSliderDataType data_type);
+
 struct ElementSliderData {
   ElementSliderDataType type;
   float data_float;
@@ -33,6 +35,7 @@ struct ElementSliderData {
   bool is_hovered;
   uint32_t hover_component_index;
   bool write_access;
+  SliderValueStringifyFunc value_string_func;
 } typedef ElementSliderData;
 static_assert(sizeof(ElementSliderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -49,6 +52,7 @@ struct ElementSliderArgs {
   bool center_x;
   bool center_y;
   bool write_access;
+  SliderValueStringifyFunc value_string_func;
 } typedef ElementSliderArgs;
 
 bool element_slider(

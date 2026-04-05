@@ -6,6 +6,29 @@
 
 #include "display.h"
 
+static void _element_slider_default_value_string_func(char* text, const void* data, ElementSliderDataType data_type) {
+  switch (data_type) {
+    case ELEMENT_SLIDER_DATA_TYPE_FLOAT: {
+      const float value = *(const float*) data;
+      sprintf(text, "%.2f", value);
+    } break;
+    case ELEMENT_SLIDER_DATA_TYPE_UINT: {
+      const uint32_t value = *(const uint32_t*) data;
+      sprintf(text, "%u", value);
+    } break;
+    case ELEMENT_SLIDER_DATA_TYPE_SINT: {
+      const int32_t value = *(const int32_t*) data;
+      sprintf(text, "%d", value);
+    } break;
+    case ELEMENT_SLIDER_DATA_TYPE_VECTOR: {
+      const float value = *(const float*) data;
+      sprintf(text, "%.2f", value);
+    } break;
+    default:
+      break;
+  }
+}
+
 static void _element_slider_render_float(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
@@ -20,7 +43,7 @@ static void _element_slider_render_float(Element* slider, Display* display) {
     sprintf(text, "%s", data->string);
   }
   else {
-    sprintf(text, "%.2f", data->data_float);
+    data->value_string_func(text, &data->data_float, ELEMENT_SLIDER_DATA_TYPE_FLOAT);
   }
 
   const uint32_t padding_x = data->center_x ? slider->width >> 1 : 0;
@@ -49,10 +72,10 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
   }
   else {
     if (data->type == ELEMENT_SLIDER_DATA_TYPE_UINT) {
-      sprintf(text, "%u", data->data_uint);
+      data->value_string_func(text, &data->data_uint, ELEMENT_SLIDER_DATA_TYPE_UINT);
     }
     else {
-      sprintf(text, "%d", data->data_sint);
+      data->value_string_func(text, &data->data_sint, ELEMENT_SLIDER_DATA_TYPE_SINT);
     }
   }
 
@@ -95,7 +118,7 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
       sprintf(text, "%s", data->string);
     }
     else {
-      sprintf(text, "%.2f", vec_data[component]);
+      data->value_string_func(text, &vec_data[component], ELEMENT_SLIDER_DATA_TYPE_VECTOR);
     }
 
     const uint32_t padding_x = data->center_x ? component_size_padded >> 1 : component_size_padded;
@@ -203,6 +226,9 @@ bool element_slider(
   data->center_y          = args.center_y;
   data->string_edit_mode  = false;
   data->write_access      = args.write_access;
+  data->value_string_func = (args.value_string_func != (SliderValueStringifyFunc) 0)
+                              ? args.value_string_func
+                              : (SliderValueStringifyFunc) _element_slider_default_value_string_func;
 
   const bool is_integer_type = (args.type == ELEMENT_SLIDER_DATA_TYPE_UINT || args.type == ELEMENT_SLIDER_DATA_TYPE_SINT);
 

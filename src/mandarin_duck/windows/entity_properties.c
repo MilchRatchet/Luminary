@@ -1,6 +1,7 @@
 #include "entity_properties.h"
 
 #include <float.h>
+#include <stdio.h>
 
 #include "display.h"
 #include "elements/button.h"
@@ -25,9 +26,17 @@ enum EntityPropertyButtonFunction {
   ENTITY_PROPERTY_BUTTON_FUNCTION_COUNT
 } typedef EntityPropertyButtonFunction;
 
-static bool _window_entity_properties_add_slider(
-  WindowEntityPropertiesPassingData data, const char* text, void* data_binding, ElementSliderDataType data_type, float min, float max,
-  float change_rate) {
+struct WindowEntityPropertiesSliderArgsV2 {
+  const char* text;
+  void* data_binding;
+  ElementSliderDataType data_type;
+  float min;
+  float max;
+  float change_rate;
+  SliderValueStringifyFunc value_string_func;
+} typedef WindowEntityPropertiesSliderArgsV2;
+
+static bool _window_entity_properties_add_slider_v2(WindowEntityPropertiesPassingData data, const WindowEntityPropertiesSliderArgsV2 args) {
   bool update_data = false;
 
   window_push_section(data.window, 32, 0);
@@ -37,7 +46,7 @@ static bool _window_entity_properties_add_slider(
       (ElementTextArgs) {
         .color        = 0xFFFFFFFF,
         .size         = (ElementSize) {.rel_width = 0.4f, .rel_height = 0.75f},
-        .text         = text,
+        .text         = args.text,
         .center_x     = false,
         .center_y     = true,
         .highlighting = false,
@@ -46,8 +55,8 @@ static bool _window_entity_properties_add_slider(
         .is_clickable = false,
       });
 
-    if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
-      LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
+    if (args.data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
+      LuminaryRGBF color = *(LuminaryRGBF*) args.data_binding;
 
       uint32_t color_bits = 0xFF000000;
 
@@ -65,18 +74,19 @@ static bool _window_entity_properties_add_slider(
       element_slider(
         data.window, data.display, data.mouse_state, data.keyboard_state,
         (ElementSliderArgs) {
-          .identifier        = text,
-          .type              = data_type,
+          .identifier        = args.text,
+          .type              = args.data_type,
           .size              = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
-          .data_binding      = data_binding,
-          .min               = min,
-          .max               = max,
-          .change_rate       = change_rate,
+          .data_binding      = args.data_binding,
+          .min               = args.min,
+          .max               = args.max,
+          .change_rate       = args.change_rate,
           .component_padding = 4,
           .margins           = 4,
           .center_x          = true,
           .center_y          = true,
           .write_access      = data.write_access,
+          .value_string_func = args.value_string_func,
         })) {
       update_data = true;
     }
@@ -84,6 +94,20 @@ static bool _window_entity_properties_add_slider(
   window_pop_section(data.window);
 
   return update_data;
+}
+
+static bool _window_entity_properties_add_slider(
+  WindowEntityPropertiesPassingData data, const char* text, void* data_binding, ElementSliderDataType data_type, float min, float max,
+  float change_rate) {
+  return _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text         = text,
+            .data_binding = data_binding,
+            .data_type    = data_type,
+            .min          = min,
+            .max          = max,
+            .change_rate  = change_rate,
+          });
 }
 
 static bool _window_entity_properties_add_checkbox(WindowEntityPropertiesPassingData data, const char* text, void* data_binding) {
@@ -334,6 +358,39 @@ static void _window_entity_properties_renderer_settings_action(
   LUM_FAILURE_HANDLE(luminary_host_release_scene_lock(host));
 }
 
+static void _window_entity_properties_slider_value_string_func_millimeter(char* text, const void* data, ElementSliderDataType data_type) {
+  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
+    crash_message("Expected float data type.");
+
+  const float value = *(const float*) data;
+  sprintf(text, "%.2fmm", value);
+}
+
+static void _window_entity_properties_slider_value_string_func_aperture_stop(
+  char* text, const void* data, ElementSliderDataType data_type) {
+  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
+    crash_message("Expected float data type.");
+
+  const float value = *(const float*) data;
+  sprintf(text, "f/%.2f", value);
+}
+
+static void _window_entity_properties_slider_value_string_func_sensor_diameter(
+  char* text, const void* data, ElementSliderDataType data_type) {
+  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
+    crash_message("Expected float data type.");
+
+  const float value_mm   = *(const float*) data;
+  const float value_inch = 0.0393701f * value_mm;
+
+  if (value_inch < 1.0f) {
+    sprintf(text, "1/%.2f\"", 1.0f / value_inch);
+  }
+  else {
+    sprintf(text, "%.2f\"", value_inch);
+  }
+}
+
 static void _window_entity_properties_camera_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -374,12 +431,38 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_dropdown(
     data, "Template", LUMINARY_LENS_TEMPLATE_COUNT, (char**) luminary_strings_lens_template, &lens_template);
 
-  update_data |= _window_entity_properties_add_slider(
-    data, "Focal Length", &camera.lens[lens_template].focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Aperture Stop", &camera.lens[lens_template].aperture_stop, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 1.0f, FLT_MAX, 1.0f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "Sensor Distance", &camera.lens[lens_template].sensor_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Focal Length",
+            .data_binding      = &camera.lens[lens_template].focal_length,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 0.0f,
+            .max               = FLT_MAX,
+            .change_rate       = 1.0f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
+          });
+
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Aperture Stop",
+            .data_binding      = &camera.lens[lens_template].aperture_stop,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 1.0f,
+            .max               = FLT_MAX,
+            .change_rate       = 1.0f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_aperture_stop,
+          });
+
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Sensor Distance",
+            .data_binding      = &camera.lens[lens_template].sensor_distance,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 0.0f,
+            .max               = FLT_MAX,
+            .change_rate       = 1.0f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
+          });
 
   update_data |= _window_entity_properties_add_dropdown(
     data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
@@ -395,8 +478,17 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
-  update_data |= _window_entity_properties_add_slider(
-    data, "Diameter", &camera.sensor.diagonal_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Diameter",
+            .data_binding      = &camera.sensor.diagonal_size,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 0.01f,
+            .max               = FLT_MAX,
+            .change_rate       = 1.0f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_sensor_diameter,
+          });
+
   update_data |= _window_entity_properties_add_checkbox(data, "Native Aspect Ratio", &camera.sensor.use_aspect_ratio_from_resolution);
 
   if (camera.sensor.use_aspect_ratio_from_resolution == false)
