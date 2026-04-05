@@ -46,9 +46,10 @@ struct DeviceCamera {
   uint32_t use_color_correction : 1;
   uint32_t allow_reflections : 1;
   uint32_t use_spectral_rendering : 1;
-  uint32_t use_physical_camera : 1;
+  uint32_t is_thin_lens_template : 1;
   uint32_t use_local_error_minimization : 1;
-  // 18 bits spare
+  uint32_t use_aspect_ratio_from_resolution : 1;
+  // 17 bits spare
 
   vec3 pos;
   Quaternion rotation;
@@ -57,30 +58,19 @@ struct DeviceCamera {
   float purkinje_kappa2;
   float film_grain;
   float camera_scale;
-  float object_distance;
 
-  union {
-    struct {
-      uint32_t num_interfaces;
-      float focal_length;
-      float front_focal_point;
-      float back_focal_point;
-      float front_principal_point;
-      float back_principal_point;
-      float aperture_point;
-      float aperture_radius;
-      float exit_pupil_point;
-      float exit_pupil_radius;
-      float image_plane_distance;
-      float sensor_width;
-    } physical;
-    struct {
-      float fov;
-      float aperture_size;
-    } thin_lens;
-  };
+  struct {
+    float focal_length;
+    float aperture_radius;
+    float sensor_distance;
+  } lens;
+
+  struct {
+    float diagonal_size;
+    float aspect_ratio;
+  } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x68u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x48u);
 
 struct DeviceOcean {
   uint32_t active : 1;
@@ -299,6 +289,15 @@ LUM_STATIC_SIZE_ASSERT(DeviceTransform, 0x20u);
 
 struct DeviceTexture typedef DeviceTexture;
 struct DeviceMesh typedef DeviceMesh;
+
+struct DeviceCameraAux {
+  uint32_t num_interfaces;
+  float design_focal_length;
+  float aperture_point;
+  float exit_pupil_radius;
+  float exit_pupil_point;
+} typedef DeviceCameraAux;
+LUM_STATIC_SIZE_ASSERT(DeviceCameraAux, 0x14u);
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);

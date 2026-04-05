@@ -6,12 +6,18 @@
 struct Device typedef Device;
 
 struct PhysicalCamera {
+  uint32_t num_allocated_interfaces;
   uint32_t num_interfaces;
   DeviceCameraInterface* camera_interfaces;
   DeviceCameraMedium* camera_media;
+  float design_focal_length;
+  float aperture_point;
+  float exit_pupil_point;
+  float exit_pupil_diameter;
 } typedef PhysicalCamera;
 
 LuminaryResult physical_camera_create(PhysicalCamera** physical_camera);
+LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, LuminaryLensTemplate lens_template);
 LuminaryResult physical_camera_destroy(PhysicalCamera** physical_camera);
 
 struct DevicePhysicalCameraPtrs {
@@ -23,6 +29,7 @@ struct DevicePhysicalCamera {
   uint32_t allocated_num_interfaces;
   DEVICE DeviceCameraInterface* camera_interfaces;
   DEVICE DeviceCameraMedium* camera_media;
+  DeviceCameraAux aux_data;
 } typedef DevicePhysicalCamera;
 
 LuminaryResult device_physical_camera_create(DevicePhysicalCamera** physical_camera);

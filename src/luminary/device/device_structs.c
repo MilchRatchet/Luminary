@@ -4,6 +4,7 @@
 
 #include "device_mesh.h"
 #include "device_packing.h"
+#include "device_physical_camera.h"
 #include "device_texture.h"
 #include "host_math.h"
 #include "internal_error.h"
@@ -46,35 +47,25 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(device_camera);
 
-  device_camera->aperture_shape               = camera->aperture_shape;
-  device_camera->aperture_blade_count         = camera->aperture_blade_count;
-  device_camera->tonemap                      = camera->tonemap;
-  device_camera->dithering                    = camera->dithering;
-  device_camera->purkinje                     = camera->purkinje && (camera->use_physical_camera == false);
-  device_camera->use_color_correction         = camera->use_color_correction;
-  device_camera->allow_reflections            = camera->physical.allow_reflections;
-  device_camera->use_spectral_rendering       = camera->physical.use_spectral_rendering;
-  device_camera->use_physical_camera          = camera->use_physical_camera;
-  device_camera->use_local_error_minimization = camera->use_local_error_minimization;
+  device_camera->aperture_shape                   = camera->aperture_shape;
+  device_camera->aperture_blade_count             = camera->aperture_blade_count;
+  device_camera->tonemap                          = camera->tonemap;
+  device_camera->dithering                        = camera->dithering;
+  device_camera->purkinje                         = camera->purkinje;
+  device_camera->use_color_correction             = camera->use_color_correction;
+  device_camera->allow_reflections                = camera->allow_reflections;
+  device_camera->use_spectral_rendering           = camera->use_spectral_rendering;
+  device_camera->is_thin_lens_template            = camera->lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS;
+  device_camera->use_local_error_minimization     = camera->use_local_error_minimization;
+  device_camera->use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
 
-  if (camera->use_physical_camera) {
-    device_camera->physical.num_interfaces        = 12;
-    device_camera->physical.focal_length          = camera->physical.focal_length;
-    device_camera->physical.front_focal_point     = camera->physical.front_focal_point;
-    device_camera->physical.back_focal_point      = camera->physical.back_focal_point;
-    device_camera->physical.front_principal_point = camera->physical.front_principal_point;
-    device_camera->physical.back_principal_point  = camera->physical.back_principal_point;
-    device_camera->physical.aperture_point        = camera->physical.aperture_point;
-    device_camera->physical.aperture_radius       = camera->physical.aperture_diameter * 0.5f;
-    device_camera->physical.exit_pupil_point      = camera->physical.exit_pupil_point;
-    device_camera->physical.exit_pupil_radius     = camera->physical.exit_pupil_diameter * 0.5f;
-    device_camera->physical.image_plane_distance  = camera->physical.image_plane_distance;
-    device_camera->physical.sensor_width          = camera->physical.sensor_width;
-  }
-  else {
-    device_camera->thin_lens.fov           = camera->thin_lens.fov;
-    device_camera->thin_lens.aperture_size = camera->thin_lens.aperture_size;
-  }
+  device_camera->lens.focal_length    = camera->lens[camera->lens_template].focal_length;
+  device_camera->lens.aperture_radius = camera->lens[camera->lens_template].aperture_diameter * 0.5f;
+  device_camera->lens.sensor_distance =
+    (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) ? camera->lens[camera->lens_template].sensor_distance : 1.0f;
+
+  device_camera->sensor.diagonal_size = camera->sensor.diagonal_size;
+  device_camera->sensor.aspect_ratio  = camera->sensor.aspect_ratio;
 
   device_camera->pos             = camera->pos;
   device_camera->rotation        = rotation_euler_angles_to_quaternion(camera->rotation);
@@ -83,7 +74,6 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->purkinje_kappa2 = camera->purkinje_kappa2;
   device_camera->film_grain      = camera->film_grain;
   device_camera->camera_scale    = camera->camera_scale;
-  device_camera->object_distance = camera->object_distance;
 
   return LUMINARY_SUCCESS;
 }

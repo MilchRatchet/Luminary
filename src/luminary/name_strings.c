@@ -57,3 +57,8 @@ const char* const luminary_strings_material_base_substrate[LUMINARY_MATERIAL_BAS
   [LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE]      = "Opaque",
   [LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT] = "Translucent",
 };
+
+const char* const luminary_strings_lens_template[LUMINARY_LENS_TEMPLATE_COUNT] = {
+  [LUMINARY_LENS_TEMPLATE_THIN_LENS]  = "Thin Lens",
+  [LUMINARY_LENS_TEMPLATE_PHYSICAL_A] = "Physical A",
+};

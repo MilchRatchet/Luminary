@@ -19,6 +19,7 @@ LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(con
 }
 
 LUMINARY_FUNCTION float adaptive_sampling_compute_coefficient_of_variation(const float variance, const float mean) {
+  // TODO: Technically I need to take the Sqrt here.
   return variance / (mean * mean + FLT_EPSILON);
 }
 

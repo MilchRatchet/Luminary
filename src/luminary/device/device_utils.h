@@ -68,8 +68,6 @@ static_assert(
 #define SPECTRAL_MIN_WAVELENGTH 360
 #define SPECTRAL_MAX_WAVELENGTH 830
 
-#define IOR_AIR (1.0003f)
-
 #define TEXTURE_OBJECT_INVALID (0xFFFFFFFFFFFFFFFFull)
 
 #ifdef __cplusplus
@@ -572,6 +570,8 @@ struct DeviceConstantMemory {
   DeviceFog fog;
   // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
   DeviceParticles particles;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA_AUX
+  DeviceCameraAux camera_aux;
   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;

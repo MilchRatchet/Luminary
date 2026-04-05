@@ -156,15 +156,16 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FOV_____ */
     case 6872316419616689990u:
-      sscanf(value, "%f\n", &camera->thin_lens.fov);
+      sscanf(value, "%f\n", &camera->sensor.diagonal_size);
       break;
     /* FOCALLEN */
     case 5639997998747569990u:
-      sscanf(value, "%f\n", &camera->object_distance);
+      sscanf(value, "%f\n", &camera->lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].focal_length);
+      camera->lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].focal_length *= 1000.0f;  // m to mm
       break;
     /* APERTURE */
     case 4995148757353189441u:
-      sscanf(value, "%f\n", &camera->thin_lens.aperture_size);
+      sscanf(value, "%f\n", &camera->lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].aperture_diameter);
       break;
     /* APESHAPE */
     case 4994563765644382273u:
@@ -699,7 +700,7 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
     .force_no_bloom            = false};
 
   // Legacy scenes cannot use physical camera
-  content->camera.use_physical_camera = false;
+  content->camera.lens_template = LUMINARY_LENS_TEMPLATE_THIN_LENS;
 
   while (1) {
     fgets(line, LINE_SIZE, file);

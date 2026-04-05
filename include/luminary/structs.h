@@ -151,6 +151,12 @@ LUMINARY_API enum LuminaryToneMap {
   LUMINARY_TONEMAP_COUNT
 } typedef LuminaryToneMap;
 
+LUMINARY_API enum LuminaryLensTemplate {
+  LUMINARY_LENS_TEMPLATE_THIN_LENS,
+  LUMINARY_LENS_TEMPLATE_PHYSICAL_A,
+  LUMINARY_LENS_TEMPLATE_COUNT
+} typedef LuminaryLensTemplate;
+
 LUMINARY_API enum LuminaryApertureShape {
   LUMINARY_APERTURE_ROUND  = 0,
   LUMINARY_APERTURE_BLADED = 1,
@@ -162,21 +168,17 @@ LUMINARY_API struct LuminaryCameraThinLens {
   float aperture_size;
 } typedef LuminaryCameraThinLens;
 
-LUMINARY_API struct LuminaryCameraPhysical {
-  bool allow_reflections;
-  bool use_spectral_rendering;
+LUMINARY_API struct LuminaryCameraLens {
   float focal_length;
-  float front_focal_point;
-  float back_focal_point;
-  float front_principal_point;
-  float back_principal_point;
-  float aperture_point;
   float aperture_diameter;
-  float exit_pupil_point;
-  float exit_pupil_diameter;
-  float image_plane_distance;
-  float sensor_width;
-} typedef LuminaryCameraPhysical;
+  float sensor_distance;
+} typedef LuminaryCameraLens;
+
+LUMINARY_API struct LuminaryCameraSensor {
+  float diagonal_size;
+  float aspect_ratio;
+  bool use_aspect_ratio_from_resolution;
+} typedef LuminaryCameraSensor;
 
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
@@ -199,10 +201,11 @@ LUMINARY_API struct LuminaryCamera {
   LuminaryRGBF color_correction;
   float film_grain;
   float camera_scale;
-  float object_distance;
-  bool use_physical_camera;
-  LuminaryCameraThinLens thin_lens;
-  LuminaryCameraPhysical physical;
+  bool allow_reflections;
+  bool use_spectral_rendering;
+  LuminaryLensTemplate lens_template;
+  LuminaryCameraLens lens[LUMINARY_LENS_TEMPLATE_COUNT];
+  LuminaryCameraSensor sensor;
 } typedef LuminaryCamera;
 
 ////////////////////////////////////////////////////////////////////

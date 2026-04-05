@@ -6,35 +6,19 @@
 #include "ris.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION vec3 camera_physical_sample_sensor(const PathID& path_id) {
-  const float2 jitter = camera_get_jitter(path_id);
-
-  const float step = 2.0f * (device.camera.physical.sensor_width / device.settings.width);
-  const float vfov = step * device.settings.height * 0.5f;
-
-  const ushort2 sensor_pixel = path_id_get_pixel(path_id);
-
-  vec3 sensor_point;
-  sensor_point.x = device.camera.physical.sensor_width - step * (sensor_pixel.x + jitter.x);
-  sensor_point.y = -vfov + step * (sensor_pixel.y + jitter.y);
-  sensor_point.z = -camera_get_image_plane();
-
-  return sensor_point;
-}
-
 LUMINARY_FUNCTION vec3
   camera_physical_sample_exit_pupil(const vec3 sensor_point, const PathID& path_id, const uint32_t sample_id, float& sampling_weight) {
   const float2 random = random_2D(RANDOM_TARGET_LENS + sample_id, path_id);
 
   const float alpha = random.x * 2.0f * PI;
-  const float beta  = sqrtf(random.y) * device.camera.physical.exit_pupil_radius;
+  const float beta  = sqrtf(random.y) * device.camera_aux.exit_pupil_radius;
 
-  const vec3 target_point = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, device.camera.physical.exit_pupil_point);
+  const vec3 target_point = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, device.camera_aux.exit_pupil_point);
 
   const vec3 diff = sub_vector(target_point, sensor_point);
 
   const float dist = get_length(diff);
-  const float area = device.camera.physical.exit_pupil_radius * device.camera.physical.exit_pupil_radius * PI;
+  const float area = device.camera_aux.exit_pupil_radius * device.camera_aux.exit_pupil_radius * PI;
 
   const vec3 ray = normalize_vector(diff);
 
@@ -65,12 +49,12 @@ struct CameraSimulationResult {
 } typedef CameraSimulationResult;
 
 LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
-  const float aperture_dist = (ray.z != 0.0f) ? (device.camera.physical.aperture_point - origin.z) / ray.z : -FLT_MAX;
+  const float aperture_dist = (ray.z != 0.0f) ? (device.camera_aux.aperture_point - origin.z) / ray.z : -FLT_MAX;
   if (aperture_dist > 0.0f && aperture_dist < dist) {
     const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
 
     const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
-    const float aperture_radius               = device.camera.physical.aperture_radius;
+    const float aperture_radius               = device.camera.lens.aperture_radius;
 
     if (vertical_aperture_hit_dist_sq > aperture_radius * aperture_radius) {
       return true;
@@ -210,7 +194,7 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
     if (allow_refraction && allow_reflection) {
       const float random = random_1D(RANDOM_TARGET_LENS_METHOD + iteration + sample_id * RANDOM_LENS_MAX_INTERSECTIONS, path_id);
 
-      probality = 1.0f / device.camera.physical.num_interfaces;
+      probality = 1.0f / device.camera_aux.num_interfaces;
 
       sampled_refraction = random >= probality;
 
@@ -257,7 +241,7 @@ LUMINARY_FUNCTION CameraSimulationResult camera_simulation_trace(
   state.has_forward_reflected = false;
 
   // There are num_interfaces + 1 media.
-  const uint32_t num_interfaces = device.camera.physical.num_interfaces;
+  const uint32_t num_interfaces = device.camera_aux.num_interfaces;
 
   uint32_t iteration        = 0;
   int32_t current_interface = 0;
@@ -288,7 +272,7 @@ LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_i
   float wavelength_pdf;
   const float wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, path_id), wavelength_pdf);
 
-  const vec3 sensor_point = camera_physical_sample_sensor(path_id);
+  const vec3 sensor_point = camera_sample_sensor(path_id);
 
   CameraSimulationResult selected_simulation_result;
   selected_simulation_result.origin              = get_vector(0.0f, 0.0f, 0.0f);
@@ -327,7 +311,7 @@ LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_i
     result.weight = scale_color(result.weight, 1.0f / wavelength_pdf);
   }
 
-  // Physical camera simulation is in +Z direction but Luminary uses -Z convention
+  // Camera simulation is in +Z direction but Luminary uses -Z convention
   result.origin.z = -result.origin.z;
   result.ray.z    = -result.ray.z;
 

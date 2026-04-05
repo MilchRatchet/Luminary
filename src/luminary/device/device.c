@@ -1174,6 +1174,8 @@ LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamer
   bool buffers_have_changed;
   __FAILURE_HANDLE(device_physical_camera_update(device->physical_camera, device, physical_camera, &buffers_have_changed));
 
+  DEVICE_UPDATE_CONSTANT_MEMORY(camera_aux, device->physical_camera->aux_data);
+
   if (buffers_have_changed) {
     DevicePhysicalCameraPtrs ptrs;
     __FAILURE_HANDLE(device_physical_camera_get_ptrs(device->physical_camera, &ptrs));

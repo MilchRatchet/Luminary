@@ -10,7 +10,10 @@
 
 LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
   CameraSampleResult result;
-  if (device.camera.use_physical_camera) {
+  if (device.camera.is_thin_lens_template) {
+    result = camera_thin_lens_sample(path_id);
+  }
+  else {
     const bool allow_reflections  = device.camera.allow_reflections;
     const bool spectral_rendering = device.camera.use_spectral_rendering;
 
@@ -22,9 +25,6 @@ LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
       result = camera_physical_sample<false, true>(path_id);
     else
       result = camera_physical_sample<false, false>(path_id);
-  }
-  else {
-    result = camera_thin_lens_sample(path_id);
   }
 
   // Transform result to world space

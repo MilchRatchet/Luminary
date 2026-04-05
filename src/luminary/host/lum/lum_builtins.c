@@ -882,6 +882,8 @@ LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, 
   return LUMINARY_SUCCESS;
 }
 
+// TODO
+#if 0
 static LuminaryResult _lum_builtin_camera_thin_lens_convert(
   const LumBuiltinCameraThinLens* camera, LuminaryCameraThinLens* dst_camera, uint32_t version) {
   __CHECK_NULL_ARGUMENT(camera);
@@ -920,6 +922,7 @@ static LuminaryResult _lum_builtin_camera_physical_convert(
 
   return LUMINARY_SUCCESS;
 }
+#endif
 
 LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, LuminaryCamera* dst_camera, uint32_t version) {
   __CHECK_NULL_ARGUMENT(camera);
@@ -948,11 +951,13 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->color_correction             = camera->color_correction;
   dst_camera->film_grain                   = camera->film_grain;
   dst_camera->camera_scale                 = camera->camera_scale;
-  dst_camera->object_distance              = camera->object_distance;
+
+#if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;
 
   __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_convert(&camera->thin_lens, &dst_camera->thin_lens, version));
   __FAILURE_HANDLE(_lum_builtin_camera_physical_convert(&camera->physical, &dst_camera->physical, version));
+#endif
 
   return LUMINARY_SUCCESS;
 }
@@ -1177,6 +1182,8 @@ LuminaryResult lum_builtin_settings_serialize(const LuminaryRendererSettings* se
   return LUMINARY_SUCCESS;
 }
 
+// TODO
+#if 0
 static LuminaryResult _lum_builtin_camera_thin_lens_serialize(const LuminaryCameraThinLens* camera, LumBuiltinCameraThinLens* dst_camera) {
   __CHECK_NULL_ARGUMENT(camera);
   __CHECK_NULL_ARGUMENT(dst_camera);
@@ -1207,6 +1214,7 @@ static LuminaryResult _lum_builtin_camera_physical_serialize(const LuminaryCamer
 
   return LUMINARY_SUCCESS;
 }
+#endif
 
 LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBuiltinCamera* dst_camera) {
   __CHECK_NULL_ARGUMENT(camera);
@@ -1232,11 +1240,13 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->color_correction             = camera->color_correction;
   dst_camera->film_grain                   = camera->film_grain;
   dst_camera->camera_scale                 = camera->camera_scale;
-  dst_camera->object_distance              = camera->object_distance;
+
+#if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;
 
   __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_serialize(&camera->thin_lens, &dst_camera->thin_lens));
   __FAILURE_HANDLE(_lum_builtin_camera_physical_serialize(&camera->physical, &dst_camera->physical));
+#endif
 
   return LUMINARY_SUCCESS;
 }

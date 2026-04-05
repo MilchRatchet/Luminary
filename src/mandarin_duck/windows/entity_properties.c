@@ -351,6 +351,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
+  uint32_t lens_template  = (uint32_t) camera.lens_template;
   uint32_t tonemap        = (uint32_t) camera.tonemap;
   uint32_t filter         = (uint32_t) camera.filter;
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
@@ -365,26 +366,20 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |=
     _window_entity_properties_add_slider(data, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
 
+  update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.allow_reflections);
+  update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.use_spectral_rendering);
+
   element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Lens", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
-  update_data |= _window_entity_properties_add_checkbox(data, "Physical", &camera.use_physical_camera);
+  update_data |= _window_entity_properties_add_dropdown(
+    data, "Template", LUMINARY_LENS_TEMPLATE_COUNT, (char**) luminary_strings_lens_template, &lens_template);
 
-  if (camera.use_physical_camera) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Sensor Width", &camera.physical.sensor_width, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Sensor Distance", &camera.physical.image_plane_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Aperture Diameter", &camera.physical.aperture_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.physical.allow_reflections);
-    update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.physical.use_spectral_rendering);
-  }
-  else {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Field of View", &camera.thin_lens.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Aperture Size", &camera.thin_lens.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  }
+  update_data |= _window_entity_properties_add_slider(
+    data, "Focal Length", &camera.lens[lens_template].focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Aperture Stop Diameter", &camera.lens[lens_template].aperture_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Sensor Distance", &camera.lens[lens_template].sensor_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
   update_data |= _window_entity_properties_add_dropdown(
     data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
@@ -397,22 +392,26 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |=
     _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
 
-  if (camera.use_physical_camera == false) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Object Distance", &camera.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
-  }
-
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
-  update_data |=
-    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
-  update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Diameter", &camera.sensor.diagonal_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_checkbox(data, "Native Aspect Ratio", &camera.sensor.use_aspect_ratio_from_resolution);
+
+  if (camera.sensor.use_aspect_ratio_from_resolution == false)
+    update_data |= _window_entity_properties_add_slider(
+      data, "Aspect Ratio", &camera.sensor.aspect_ratio, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+
   update_data |=
     _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  update_data |=
+    _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
 
   update_data |=
     _window_entity_properties_add_dropdown(data, "Tonemap", LUMINARY_TONEMAP_COUNT, (char**) luminary_strings_tonemap, &tonemap);
@@ -428,15 +427,13 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   update_data |= _window_entity_properties_add_checkbox(data, "Local Error Minimization", &camera.use_local_error_minimization);
 
-  if (camera.use_physical_camera == false) {
-    update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
+  update_data |= _window_entity_properties_add_checkbox(data, "Purkinje Shift", &camera.purkinje);
 
-    if (camera.purkinje) {
-      update_data |= _window_entity_properties_add_slider(
-        data, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
-      update_data |= _window_entity_properties_add_slider(
-        data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
-    }
+  if (camera.purkinje) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
   }
 
   update_data |= _window_entity_properties_add_dropdown(data, "Filter", LUMINARY_FILTER_COUNT, (char**) luminary_strings_filter, &filter);
@@ -454,6 +451,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   if (update_data) {
+    camera.lens_template  = (LuminaryLensTemplate) lens_template;
     camera.tonemap        = (LuminaryToneMap) tonemap;
     camera.filter         = (LuminaryFilter) filter;
     camera.aperture_shape = (LuminaryApertureShape) aperture_shape;

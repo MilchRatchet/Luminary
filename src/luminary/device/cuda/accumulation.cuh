@@ -135,6 +135,7 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
               neighbour_mean = add_color(neighbour_mean, neighbour_first_moment);
 
+              // TODO: Use coefficient of variation
               neighbour_error += variance * norm_neighbour;
             }
           }

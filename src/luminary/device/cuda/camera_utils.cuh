@@ -26,17 +26,26 @@ LUMINARY_FUNCTION float2 camera_get_jitter(const PathID& path_id) {
   return random_2D_base_float(RANDOM_TARGET_CAMERA_JITTER, make_ushort2(0, 0), sample_id, 0);
 }
 
-LUMINARY_FUNCTION float camera_get_image_plane() {
-#if 0
-  const float f = device.camera.physical.focal_length;
-  const float o = device.camera.object_distance * CAMERA_COMMON_INV_SCALE - device.camera.physical.front_principal_point;
+LUMINARY_FUNCTION vec3 camera_sample_sensor(const PathID& path_id) {
+  const float2 jitter = camera_get_jitter(path_id);
 
-  const float i = (f * o) / (o - f);
+  const float aspect_ratio = (device.camera.use_aspect_ratio_from_resolution) ? ((float) device.settings.width / device.settings.height)
+                                                                              : device.camera.sensor.aspect_ratio;
 
-  return i - device.camera.physical.back_principal_point;
-#else
-  return device.camera.physical.image_plane_distance;
-#endif
+  const float sensor_height = device.camera.sensor.diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
+  const float sensor_width  = aspect_ratio * sensor_height;
+
+  const float step_x = 2.0f * (sensor_width / device.settings.width);
+  const float step_y = 2.0f * (sensor_height / device.settings.height);
+
+  const ushort2 sensor_pixel = path_id_get_pixel(path_id);
+
+  vec3 sensor_point;
+  sensor_point.x = sensor_width - step_x * (sensor_pixel.x + jitter.x);
+  sensor_point.y = -sensor_height + step_y * (sensor_pixel.y + jitter.y);
+  sensor_point.z = -device.camera.lens.sensor_distance;
+
+  return sensor_point;
 }
 
 ////////////////////////////////////////////////////////////////////

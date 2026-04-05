@@ -4,6 +4,7 @@
 
 #include "device.h"
 #include "internal_error.h"
+#include "lens_library.h"
 
 LuminaryResult physical_camera_create(PhysicalCamera** physical_camera) {
   __CHECK_NULL_ARGUMENT(physical_camera);
@@ -11,49 +12,50 @@ LuminaryResult physical_camera_create(PhysicalCamera** physical_camera) {
   __FAILURE_HANDLE(host_malloc(physical_camera, sizeof(PhysicalCamera)));
   memset(*physical_camera, 0, sizeof(PhysicalCamera));
 
-  // TODO TODO TODO
-  // This is just a placeholder initialization until the camera is given through the API
+  return LUMINARY_SUCCESS;
+}
 
-  (*physical_camera)->num_interfaces = 12;
+LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, LuminaryLensTemplate lens_template) {
+  __CHECK_NULL_ARGUMENT(physical_camera);
 
-  __FAILURE_HANDLE(host_malloc(&(*physical_camera)->camera_interfaces, 12 * sizeof(DeviceCameraInterface)));
-  __FAILURE_HANDLE(host_malloc(&(*physical_camera)->camera_media, 13 * sizeof(DeviceCameraMedium)));
+  // TODO: Remove focal length
+  LensTemplateData template_data;
+  __FAILURE_HANDLE(lens_library_get_template_data(lens_template, 50.53f, &template_data));
 
-  // Cylindrical radii are rough estimates
-  (*physical_camera)->camera_interfaces[0]  = (DeviceCameraInterface) {.radius = -94.29f, .vertex = 0.0f, .cylindrical_radius = 14.0f};
-  (*physical_camera)->camera_interfaces[1]  = (DeviceCameraInterface) {.radius = 181.58f, .vertex = 7.17f, .cylindrical_radius = 14.0f};
-  (*physical_camera)->camera_interfaces[2]  = (DeviceCameraInterface) {.radius = -72.86f, .vertex = 9.3f, .cylindrical_radius = 12.0f};
-  (*physical_camera)->camera_interfaces[3]  = (DeviceCameraInterface) {.radius = 76.74f, .vertex = 21.7f, .cylindrical_radius = 12.0f};
-  (*physical_camera)->camera_interfaces[4]  = (DeviceCameraInterface) {.radius = -43.02f, .vertex = 23.83f, .cylindrical_radius = 12.0f};
-  (*physical_camera)->camera_interfaces[5]  = (DeviceCameraInterface) {.radius = 27.44f, .vertex = 45.14f, .cylindrical_radius = 17.0f};
-  (*physical_camera)->camera_interfaces[6]  = (DeviceCameraInterface) {.radius = -321.70f, .vertex = 49.53f, .cylindrical_radius = 17.0f};
-  (*physical_camera)->camera_interfaces[7]  = (DeviceCameraInterface) {.radius = 50.96f, .vertex = 70.01f, .cylindrical_radius = 17.0f};
-  (*physical_camera)->camera_interfaces[8]  = (DeviceCameraInterface) {.radius = 120.34f, .vertex = 70.97f, .cylindrical_radius = 20.0f};
-  (*physical_camera)->camera_interfaces[9]  = (DeviceCameraInterface) {.radius = 68.99f, .vertex = 78.97f, .cylindrical_radius = 20.0f};
-  (*physical_camera)->camera_interfaces[10] = (DeviceCameraInterface) {.radius = 251.93f, .vertex = 79.18f, .cylindrical_radius = 23.2f};
-  (*physical_camera)->camera_interfaces[11] = (DeviceCameraInterface) {.radius = 94.00f, .vertex = 88.18f, .cylindrical_radius = 23.2f};
+  if (physical_camera->num_allocated_interfaces < template_data.num_interfaces) {
+    if (physical_camera->camera_interfaces)
+      __FAILURE_HANDLE(host_free(&physical_camera->camera_interfaces));
 
-  const float scale = 50.53f / 100.0f;
-  for (uint32_t interface_id = 0; interface_id < (*physical_camera)->num_interfaces; interface_id++) {
-    (*physical_camera)->camera_interfaces[interface_id].radius *= scale;
-    (*physical_camera)->camera_interfaces[interface_id].vertex *= scale;
+    if (physical_camera->camera_media)
+      __FAILURE_HANDLE(host_free(&physical_camera->camera_media));
+
+    __FAILURE_HANDLE(host_malloc(&physical_camera->camera_interfaces, template_data.num_interfaces));
+    __FAILURE_HANDLE(host_malloc(&physical_camera->camera_media, template_data.num_interfaces + 1));
+
+    physical_camera->num_allocated_interfaces = template_data.num_interfaces;
   }
 
-  (*physical_camera)->camera_media[0]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
-  (*physical_camera)->camera_media[1]  = (DeviceCameraMedium) {.design_ior = 1.6435f, .abbe = 53.5f, .cylindrical_radius = 14.0f};
-  (*physical_camera)->camera_media[2]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
-  (*physical_camera)->camera_media[3]  = (DeviceCameraMedium) {.design_ior = 1.6935f, .abbe = 53.5f, .cylindrical_radius = 12.0f};
-  (*physical_camera)->camera_media[4]  = (DeviceCameraMedium) {.design_ior = 1.5174f, .abbe = 52.5f, .cylindrical_radius = 12.0f};
-  (*physical_camera)->camera_media[5]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
-  (*physical_camera)->camera_media[6]  = (DeviceCameraMedium) {.design_ior = 1.7174f, .abbe = 29.5f, .cylindrical_radius = 17.0f};
-  (*physical_camera)->camera_media[7]  = (DeviceCameraMedium) {.design_ior = 1.6385f, .abbe = 55.5f, .cylindrical_radius = 17.0f};
-  (*physical_camera)->camera_media[8]  = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
-  (*physical_camera)->camera_media[9]  = (DeviceCameraMedium) {.design_ior = 1.7173f, .abbe = 47.9f, .cylindrical_radius = 20.0f};
-  (*physical_camera)->camera_media[10] = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
-  (*physical_camera)->camera_media[11] = (DeviceCameraMedium) {.design_ior = 1.6935f, .abbe = 53.5f, .cylindrical_radius = 23.2f};
-  (*physical_camera)->camera_media[12] = (DeviceCameraMedium) {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX};
+  physical_camera->num_interfaces      = template_data.num_interfaces;
+  physical_camera->design_focal_length = template_data.design_focal_length;
+  physical_camera->aperture_point      = template_data.aperture_point;
+  physical_camera->exit_pupil_point    = template_data.exit_pupil_point;
+  physical_camera->exit_pupil_diameter = template_data.exit_pupil_diameter;
 
-  // TODO TODO TODO
+  for (uint32_t interface_id = 0; interface_id < physical_camera->num_interfaces; interface_id++) {
+    physical_camera->camera_interfaces[interface_id] = (DeviceCameraInterface) {
+      .radius             = template_data.interfaces[interface_id].radius,
+      .vertex             = template_data.interfaces[interface_id].vertex,
+      .cylindrical_radius = template_data.interfaces[interface_id].cylindrical_radius,
+    };
+  }
+
+  for (uint32_t medium_id = 0; medium_id < physical_camera->num_interfaces + 1; medium_id++) {
+    physical_camera->camera_media[medium_id] = (DeviceCameraMedium) {
+      .design_ior         = template_data.media[medium_id].design_ior,
+      .abbe               = template_data.media[medium_id].abbe,
+      .cylindrical_radius = template_data.media[medium_id].cylindrical_radius,
+    };
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -104,12 +106,20 @@ LuminaryResult device_physical_camera_update(
     *buffers_have_changed                     = true;
   }
 
-  __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, shared_camera->camera_interfaces, (DEVICE void*) physical_camera->camera_interfaces, 0,
-    physical_camera->allocated_num_interfaces * sizeof(DeviceCameraInterface)));
-  __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, shared_camera->camera_media, (DEVICE void*) physical_camera->camera_media, 0,
-    (physical_camera->allocated_num_interfaces + 1) * sizeof(DeviceCameraMedium)));
+  physical_camera->aux_data.num_interfaces      = shared_camera->num_interfaces;
+  physical_camera->aux_data.design_focal_length = shared_camera->design_focal_length;
+  physical_camera->aux_data.aperture_point      = shared_camera->aperture_point;
+  physical_camera->aux_data.exit_pupil_point    = shared_camera->exit_pupil_point;
+  physical_camera->aux_data.exit_pupil_radius   = shared_camera->exit_pupil_diameter * 0.5f;
+
+  if (physical_camera->allocated_num_interfaces > 0) {
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_camera->camera_interfaces, (DEVICE void*) physical_camera->camera_interfaces, 0,
+      physical_camera->allocated_num_interfaces * sizeof(DeviceCameraInterface)));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, shared_camera->camera_media, (DEVICE void*) physical_camera->camera_media, 0,
+      (physical_camera->allocated_num_interfaces + 1) * sizeof(DeviceCameraMedium)));
+  }
 
   return LUMINARY_SUCCESS;
 }

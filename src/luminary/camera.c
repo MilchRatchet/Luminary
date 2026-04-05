@@ -1,6 +1,7 @@
 #include "camera.h"
 
 #include "internal_error.h"
+#include "lens_library.h"
 #include "scene.h"
 #include "utils.h"
 
@@ -33,35 +34,32 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->color_correction.b           = 0.0f;
   camera->film_grain                   = 0.0f;
   camera->camera_scale                 = 1.0f;
-  camera->object_distance              = 1.0f;
-  camera->use_physical_camera          = false;
+  camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
+  camera->use_spectral_rendering       = false;
+  camera->allow_reflections            = true;
 
-  camera->thin_lens.fov           = 1.0f;
-  camera->thin_lens.aperture_size = 0.0f;
+  for (uint32_t template_id = 0; template_id < LUMINARY_LENS_TEMPLATE_COUNT; template_id++) {
+    LensTemplateDefaults defaults;
+    __FAILURE_HANDLE(lens_library_get_template_defaults((LuminaryLensTemplate) template_id, &defaults));
 
-  camera->physical.allow_reflections      = false;
-  camera->physical.use_spectral_rendering = false;
+    camera->lens[template_id] = (LuminaryCameraLens) {
+      .focal_length      = defaults.focal_length,
+      .aperture_diameter = defaults.aperture_diameter,
+      .sensor_distance   = defaults.sensor_distance,
+    };
+  }
 
-  // Temp - Canon 50mm F1.2 from 1950s
-  const float scale             = 50.53f / 100.0f;
-  const float last_vertex_point = 88.18f * scale;
-
-  camera->physical.focal_length          = 50.53f;
-  camera->physical.front_focal_point     = last_vertex_point - (-22.69f);
-  camera->physical.back_focal_point      = last_vertex_point - 65.18f;
-  camera->physical.front_principal_point = last_vertex_point - 27.84f;
-  camera->physical.back_principal_point  = last_vertex_point - 14.65f;
-  camera->physical.aperture_point        = last_vertex_point - 28.02f;
-  camera->physical.aperture_diameter     = 21.411f;
-  camera->physical.exit_pupil_point      = 0.0f;   // last_vertex_point - 26.55f;
-  camera->physical.exit_pupil_diameter   = 28.0f;  // 34.64f;
-  camera->physical.image_plane_distance  = 65.18f - last_vertex_point;
-  camera->physical.sensor_width          = 20.0f;
+  camera->sensor = (LuminaryCameraSensor) {
+    .diagonal_size                    = 20.0f,
+    .aspect_ratio                     = 16.0f / 9.0f,
+    .use_aspect_ratio_from_resolution = true,
+  };
 
   return LUMINARY_SUCCESS;
 }
 
-#define CAMERA_ALL_DIRTY_FLAGS ((uint32_t) (SCENE_DIRTY_FLAG_CAMERA | SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT))
+#define CAMERA_ALL_DIRTY_FLAGS \
+  ((uint32_t) (SCENE_DIRTY_FLAG_CAMERA | SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE))
 
 #define __CAMERA_CHECK_DIRTY(var, flags)                                     \
   {                                                                          \
@@ -84,8 +82,12 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(rotation.y, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(rotation.z, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(camera_scale, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(object_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(use_physical_camera, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(lens_template, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
+
+  if (input->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
+    __CAMERA_CHECK_DIRTY(use_spectral_rendering, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+    __CAMERA_CHECK_DIRTY(allow_reflections, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  }
 
   __CAMERA_CHECK_DIRTY(aperture_shape, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
@@ -93,25 +95,13 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
     __CAMERA_CHECK_DIRTY(aperture_blade_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   }
 
-  if (input->use_physical_camera) {
-    __CAMERA_CHECK_DIRTY(physical.allow_reflections, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.use_spectral_rendering, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.focal_length, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.front_focal_point, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.back_focal_point, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.front_principal_point, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.back_principal_point, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.aperture_point, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.aperture_diameter, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.exit_pupil_point, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.exit_pupil_diameter, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.image_plane_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(physical.sensor_width, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  }
-  else {
-    __CAMERA_CHECK_DIRTY(thin_lens.fov, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(thin_lens.aperture_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  }
+  __CAMERA_CHECK_DIRTY(lens[input->lens_template].focal_length, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(lens[input->lens_template].aperture_diameter, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(lens[input->lens_template].sensor_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+
+  __CAMERA_CHECK_DIRTY(sensor.diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.aspect_ratio, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.use_aspect_ratio_from_resolution, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   __CAMERA_CHECK_DIRTY(use_local_error_minimization, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(exposure, SCENE_DIRTY_FLAG_OUTPUT);
