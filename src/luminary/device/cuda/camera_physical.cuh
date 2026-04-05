@@ -106,13 +106,22 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_medium_cylinder(
   return false;
 }
 
+LUMINARY_FUNCTION float camera_simulation_interface_intersection(CameraSimulationState& state, const vec3 center, const float radius) {
+  if (radius == FLT_MAX) {
+    return (state.ray.z != 0.0f) ? (center.z - state.origin.z) / state.ray.z : FLT_MAX;
+  }
+
+  return sphere_ray_intersection(state.ray, state.origin, center, fabsf(radius));
+}
+
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 LUMINARY_FUNCTION int32_t camera_simulation_step(
   CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const PathID& path_id, const uint32_t sample_id) {
   const DeviceCameraInterface interface = device.ptrs.camera_interfaces[interface_id];
 
-  const vec3 semi_circle_center = get_vector(0.0f, 0.0f, interface.vertex - interface.radius);
-  float dist                    = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
+  const float center            = (interface.radius != FLT_MAX) ? interface.vertex - interface.radius : interface.vertex;
+  const vec3 semi_circle_center = get_vector(0.0f, 0.0f, center);
+  float dist                    = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
 
   // No hit
   if (dist == FLT_MAX) {
@@ -130,7 +139,7 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < fabsf(interface.radius);
 
   if (camera_simulation_intersect_medium_cylinder(state.origin, state.ray, state.throughput, dist, state.cylindrical_radius, state.ior)) {
-    dist = sphere_ray_intersection(state.ray, state.origin, semi_circle_center, fabsf(interface.radius));
+    dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
 
     state.has_forward_reflected = true;
 
@@ -158,10 +167,11 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
     return 0;
   }
 
-  vec3 normal = normalize_vector(sub_vector(state.origin, semi_circle_center));
+  vec3 normal = (interface.radius != FLT_MAX) ? normalize_vector(sub_vector(state.origin, semi_circle_center))
+                                              : get_vector(0.0f, 0.0f, (state.origin.z > center) ? 1.0f : -1.0f);
 
   // Flip normal if we are inside
-  if (is_inside) {
+  if (is_inside && interface.radius != FLT_MAX) {
     normal = scale_vector(normal, -1.0f);
   }
 
