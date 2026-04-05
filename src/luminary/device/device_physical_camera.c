@@ -29,8 +29,8 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, Luminar
     if (physical_camera->camera_media)
       __FAILURE_HANDLE(host_free(&physical_camera->camera_media));
 
-    __FAILURE_HANDLE(host_malloc(&physical_camera->camera_interfaces, template_data.num_interfaces));
-    __FAILURE_HANDLE(host_malloc(&physical_camera->camera_media, template_data.num_interfaces + 1));
+    __FAILURE_HANDLE(host_malloc(&physical_camera->camera_interfaces, template_data.num_interfaces * sizeof(DeviceCameraInterface)));
+    __FAILURE_HANDLE(host_malloc(&physical_camera->camera_media, (template_data.num_interfaces + 1) * sizeof(DeviceCameraMedium)));
 
     physical_camera->num_allocated_interfaces = template_data.num_interfaces;
   }
@@ -40,6 +40,9 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, Luminar
   physical_camera->aperture_point      = template_data.aperture_point;
   physical_camera->exit_pupil_point    = template_data.exit_pupil_point;
   physical_camera->exit_pupil_diameter = template_data.exit_pupil_diameter;
+
+  if (lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS)
+    return LUMINARY_SUCCESS;
 
   for (uint32_t interface_id = 0; interface_id < physical_camera->num_interfaces; interface_id++) {
     physical_camera->camera_interfaces[interface_id] = (DeviceCameraInterface) {

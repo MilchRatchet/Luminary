@@ -36,7 +36,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->camera_scale                 = 1.0f;
   camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
   camera->use_spectral_rendering       = false;
-  camera->allow_reflections            = true;
+  camera->allow_reflections            = false;
 
   for (uint32_t template_id = 0; template_id < LUMINARY_LENS_TEMPLATE_COUNT; template_id++) {
     LensTemplateDefaults defaults;

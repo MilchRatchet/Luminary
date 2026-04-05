@@ -429,6 +429,8 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
   }
 
   if (flags & SCENE_DIRTY_FLAG_CAMERA_TEMPLATE) {
+    __FAILURE_HANDLE(physical_camera_generate(device_manager->physical_camera, scene->camera.lens_template));
+
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
       __FAILURE_HANDLE_CRITICAL(device_update_physical_camera(device, device_manager->physical_camera));
