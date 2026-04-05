@@ -230,12 +230,16 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   *_display = display;
 }
 
+static bool _display_get_mouse_mode_enables_hittest(DisplayMouseMode mode) {
+  return (mode == DISPLAY_MOUSE_MODE_DEFAULT) || (mode == DISPLAY_MOUSE_MODE_LOCK);
+}
+
 void display_set_mouse_visible(Display* display, bool enable) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   display->mouse_visible = enable;
   SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
-  _display_set_hittest(display, enable && (display->mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT) && !display->active_camera_movement);
+  _display_set_hittest(display, enable && _display_get_mouse_mode_enables_hittest(display->mouse_mode) && !display->active_camera_movement);
 }
 
 void display_set_cursor(Display* display, SDL_SystemCursor cursor) {
@@ -254,7 +258,7 @@ void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
     display->focus_pixel_data.pixel_query_is_valid = false;
   }
 
-  _display_set_hittest(display, (mouse_mode == DISPLAY_MOUSE_MODE_DEFAULT));
+  _display_set_hittest(display, _display_get_mouse_mode_enables_hittest(display->mouse_mode));
 }
 
 static void _display_handle_drop_event(DisplayFileDrop** file_drop_array, SDL_DropEvent event) {

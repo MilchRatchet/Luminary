@@ -287,6 +287,8 @@ static void _window_entity_properties_renderer_settings_action(
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
+
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
@@ -404,6 +406,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   };
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
 
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
@@ -568,6 +572,8 @@ static void _window_entity_properties_ocean_action(Window* window, Display* disp
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
 
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
+
   LuminaryOcean ocean;
   LUM_FAILURE_HANDLE(luminary_host_get_ocean(host, &ocean));
 
@@ -626,6 +632,8 @@ static void _window_entity_properties_sky_action(Window* window, Display* displa
   };
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
 
   LuminarySky sky;
   LUM_FAILURE_HANDLE(luminary_host_get_sky(host, &sky));
@@ -750,6 +758,8 @@ static bool _window_entity_properties_cloud_layer_action(
   bool write_access;
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &write_access));
 
+  write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
+
   WindowEntityPropertiesPassingData data = {
     .window         = window,
     .display        = display,
@@ -796,6 +806,8 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
   };
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
 
   LuminaryCloud cloud;
   LUM_FAILURE_HANDLE(luminary_host_get_cloud(host, &cloud));
@@ -853,6 +865,8 @@ static void _window_entity_properties_fog_action(Window* window, Display* displa
   bool write_access;
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &write_access));
 
+  write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
+
   WindowEntityPropertiesPassingData data = {
     .window         = window,
     .display        = display,
@@ -900,6 +914,8 @@ static void _window_entity_properties_particles_action(
   };
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
 
   LuminaryParticles particles;
   LUM_FAILURE_HANDLE(luminary_host_get_particles(host, &particles));
@@ -973,6 +989,8 @@ static void _window_entity_properties_material_action(Window* window, Display* d
   };
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
 
   LuminaryMaterial material;
   LUM_FAILURE_HANDLE(luminary_host_get_material(host, display->select_pixel_data.material_id, &material));
@@ -1077,6 +1095,8 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
   };
 
   LUM_FAILURE_HANDLE(luminary_host_acquire_scene_lock(host, &data.write_access));
+
+  data.write_access &= display->mouse_mode != DISPLAY_MOUSE_MODE_LOCK;
 
   LuminaryInstance instance;
   LUM_FAILURE_HANDLE(luminary_host_get_instance(host, display->select_pixel_data.instance_id, &instance));
