@@ -16,7 +16,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-#define PURKINJE_STRENGTH (5000.0f)
+#define PURKINJE_STRENGTH (32.0f)
 
 LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
   if (color_luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))

@@ -208,10 +208,6 @@ LUMINARY_FUNCTION RGBF
   if (device.settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
     return pixel;
 
-  if (device.camera.purkinje) {
-    pixel = purkinje_shift(pixel);
-  }
-
   if (device.camera.use_color_correction) {
     RGBF hsv = rgb_to_hsv(pixel);
 
@@ -229,6 +225,10 @@ LUMINARY_FUNCTION RGBF
   }
 
   pixel = scale_color(pixel, device.camera.exposure);
+
+  if (device.camera.purkinje) {
+    pixel = purkinje_shift(pixel);
+  }
 
   const float grain = device.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 
