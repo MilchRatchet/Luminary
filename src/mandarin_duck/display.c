@@ -22,6 +22,22 @@ static void _display_handle_resize(Display* display) {
 
   SDL_GetWindowSizeInPixels(display->sdl_window, (int*) &(display->width), (int*) &(display->height));
 
+  int x, y;
+  SDL_GetWindowPosition(display->sdl_window, &x, &y);
+
+  x -= DISPLAY_SCREEN_MARGIN;
+  y -= DISPLAY_SCREEN_MARGIN;
+
+  if (x + display->width > display->screen_width || y + display->height > display->screen_height) {
+    x = display->screen_width - display->width;
+    y = display->screen_height - display->height;
+
+    x += DISPLAY_SCREEN_MARGIN;
+    y += DISPLAY_SCREEN_MARGIN;
+
+    SDL_SetWindowPosition(display->sdl_window, x, y);
+  }
+
   display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
   display->buffer      = display->sdl_surface->pixels;
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
@@ -72,24 +88,25 @@ static void _display_handle_display_change(Display* display) {
 }
 
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
-  if (display->zoom_handler->scale == 0) {
-    uint8_t* buffer = image.buffer;
+  uint32_t scale = display->display_base_scale;
 
-    const uint32_t width  = (display->width < image.width) ? display->width : image.width;
-    const uint32_t height = (display->height < image.height) ? display->height : image.height;
+  scale += display->zoom_handler->scale;
 
-    for (uint32_t y = 0; y < height; y++) {
-      memcpy(display->buffer + y * display->pitch, buffer + y * image.ld * sizeof(LuminaryARGB8), sizeof(LuminaryARGB8) * width);
-    }
-
-    return;
-  }
-
-  const uint32_t scale        = display->zoom_handler->scale;
   const uint32_t src_offset_x = display->zoom_handler->offset_x;
   const uint32_t src_offset_y = display->zoom_handler->offset_y;
 
   const LuminaryARGB8* src = (const LuminaryARGB8*) image.buffer;
+
+  if (scale == 0) {
+    const uint32_t width  = (display->width < image.width) ? display->width : image.width;
+    const uint32_t height = (display->height < image.height) ? display->height : image.height;
+
+    for (uint32_t y = 0; y < height; y++) {
+      memcpy(display->buffer + y * display->pitch, src + y * image.ld, sizeof(LuminaryARGB8) * width);
+    }
+
+    return;
+  }
 
   for (uint32_t y = 0; y < display->height; y++) {
     const LuminaryARGB8* src_row = src + ((y >> scale) + src_offset_y) * image.ld;
@@ -556,6 +573,13 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
+  if ((display->frame_id & 0x1F) == 0) {
+    LuminaryRendererSettings settings;
+    LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+    display_update_resolution(display, host, &settings);
+  }
+
   display->frametime = time_step;
 
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
@@ -843,6 +867,8 @@ void display_update(Display* display) {
   SDL_SetCursor(display->sdl_cursors[display->selected_cursor]);
 
   SDL_UpdateWindowSurface(display->sdl_window);
+
+  display->frame_id++;
 }
 
 void display_resize(Display* display, uint32_t width, uint32_t height) {
@@ -853,6 +879,22 @@ void display_resize(Display* display, uint32_t width, uint32_t height) {
 
   // Display width and height will be updated through a resize event
   SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
+}
+
+void display_update_resolution(Display* display, LuminaryHost* host, const LuminaryRendererSettings* settings) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(settings);
+
+  if (display->sync_render_resolution == false)
+    return;
+
+  if (settings->width != display->width || settings->height != display->height) {
+    // If the display is maximized, we unmaximize it here
+    if (display->is_maximized)
+      display_handle_maximize(display, host, false);
+
+    display_resize(display, settings->width, settings->height);
+  }
 }
 
 void display_destroy(Display** display) {

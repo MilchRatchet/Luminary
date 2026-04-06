@@ -33,6 +33,7 @@ struct DisplayFileDrop {
 } typedef DisplayFileDrop;
 
 struct Display {
+  uint64_t frame_id;
   uint64_t ticks_last_frame;
   SDL_Window* sdl_window;
   SDL_Surface* sdl_surface;
@@ -45,6 +46,7 @@ struct Display {
   uint32_t unmaximize_x;
   uint32_t unmaximize_y;
   uint8_t* buffer;
+  uint32_t display_base_scale;
   uint32_t pitch;
   bool exit_requested;
   bool show_ui;
@@ -88,6 +90,7 @@ void display_handle_maximize(Display* display, LuminaryHost* host, bool reinstat
 void display_render(Display* display, LuminaryHost* host);
 void display_update(Display* display);
 void display_resize(Display* display, uint32_t width, uint32_t height);
+void display_update_resolution(Display* display, LuminaryHost* host, const LuminaryRendererSettings* settings);
 void display_destroy(Display** display);
 
 #endif /* MANDARIN_DUCK_DISPLAY_H */
