@@ -10,6 +10,9 @@ static void _element_button_render_circle(Element* button, Display* display) {
 
   uint32_t color = (data->is_down) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
 
+  if (data->inactive)
+    color = MD_COLOR_DARKGRAY;
+
   Color256 color256        = color256_set_1(color);
   Color256 mask_low16      = color256_set_1(0x00FF00FF);
   Color256 mask_high16     = color256_set_1(0xFF00FF00);

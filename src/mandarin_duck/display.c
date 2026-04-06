@@ -251,6 +251,13 @@ void display_set_cursor(Display* display, SDL_SystemCursor cursor) {
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
   MD_CHECK_NULL_ARGUMENT(display);
 
+  if (display->mouse_mode == mouse_mode) {
+    if (mouse_mode != DISPLAY_MOUSE_MODE_DEFAULT)
+      display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
+
+    return;
+  }
+
   display->mouse_mode = mouse_mode;
 
   // Invalidate the result
