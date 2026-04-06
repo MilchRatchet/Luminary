@@ -35,15 +35,18 @@ LUMINARY_FUNCTION vec3 camera_sample_sensor(const PathID& path_id) {
   const float sensor_height = device.camera.sensor.diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
   const float sensor_width  = aspect_ratio * sensor_height;
 
-  const float step_x = 2.0f * (sensor_width / device.settings.width);
-  const float step_y = 2.0f * (sensor_height / device.settings.height);
+  const float step_x = sensor_width / device.settings.width;
+  const float step_y = sensor_height / device.settings.height;
 
   const ushort2 sensor_pixel = path_id_get_pixel(path_id);
 
   vec3 sensor_point;
-  sensor_point.x = sensor_width - step_x * (sensor_pixel.x + jitter.x);
-  sensor_point.y = -sensor_height + step_y * (sensor_pixel.y + jitter.y);
+  sensor_point.x = 0.5f * sensor_width - step_x * (sensor_pixel.x + jitter.x);
+  sensor_point.y = 0.5f * sensor_height - step_y * (sensor_pixel.y + jitter.y);
   sensor_point.z = -device.camera.lens.sensor_distance;
+
+  // Flip vertically
+  sensor_point.y *= -1.0f;
 
   return sensor_point;
 }
