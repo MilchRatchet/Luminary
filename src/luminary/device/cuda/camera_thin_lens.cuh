@@ -8,14 +8,14 @@
 // We force the weight to be 1, else the brightness of the image would depend on aperture size.
 // That would be realistic but not practical.
 LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const PathID& path_id) {
-  if (device.camera.lens.aperture_radius == 0.0f)
+  if (device.camera_aux.aperture_radius == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
   const float2 random = random_2D(RANDOM_TARGET_LENS, path_id);
 
   float2 sample;
 
-  const float aperture_size = device.camera.lens.aperture_radius * CAMERA_COMMON_INV_SCALE;
+  const float aperture_size = device.camera_aux.aperture_radius * CAMERA_COMMON_INV_SCALE;
 
   switch (device.camera.aperture_shape) {
     default:

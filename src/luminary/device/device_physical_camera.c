@@ -15,11 +15,24 @@ LuminaryResult physical_camera_create(PhysicalCamera** physical_camera) {
   return LUMINARY_SUCCESS;
 }
 
+static float _physical_camera_compute_auto_focus(
+  float focal_length, float object_distance, float last_vertex, float front_principal_point, float back_principal_point) {
+  // Subtract the last vertex again because we center the simulation space on the last vertex at the end.
+  const float f = focal_length;
+  const float o = object_distance * CAMERA_COMMON_INV_SCALE + last_vertex - front_principal_point;
+
+  const float i = (f * o) / (o - f);
+
+  const float sensor_distance = i - back_principal_point;
+
+  return sensor_distance;
+}
+
 LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const Camera* camera) {
   __CHECK_NULL_ARGUMENT(physical_camera);
 
   LensTemplateData template_data;
-  __FAILURE_HANDLE(lens_library_get_template_data(camera->lens_template, camera->lens[camera->lens_template].focal_length, &template_data));
+  __FAILURE_HANDLE(lens_library_get_template_data(camera->lens_template, &template_data));
 
   if (physical_camera->num_allocated_interfaces < template_data.num_interfaces) {
     if (physical_camera->camera_interfaces)
@@ -34,11 +47,30 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const C
     physical_camera->num_allocated_interfaces = template_data.num_interfaces;
   }
 
-  physical_camera->num_interfaces      = template_data.num_interfaces;
-  physical_camera->design_focal_length = template_data.design_focal_length;
-  physical_camera->aperture_point      = template_data.aperture_point;
-  physical_camera->exit_pupil_point    = template_data.exit_pupil_point;
-  physical_camera->exit_pupil_diameter = template_data.exit_pupil_diameter;
+  float sensor_distance = 1.0f;
+
+  if (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
+    if (camera->lens.use_auto_focus) {
+      sensor_distance = _physical_camera_compute_auto_focus(
+        template_data.design_focal_length, camera->lens.object_distance / camera->scale, template_data.last_vertex,
+        template_data.front_principal_plane, template_data.back_principal_plane);
+    }
+    else {
+      sensor_distance = camera->lens.sensor_distance;
+    }
+  }
+
+  float aperture_radius = 0.0f;
+  if (camera->lens.aperture_stop < 32.0f * 1024.0f)
+    aperture_radius = (template_data.design_focal_length / camera->lens.aperture_stop) * 0.5f;
+
+  physical_camera->num_interfaces    = template_data.num_interfaces;
+  physical_camera->aperture_radius   = aperture_radius;
+  physical_camera->aperture_point    = template_data.aperture_point;
+  physical_camera->exit_pupil_point  = template_data.exit_pupil_point;
+  physical_camera->exit_pupil_radius = template_data.exit_pupil_diameter * 0.5f;
+  physical_camera->last_vertex       = template_data.last_vertex;
+  physical_camera->sensor_distance   = sensor_distance;
 
   if (camera->lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS)
     return LUMINARY_SUCCESS;
@@ -108,11 +140,13 @@ LuminaryResult device_physical_camera_update(
     *buffers_have_changed                     = true;
   }
 
-  physical_camera->aux_data.num_interfaces      = shared_camera->num_interfaces;
-  physical_camera->aux_data.design_focal_length = shared_camera->design_focal_length;
-  physical_camera->aux_data.aperture_point      = shared_camera->aperture_point;
-  physical_camera->aux_data.exit_pupil_point    = shared_camera->exit_pupil_point;
-  physical_camera->aux_data.exit_pupil_radius   = shared_camera->exit_pupil_diameter * 0.5f;
+  physical_camera->aux_data.num_interfaces    = shared_camera->num_interfaces;
+  physical_camera->aux_data.aperture_radius   = shared_camera->aperture_radius;
+  physical_camera->aux_data.aperture_point    = shared_camera->aperture_point;
+  physical_camera->aux_data.exit_pupil_point  = shared_camera->exit_pupil_point;
+  physical_camera->aux_data.exit_pupil_radius = shared_camera->exit_pupil_radius;
+  physical_camera->aux_data.last_vertex       = shared_camera->last_vertex;
+  physical_camera->aux_data.sensor_distance   = shared_camera->sensor_distance;
 
   if (physical_camera->allocated_num_interfaces > 0) {
     __FAILURE_HANDLE(device_staging_manager_register(

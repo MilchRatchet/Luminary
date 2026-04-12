@@ -208,7 +208,7 @@ struct LumBuiltinCamera {
   bool use_color_correction;
   LuminaryRGBF color_correction;
   float film_grain;
-  float camera_scale;
+  float scale;
   float object_distance;
   bool use_physical_camera;
   LumBuiltinCameraThinLens thin_lens;

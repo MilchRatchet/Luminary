@@ -33,24 +33,17 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->color_correction.g           = 0.0f;
   camera->color_correction.b           = 0.0f;
   camera->film_grain                   = 0.0f;
-  camera->camera_scale                 = 1.0f;
-  camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
+  camera->scale                        = 1.0f;
   camera->use_spectral_rendering       = false;
   camera->allow_reflections            = false;
-
-  for (uint32_t template_id = 0; template_id < LUMINARY_LENS_TEMPLATE_COUNT; template_id++) {
-    LensTemplateDefaults defaults;
-    __FAILURE_HANDLE(lens_library_get_template_defaults((LuminaryLensTemplate) template_id, &defaults));
-
-    camera->lens[template_id] = (LuminaryCameraLens) {
-      .focal_length    = defaults.focal_length,
-      .aperture_stop   = defaults.aperture_stop,
-      .sensor_distance = defaults.sensor_distance,
-    };
-  }
+  camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
+  camera->lens.aperture_stop           = 1.0f;
+  camera->lens.sensor_diagonal_size    = 1.0f;
+  camera->lens.sensor_distance         = 1.0f;
+  camera->lens.use_auto_focus          = false;
+  camera->lens.object_distance         = 1.0f;
 
   camera->sensor = (LuminaryCameraSensor) {
-    .diagonal_size                    = 20.0f,
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
   };
@@ -81,7 +74,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(rotation.x, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(rotation.y, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(rotation.z, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(camera_scale, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(scale, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
   __CAMERA_CHECK_DIRTY(lens_template, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
 
   if (input->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
@@ -95,12 +88,12 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
     __CAMERA_CHECK_DIRTY(aperture_blade_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   }
 
-  __CAMERA_CHECK_DIRTY(
-    lens[input->lens_template].focal_length, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
-  __CAMERA_CHECK_DIRTY(lens[input->lens_template].aperture_stop, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(lens[input->lens_template].sensor_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(lens.aperture_stop, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
+  __CAMERA_CHECK_DIRTY(lens.sensor_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
+  __CAMERA_CHECK_DIRTY(lens.sensor_diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(lens.use_auto_focus, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
+  __CAMERA_CHECK_DIRTY(lens.object_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
 
-  __CAMERA_CHECK_DIRTY(sensor.diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.aspect_ratio, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.use_aspect_ratio_from_resolution, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 

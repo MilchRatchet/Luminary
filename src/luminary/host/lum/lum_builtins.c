@@ -267,7 +267,7 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_color_correction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, color_correction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, film_grain, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, camera_scale, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, scale, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, object_distance, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_physical_camera, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, thin_lens, 1, LUM_VERSION_CURRENT),
@@ -612,7 +612,7 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->color_correction.g           = 0.0f;
   camera->color_correction.b           = 0.0f;
   camera->film_grain                   = 0.0f;
-  camera->camera_scale                 = 1.0f;
+  camera->scale                        = 1.0f;
   camera->object_distance              = 1.0f;
   camera->use_physical_camera          = false;
 
@@ -950,7 +950,7 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
   dst_camera->film_grain                   = camera->film_grain;
-  dst_camera->camera_scale                 = camera->camera_scale;
+  dst_camera->scale                        = camera->scale;
 
 #if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;
@@ -1239,7 +1239,7 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
   dst_camera->film_grain                   = camera->film_grain;
-  dst_camera->camera_scale                 = camera->camera_scale;
+  dst_camera->scale                        = camera->scale;
 
 #if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;

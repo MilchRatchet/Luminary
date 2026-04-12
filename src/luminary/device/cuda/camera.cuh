@@ -29,7 +29,7 @@ LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
 
   // Transform result to world space
   result.origin = quaternion_apply(device.camera.rotation, result.origin);
-  result.origin = scale_vector(result.origin, device.camera.camera_scale * CAMERA_COMMON_SCALE);
+  result.origin = scale_vector(result.origin, device.camera.scale * CAMERA_COMMON_SCALE);
   result.origin = add_vector(result.origin, device.camera.pos);
 
   result.ray = quaternion_apply(device.camera.rotation, result.ray);

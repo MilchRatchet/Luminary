@@ -57,20 +57,29 @@ struct DeviceCamera {
   float purkinje_kappa1;
   float purkinje_kappa2;
   float film_grain;
-  float camera_scale;
+  float scale;
 
   struct {
     float focal_length;
-    float aperture_radius;
-    float sensor_distance;
+    float sensor_diagonal_size;
   } lens;
 
   struct {
-    float diagonal_size;
     float aspect_ratio;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x48u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x40u);
+
+struct DeviceCameraAux {
+  uint32_t num_interfaces;
+  float aperture_radius;
+  float aperture_point;
+  float exit_pupil_radius;
+  float exit_pupil_point;
+  float last_vertex;
+  float sensor_distance;
+} typedef DeviceCameraAux;
+LUM_STATIC_SIZE_ASSERT(DeviceCameraAux, 0x1Cu);
 
 struct DeviceOcean {
   uint32_t active : 1;
@@ -289,15 +298,6 @@ LUM_STATIC_SIZE_ASSERT(DeviceTransform, 0x20u);
 
 struct DeviceTexture typedef DeviceTexture;
 struct DeviceMesh typedef DeviceMesh;
-
-struct DeviceCameraAux {
-  uint32_t num_interfaces;
-  float design_focal_length;
-  float aperture_point;
-  float exit_pupil_radius;
-  float exit_pupil_point;
-} typedef DeviceCameraAux;
-LUM_STATIC_SIZE_ASSERT(DeviceCameraAux, 0x14u);
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);

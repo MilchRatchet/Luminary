@@ -164,19 +164,15 @@ LUMINARY_API enum LuminaryApertureShape {
   LUMINARY_APERTURE_COUNT
 } typedef LuminaryApertureShape;
 
-LUMINARY_API struct LuminaryCameraThinLens {
-  float fov;
-  float aperture_size;
-} typedef LuminaryCameraThinLens;
-
 LUMINARY_API struct LuminaryCameraLens {
-  float focal_length;
-  float aperture_stop;
-  float sensor_distance;
+  float aperture_stop;    // [f/*]
+  float sensor_distance;  // [mm]
+  float sensor_diagonal_size;
+  float object_distance;  // [m]
+  bool use_auto_focus;
 } typedef LuminaryCameraLens;
 
 LUMINARY_API struct LuminaryCameraSensor {
-  float diagonal_size;
   float aspect_ratio;
   bool use_aspect_ratio_from_resolution;
 } typedef LuminaryCameraSensor;
@@ -201,11 +197,11 @@ LUMINARY_API struct LuminaryCamera {
   bool use_color_correction;
   LuminaryRGBF color_correction;
   float film_grain;
-  float camera_scale;
+  float scale;
   bool allow_reflections;
   bool use_spectral_rendering;
   LuminaryLensTemplate lens_template;
-  LuminaryCameraLens lens[LUMINARY_LENS_TEMPLATE_COUNT];
+  LuminaryCameraLens lens;
   LuminaryCameraSensor sensor;
 } typedef LuminaryCamera;
 

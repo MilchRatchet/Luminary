@@ -54,7 +54,7 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, c
     const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
 
     const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
-    const float aperture_radius               = device.camera.lens.aperture_radius;
+    const float aperture_radius               = device.camera_aux.aperture_radius;
 
     if (vertical_aperture_hit_dist_sq > aperture_radius * aperture_radius) {
       return true;
@@ -320,6 +320,9 @@ LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_i
     result.weight = mul_color(result.weight, spectral_wavelength_to_rgb(wavelength));
     result.weight = scale_color(result.weight, 1.0f / wavelength_pdf);
   }
+
+  // We center the result around the last vertex. This allows for a more stable perspective when scaling the camera.
+  result.origin.z -= device.camera_aux.last_vertex;
 
   // Camera simulation is in +Z direction but Luminary uses -Z convention
   result.origin.z = -result.origin.z;

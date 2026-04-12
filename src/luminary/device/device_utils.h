@@ -56,6 +56,9 @@ static_assert(
   LIGHT_TREE_ROOT_MAX_CHILD_COUNT % LIGHT_TREE_MAX_CHILDREN_PER_SECTION == 0,
   "Light tree root node max children must be a multiple of max children per root section.");
 
+#define CAMERA_COMMON_SCALE (0.001f)
+#define CAMERA_COMMON_INV_SCALE (1.0f / CAMERA_COMMON_SCALE)
+
 #define OMM_REFINEMENT_NEEDED_FLAG (0x80)
 
 #define UNDERSAMPLING_FIRST_SAMPLE_MASK 0x80

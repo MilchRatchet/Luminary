@@ -4,13 +4,9 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-// mm to m
-#define CAMERA_COMMON_SCALE (0.001f)
-#define CAMERA_COMMON_INV_SCALE (1.0f / CAMERA_COMMON_SCALE)
-
-#define CAMERA_FRAUNHOFER_D_LINE (587.6f)
-#define CAMERA_FRAUNHOFER_F_LINE (486.1f)
-#define CAMERA_FRAUNHOFER_C_LINE (656.3f)
+#define CAMERA_FRAUNHOFER_D_LINE (587.562f)
+#define CAMERA_FRAUNHOFER_F_LINE (486.134f)
+#define CAMERA_FRAUNHOFER_C_LINE (656.281f)
 
 #define CAMERA_DESIGN_WAVELENGTH CAMERA_FRAUNHOFER_D_LINE
 
@@ -32,7 +28,7 @@ LUMINARY_FUNCTION vec3 camera_sample_sensor(const PathID& path_id) {
   const float aspect_ratio = (device.camera.use_aspect_ratio_from_resolution) ? ((float) device.settings.width / device.settings.height)
                                                                               : device.camera.sensor.aspect_ratio;
 
-  const float sensor_height = device.camera.sensor.diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
+  const float sensor_height = device.camera.lens.sensor_diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
   const float sensor_width  = aspect_ratio * sensor_height;
 
   const float step_x = sensor_width / device.settings.width;
@@ -43,7 +39,7 @@ LUMINARY_FUNCTION vec3 camera_sample_sensor(const PathID& path_id) {
   vec3 sensor_point;
   sensor_point.x = 0.5f * sensor_width - step_x * (sensor_pixel.x + jitter.x);
   sensor_point.y = 0.5f * sensor_height - step_y * (sensor_pixel.y + jitter.y);
-  sensor_point.z = -device.camera.lens.sensor_distance;
+  sensor_point.z = -device.camera_aux.sensor_distance;
 
   // Flip vertically
   sensor_point.y *= -1.0f;

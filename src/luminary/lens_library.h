@@ -26,15 +26,11 @@ struct LensTemplateData {
   float aperture_point;
   float exit_pupil_point;
   float exit_pupil_diameter;
+  float last_vertex;
+  float front_principal_plane;
+  float back_principal_plane;
 } typedef LensTemplateData;
 
-struct LensTemplateDefaults {
-  float focal_length;
-  float aperture_stop;
-  float sensor_distance;
-} typedef LensTemplateDefaults;
-
-LuminaryResult lens_library_get_template_data(LuminaryLensTemplate template, float focal_length, LensTemplateData* data);
-LuminaryResult lens_library_get_template_defaults(LuminaryLensTemplate template, LensTemplateDefaults* defaults);
+LuminaryResult lens_library_get_template_data(LuminaryLensTemplate template, LensTemplateData* data);
 
 #endif /* LUMINARY_LENS_LIBRARY_H */

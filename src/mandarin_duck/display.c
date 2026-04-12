@@ -699,10 +699,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
         LuminaryCamera camera;
         LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
-        // m to mm
-        const float focal_length = fmaxf(display->focus_pixel_data.depth * 1000.0f, 0.01f);
-
-        camera.lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].focal_length = focal_length;
+        camera.lens.object_distance = fmaxf(display->focus_pixel_data.depth, 0.01f);
 
         LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
 

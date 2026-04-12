@@ -156,16 +156,15 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FOV_____ */
     case 6872316419616689990u:
-      sscanf(value, "%f\n", &camera->sensor.diagonal_size);
+      sscanf(value, "%f\n", &camera->lens.sensor_diagonal_size);
       break;
     /* FOCALLEN */
     case 5639997998747569990u:
-      sscanf(value, "%f\n", &camera->lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].focal_length);
-      camera->lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].focal_length *= 1000.0f;  // m to mm
+      sscanf(value, "%f\n", &camera->lens.object_distance);
       break;
     /* APERTURE */
     case 4995148757353189441u:
-      sscanf(value, "%f\n", &camera->lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].aperture_stop);
+      sscanf(value, "%f\n", &camera->lens.aperture_stop);
       break;
     /* APESHAPE */
     case 4994563765644382273u:
@@ -750,9 +749,7 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
     content->camera.bloom_blend = 0.0f;
   }
 
-  content->camera.lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].aperture_stop =
-    content->camera.lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].focal_length
-    / content->camera.lens[LUMINARY_LENS_TEMPLATE_THIN_LENS].aperture_stop;
+  content->camera.lens.aperture_stop = 100.0f * content->camera.scale / content->camera.lens.aperture_stop;
 
   content->wavefront_args->legacy_smoothness            = legacy_settings.legacy_smoothness;
   content->wavefront_args->force_transparency_cutout    = legacy_settings.force_transparency_cutout;

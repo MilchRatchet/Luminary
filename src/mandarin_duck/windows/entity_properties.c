@@ -366,7 +366,10 @@ static void _window_entity_properties_slider_value_string_func_aperture_stop(
     crash_message("Expected float data type.");
 
   const float value = *(const float*) data;
-  sprintf(text, "f/%.2f", value);
+  if (value < 32.0f * 1024.0f)
+    sprintf(text, "f/%.2f", value);
+  else
+    sprintf(text, "f/INFINITY");
 }
 
 static void _window_entity_properties_slider_value_string_func_sensor_diameter(
@@ -429,35 +432,13 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   update_data |= _window_entity_properties_add_slider_v2(
     data, (WindowEntityPropertiesSliderArgsV2) {
-            .text              = "Focal Length",
-            .data_binding      = &camera.lens[lens_template].focal_length,
-            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
-            .min               = 0.0f,
-            .max               = FLT_MAX,
-            .change_rate       = 1.0f,
-            .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
-          });
-
-  update_data |= _window_entity_properties_add_slider_v2(
-    data, (WindowEntityPropertiesSliderArgsV2) {
             .text              = "Aperture Stop",
-            .data_binding      = &camera.lens[lens_template].aperture_stop,
+            .data_binding      = &camera.lens.aperture_stop,
             .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
             .min               = 1.0f,
-            .max               = FLT_MAX,
+            .max               = 32.0f * 1024.0f,
             .change_rate       = 1.0f,
             .value_string_func = _window_entity_properties_slider_value_string_func_aperture_stop,
-          });
-
-  update_data |= _window_entity_properties_add_slider_v2(
-    data, (WindowEntityPropertiesSliderArgsV2) {
-            .text              = "Sensor Distance",
-            .data_binding      = &camera.lens[lens_template].sensor_distance,
-            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
-            .min               = 0.0f,
-            .max               = FLT_MAX,
-            .change_rate       = 1.0f,
-            .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
           });
 
   update_data |= _window_entity_properties_add_dropdown(
@@ -468,8 +449,28 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
   }
 
-  update_data |=
-    _window_entity_properties_add_slider(data, "Scale", &camera.camera_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
+    update_data |= _window_entity_properties_add_checkbox(data, "Auto Focus", &camera.lens.use_auto_focus);
+
+  if (camera.lens.use_auto_focus || camera.lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Object Distance", &camera.lens.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+  }
+  else {
+    update_data |= _window_entity_properties_add_slider_v2(
+      data, (WindowEntityPropertiesSliderArgsV2) {
+              .text              = "Sensor Distance",
+              .data_binding      = &camera.lens.sensor_distance,
+              .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+              .min               = 0.0f,
+              .max               = FLT_MAX,
+              .change_rate       = 1.0f,
+              .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
+            });
+  }
+
+  if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
+    update_data |= _window_entity_properties_add_slider(data, "Scale", &camera.scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 0.1f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -477,7 +478,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider_v2(
     data, (WindowEntityPropertiesSliderArgsV2) {
             .text              = "Diameter",
-            .data_binding      = &camera.sensor.diagonal_size,
+            .data_binding      = &camera.lens.sensor_diagonal_size,
             .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
             .min               = 0.01f,
             .max               = FLT_MAX,
