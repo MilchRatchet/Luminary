@@ -50,16 +50,42 @@ struct CameraSimulationResult {
 
 LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
   const float aperture_dist = (ray.z != 0.0f) ? (device.camera_aux.aperture_point - origin.z) / ray.z : -FLT_MAX;
-  if (aperture_dist > 0.0f && aperture_dist < dist) {
-    const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
+  if (aperture_dist < 0.0f || aperture_dist > dist)
+    return false;
 
-    const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
-    const float aperture_radius               = device.camera_aux.aperture_radius;
+  const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
 
-    if (vertical_aperture_hit_dist_sq > aperture_radius * aperture_radius) {
-      return true;
-    }
-  }
+  const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
+  const float aperture_radius               = device.camera_aux.aperture_radius;
+
+  if (vertical_aperture_hit_dist_sq > aperture_radius * aperture_radius)
+    return true;
+
+  if (device.camera.aperture_shape == LUMINARY_APERTURE_ROUND)
+    return false;
+
+  float angle = atan2f(aperture_hit.y, aperture_hit.x);
+  angle       = (angle < 0.0f) ? (angle + (2.0f * PI)) : angle;
+
+  uint32_t section_id = angle * (device.camera.aperture_blade_count * (1.0f / (2.0f * PI)));
+
+  if (section_id >= device.camera.aperture_blade_count)
+    section_id = device.camera.aperture_blade_count - 1;
+
+  const float angle_a = section_id * (2.0f * PI) / device.camera.aperture_blade_count;
+  const float angle_b = (section_id + 1) * (2.0f * PI) / device.camera.aperture_blade_count;
+
+  const float2 point_a = make_float2(aperture_radius * cosf(angle_a), aperture_radius * sinf(angle_a));
+  const float2 point_b = make_float2(aperture_radius * cosf(angle_b), aperture_radius * sinf(angle_b));
+
+  const float2 blade_edge   = make_float2(point_b.x - point_a.x, point_b.y - point_a.y);
+  const float2 blade_normal = make_float2(blade_edge.y, -blade_edge.x);
+  const float2 hit_rel_a    = make_float2(aperture_hit.x - point_a.x, aperture_hit.y - point_a.y);
+
+  const float dot = blade_normal.x * hit_rel_a.x + blade_normal.y * hit_rel_a.y;
+
+  if (dot >= 0.0f)
+    return true;
 
   return false;
 }
