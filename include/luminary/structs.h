@@ -175,6 +175,9 @@ LUMINARY_API struct LuminaryCameraLens {
 LUMINARY_API struct LuminaryCameraSensor {
   float aspect_ratio;
   bool use_aspect_ratio_from_resolution;
+  float film_grain_strength;
+  float film_grain_sensitity;
+  uint32_t film_grains_per_pixel;
 } typedef LuminaryCameraSensor;
 
 LUMINARY_API struct LuminaryCamera {
@@ -196,7 +199,6 @@ LUMINARY_API struct LuminaryCamera {
   float purkinje_kappa2;
   bool use_color_correction;
   LuminaryRGBF color_correction;
-  float film_grain;
   float scale;
   bool allow_reflections;
   bool use_spectral_rendering;

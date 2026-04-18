@@ -62,14 +62,16 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->lens.focal_length         = camera->lens.object_distance * CAMERA_COMMON_INV_SCALE;
   device_camera->lens.sensor_diagonal_size = camera->lens.sensor_diagonal_size;
 
-  device_camera->sensor.aspect_ratio = camera->sensor.aspect_ratio;
+  device_camera->sensor.aspect_ratio          = camera->sensor.aspect_ratio;
+  device_camera->sensor.film_grain_strength   = camera->sensor.film_grain_strength;
+  device_camera->sensor.film_grain_sensitity  = camera->sensor.film_grain_sensitity;
+  device_camera->sensor.film_grains_per_pixel = camera->sensor.film_grains_per_pixel;
 
   device_camera->pos             = camera->pos;
   device_camera->rotation        = rotation_euler_angles_to_quaternion(camera->rotation);
   device_camera->exposure        = expf(camera->exposure);
   device_camera->purkinje_kappa1 = camera->purkinje_kappa1;
   device_camera->purkinje_kappa2 = camera->purkinje_kappa2;
-  device_camera->film_grain      = camera->film_grain;
   device_camera->scale           = camera->scale;
 
   return LUMINARY_SUCCESS;

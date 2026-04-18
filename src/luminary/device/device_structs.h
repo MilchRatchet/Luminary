@@ -56,7 +56,6 @@ struct DeviceCamera {
   float exposure;
   float purkinje_kappa1;
   float purkinje_kappa2;
-  float film_grain;
   float scale;
 
   struct {
@@ -66,9 +65,12 @@ struct DeviceCamera {
 
   struct {
     float aspect_ratio;
+    float film_grain_strength;
+    float film_grain_sensitity;
+    uint32_t film_grains_per_pixel;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x40u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x48u);
 
 struct DeviceCameraAux {
   uint32_t num_interfaces;

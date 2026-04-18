@@ -258,7 +258,7 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FILMGRAI */
     case 5278590704447932742u:
-      sscanf(value, "%f\n", &camera->film_grain);
+      sscanf(value, "%f\n", &camera->sensor.film_grain_strength);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);

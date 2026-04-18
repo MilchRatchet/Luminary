@@ -32,7 +32,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->color_correction.r           = 0.0f;
   camera->color_correction.g           = 0.0f;
   camera->color_correction.b           = 0.0f;
-  camera->film_grain                   = 0.0f;
   camera->scale                        = 1.0f;
   camera->use_spectral_rendering       = false;
   camera->allow_reflections            = false;
@@ -46,6 +45,9 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->sensor = (LuminaryCameraSensor) {
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
+    .film_grain_strength              = 0.0f,
+    .film_grain_sensitity             = 1.0f,
+    .film_grains_per_pixel            = 128,
   };
 
   return LUMINARY_SUCCESS;
@@ -96,6 +98,9 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
 
   __CAMERA_CHECK_DIRTY(sensor.aspect_ratio, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.use_aspect_ratio_from_resolution, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.film_grain_strength, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.film_grain_sensitity, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.film_grains_per_pixel, SCENE_DIRTY_FLAG_OUTPUT);
 
   __CAMERA_CHECK_DIRTY(use_local_error_minimization, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(exposure, SCENE_DIRTY_FLAG_OUTPUT);
@@ -107,7 +112,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(purkinje_kappa1, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje_kappa2, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(use_color_correction, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(film_grain, SCENE_DIRTY_FLAG_OUTPUT);
 
   if (input->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
     __CAMERA_CHECK_DIRTY(agx_custom_slope, SCENE_DIRTY_FLAG_OUTPUT);

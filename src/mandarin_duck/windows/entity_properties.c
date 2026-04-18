@@ -492,8 +492,15 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
     update_data |= _window_entity_properties_add_slider(
       data, "Aspect Ratio", &camera.sensor.aspect_ratio, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
 
-  update_data |=
-    _window_entity_properties_add_slider(data, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Film Grain", &camera.sensor.film_grain_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
+
+  if (camera.sensor.film_grain_strength > 0.0f) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Film Grain Sensitivity", &camera.sensor.film_grain_sensitity, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Film Grains per Pixel", &camera.sensor.film_grains_per_pixel, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 65536.0f, 1.0f);
+  }
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});

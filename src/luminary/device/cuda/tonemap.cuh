@@ -1,6 +1,7 @@
 #ifndef CU_TONEMAP_H
 #define CU_TONEMAP_H
 
+#include "film.cuh"
 #include "math.cuh"
 #include "purkinje.cuh"
 #include "random.cuh"
@@ -230,9 +231,7 @@ LUMINARY_FUNCTION RGBF
     pixel = purkinje_shift(pixel);
   }
 
-  const float grain = device.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
-
-  pixel = add_color(pixel, splat_color(grain));
+  pixel = film_grain_apply(pixel, x, y);
   pixel = max_color(pixel, splat_color(0.0f));
 
   pixel = tonemap_apply_transform(pixel, agx_params);

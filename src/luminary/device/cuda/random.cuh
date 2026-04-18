@@ -376,8 +376,38 @@ LUMINARY_FUNCTION float random_dither_mask(const uint32_t x, const uint32_t y) {
   return random_uint16_t_to_float(blue_noise);
 }
 
-LUMINARY_FUNCTION float random_grain_mask(const uint32_t x, const uint32_t y) {
-  return white_noise_offset(x + y * device.settings.width);
+LUMINARY_FUNCTION float random_grain(const uint32_t x, const uint32_t y, uint32_t layer_id) {
+  return random_uint16_t_to_float(random_uint16_t_base(0xfcbd6e15 + layer_id, x + y * device.settings.width));
+}
+
+// Koopman, R. (2025). Some simple full-range inverse-normal approximations. J. Numer. Anal. Approx. Theory, 54(1), 111-116.
+LUMINARY_FUNCTION float random_normal_inverse_approx(float q) {
+  const float sign = (q > 0.5f) ? -1.0f : 1.0f;
+
+  q = (q > 0.5f) ? 1.0f - q : q;
+
+  const float t = -2.0f * logf(2.0f * q);
+
+  const float num   = 1.0f + t + t * t;
+  const float denom = 1.991162f * t + 10.05113f;
+
+  const float r = num / denom;
+
+  return sign * sqrtf(t - logf(r));
+}
+
+LUMINARY_FUNCTION uint32_t random_binomial_approx(const uint32_t n, const float p, const float random) {
+  const float mean    = n * p;
+  const float std_dev = sqrtf(mean * (1.0f - p));
+
+  if (std_dev == 0.0f)
+    return (uint32_t) (mean + 0.5f);
+
+  float x = mean + std_dev * random_normal_inverse_approx(random);
+
+  x = fmaxf(fminf(x, n), 0.0f);
+
+  return (uint32_t) (x + 0.49999f);
 }
 
 #endif /* CU_RANDOM_H */
