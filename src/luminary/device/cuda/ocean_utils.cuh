@@ -103,7 +103,7 @@ LUMINARY_FUNCTION float ocean_get_height(const vec3 p, const int steps) {
 }
 
 LUMINARY_FUNCTION bool ocean_is_underwater(const vec3 p) {
-  return p.y < device.ocean.height;
+  return (device.ocean.active) ? p.y < device.ocean.height : false;
 }
 
 LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {

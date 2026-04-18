@@ -7,7 +7,7 @@
 #include "utils.cuh"
 
 LUMINARY_FUNCTION float sky_height(const vec3 point) {
-  return get_length(point) - SKY_EARTH_RADIUS;
+  return fmaxf(get_length(point) - SKY_EARTH_RADIUS, eps);
 }
 
 LUMINARY_FUNCTION float world_to_sky_scale(float input) {

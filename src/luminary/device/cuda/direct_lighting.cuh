@@ -352,11 +352,21 @@ LUMINARY_FUNCTION DeviceTaskDirectLightGeo
 template <MaterialType TYPE>
 LUMINARY_FUNCTION DeviceTaskDirectLightSun
   direct_lighting_sun_create_task(const MaterialContext<TYPE> ctx, const DeviceTaskMediumStack& medium, const PathID& path_id) {
+  bool is_caustics_path;
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    is_caustics_path = ctx.volume_type == VOLUME_TYPE_OCEAN && ctx.instance_id != HIT_TYPE_OCEAN;
+  else
+    is_caustics_path = ctx.volume_type == VOLUME_TYPE_OCEAN;
+
   const vec3 sky_pos = world_to_sky_transform(ctx.position);
 
-  const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
-  const bool inside_earth      = get_length(sky_pos) < SKY_EARTH_RADIUS;
-  const bool sun_visible       = (sun_below_horizon == false) && (inside_earth == false);
+  bool sun_visible = true;
+  if (is_caustics_path == false) {
+    const bool sun_below_horizon = sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+    const bool inside_earth      = get_length(sky_pos) < SKY_EARTH_RADIUS;
+
+    sun_visible = (sun_below_horizon == false) && (inside_earth == false);
+  }
 
   // Sun is not present
   if (sun_visible == false) {
@@ -365,12 +375,6 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 
     return task;
   }
-
-  bool is_caustics_path;
-  if constexpr (TYPE == MATERIAL_GEOMETRY)
-    is_caustics_path = ctx.volume_type == VOLUME_TYPE_OCEAN && ctx.instance_id != HIT_TYPE_OCEAN;
-  else
-    is_caustics_path = ctx.volume_type == VOLUME_TYPE_OCEAN;
 
   DeviceTaskDirectLightSun task;
   if (is_caustics_path) {

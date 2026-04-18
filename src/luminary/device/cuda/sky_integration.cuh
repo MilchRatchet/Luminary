@@ -4,6 +4,7 @@
 #include "cloud_shadow.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "ocean_utils.cuh"
 #include "sky_utils.cuh"
 #include "utils.cuh"
 
@@ -49,20 +50,20 @@ LUMINARY_FUNCTION float2 sky_compute_path(const vec3 origin, const vec3 ray, con
   if (height <= min_height)
     return make_float2(0.0f, -FLT_MAX);
 
+  const float earth_dist = sph_ray_int_p0(ray, origin, min_height);
+  const float atmo_dist  = sph_ray_int_p0(ray, origin, max_height);
+
   float distance;
-  float start = 0.0f;
+  float start;
   if (height > max_height) {
-    const float earth_dist = sph_ray_int_p0(ray, origin, min_height);
-    const float atmo_dist  = sph_ray_int_p0(ray, origin, max_height);
     const float atmo_dist2 = sph_ray_int_back_p0(ray, origin, max_height);
 
     distance = fminf(earth_dist - atmo_dist, atmo_dist2 - atmo_dist);
     start    = atmo_dist;
   }
   else {
-    const float earth_dist = sph_ray_int_p0(ray, origin, min_height);
-    const float atmo_dist  = sph_ray_int_p0(ray, origin, max_height);
-    distance               = fminf(earth_dist, atmo_dist);
+    distance = fminf(earth_dist, atmo_dist);
+    start    = 0.0f;
   }
 
   return make_float2(start, distance);
@@ -273,7 +274,7 @@ LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, c
   switch (device.sky.mode) {
     default:
     case LUMINARY_SKY_MODE_DEFAULT: {
-      sky = get_color(0.0f, 0.0f, 0.0f);
+      sky = splat_color(0.0f);
     } break;
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);
@@ -284,9 +285,9 @@ LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, c
 
         // HDRI does not include the sun, compute sun visibility
         const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
-        const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
+        const bool ray_hits_earth = (ocean_is_underwater(origin) == false) ? sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS) : false;
 
-        if (ray_hits_sun && !ray_hits_earth) {
+        if (ray_hits_sun && ray_hits_earth == false) {
           const RGBF sun_color = sky_get_sun_color(sky_origin, ray);
 
           sky = add_color(sky, sun_color);
