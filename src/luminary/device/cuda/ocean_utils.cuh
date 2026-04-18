@@ -245,9 +245,10 @@ LUMINARY_FUNCTION float ocean_intersection_solver(const vec3 origin, const vec3 
   }
 
   for (int i = 0; i < step_count; i++) {
-    const float step = residual_at_min / (residual_at_min - residual_at_max);
-    const float mid  = lerp(min, max, fminf(0.95f, fmaxf(0.05f, step)));
-    const vec3 p     = add_vector(origin, scale_vector(ray, mid));
+    const float residual_diff = residual_at_min - residual_at_max;
+    const float step          = (fabsf(residual_diff) > eps) ? residual_at_min / residual_diff : 0.5f;
+    const float mid           = lerp(min, max, fminf(0.95f, fmaxf(0.05f, step)));
+    const vec3 p              = add_vector(origin, scale_vector(ray, mid));
 
     const float residual_at_mid = ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION);
 
