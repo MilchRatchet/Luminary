@@ -47,7 +47,7 @@ include_directories(${CEB_INCLUDE_DIR})
 
 set(CUDA_KERNEL_FLAGS --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --extra-device-vectorization --ptxas-options=-allow-expensive-optimizations=true)
 
-if(SHOW_KERNEL_STATS)
+if(LUMINARY_SHOW_KERNEL_STATS)
   set(CUDA_KERNEL_FLAGS ${CUDA_KERNEL_FLAGS} --ptxas-options=-v)
 endif()
 
@@ -269,8 +269,6 @@ configure_file("${CMAKE_SOURCE_DIR}/src/luminary/config.h.in" "${CMAKE_SOURCE_DI
 
 message("============================= Luminary ============================")
 message("CUDA Kernel Architectures      ||  ${kernel_archs}")
-message("Show CUDA Kernel Stats         ||  ${SHOW_KERNEL_STATS}")
-message("Verbose Memory Checking        ||  ${LUMINARY_MEMORY_DEBUG}")
 message("CUDA Toolkit Version:          ||  ${LUMINARY_CUDA_VERSION}")
 message("CUDA Toolkit Libraries:        ||  ${CUDAToolkit_LIBRARY_DIR}")
 message("CUDA Toolkit NVCC:             ||  ${CUDAToolkit_NVCC_EXECUTABLE}")
