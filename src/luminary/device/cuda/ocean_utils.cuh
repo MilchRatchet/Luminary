@@ -17,13 +17,8 @@
 // The water is handled by the volume implementation.
 //
 
-#define OCEAN_MAX_HEIGHT (device.ocean.height + 1.33f * device.ocean.amplitude)
-#define OCEAN_MIN_HEIGHT (device.ocean.height)
-#define OCEAN_LIPSCHITZ (device.ocean.amplitude * 2.0f)
-
-#define OCEAN_ITERATIONS_INTERSECTION 8
-#define OCEAN_ITERATIONS_NORMAL 8
-#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 8
+#define OCEAN_ITERATIONS_NORMAL 10
+#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 10
 
 LUMINARY_FUNCTION float ocean_hash(const float2 p) {
   const float x = fabsf(p.x + p.y * (311.7f / 127.1f));
@@ -107,19 +102,15 @@ LUMINARY_FUNCTION float ocean_get_height(const vec3 p, const int steps) {
   return h;
 }
 
-LUMINARY_FUNCTION float ocean_get_relative_height(const vec3 p, const int steps) {
-  return p.y - (device.ocean.height + ocean_get_height(p, steps));
-}
-
 LUMINARY_FUNCTION bool ocean_is_underwater(const vec3 p) {
-  return ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION) < 0.0f;
+  return p.y < device.ocean.height;
 }
 
 LUMINARY_FUNCTION vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
   if (device.ocean.amplitude == 0.0f)
     return get_vector(0.0f, 1.0f, 0.0f);
 
-  const float d = (OCEAN_LIPSCHITZ + get_length(p) + 1.0f) * eps * 16.0f;
+  const float d = (device.ocean.amplitude + get_length(p) + 1.0f) * eps * 16.0f;
 
   // Sobel filter
   const float h_0 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
@@ -143,7 +134,7 @@ LUMINARY_FUNCTION vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterat
   if (device.ocean.amplitude == 0.0f)
     return get_vector(0.0f, 1.0f, 0.0f);
 
-  const float d = (OCEAN_LIPSCHITZ + get_length(p) + 1.0f) * eps * 16.0f;
+  const float d = (device.ocean.amplitude + get_length(p) + 1.0f) * eps * 16.0f;
 
   const float h_0 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
   const float h_1 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
@@ -158,39 +149,17 @@ LUMINARY_FUNCTION vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterat
   return normalize_vector(normal);
 }
 
-LUMINARY_FUNCTION float ocean_far_distance(const vec3 origin, const vec3 ray) {
-  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
+LUMINARY_FUNCTION float ocean_intersection_distance(const vec3 origin, const vec3 ray) {
+  if (sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(device.ocean.height) + SKY_WORLD_REFERENCE_HEIGHT) == false) {
     return FLT_MAX;
   }
 
   if (fabsf(ray.y) < eps) {
-    return FLT_MAX;
+    return (origin.y >= device.ocean.height && origin.y <= device.ocean.height) ? 0.0f : FLT_MAX;
   }
 
-  const float d1 = OCEAN_MIN_HEIGHT - origin.y;
-  const float d2 = OCEAN_MAX_HEIGHT - origin.y;
-
-  const float inv_ray = 1.0f / ray.y;
-
-  const float s1 = d1 * inv_ray;
-  const float s2 = d2 * inv_ray;
-
-  const float s = fmaxf(s1, s2);
-
-  return (s >= eps) ? s : FLT_MAX;
-}
-
-LUMINARY_FUNCTION float ocean_short_distance(const vec3 origin, const vec3 ray) {
-  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
-    return FLT_MAX;
-  }
-
-  if (fabsf(ray.y) < eps) {
-    return (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) ? 0.0f : FLT_MAX;
-  }
-
-  const float d1 = OCEAN_MIN_HEIGHT - origin.y;
-  const float d2 = OCEAN_MAX_HEIGHT - origin.y;
+  const float d1 = device.ocean.height - origin.y;
+  const float d2 = device.ocean.height - origin.y;
 
   const float inv_ray = 1.0f / ray.y;
 
@@ -201,98 +170,6 @@ LUMINARY_FUNCTION float ocean_short_distance(const vec3 origin, const vec3 ray) 
     return FLT_MAX;
 
   return (s1 * s2 < 0.0f) ? fmaxf(s1, s2) : fminf(s1, s2);
-}
-
-LUMINARY_FUNCTION float ocean_intersection_solver(const vec3 origin, const vec3 ray, const float start, const float limit) {
-  if (start >= limit)
-    return FLT_MAX;
-
-  const float target_residual = 1e-4f;
-
-  float min = start;
-  float max = limit;
-
-  float residual_at_max = FLT_MAX;
-  float residual_at_min;
-
-  const int32_t step_count = remap(device.ocean.amplitude * device.ocean.amplitude, 0.0f, 1.0f, 4.0f, 16.0f);
-
-  float t                       = start;
-  float last_residual           = 0.0f;
-  float slope_confidence_factor = fminf(8.0f / OCEAN_LIPSCHITZ, (limit - start) * (1.0f / step_count));
-
-  for (int i = 0; i < step_count; i++) {
-    const vec3 p = add_vector(origin, scale_vector(ray, t));
-
-    const float residual_at_t = ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION);
-
-    if (last_residual * residual_at_t < 0.0f) {
-      max             = t;
-      residual_at_max = residual_at_t;
-      break;
-    }
-
-    last_residual = residual_at_t;
-
-    min             = t;
-    residual_at_min = residual_at_t;
-
-    t += fabsf(residual_at_t) * slope_confidence_factor;
-  }
-
-  if (residual_at_max == FLT_MAX) {
-    residual_at_max = ocean_get_relative_height(add_vector(origin, scale_vector(ray, limit)), OCEAN_ITERATIONS_INTERSECTION);
-  }
-
-  for (int i = 0; i < step_count; i++) {
-    const float residual_diff = residual_at_min - residual_at_max;
-    const float step          = (fabsf(residual_diff) > eps) ? residual_at_min / residual_diff : 0.5f;
-    const float mid           = lerp(min, max, fminf(0.95f, fmaxf(0.05f, step)));
-    const vec3 p              = add_vector(origin, scale_vector(ray, mid));
-
-    const float residual_at_mid = ocean_get_relative_height(p, OCEAN_ITERATIONS_INTERSECTION);
-
-    if (fabsf(residual_at_mid) < target_residual) {
-      return (mid >= start) ? mid : FLT_MAX;
-    }
-
-    if (residual_at_mid * residual_at_min < 0.0f) {
-      max             = mid;
-      residual_at_max = residual_at_mid;
-    }
-    else {
-      min             = mid;
-      residual_at_min = residual_at_mid;
-    }
-  }
-
-  if (residual_at_max * residual_at_min < 0.0f) {
-    return 0.5f * (min + max);
-  }
-
-  return FLT_MAX;
-}
-
-LUMINARY_FUNCTION float ocean_intersection_distance(const vec3 origin, const vec3 ray, const float limit) {
-  float start = 0.0f;
-
-  if (origin.y < OCEAN_MIN_HEIGHT || origin.y > OCEAN_MAX_HEIGHT) {
-    const float short_distance = ocean_short_distance(origin, ray);
-
-    if (short_distance == FLT_MAX) {
-      return FLT_MAX;
-    }
-
-    start = short_distance;
-  }
-
-  if (device.ocean.amplitude == 0.0f) {
-    return start;
-  }
-
-  const float end = fminf(limit, ocean_far_distance(origin, ray));
-
-  return ocean_intersection_solver(origin, ray, start, end);
 }
 
 // Coefficients taken from
@@ -517,7 +394,7 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
 }
 
 LUMINARY_FUNCTION vec3 ocean_shift_vector(const MaterialContextGeometry& ctx, const bool is_refraction) {
-  const float shift_length = 8.0f * eps * (1.0f + device.ocean.amplitude) * (1.0f + fabsf(device.ocean.height));
+  const float shift_length = 8.0f * eps * (1.0f + fabsf(device.ocean.height));
 
   return add_vector(ctx.position, scale_vector(ctx.normal, (is_refraction) ? -shift_length : shift_length));
 }

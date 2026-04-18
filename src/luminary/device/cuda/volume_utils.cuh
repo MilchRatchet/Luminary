@@ -19,7 +19,7 @@ LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.scattering = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
   volume.dist       = device.fog.dist;
   volume.max_height = device.fog.height;
-  volume.min_height = (device.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
+  volume.min_height = (device.ocean.active) ? device.ocean.height : -65535.0f;
 
   volume.max_absorption = 0.0f;
   volume.max_scattering = FOG_DENSITY;
@@ -100,7 +100,7 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
   float end_y;
   if (volume.type == VOLUME_TYPE_OCEAN) {
     start_y = 0.0f;
-    end_y   = (ocean_fast_path == false) ? ocean_intersection_distance(origin, ray, limit) : limit;
+    end_y   = (ocean_fast_path == false) ? fminf(ocean_intersection_distance(origin, ray), limit) : limit;
   }
   else {
     if (fabsf(ray.y) < 0.005f) {

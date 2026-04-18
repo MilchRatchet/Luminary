@@ -32,7 +32,7 @@ LUMINARY_FUNCTION vec3 caustics_solve_for_normal(const MaterialContext<TYPE> ctx
     ray = get_vector(L.x, -L.y, L.z);
   }
 
-  const float dist = ocean_intersection_distance(ctx.position, ray, FLT_MAX);
+  const float dist = ocean_intersection_distance(ctx.position, ray);
 
   valid = dist != FLT_MAX;
 

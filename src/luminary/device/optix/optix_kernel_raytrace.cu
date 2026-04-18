@@ -32,13 +32,11 @@ LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, Optix
   const uint32_t ld = device.settings.width >> shift;
 
   if (device.ocean.active) {
-    if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
-      const float short_distance = ocean_short_distance(task.origin, task.ray);
+    const float short_distance = ocean_intersection_distance(task.origin, task.ray);
 
-      if (short_distance < result.depth) {
-        result.handle.instance_id = HIT_TYPE_REJECT;
-        result.depth              = short_distance;
-      }
+    if (short_distance < result.depth) {
+      result.handle.instance_id = HIT_TYPE_REJECT;
+      result.depth              = short_distance;
     }
   }
 
@@ -135,7 +133,7 @@ LUMINARY_FUNCTION void optix_raytrace_ocean(const DeviceTask task, OptixRaytrace
   if (device.ocean.active == false)
     return;
 
-  const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, result.depth);
+  const float ocean_depth = ocean_intersection_distance(task.origin, task.ray);
 
   if (ocean_depth < result.depth) {
     result.depth              = ocean_depth;

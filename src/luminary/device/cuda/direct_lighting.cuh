@@ -479,7 +479,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
   const bool is_caustics_path = volume_id == VOLUME_TYPE_OCEAN && trace.handle.instance_id != HIT_TYPE_OCEAN;
 
   if (is_caustics_path && ray.y > 0.0f) {
-    const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
+    const float dist = (device.ocean.height - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
   }
@@ -548,12 +548,12 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
   bool sample_is_valid = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
 
   if (is_caustics_path && ray.y > 0.0f) {
-    const float dist = (OCEAN_MAX_HEIGHT - task.origin.y) / ray.y;
+    const float dist = (device.ocean.height - task.origin.y) / ray.y;
 
     limit = (dist > 0.0f) ? dist : FLT_MAX;
   }
   // Check if we intersect with the ocean from above
-  else if (ray.y < 0.0f && device.ocean.active && task.origin.y > OCEAN_MIN_HEIGHT) {
+  else if (ray.y < 0.0f && device.ocean.active && task.origin.y > device.ocean.height) {
     sample_is_valid = false;
   }
 
