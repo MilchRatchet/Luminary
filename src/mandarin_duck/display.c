@@ -592,7 +592,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     _display_generate_screenshot(display, host);
   }
 
-  if (display->keyboard_state->keys[SDL_SCANCODE_S].phase == KEY_PHASE_PRESSED) {
+  if (display->show_ui && display->keyboard_state->keys[SDL_SCANCODE_S].phase == KEY_PHASE_PRESSED) {
     const bool ctrl_down = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
 
     if (ctrl_down) {
