@@ -18,7 +18,7 @@
 
 #define PURKINJE_STRENGTH (32.0f)
 
-LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
+LUMINARY_FUNCTION RGBF purkinje_shift(const RGBF pixel) {
   if (color_luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))
     return pixel;
 
@@ -81,6 +81,8 @@ LUMINARY_FUNCTION RGBF purkinje_shift(RGBF pixel) {
   sRGB.b = 0.0556f * XYZ.r - 0.2040f * XYZ.g + 1.0572f * XYZ.b;
 
   UTILS_CHECK_NANS(UTILS_NO_PIXEL_SELECTED, sRGB);
+
+  sRGB = max_color(sRGB, splat_color(0.0f));
 
   float blend = __saturatef(1.0f - PURKINJE_STRENGTH * color_luminance(pixel));
 

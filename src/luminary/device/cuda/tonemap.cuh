@@ -203,11 +203,21 @@ LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel, const AGXCustom
 
 LUMINARY_FUNCTION RGBF
   tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const RGBF color_correction, const AGXCustomParams agx_params) {
+  pixel = max_color(pixel, splat_color(0.0f));
+
   if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
     return pixel;
 
   if (device.settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
     return pixel;
+
+  pixel = scale_color(pixel, device.camera.exposure);
+
+  if (device.camera.purkinje)
+    pixel = purkinje_shift(pixel);
+
+  pixel = film_grain_apply(pixel, x, y);
+  pixel = tonemap_apply_transform(pixel, agx_params);
 
   if (device.camera.use_color_correction) {
     RGBF hsv = rgb_to_hsv(pixel);
@@ -224,17 +234,6 @@ LUMINARY_FUNCTION RGBF
 
     pixel = hsv_to_rgb(hsv);
   }
-
-  pixel = scale_color(pixel, device.camera.exposure);
-
-  if (device.camera.purkinje) {
-    pixel = purkinje_shift(pixel);
-  }
-
-  pixel = film_grain_apply(pixel, x, y);
-  pixel = max_color(pixel, splat_color(0.0f));
-
-  pixel = tonemap_apply_transform(pixel, agx_params);
 
   return pixel;
 }

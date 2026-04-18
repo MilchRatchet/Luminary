@@ -66,7 +66,7 @@ struct DeviceCamera {
   struct {
     float aspect_ratio;
     float film_grain_strength;
-    float film_grain_sensitity;
+    float film_grain_coarseness;
     uint32_t film_grains_per_pixel;
   } sensor;
 } typedef DeviceCamera;

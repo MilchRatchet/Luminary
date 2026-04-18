@@ -64,7 +64,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
 
   device_camera->sensor.aspect_ratio          = camera->sensor.aspect_ratio;
   device_camera->sensor.film_grain_strength   = camera->sensor.film_grain_strength;
-  device_camera->sensor.film_grain_sensitity  = camera->sensor.film_grain_sensitity;
+  device_camera->sensor.film_grain_coarseness = camera->sensor.film_grain_coarseness;
   device_camera->sensor.film_grains_per_pixel = camera->sensor.film_grains_per_pixel;
 
   device_camera->pos             = camera->pos;

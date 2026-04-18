@@ -377,7 +377,28 @@ LUMINARY_FUNCTION float random_dither_mask(const uint32_t x, const uint32_t y) {
 }
 
 LUMINARY_FUNCTION float random_grain(const uint32_t x, const uint32_t y, uint32_t layer_id) {
-  return random_uint16_t_to_float(random_uint16_t_base(0xfcbd6e15 + layer_id, x + y * device.settings.width));
+  const float coarseness = device.camera.sensor.film_grain_coarseness;
+  const float sigma      = 1.0f * coarseness + (1.0f / 3.0f) * (1.0f - coarseness);
+
+  const int32_t radius    = int(ceilf(3.0f * sigma));  // 3σ support
+  const float weight_term = 1.0f / (2.0f * sigma * sigma);
+
+  LUMINARY_ASSUME(radius <= 3 && radius >= 0);
+
+  float sum  = 0.0f;
+  float norm = 0.0f;
+
+  for (int32_t dy = -radius; dy <= radius; dy++) {
+    for (int32_t dx = -radius; dx <= radius; dx++) {
+      float w = expf(-(dx * dx + dy * dy) * weight_term);
+      float n = random_uint16_t_to_float(random_uint16_t_base(0xfcbd6e15 + layer_id, (x + dx) + (y + dy) * device.settings.width));
+
+      sum += w * n;
+      norm += w;
+    }
+  }
+
+  return sum / norm;
 }
 
 // Koopman, R. (2025). Some simple full-range inverse-normal approximations. J. Numer. Anal. Approx. Theory, 54(1), 111-116.
