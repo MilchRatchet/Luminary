@@ -14,6 +14,8 @@
 #include "particles.h"
 #include "sky.h"
 
+static _Atomic uint64_t _device_init_reference_count = 0;
+
 #ifdef CUDA_STALL_VALIDATION
 ThreadStatus* __cuda_stall_validation_macro_walltime;
 #endif
@@ -32,6 +34,11 @@ ThreadStatus* __cuda_stall_validation_macro_walltime;
   }
 
 void _device_init(void) {
+  uint64_t previous_reference_count = atomic_fetch_add_explicit(&_device_init_reference_count, 1, memory_order_seq_cst);
+
+  if (previous_reference_count > 0)
+    return;
+
   CUresult cuda_result = cuInit(0);
 
   if (cuda_result != CUDA_SUCCESS) {
@@ -56,6 +63,11 @@ void _device_init(void) {
 }
 
 void _device_shutdown(void) {
+  uint64_t previous_reference_count = atomic_fetch_sub_explicit(&_device_init_reference_count, 1, memory_order_seq_cst);
+
+  if (previous_reference_count > 1)
+    return;
+
 #ifdef CUDA_STALL_VALIDATION
   thread_status_destroy(&__cuda_stall_validation_macro_walltime);
 #endif

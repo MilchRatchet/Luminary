@@ -12,13 +12,11 @@ void luminary_init(void) {
   info_message("Build: %s (%s) - %s", LUMINARY_BRANCH_NAME, LUMINARY_VERSION_HASH, LUMINARY_VERSION_DATE);
 
   _host_memory_init();
-  _device_init();
 
   info_message("Luminary finished initialization.");
 }
 
 void luminary_shutdown(void) {
-  _device_shutdown();
   _host_memory_shutdown();
   _log_shutdown();
 }

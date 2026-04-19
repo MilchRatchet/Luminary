@@ -83,7 +83,9 @@ static_assert(
 // Failure handles
 ////////////////////////////////////////////////////////////////////
 
+#ifndef __cplusplus
 #define CUDA_STALL_VALIDATION
+#endif /* __cplusplus */
 
 #ifdef CUDA_STALL_VALIDATION
 

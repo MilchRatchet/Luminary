@@ -704,9 +704,7 @@ static LuminaryResult _device_manager_generate_bsdf_luts(DeviceManager* device_m
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_manager, void* args) {
-  LUM_UNUSED(args);
-
+static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
   ////////////////////////////////////////////////////////////////////
@@ -738,9 +736,7 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_manager, void* args) {
-  LUM_UNUSED(args);
-
+static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
   uint32_t device_count;
@@ -769,6 +765,59 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_init(DeviceManager* device_manager, DeviceManagerCreateInfo* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  _device_init();
+
+  __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
+
+  __FAILURE_HANDLE(device_library_create(&device_manager->library));
+
+  int32_t device_count;
+  CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
+
+  __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
+
+  for (int32_t device_id = 0; device_id < device_count; device_id++) {
+    // Skip devices that are not supposed to be used.
+    if ((args->device_mask & (1 << device_id)) == 0)
+      continue;
+
+    Device* device;
+    __FAILURE_HANDLE(device_create(&device, device_id));
+
+    __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Create internal members
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(device_result_interface_create(&device_manager->result_interface));
+  __FAILURE_HANDLE(adaptive_sampler_create(&device_manager->adaptive_sampler));
+  __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
+  __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
+  __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
+  __FAILURE_HANDLE(sky_stars_create(&device_manager->sky_stars));
+  __FAILURE_HANDLE(bsdf_lut_create(&device_manager->bsdf_lut));
+  __FAILURE_HANDLE(physical_camera_create(&device_manager->physical_camera));
+  __FAILURE_HANDLE(material_manager_create(&device_manager->materials));
+  __FAILURE_HANDLE(mesh_instance_manager_create(&device_manager->instances));
+
+  ////////////////////////////////////////////////////////////////////
+  // Setup
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
+  __FAILURE_HANDLE(_device_manager_compile_kernels(device_manager));
+  __FAILURE_HANDLE(_device_manager_initialize_devices(device_manager));
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerCreateInfo)));
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // API functions
 ////////////////////////////////////////////////////////////////////
@@ -783,43 +832,11 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
 
   device_manager->host = host;
 
-  __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
+  ////////////////////////////////////////////////////////////////////
+  // Create exposed members
+  ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(device_library_create(&device_manager->library));
-
-  int32_t device_count;
-  CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
-
-  __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
-
-  for (int32_t device_id = 0; device_id < device_count; device_id++) {
-    // Skip devices that are not supposed to be used.
-    if ((info.device_mask & (1 << device_id)) == 0)
-      continue;
-
-    Device* device;
-    __FAILURE_HANDLE(device_create(&device, device_id));
-
-    __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
-  }
-
-  __FAILURE_HANDLE(device_result_interface_create(&device_manager->result_interface));
-  __FAILURE_HANDLE(adaptive_sampler_create(&device_manager->adaptive_sampler));
-  __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
-  __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
-  __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
-  __FAILURE_HANDLE(sky_stars_create(&device_manager->sky_stars));
-  __FAILURE_HANDLE(bsdf_lut_create(&device_manager->bsdf_lut));
-  __FAILURE_HANDLE(physical_camera_create(&device_manager->physical_camera));
   __FAILURE_HANDLE(sample_time_create(&device_manager->sample_time));
-  __FAILURE_HANDLE(material_manager_create(&device_manager->materials));
-  __FAILURE_HANDLE(mesh_instance_manager_create(&device_manager->instances));
-
-  ////////////////////////////////////////////////////////////////////
-  // Select main device
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
 
   ////////////////////////////////////////////////////////////////////
   // Create work queue
@@ -835,20 +852,18 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   // Queue setup functions
   ////////////////////////////////////////////////////////////////////
 
+  DeviceManagerCreateInfo* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerCreateInfo), (void**) &args));
+
+  *args = info;
+
   QueueEntry entry;
   memset(&entry, 0, sizeof(QueueEntry));
 
-  entry.name       = "Kernel compilation";
-  entry.function   = (QueueEntryFunction) _device_manager_compile_kernels;
+  entry.name       = "Device Manager Initialization";
+  entry.function   = (QueueEntryFunction) _device_manager_init;
   entry.clear_func = (QueueEntryFunction) 0;
-  entry.args       = (void*) 0;
-
-  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
-
-  entry.name       = "Device initialization";
-  entry.function   = (QueueEntryFunction) _device_manager_initialize_devices;
-  entry.clear_func = (QueueEntryFunction) 0;
-  entry.args       = (void*) 0;
+  entry.args       = (DeviceManagerCreateInfo*) args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -1142,6 +1157,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
 
   __FAILURE_HANDLE(host_free(device_manager));
+
+  _device_shutdown();
 
   return LUMINARY_SUCCESS;
 }
