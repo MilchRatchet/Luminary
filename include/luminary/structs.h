@@ -128,18 +128,6 @@ LUMINARY_API struct LuminaryImage {
 ////////////////////////////////////////////////////////////////////
 
 // 3 bits reserved
-LUMINARY_API enum LuminaryFilter {
-  LUMINARY_FILTER_NONE       = 0,
-  LUMINARY_FILTER_GRAY       = 1,
-  LUMINARY_FILTER_SEPIA      = 2,
-  LUMINARY_FILTER_GAMEBOY    = 3,
-  LUMINARY_FILTER_2BITGRAY   = 4,
-  LUMINARY_FILTER_CRT        = 5,
-  LUMINARY_FILTER_BLACKWHITE = 6,
-  LUMINARY_FILTER_COUNT
-} typedef LuminaryFilter;
-
-// 3 bits reserved
 LUMINARY_API enum LuminaryToneMap {
   LUMINARY_TONEMAP_NONE       = 0,
   LUMINARY_TONEMAP_ACES       = 1,
@@ -190,7 +178,6 @@ LUMINARY_API struct LuminaryCamera {
   float agx_custom_slope;
   float agx_custom_power;
   float agx_custom_saturation;
-  LuminaryFilter filter;
   bool use_local_error_minimization;
   float bloom_blend;
   bool dithering;

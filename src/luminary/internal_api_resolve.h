@@ -21,7 +21,6 @@ typedef LuminaryOutputRequestProperties OutputRequestProperties;
 
 typedef LuminaryCamera Camera;
 typedef LuminaryApertureShape ApertureShape;
-typedef LuminaryFilter Filter;
 typedef LuminaryToneMap ToneMap;
 
 typedef LuminaryOcean Ocean;

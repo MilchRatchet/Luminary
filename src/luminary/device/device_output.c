@@ -36,7 +36,6 @@ LuminaryResult device_output_create(DeviceOutput** output) {
 
   (*output)->color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
   (*output)->agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
-  (*output)->filter           = LUMINARY_FILTER_NONE;
 
   return LUMINARY_SUCCESS;
 }
@@ -128,7 +127,6 @@ LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camer
   output->color_correction = camera->color_correction;
   output->agx_params =
     (AGXCustomParams) {.power = camera->agx_custom_power, .saturation = camera->agx_custom_saturation, .slope = camera->agx_custom_slope};
-  output->filter = camera->filter;
 
   return LUMINARY_SUCCESS;
 }
@@ -192,7 +190,6 @@ static LuminaryResult _device_output_generate_output(
   args.dst           = DEVICE_PTR(output->device_buffer);
   args.width         = width;
   args.height        = height;
-  args.filter        = output->filter;
   args.undersampling = device->undersampling_state;
 
   __FAILURE_HANDLE(

@@ -37,7 +37,6 @@ struct DeviceOutput {
   ARRAY DeviceOutputRequest* output_requests;
   RGBF color_correction;
   AGXCustomParams agx_params;
-  LuminaryFilter filter;
   bool recurring_output_is_dirty;
 } typedef DeviceOutput;
 

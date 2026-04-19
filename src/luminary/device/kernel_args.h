@@ -88,7 +88,6 @@ struct KernelArgsConvertRGBFToARGB8 {
   ARGB8* dst;
   uint32_t width;
   uint32_t height;
-  LuminaryFilter filter;
   uint8_t undersampling;
 } typedef KernelArgsConvertRGBFToARGB8;
 

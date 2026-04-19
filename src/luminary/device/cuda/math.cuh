@@ -1126,94 +1126,6 @@ LUMINARY_FUNCTION RGBAF saturate_albedo(RGBAF color, float change) {
   return color;
 }
 
-LUMINARY_FUNCTION RGBF filter_gray(const RGBF color) {
-  const float value = color_luminance(color);
-
-  return get_color(value, value, value);
-}
-
-LUMINARY_FUNCTION RGBF filter_sepia(const RGBF color) {
-  return get_color(
-    color.r * 0.393f + color.g * 0.769f + color.b * 0.189f, color.r * 0.349f + color.g * 0.686f + color.b * 0.168f,
-    color.r * 0.272f + color.g * 0.534f + color.b * 0.131f);
-}
-
-LUMINARY_FUNCTION RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 4.0f * color_luminance(color);
-  const float dither = random_dither_mask(x, y);
-
-  const int tone = (int) (value + dither);
-
-  switch (tone) {
-    case 0:
-      return get_color(15.0f / 255.0f, 56.0f / 255.0f, 15.0f / 255.0f);
-    case 1:
-      return get_color(48.0f / 255.0f, 98.0f / 255.0f, 48.0f / 255.0f);
-    case 2:
-      return get_color(139.0f / 255.0f, 172.0f / 255.0f, 15.0f / 255.0f);
-    case 3:
-    default:
-      return get_color(155.0f / 255.0f, 188.0f / 255.0f, 15.0f / 255.0f);
-  }
-}
-
-LUMINARY_FUNCTION RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 4.0f * color_luminance(color);
-  const float dither = random_dither_mask(x, y);
-
-  const int tone = (int) (value + dither);
-
-  switch (tone) {
-    case 0:
-      return get_color(0.0f, 0.0f, 0.0f);
-    case 1:
-      return get_color(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
-    case 2:
-      return get_color(2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f);
-    case 3:
-    default:
-      return get_color(1.0f, 1.0f, 1.0f);
-  }
-}
-
-LUMINARY_FUNCTION RGBF filter_crt(RGBF color, int x, int y) {
-  color = scale_color(color, 1.5f);
-
-  const int row = y % 3;
-
-  switch (row) {
-    case 0:
-      color.r = 0.0f;
-      color.g = 0.0f;
-      break;
-    case 1:
-      color.g = 0.0f;
-      color.b = 0.0f;
-      break;
-    case 2:
-      color.r = 0.0f;
-      color.b = 0.0f;
-      break;
-  }
-
-  return color;
-}
-
-LUMINARY_FUNCTION RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
-  const float value  = 2.0f * color_luminance(color);
-  const float dither = random_dither_mask(x, y);
-
-  const int tone = (int) (value + dither);
-
-  switch (tone) {
-    case 0:
-      return get_color(0.0f, 0.0f, 0.0f);
-    case 1:
-    default:
-      return get_color(1.0f, 1.0f, 1.0f);
-  }
-}
-
 LUMINARY_FUNCTION float henyey_greenstein_phase_function(const float cos_angle, const float g) {
   const float g2         = g * g;
   const float denom_term = 1.0f + g2 - 2.0f * g * cos_angle;
@@ -1253,12 +1165,12 @@ LUMINARY_FUNCTION JendersieEonParams jendersie_eon_phase_parameters(const float 
     params.w_d   = 0.026914f * (logf(d) - cosf(5.68947f * (logf(logf(d)) - 0.0292149f))) + 0.376475f;
   }
   else if (d >= 0.1f && d < 1.5f) {
-    params.g_hg = 0.862f - 0.143f * logf(d) * logf(d);
-    params.g_d  = 0.379685f
-                   * cosf(
-                     1.19692f * cosf(((logf(d) - 0.238604f) * (logf(d) + 1.00667f)) / (0.507522f - 0.15677f * logf(d))) + 1.37932f * logf(d)
-                     + 0.0625835f)
-                 + 0.344213f;
+    params.g_hg  = 0.862f - 0.143f * logf(d) * logf(d);
+    params.g_d   = 0.379685f
+                     * cosf(
+                       1.19692f * cosf(((logf(d) - 0.238604f) * (logf(d) + 1.00667f)) / (0.507522f - 0.15677f * logf(d))) + 1.37932f * logf(d)
+                       + 0.0625835f)
+                   + 0.344213f;
     params.alpha = 250.0f;
     params.w_d   = 0.146209f * cosf(3.38707f * logf(d) + 2.11193f) + 0.316072f + 0.0778917f * logf(d);
   }

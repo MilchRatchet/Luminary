@@ -155,14 +155,6 @@ const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   __BUILTIN_ENUM_PAIR(SHADING_MODE_NORMAL, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(SHADING_MODE_IDENTIFICATION, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(SHADING_MODE_LIGHTS, 1, LUM_VERSION_CURRENT),
-  // LuminaryFilter
-  __BUILTIN_ENUM_PAIR(FILTER_NONE, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(FILTER_GRAY, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(FILTER_SEPIA, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(FILTER_GAMEBOY, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(FILTER_2BITGRAY, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(FILTER_CRT, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(FILTER_BLACKWHITE, 1, LUM_VERSION_CURRENT),
   // LuminaryTonemap
   __BUILTIN_ENUM_PAIR(TONEMAP_NONE, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(TONEMAP_ACES, 1, LUM_VERSION_CURRENT),
@@ -257,7 +249,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_slope, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_power, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_saturation, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, filter, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_local_error_minimization, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, bloom_blend, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, dithering, 1, LUM_VERSION_CURRENT),
@@ -603,7 +594,6 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->agx_custom_slope             = 1.0f;
   camera->agx_custom_power             = 1.0f;
   camera->agx_custom_saturation        = 1.0f;
-  camera->filter                       = LUMINARY_FILTER_NONE;
   camera->purkinje                     = 1;
   camera->purkinje_kappa1              = 0.2f;
   camera->purkinje_kappa2              = 0.29f;
@@ -940,7 +930,6 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->agx_custom_slope             = camera->agx_custom_slope;
   dst_camera->agx_custom_power             = camera->agx_custom_power;
   dst_camera->agx_custom_saturation        = camera->agx_custom_saturation;
-  dst_camera->filter                       = camera->filter;
   dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
   dst_camera->bloom_blend                  = camera->bloom_blend;
   dst_camera->dithering                    = camera->dithering;
@@ -1228,7 +1217,6 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->agx_custom_slope             = camera->agx_custom_slope;
   dst_camera->agx_custom_power             = camera->agx_custom_power;
   dst_camera->agx_custom_saturation        = camera->agx_custom_saturation;
-  dst_camera->filter                       = camera->filter;
   dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
   dst_camera->bloom_blend                  = camera->bloom_blend;
   dst_camera->dithering                    = camera->dithering;

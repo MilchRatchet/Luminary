@@ -409,7 +409,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   uint32_t lens_template  = (uint32_t) camera.lens_template;
   uint32_t tonemap        = (uint32_t) camera.tonemap;
-  uint32_t filter         = (uint32_t) camera.filter;
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
 
   element_separator(
@@ -532,7 +531,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
   }
 
-  update_data |= _window_entity_properties_add_dropdown(data, "Filter", LUMINARY_FILTER_COUNT, (char**) luminary_strings_filter, &filter);
   update_data |= _window_entity_properties_add_checkbox(data, "Dithering", &camera.dithering);
 
   update_data |= _window_entity_properties_add_checkbox(data, "Color Correction", &camera.use_color_correction);
@@ -549,7 +547,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   if (update_data) {
     camera.lens_template  = (LuminaryLensTemplate) lens_template;
     camera.tonemap        = (LuminaryToneMap) tonemap;
-    camera.filter         = (LuminaryFilter) filter;
     camera.aperture_shape = (LuminaryApertureShape) aperture_shape;
 
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));

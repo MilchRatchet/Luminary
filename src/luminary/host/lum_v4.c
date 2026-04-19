@@ -238,7 +238,8 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FILTER__ */
     case 6872302014111172934u:
-      sscanf(value, "%u\n", &camera->filter);
+      // Legacy
+      // sscanf(value, "%u\n", &camera->filter);
       break;
     /* PURKINJE */
     case 4992889213596882256u:
@@ -249,7 +250,7 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
     case 5930749542479910226u:
       // Legacy, no longer a camera property
       // sscanf(value, "%f\n", &camera->russian_roulette_threshold);
-      // break;
+      break;
     /* FIREFLYC */
     case 4852993938162862406u:
       // Legacy

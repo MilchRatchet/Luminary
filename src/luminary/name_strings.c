@@ -15,16 +15,6 @@ const char* const luminary_strings_adaptive_sampling_output_mode[LUMINARY_ADAPTI
   [LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_SAMPLE_DISTRIBUTION] = "Sample Distribution",
 };
 
-const char* const luminary_strings_filter[LUMINARY_FILTER_COUNT] = {
-  [LUMINARY_FILTER_NONE]       = "None",
-  [LUMINARY_FILTER_GRAY]       = "Gray",
-  [LUMINARY_FILTER_SEPIA]      = "Sepia",
-  [LUMINARY_FILTER_GAMEBOY]    = "Gameboy",
-  [LUMINARY_FILTER_2BITGRAY]   = "2 Bit Gray",
-  [LUMINARY_FILTER_CRT]        = "CRT",
-  [LUMINARY_FILTER_BLACKWHITE] = "Black & White",
-};
-
 const char* const luminary_strings_tonemap[LUMINARY_TONEMAP_COUNT] = {
   [LUMINARY_TONEMAP_NONE]       = "None",
   [LUMINARY_TONEMAP_ACES]       = "ACES",

@@ -24,7 +24,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->agx_custom_slope             = 1.0f;
   camera->agx_custom_power             = 1.0f;
   camera->agx_custom_saturation        = 1.0f;
-  camera->filter                       = LUMINARY_FILTER_NONE;
   camera->purkinje                     = 1;
   camera->purkinje_kappa1              = 0.2f;
   camera->purkinje_kappa2              = 0.29f;
@@ -107,7 +106,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(bloom_blend, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(dithering, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(tonemap, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(filter, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje_kappa1, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje_kappa2, SCENE_DIRTY_FLAG_OUTPUT);

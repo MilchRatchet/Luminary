@@ -52,9 +52,9 @@ extern const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT];
 // LumBuiltin Enums
 ////////////////////////////////////////////////////////////////////
 
-#define LUM_BUILTIN_ENUM_COUNT                                                                            \
-  (LUMINARY_SHADING_MODE_COUNT + LUMINARY_FILTER_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_APERTURE_COUNT \
-   + LUMINARY_JERLOV_WATER_TYPE_COUNT + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT)
+#define LUM_BUILTIN_ENUM_COUNT                                                                                       \
+  (LUMINARY_SHADING_MODE_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_APERTURE_COUNT + LUMINARY_JERLOV_WATER_TYPE_COUNT \
+   + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT)
 
 struct LumBuiltinEnumValuePair {
   const char* string;
@@ -73,14 +73,6 @@ enum LumBuiltinEnum {
   LUM_BUILTIN_ENUM_SHADING_MODE_NORMAL         = LUMINARY_SHADING_MODE_NORMAL,
   LUM_BUILTIN_ENUM_SHADING_MODE_IDENTIFICATION = LUMINARY_SHADING_MODE_IDENTIFICATION,
   LUM_BUILTIN_ENUM_SHADING_MODE_LIGHTS         = LUMINARY_SHADING_MODE_LIGHTS,
-  // LuminaryFilter
-  LUM_BUILTIN_ENUM_FILTER_NONE       = LUMINARY_FILTER_NONE,
-  LUM_BUILTIN_ENUM_FILTER_GRAY       = LUMINARY_FILTER_GRAY,
-  LUM_BUILTIN_ENUM_FILTER_SEPIA      = LUMINARY_FILTER_SEPIA,
-  LUM_BUILTIN_ENUM_FILTER_GAMEBOY    = LUMINARY_FILTER_GAMEBOY,
-  LUM_BUILTIN_ENUM_FILTER_2BITGRAY   = LUMINARY_FILTER_2BITGRAY,
-  LUM_BUILTIN_ENUM_FILTER_CRT        = LUMINARY_FILTER_CRT,
-  LUM_BUILTIN_ENUM_FILTER_BLACKWHITE = LUMINARY_FILTER_BLACKWHITE,
   // LuminaryTonemap
   LUM_BUILTIN_ENUM_TONEMAP_NONE       = LUMINARY_TONEMAP_NONE,
   LUM_BUILTIN_ENUM_TONEMAP_ACES       = LUMINARY_TONEMAP_ACES,
@@ -198,7 +190,6 @@ struct LumBuiltinCamera {
   float agx_custom_slope;
   float agx_custom_power;
   float agx_custom_saturation;
-  LuminaryFilter filter;
   bool use_local_error_minimization;
   float bloom_blend;
   bool dithering;

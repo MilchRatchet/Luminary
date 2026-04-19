@@ -602,29 +602,6 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
       pixel = get_color(red, green, blue);
     }
 
-    switch (args.filter) {
-      case LUMINARY_FILTER_NONE:
-        break;
-      case LUMINARY_FILTER_GRAY:
-        pixel = filter_gray(pixel);
-        break;
-      case LUMINARY_FILTER_SEPIA:
-        pixel = filter_sepia(pixel);
-        break;
-      case LUMINARY_FILTER_GAMEBOY:
-        pixel = filter_gameboy(pixel, x, y);
-        break;
-      case LUMINARY_FILTER_2BITGRAY:
-        pixel = filter_2bitgray(pixel, x, y);
-        break;
-      case LUMINARY_FILTER_CRT:
-        pixel = filter_crt(pixel, x, y);
-        break;
-      case LUMINARY_FILTER_BLACKWHITE:
-        pixel = filter_blackwhite(pixel, x, y);
-        break;
-    }
-
     const float dither = (device.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
 
     pixel = color_linear_to_sRGB(pixel);
