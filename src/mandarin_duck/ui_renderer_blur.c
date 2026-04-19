@@ -1,275 +1,247 @@
 #include "ui_renderer_blur.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "display.h"
 
-/*
- * Based on the implementation in https://github.com/FigBug/Gin
- */
-
-static uint16_t const stackblur_mul[255] = {
-  512, 512, 456, 512, 328, 456, 335, 512, 405, 328, 271, 456, 388, 335, 292, 512, 454, 405, 364, 328, 298, 271, 496, 456, 420, 388,
-  360, 335, 312, 292, 273, 512, 482, 454, 428, 405, 383, 364, 345, 328, 312, 298, 284, 271, 259, 496, 475, 456, 437, 420, 404, 388,
-  374, 360, 347, 335, 323, 312, 302, 292, 282, 273, 265, 512, 497, 482, 468, 454, 441, 428, 417, 405, 394, 383, 373, 364, 354, 345,
-  337, 328, 320, 312, 305, 298, 291, 284, 278, 271, 265, 259, 507, 496, 485, 475, 465, 456, 446, 437, 428, 420, 412, 404, 396, 388,
-  381, 374, 367, 360, 354, 347, 341, 335, 329, 323, 318, 312, 307, 302, 297, 292, 287, 282, 278, 273, 269, 265, 261, 512, 505, 497,
-  489, 482, 475, 468, 461, 454, 447, 441, 435, 428, 422, 417, 411, 405, 399, 394, 389, 383, 378, 373, 368, 364, 359, 354, 350, 345,
-  341, 337, 332, 328, 324, 320, 316, 312, 309, 305, 301, 298, 294, 291, 287, 284, 281, 278, 274, 271, 268, 265, 262, 259, 257, 507,
-  501, 496, 491, 485, 480, 475, 470, 465, 460, 456, 451, 446, 442, 437, 433, 428, 424, 420, 416, 412, 408, 404, 400, 396, 392, 388,
-  385, 381, 377, 374, 370, 367, 363, 360, 357, 354, 350, 347, 344, 341, 338, 335, 332, 329, 326, 323, 320, 318, 315, 312, 310, 307,
-  304, 302, 299, 297, 294, 292, 289, 287, 285, 282, 280, 278, 275, 273, 271, 269, 267, 265, 263, 261, 259};
-
-static uint8_t const stackblur_shr[255] = {
-  9,  11, 12, 13, 13, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19,
-  19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21,
-  21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22,
-  22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23,
-  23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
-  23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
-  24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
-  24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24};
+#define BLUR_MAX_SUPPORTED_DIM (7680)
 
 static void _ui_renderer_stack_blur_generic(
-  const uint8_t* src, uint32_t width, uint32_t height, uint32_t src_ld, uint32_t x, uint32_t y, uint32_t radius, uint8_t* dst,
-  uint32_t dst_ld) {
+  const uint8_t* restrict src, uint32_t width, uint32_t height, uint32_t src_ld, uint32_t x, uint32_t y, uint32_t radius,
+  uint8_t* restrict dst, uint32_t dst_ld) {
   const uint32_t cols = width;
   const uint32_t rows = height;
 
   if (radius > 254 || radius < 2) {
-    crash_message("Invalid blur radius");
+    error_message("Invalid blur radius. Skipping blur...");
+    return;
   }
 
-  // TODO: We don't need this to be inplace, see if I can improve performance by using the property.
-  src = src + x * sizeof(LuminaryARGB8) + y * src_ld;
-  for (uint32_t row = 0; row < rows; row++) {
-    memcpy(dst + row * dst_ld, src + row * src_ld, sizeof(LuminaryARGB8) * width);
+  if (rows > BLUR_MAX_SUPPORTED_DIM || cols > BLUR_MAX_SUPPORTED_DIM) {
+    error_message("Blur not supported for given dimensions. Skipping blur...");
+    return;
   }
 
-  uint8_t stack[(254 * 2 + 1) * 4];
+  const size_t pixel_size = sizeof(LuminaryARGB8);
 
-  uint32_t xp, yp, sp, stack_start;
+  /* Copy source rectangle into destination buffer (inplace target for results) */
+  src = src + x * pixel_size + y * src_ld;
 
-  uint8_t* stack_ptr = (uint8_t*) 0;
+  size_t row_bytes = pixel_size * (size_t) cols;
+  for (uint32_t row = 0; row < rows; row++)
+    memcpy(dst + row * dst_ld, src + row * src_ld, row_bytes);
 
-  uint64_t sum_r, sum_g, sum_b, sum_a, sum_in_r, sum_in_g, sum_in_b, sum_in_a, sum_out_r, sum_out_g, sum_out_b, sum_out_a;
+  uint8_t scratch_buffer[BLUR_MAX_SUPPORTED_DIM * sizeof(LuminaryARGB8)];
 
   uint32_t last_col = cols - 1;
   uint32_t last_row = rows - 1;
-  uint32_t div      = (radius * 2) + 1;
-  uint32_t mul_sum  = stackblur_mul[radius];
-  uint8_t shr_sum   = stackblur_shr[radius];
 
-  for (uint32_t row = 0; row < rows; row++) {
-    sum_r = sum_g = sum_b = sum_a = sum_in_r = sum_in_g = sum_in_b = sum_in_a = sum_out_r = sum_out_g = sum_out_b = sum_out_a = 0;
+  const uint32_t L     = radius + 1; /* box length */
+  const uint32_t left  = (L - 1) / 2;
+  const uint32_t right = (L - 1) - left;
 
-    const uint8_t* src_ptr = dst + row * dst_ld;
+  /* Precompute normalization multiplier and shift to avoid divisions */
+  const int NORM_SHIFT    = 20;
+  const uint32_t norm_mul = (uint32_t) (((1ULL << NORM_SHIFT) + (L / 2)) / L);
 
-    for (uint32_t i = 0; i <= radius; i++) {
-      stack_ptr    = &stack[4 * i];
-      stack_ptr[0] = src_ptr[0];
-      stack_ptr[1] = src_ptr[1];
-      stack_ptr[2] = src_ptr[2];
-      stack_ptr[3] = src_ptr[3];
-      sum_r += src_ptr[0] * (i + 1);
-      sum_g += src_ptr[1] * (i + 1);
-      sum_b += src_ptr[2] * (i + 1);
-      sum_a += src_ptr[3] * (i + 1);
-      sum_out_r += src_ptr[0];
-      sum_out_g += src_ptr[1];
-      sum_out_b += src_ptr[2];
-      sum_out_a += src_ptr[3];
+  /* Horizontal two-pass (per-row). First pass: dst(row) -> row_tmp, second pass: row_tmp -> dst(row). */
+  for (uint32_t row = 0; row < rows; ++row) {
+    const uint8_t* restrict row_src = dst + row * dst_ld;
+    uint8_t* restrict tmp_dst       = scratch_buffer;
+
+    uint32_t sum_r = 0, sum_g = 0, sum_b = 0, sum_a = 0;
+    for (int k = -(int) left; k <= (int) right; ++k) {
+      int pos = k;
+      if (pos < 0)
+        pos = 0;
+      if ((uint32_t) pos > last_col)
+        pos = (int) last_col;
+      const uint8_t* restrict p = row_src + ((uint32_t) pos) * pixel_size;
+      sum_r += p[0];
+      sum_g += p[1];
+      sum_b += p[2];
+      sum_a += p[3];
     }
 
-    for (uint32_t i = 1; i <= radius; ++i) {
-      if (i <= last_col)
-        src_ptr += 4;
+    for (uint32_t col = 0; col < cols; ++col) {
+      uint32_t out_r = (uint32_t) ((sum_r * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_g = (uint32_t) ((sum_g * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_b = (uint32_t) ((sum_b * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_a = (uint32_t) ((sum_a * (uint64_t) norm_mul) >> NORM_SHIFT);
 
-      stack_ptr    = &stack[4 * (i + radius)];
-      stack_ptr[0] = src_ptr[0];
-      stack_ptr[1] = src_ptr[1];
-      stack_ptr[2] = src_ptr[2];
-      stack_ptr[3] = src_ptr[3];
-      sum_r += src_ptr[0] * (radius + 1 - i);
-      sum_g += src_ptr[1] * (radius + 1 - i);
-      sum_b += src_ptr[2] * (radius + 1 - i);
-      sum_a += src_ptr[3] * (radius + 1 - i);
-      sum_in_r += src_ptr[0];
-      sum_in_g += src_ptr[1];
-      sum_in_b += src_ptr[2];
-      sum_in_a += src_ptr[3];
+      uint8_t* restrict od = tmp_dst + col * pixel_size;
+
+      od[0] = (uint8_t) out_r;
+      od[1] = (uint8_t) out_g;
+      od[2] = (uint8_t) out_b;
+      od[3] = (uint8_t) out_a;
+
+      int remove_idx = (int) col - (int) left;
+      if (remove_idx < 0)
+        remove_idx = 0;
+      if ((uint32_t) remove_idx > last_col)
+        remove_idx = (int) last_col;
+      int add_idx = (int) col + (int) right + 1;
+      if (add_idx < 0)
+        add_idx = 0;
+      if ((uint32_t) add_idx > last_col)
+        add_idx = (int) last_col;
+
+      const uint8_t* restrict p_remove = row_src + ((uint32_t) remove_idx) * pixel_size;
+      const uint8_t* restrict p_add    = row_src + ((uint32_t) add_idx) * pixel_size;
+
+      sum_r += (int) p_add[0] - (int) p_remove[0];
+      sum_g += (int) p_add[1] - (int) p_remove[1];
+      sum_b += (int) p_add[2] - (int) p_remove[2];
+      sum_a += (int) p_add[3] - (int) p_remove[3];
     }
 
-    sp = radius;
-    xp = radius;
-    if (xp > last_col)
-      xp = last_col;
+    /* second pass */
+    uint32_t sum2_r = 0, sum2_g = 0, sum2_b = 0, sum2_a = 0;
+    for (int k = -(int) left; k <= (int) right; ++k) {
+      int pos = k;
+      if (pos < 0)
+        pos = 0;
+      if ((uint32_t) pos > last_col)
+        pos = (int) last_col;
+      const uint8_t* restrict p = tmp_dst + ((uint32_t) pos) * pixel_size;
+      sum2_r += p[0];
+      sum2_g += p[1];
+      sum2_b += p[2];
+      sum2_a += p[3];
+    }
 
-    src_ptr          = dst + row * dst_ld + xp * sizeof(LuminaryARGB8);
-    uint8_t* dst_ptr = dst + row * dst_ld;
+    uint8_t* restrict row_dst = dst + row * dst_ld;
+    for (uint32_t col = 0; col < cols; ++col) {
+      uint32_t out_r = (uint32_t) ((sum2_r * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_g = (uint32_t) ((sum2_g * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_b = (uint32_t) ((sum2_b * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_a = (uint32_t) ((sum2_a * (uint64_t) norm_mul) >> NORM_SHIFT);
 
-    for (uint32_t col = 0; col < cols; col++) {
-      dst_ptr[0] = (uint8_t) ((sum_r * mul_sum) >> shr_sum);
-      dst_ptr[1] = (uint8_t) ((sum_g * mul_sum) >> shr_sum);
-      dst_ptr[2] = (uint8_t) ((sum_b * mul_sum) >> shr_sum);
-      dst_ptr[3] = (uint8_t) ((sum_a * mul_sum) >> shr_sum);
-      dst_ptr += 4;
+      uint8_t* restrict od = row_dst + col * pixel_size;
 
-      sum_r -= sum_out_r;
-      sum_g -= sum_out_g;
-      sum_b -= sum_out_b;
-      sum_a -= sum_out_a;
+      od[0] = (uint8_t) out_r;
+      od[1] = (uint8_t) out_g;
+      od[2] = (uint8_t) out_b;
+      od[3] = (uint8_t) out_a;
 
-      stack_start = sp + div - radius;
+      int remove_idx = (int) col - (int) left;
+      if (remove_idx < 0)
+        remove_idx = 0;
+      if ((uint32_t) remove_idx > last_col)
+        remove_idx = (int) last_col;
+      int add_idx = (int) col + (int) right + 1;
+      if (add_idx < 0)
+        add_idx = 0;
+      if ((uint32_t) add_idx > last_col)
+        add_idx = (int) last_col;
 
-      if (stack_start >= div)
-        stack_start -= div;
+      const uint8_t* restrict p_remove = tmp_dst + ((uint32_t) remove_idx) * pixel_size;
+      const uint8_t* restrict p_add    = tmp_dst + ((uint32_t) add_idx) * pixel_size;
 
-      stack_ptr = &stack[4 * stack_start];
-
-      sum_out_r -= stack_ptr[0];
-      sum_out_g -= stack_ptr[1];
-      sum_out_b -= stack_ptr[2];
-      sum_out_a -= stack_ptr[3];
-
-      if (xp < last_col) {
-        src_ptr += 4;
-        ++xp;
-      }
-
-      stack_ptr[0] = src_ptr[0];
-      stack_ptr[1] = src_ptr[1];
-      stack_ptr[2] = src_ptr[2];
-      stack_ptr[3] = src_ptr[3];
-
-      sum_in_r += src_ptr[0];
-      sum_in_g += src_ptr[1];
-      sum_in_b += src_ptr[2];
-      sum_in_a += src_ptr[3];
-      sum_r += sum_in_r;
-      sum_g += sum_in_g;
-      sum_b += sum_in_b;
-      sum_a += sum_in_a;
-
-      ++sp;
-      if (sp >= div)
-        sp = 0;
-
-      stack_ptr = &stack[sp * 4];
-
-      sum_out_r += stack_ptr[0];
-      sum_out_g += stack_ptr[1];
-      sum_out_b += stack_ptr[2];
-      sum_out_a += stack_ptr[3];
-      sum_in_r -= stack_ptr[0];
-      sum_in_g -= stack_ptr[1];
-      sum_in_b -= stack_ptr[2];
-      sum_in_a -= stack_ptr[3];
+      sum2_r += (int) p_add[0] - (int) p_remove[0];
+      sum2_g += (int) p_add[1] - (int) p_remove[1];
+      sum2_b += (int) p_add[2] - (int) p_remove[2];
+      sum2_a += (int) p_add[3] - (int) p_remove[3];
     }
   }
 
-  for (uint32_t col = 0; col < cols; col++) {
-    sum_r = sum_g = sum_b = sum_a = sum_in_r = sum_in_g = sum_in_b = sum_in_a = sum_out_r = sum_out_g = sum_out_b = sum_out_a = 0;
-
-    const uint8_t* src_ptr = dst + col * sizeof(LuminaryARGB8);
-
-    for (uint32_t i = 0; i <= radius; i++) {
-      stack_ptr    = &stack[i * 4];
-      stack_ptr[0] = src_ptr[0];
-      stack_ptr[1] = src_ptr[1];
-      stack_ptr[2] = src_ptr[2];
-      stack_ptr[3] = src_ptr[3];
-      sum_r += src_ptr[0] * (i + 1);
-      sum_g += src_ptr[1] * (i + 1);
-      sum_b += src_ptr[2] * (i + 1);
-      sum_a += src_ptr[3] * (i + 1);
-      sum_out_r += src_ptr[0];
-      sum_out_g += src_ptr[1];
-      sum_out_b += src_ptr[2];
-      sum_out_a += src_ptr[3];
+  /* Vertical two-pass (per-column). First pass: dst(column) -> col_tmp, second pass: col_tmp -> dst(column). */
+  for (uint32_t col = 0; col < cols; ++col) {
+    uint32_t sum_r = 0, sum_g = 0, sum_b = 0, sum_a = 0;
+    for (int k = -(int) left; k <= (int) right; ++k) {
+      int pos = k;
+      if (pos < 0)
+        pos = 0;
+      if ((uint32_t) pos > last_row)
+        pos = (int) last_row;
+      const uint8_t* restrict p = dst + ((uint32_t) pos) * dst_ld + col * pixel_size;
+      sum_r += p[0];
+      sum_g += p[1];
+      sum_b += p[2];
+      sum_a += p[3];
     }
 
-    for (uint32_t i = 1; i <= radius; i++) {
-      if (i <= last_row)
-        src_ptr += dst_ld;
+    for (uint32_t row = 0; row < rows; ++row) {
+      uint8_t* restrict od = scratch_buffer + (size_t) row * pixel_size;
 
-      stack_ptr    = &stack[4 * (i + radius)];
-      stack_ptr[0] = src_ptr[0];
-      stack_ptr[1] = src_ptr[1];
-      stack_ptr[2] = src_ptr[2];
-      stack_ptr[3] = src_ptr[3];
-      sum_r += src_ptr[0] * (radius + 1 - i);
-      sum_g += src_ptr[1] * (radius + 1 - i);
-      sum_b += src_ptr[2] * (radius + 1 - i);
-      sum_a += src_ptr[3] * (radius + 1 - i);
-      sum_in_r += src_ptr[0];
-      sum_in_g += src_ptr[1];
-      sum_in_b += src_ptr[2];
-      sum_in_a += src_ptr[3];
+      uint32_t out_r = (uint32_t) ((sum_r * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_g = (uint32_t) ((sum_g * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_b = (uint32_t) ((sum_b * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_a = (uint32_t) ((sum_a * (uint64_t) norm_mul) >> NORM_SHIFT);
+
+      od[0] = (uint8_t) out_r;
+      od[1] = (uint8_t) out_g;
+      od[2] = (uint8_t) out_b;
+      od[3] = (uint8_t) out_a;
+
+      int remove_idx = (int) row - (int) left;
+      if (remove_idx < 0)
+        remove_idx = 0;
+      if ((uint32_t) remove_idx > last_row)
+        remove_idx = (int) last_row;
+      int add_idx = (int) row + (int) right + 1;
+      if (add_idx < 0)
+        add_idx = 0;
+      if ((uint32_t) add_idx > last_row)
+        add_idx = (int) last_row;
+
+      const uint8_t* restrict p_remove = dst + ((uint32_t) remove_idx) * dst_ld + col * pixel_size;
+      const uint8_t* restrict p_add    = dst + ((uint32_t) add_idx) * dst_ld + col * pixel_size;
+
+      sum_r += (int) p_add[0] - (int) p_remove[0];
+      sum_g += (int) p_add[1] - (int) p_remove[1];
+      sum_b += (int) p_add[2] - (int) p_remove[2];
+      sum_a += (int) p_add[3] - (int) p_remove[3];
     }
 
-    sp = radius;
-    yp = radius;
-    if (yp > last_row)
-      yp = last_row;
+    /* second vertical pass: col_tmp -> dst column */
+    uint32_t sum2_r = 0, sum2_g = 0, sum2_b = 0, sum2_a = 0;
+    for (int k = -(int) left; k <= (int) right; ++k) {
+      int pos = k;
+      if (pos < 0)
+        pos = 0;
+      if ((uint32_t) pos > last_row)
+        pos = (int) last_row;
+      const uint8_t* restrict p = scratch_buffer + ((uint32_t) pos) * pixel_size;
+      sum2_r += p[0];
+      sum2_g += p[1];
+      sum2_b += p[2];
+      sum2_a += p[3];
+    }
 
-    src_ptr          = dst + yp * dst_ld + col * sizeof(LuminaryARGB8);
-    uint8_t* dst_ptr = dst + col * sizeof(LuminaryARGB8);
+    for (uint32_t row = 0; row < rows; ++row) {
+      uint8_t* restrict od = dst + (size_t) row * dst_ld + col * pixel_size;
 
-    for (uint32_t row = 0; row < rows; row++) {
-      dst_ptr[0] = (uint8_t) ((sum_r * mul_sum) >> shr_sum);
-      dst_ptr[1] = (uint8_t) ((sum_g * mul_sum) >> shr_sum);
-      dst_ptr[2] = (uint8_t) ((sum_b * mul_sum) >> shr_sum);
-      dst_ptr[3] = (uint8_t) ((sum_a * mul_sum) >> shr_sum);
-      dst_ptr += dst_ld;
+      uint32_t out_r = (uint32_t) ((sum2_r * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_g = (uint32_t) ((sum2_g * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_b = (uint32_t) ((sum2_b * (uint64_t) norm_mul) >> NORM_SHIFT);
+      uint32_t out_a = (uint32_t) ((sum2_a * (uint64_t) norm_mul) >> NORM_SHIFT);
 
-      sum_r -= sum_out_r;
-      sum_g -= sum_out_g;
-      sum_b -= sum_out_b;
-      sum_a -= sum_out_a;
+      od[0] = (uint8_t) out_r;
+      od[1] = (uint8_t) out_g;
+      od[2] = (uint8_t) out_b;
+      od[3] = (uint8_t) out_a;
 
-      stack_start = sp + div - radius;
-      if (stack_start >= div)
-        stack_start -= div;
+      int remove_idx = (int) row - (int) left;
+      if (remove_idx < 0)
+        remove_idx = 0;
+      if ((uint32_t) remove_idx > last_row)
+        remove_idx = (int) last_row;
+      int add_idx = (int) row + (int) right + 1;
+      if (add_idx < 0)
+        add_idx = 0;
+      if ((uint32_t) add_idx > last_row)
+        add_idx = (int) last_row;
 
-      stack_ptr = &stack[4 * stack_start];
+      const uint8_t* restrict p_remove = scratch_buffer + ((uint32_t) remove_idx) * pixel_size;
+      const uint8_t* restrict p_add    = scratch_buffer + ((uint32_t) add_idx) * pixel_size;
 
-      sum_out_r -= stack_ptr[0];
-      sum_out_g -= stack_ptr[1];
-      sum_out_b -= stack_ptr[2];
-      sum_out_a -= stack_ptr[3];
-
-      if (yp < last_row) {
-        src_ptr += dst_ld;
-        ++yp;
-      }
-
-      stack_ptr[0] = src_ptr[0];
-      stack_ptr[1] = src_ptr[1];
-      stack_ptr[2] = src_ptr[2];
-      stack_ptr[3] = src_ptr[3];
-
-      sum_in_r += src_ptr[0];
-      sum_in_g += src_ptr[1];
-      sum_in_b += src_ptr[2];
-      sum_in_a += src_ptr[3];
-      sum_r += sum_in_r;
-      sum_g += sum_in_g;
-      sum_b += sum_in_b;
-      sum_a += sum_in_a;
-
-      ++sp;
-      if (sp >= div)
-        sp = 0;
-
-      stack_ptr = &stack[sp * 4];
-
-      sum_out_r += stack_ptr[0];
-      sum_out_g += stack_ptr[1];
-      sum_out_b += stack_ptr[2];
-      sum_out_a += stack_ptr[3];
-      sum_in_r -= stack_ptr[0];
-      sum_in_g -= stack_ptr[1];
-      sum_in_b -= stack_ptr[2];
-      sum_in_a -= stack_ptr[3];
+      sum2_r += (int) p_add[0] - (int) p_remove[0];
+      sum2_g += (int) p_add[1] - (int) p_remove[1];
+      sum2_b += (int) p_add[2] - (int) p_remove[2];
+      sum2_a += (int) p_add[3] - (int) p_remove[3];
     }
   }
 }
