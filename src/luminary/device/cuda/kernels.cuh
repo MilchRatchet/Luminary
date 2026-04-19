@@ -388,9 +388,6 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
   }
 }
 
-#define SORT_TYPE_NUM_BITS 12
-#define SORT_TYPE_MASK ((1 << SORT_TYPE_NUM_BITS) - 1)
-
 LUMINARY_KERNEL void tasks_sort() {
   HANDLE_DEVICE_ABORT();
 
@@ -436,48 +433,41 @@ LUMINARY_KERNEL void tasks_sort() {
 
   LUMINARY_ASSUME(max_warp_task_count <= MAXIMUM_TASKS_PER_THREAD);
 
-  uint64_t offset_mask = 0;
-
   for (uint32_t task_id = 0; task_id < max_warp_task_count; task_id++) {
     HANDLE_DEVICE_ABORT();
 
-    // Due to the prefix sum, all threads must always keep participating, the actual load/stores must hence be predicated off.
+    // Due to __ballot_sync, all threads must always keep participating; actual load/stores are predicated off.
     const bool thread_predicate = task_id < task_count;
 
-    DeviceTask task;
-    DeviceTaskTrace trace;
-    DeviceTaskThroughput throughput;
-    DeviceTaskMediumStack medium;
+    DeviceTaskState state;
     ShadingTaskIndex index = SHADING_TASK_INDEX_INVALID;
 
     if (thread_predicate) {
       const uint32_t src_task_base_address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
 
-      task       = task_load(src_task_base_address);
-      trace      = task_trace_load(src_task_base_address);
-      throughput = task_throughput_load(src_task_base_address);
-      medium     = task_medium_load(src_task_base_address);
-
-      index = shading_task_index_from_instance_id(trace.handle.instance_id);
+      state = task_state_load(src_task_base_address);
+      index = shading_task_index_from_instance_id(state.trace_result.handle.instance_id);
     }
 
-    const uint64_t index_entry     = (index != SHADING_TASK_INDEX_INVALID) ? ((uint64_t) 1) << (index * SORT_TYPE_NUM_BITS) : 0;
-    const uint64_t offset_result   = offset_mask + warp_reduce_prefixsum(index_entry) - index_entry;
-    const uint64_t warp_sum_offset = warp_reduce_sum(index_entry);
-    offset_mask += warp_sum_offset;
+    uint32_t dst_task_base_address;
 
-    // It is important that threads participate in the reduction even when their task is invalid so their mask stays synced.
-    if ((thread_predicate == false) || (index == SHADING_TASK_INDEX_INVALID))
-      continue;
+#pragma unroll
+    for (uint32_t task_index = 0; task_index < SHADING_TASK_INDEX_TOTAL; task_index++) {
+      const uint32_t ballot     = __ballot_sync(0xFFFFFFFF, (index == (ShadingTaskIndex) task_index));
+      const uint32_t type_count = __popc(ballot);
 
-    const uint32_t dst_offset = warp_offsets[index] + (((uint32_t) (offset_result >> (index * SORT_TYPE_NUM_BITS))) & SORT_TYPE_MASK);
+      if (index == (ShadingTaskIndex) task_index) {
+        const uint32_t rank       = __popc(ballot & ((1u << thread_id_in_warp) - 1));
+        const uint32_t dst_offset = warp_offsets[task_index] + rank;
 
-    const uint32_t dst_task_base_address = task_arbitrary_warp_address(dst_offset, TASK_STATE_BUFFER_INDEX_POSTSORT);
+        dst_task_base_address = task_arbitrary_warp_address(dst_offset, TASK_STATE_BUFFER_INDEX_POSTSORT);
+      }
 
-    task_store(dst_task_base_address, task);
-    task_trace_store(dst_task_base_address, trace);
-    task_throughput_store(dst_task_base_address, throughput);
-    task_medium_store(dst_task_base_address, medium);
+      warp_offsets[task_index] += type_count;
+    }
+
+    if (thread_predicate)
+      task_state_store(dst_task_base_address, state);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = 0;

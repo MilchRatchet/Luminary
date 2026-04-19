@@ -196,6 +196,10 @@ LUMINARY_FUNCTION void store_task_state(
   }
 }
 
+LUMINARY_FUNCTION DeviceTaskState task_state_load(const uint32_t base_address) {
+  return load_task_state<DeviceTaskState, float4>(device.ptrs.task_states, base_address, 0);
+}
+
 LUMINARY_FUNCTION DeviceTask task_load(const uint32_t base_address) {
   return load_task_state<DeviceTask, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, task));
 }
@@ -214,6 +218,12 @@ LUMINARY_FUNCTION DeviceTaskMediumStack task_medium_load(const uint32_t base_add
 
 LUMINARY_FUNCTION DeviceTaskResult task_result_load(const uint32_t base_address) {
   return load_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0);
+}
+
+// Store
+
+LUMINARY_FUNCTION void task_state_store(const uint32_t base_address, const DeviceTaskState data) {
+  store_task_state<DeviceTaskState, float4>(device.ptrs.task_states, base_address, 0, data);
 }
 
 // DeviceTask
