@@ -141,12 +141,15 @@ LUMINARY_FUNCTION CloudRenderResult
   const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
+  // Evaluate ambient sky radiance and cloud self-shadowing once at the initial march position.
+  // Within the narrow cloud layer the variation of both quantities with position is small
+  // relative to the Monte Carlo noise, making a single evaluation a sound approximation.
+  const vec3 initial_pos              = add_vector(origin, scale_vector(ray, reach));
+  const RGBF ambient_color            = sky_get_color(initial_pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, path_id);
+  const float ambient_extinction_base = cloud_extinction(initial_pos, ambient_ray, layer);
+
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
-
-    if (!hit) {
-      hit_dist = reach;
-    }
 
     const float height = cloud_height(pos, layer);
 
@@ -164,11 +167,10 @@ LUMINARY_FUNCTION CloudRenderResult
     const float density = cloud_density(pos, height, weather, 0.0f, layer);
 
     if (density > 0.0f) {
-      hit = true;
-
-      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, path_id);
-
-      float ambient_extinction = cloud_extinction(pos, ambient_ray, layer);
+      if (hit == false) {
+        hit_dist = reach;
+        hit      = true;
+      }
 
       RGBF sun_color;
       float sun_extinction;
@@ -190,12 +192,21 @@ LUMINARY_FUNCTION CloudRenderResult
         sun_cos_angle  = 0.0f;
       }
 
-      float scattering   = density * CLOUD_SCATTERING_DENSITY;
-      float extinction   = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
-      float phase_factor = 1.0f;
-      for (int i = 0; i < device.cloud.octaves; i++) {
+      float scattering            = density * CLOUD_SCATTERING_DENSITY;
+      const float extinction_init = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
+      float ambient_extinction    = ambient_extinction_base;
+      float phase_factor          = 1.0f;
+      // Precompute step_trans for oct=0, anticipating the first CLOUD_OCTAVE_EXTINCTION_FACTOR
+      // halving. Subsequent octaves are obtained by taking the square root, which is valid
+      // because CLOUD_OCTAVE_EXTINCTION_FACTOR == 0.5: halving extinction squares step_trans.
+      const float step_trans_oct0 = expf(-extinction_init * CLOUD_OCTAVE_EXTINCTION_FACTOR * step_size);
+      float step_trans_running    = step_trans_oct0;
+      // Precompute 1/extinction for oct=0 (== 2/extinction_init) and double each octave
+      // instead of recomputing via division, saving one MUFU.RCP per octave.
+      float rcp_extinction = 2.0f / extinction_init;
+
+      for (int oct = 0; oct < device.cloud.octaves; oct++) {
         scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
-        extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
 
         const float sun_phase     = jendersie_eon_phase_function(sun_cos_angle, params, phase_factor);
         const float ambient_phase = jendersie_eon_phase_function(ambient_cos_angle, params, phase_factor);
@@ -210,13 +221,19 @@ LUMINARY_FUNCTION CloudRenderResult
         RGBF S = add_color(sun_color_i, ambient_color_i);
         S      = scale_color(S, scattering);
 
-        const float step_trans = expf(-extinction * step_size);
-
-        S               = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
+        S               = scale_color(sub_color(S, scale_color(S, step_trans_running)), rcp_extinction);
         scattered_light = add_color(scattered_light, scale_color(S, transmittance));
+
+        // Prepare for next octave: CLOUD_OCTAVE_EXTINCTION_FACTOR == 0.5 means halving
+        // extinction is equivalent to squaring step_trans; rcp_extinction doubles.
+        step_trans_running = sqrtf(step_trans_running);
+        rcp_extinction *= 2.0f;
       }
 
-      transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
+      // step_trans_oct0^2 == expf(-extinction_init * step_size), valid because
+      // CLOUD_OCTAVE_EXTINCTION_FACTOR == 0.5 and extinction_init == fmaxf(...) which
+      // is effectively density * CLOUD_EXTINCTION_DENSITY for any meaningful density.
+      transmittance *= step_trans_oct0 * step_trans_oct0;
 
       if (transmittance < 0.1f) {
         transmittance = 0.0f;
