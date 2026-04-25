@@ -143,6 +143,10 @@ LUMINARY_API enum LuminaryLensTemplate {
   LUMINARY_LENS_TEMPLATE_THIN_LENS,
   LUMINARY_LENS_TEMPLATE_PHYSICAL_A,  // Canon 50mm f/1.2
   LUMINARY_LENS_TEMPLATE_PHYSICAL_B,  // Zeiss Tessar 50mm f/2.8
+  LUMINARY_LENS_TEMPLATE_PHYSICAL_C,  // ???
+  LUMINARY_LENS_TEMPLATE_PHYSICAL_D,  // ???
+  LUMINARY_LENS_TEMPLATE_PHYSICAL_E,  // Kapella 100mm f/1.0
+  LUMINARY_LENS_TEMPLATE_PHYSICAL_F,  // ???
   LUMINARY_LENS_TEMPLATE_COUNT
 } typedef LuminaryLensTemplate;
 
@@ -153,10 +157,10 @@ LUMINARY_API enum LuminaryApertureShape {
 } typedef LuminaryApertureShape;
 
 LUMINARY_API struct LuminaryCameraLens {
-  float aperture_stop;    // [f/*]
-  float sensor_distance;  // [mm]
-  float sensor_diagonal_size;
-  float object_distance;  // [m]
+  float aperture_stop;         // [f/*]
+  float sensor_distance;       // [mm]
+  float sensor_diagonal_size;  // [mm]
+  float object_distance;       // [m]
   bool use_auto_focus;
 } typedef LuminaryCameraLens;
 

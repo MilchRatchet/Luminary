@@ -88,6 +88,59 @@ static const LensTemplateData
           .front_principal_plane = 39.14f - 18.32f,
           .back_principal_plane  = 39.14f - 19.80f,
         },
+      [LUMINARY_LENS_TEMPLATE_PHYSICAL_C] =
+        {
+          .num_interfaces      = 0,
+          .design_focal_length = 100.0f,
+          .aperture_point      = 0.0f,
+        },
+      [LUMINARY_LENS_TEMPLATE_PHYSICAL_D] =
+        {
+          .num_interfaces      = 0,
+          .design_focal_length = 100.0f,
+          .aperture_point      = 0.0f,
+        },
+      [LUMINARY_LENS_TEMPLATE_PHYSICAL_E] =
+        {
+          .num_interfaces = 9,
+          {
+            [0] = {.radius = -190.62f, .vertex = 0.000f, .cylindrical_radius = 30.0f},
+            [1] = {.radius = 59.39f, .vertex = 13.72f, .cylindrical_radius = 30.0f},
+            [2] = {.radius = 29.03f, .vertex = 36.66f, .cylindrical_radius = 42.0f},
+            [3] = {.radius = -105.16f, .vertex = 40.05f, .cylindrical_radius = 42.0f},
+            [4] = {.radius = 50.42f, .vertex = 73.75f, .cylindrical_radius = 42.0f},
+            [5] = {.radius = 118.55f, .vertex = 74.25f, .cylindrical_radius = 49.0f},
+            [6] = {.radius = 073.27f, .vertex = 82.63f, .cylindrical_radius = 49.0f},
+            [7] = {.radius = 310.7f, .vertex = 83.13f, .cylindrical_radius = 52.0f},
+            [8] = {.radius = 121.47f, .vertex = 91.94f, .cylindrical_radius = 52.0f},
+          },
+          .media =
+            {
+              [0] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+              [1] = {.design_ior = 1.6135f, .abbe = 59.4f, .cylindrical_radius = 30.0f},
+              [2] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+              [3] = {.design_ior = 1.6945f, .abbe = 30.7f, .cylindrical_radius = 42.0f},
+              [4] = {.design_ior = 1.6062f, .abbe = 59.8f, .cylindrical_radius = 42.0f},
+              [5] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+              [6] = {.design_ior = 1.6135f, .abbe = 59.4f, .cylindrical_radius = 49.0f},
+              [7] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+              [8] = {.design_ior = 1.6135f, .abbe = 59.4f, .cylindrical_radius = 52.0f},
+              [9] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+            },
+          .design_focal_length   = 100.0f,
+          .aperture_point        = 91.94f - 71.56f,
+          .exit_pupil_point      = 0.0f,
+          .exit_pupil_diameter   = 60.0f,
+          .last_vertex           = 91.94f,
+          .front_principal_plane = 91.94f - 30.93f,
+          .back_principal_plane  = 91.94f - 23.97f,
+        },
+      [LUMINARY_LENS_TEMPLATE_PHYSICAL_F] =
+        {
+          .num_interfaces      = 0,
+          .design_focal_length = 100.0f,
+          .aperture_point      = 0.0f,
+        },
 };
 
 LuminaryResult lens_library_get_template_data(LuminaryLensTemplate template, LensTemplateData* data) {
