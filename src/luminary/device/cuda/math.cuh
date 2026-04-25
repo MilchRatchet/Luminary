@@ -36,6 +36,23 @@ LUMINARY_FUNCTION float lum_fast_cosf(const float x) {
 }
 
 ////////////////////////////////////////////////////////////////////
+// Fraction (Deferred MUFU.RCP)
+////////////////////////////////////////////////////////////////////
+
+struct Fraction {
+  float numerator;
+  float denominator;
+} typedef Fraction;
+
+LUMINARY_FUNCTION Fraction fraction_multiply(const Fraction a, const Fraction b) {
+  return {a.numerator * b.numerator, a.denominator * b.denominator};
+}
+
+LUMINARY_FUNCTION float fraction_evaluate(const Fraction a) {
+  return a.numerator / a.denominator;
+}
+
+////////////////////////////////////////////////////////////////////
 // Math
 ////////////////////////////////////////////////////////////////////
 

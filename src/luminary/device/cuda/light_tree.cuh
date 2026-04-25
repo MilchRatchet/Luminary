@@ -74,15 +74,18 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
   const vec3 PO       = sub_vector(mean, ctx.position);
   const float dist_sq = dot_product(PO, PO);
 
-  const float variance    = std_dev * std_dev;
-  const float inv_dist_sq = 1.0f / (dist_sq + variance);
+  const float variance = std_dev * std_dev;
+
+  // Do it this way because this only needs 1 MUFU instruction instead of 2 (RCP + SQRT)
+  const float rsqrt_dist  = rsqrtf(dist_sq + variance);
+  const float inv_dist_sq = rsqrt_dist * rsqrt_dist;
 
   float result = power * inv_dist_sq;
   if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.params.flags))
     return result;
 
   const float t     = variance * inv_dist_sq;
-  const float NdotL = __saturatef(dot_product(PO, ctx.normal) * sqrtf(inv_dist_sq));
+  const float NdotL = __saturatef(dot_product(PO, ctx.normal) * rsqrt_dist);
   result            = result * (NdotL * (1.0f - t) + t);
 
   return result;
@@ -281,7 +284,7 @@ LUMINARY_FUNCTION LightTreeResult
   RISReservoir reservoir = ris_reservoir_init(random);
 
 #pragma nounroll
-  while (result.light_id == 0xFFFFFFFF) {
+  while (true) {
     const vec3 base   = get_vector(bfloat_unpack(node.x), bfloat_unpack(node.y), bfloat_unpack(node.z));
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
     const float exp_v = exp2f(node.exp_std_dev);
@@ -297,9 +300,8 @@ LUMINARY_FUNCTION LightTreeResult
       }
     }
 
-    if (selected_child == 0xFF) {
+    if (selected_child == 0xFF)
       break;
-    }
 
     result.weight *= ris_reservoir_get_sampling_weight(reservoir);
 

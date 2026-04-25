@@ -136,9 +136,9 @@ LUMINARY_FUNCTION float bsdf_refraction_index_ambient(const vec3 position, const
 LUMINARY_FUNCTION vec3 bsdf_normal_from_pair(const vec3 L, const vec3 V, const float refraction_index) {
   const vec3 refraction_normal = add_vector(L, scale_vector(V, refraction_index));
 
-  const float length = get_length(refraction_normal);
+  const float length_sq = dot_product(refraction_normal, refraction_normal);
 
-  return (length > 0.0f) ? scale_vector(refraction_normal, 1.0f / length) : V;
+  return (length_sq > 0.0f) ? scale_vector(refraction_normal, rsqrtf(length_sq)) : V;
 }
 
 ///////////////////////////////////////////////////
@@ -146,30 +146,29 @@ LUMINARY_FUNCTION vec3 bsdf_normal_from_pair(const vec3 L, const vec3 V, const f
 ///////////////////////////////////////////////////
 
 // S can be either L or V, doesn't matter.
-LUMINARY_FUNCTION float bsdf_microfacet_evaluate_smith_G1_GGX(const float roughness4, const float NdotS) {
+LUMINARY_FUNCTION Fraction bsdf_microfacet_evaluate_smith_G1_GGX(const float roughness4, const float NdotS) {
   const float NdotS2 = fmaxf(0.0001f, NdotS * NdotS);
-  return 2.0f / (sqrtf(((roughness4 * (1.0f - NdotS2)) + NdotS2) / NdotS2) + 1.0f);
+  return {2.0f * NdotS, sqrtf(roughness4 + NdotS2 * (1.0f - roughness4)) + NdotS};
 }
 
-LUMINARY_FUNCTION float bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(
-  const float roughness4, const float NdotL, const float NdotV) {
+LUMINARY_FUNCTION Fraction
+  bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(const float roughness4, const float NdotL, const float NdotV) {
   const float a = NdotV * sqrtf(roughness4 + NdotL * (NdotL - roughness4 * NdotL));
   const float b = NdotL * sqrtf(roughness4 + NdotV * (NdotV - roughness4 * NdotV));
-  return 0.5f / (a + b);
+  return {0.5f, a + b};
 }
 
-LUMINARY_FUNCTION float bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(
-  const float roughness4, const float NdotL, const float NdotV) {
-  const float G1V = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
-  const float G1L = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotL);
-  return G1L / (G1V + G1L - G1V * G1L);
+LUMINARY_FUNCTION Fraction
+  bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(const float roughness4, const float NdotL, const float NdotV) {
+  const float G1V = fraction_evaluate(bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV));
+  const float G1L = fraction_evaluate(bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotL));
+  return {G1L, G1V + G1L - G1V * G1L};
 }
 
-LUMINARY_FUNCTION float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float roughness4) {
+LUMINARY_FUNCTION Fraction bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float roughness4) {
   const float NdotH2 = fminf(NdotH * NdotH, 1.0f);
   const float a      = 1.0f - NdotH2 + roughness4 * NdotH2;
-
-  return roughness4 / (PI * a * a);
+  return {roughness4, PI * a * a};
 }
 
 /*
@@ -205,7 +204,7 @@ LUMINARY_FUNCTION float bsdf_microfacet_pdf(const vec3 V, const float roughness,
 
   // NdotV == data.V.z
 
-  const float D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
 
   const float len2 = roughness4 * (V.x * V.x + V.y * V.y);
   const float t    = sqrtf(len2 + V.z * V.z);
@@ -213,7 +212,7 @@ LUMINARY_FUNCTION float bsdf_microfacet_pdf(const vec3 V, const float roughness,
   const float s  = 1.0f + sqrtf(V.x * V.x + V.y * V.y);
   const float s2 = s * s;
   const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * V.z * V.z);
-  return D / (2.0f * (k * NdotV + t));
+  return D.numerator / (2.0f * D.denominator * (k * NdotV + t));
 }
 
 LUMINARY_FUNCTION vec3 bsdf_microfacet_sample(const vec3 V, const float roughness, const PathID& path_id, const uint32_t target) {
@@ -225,12 +224,14 @@ LUMINARY_FUNCTION float bsdf_microfacet_evaluate(const float roughness, const fl
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+  const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+
+  const float D_G2 = fraction_evaluate(fraction_multiply(D, G2));
 
   // D * G2 * NdotL / (4.0f * NdotL * NdotV)
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return D * G2 * NdotL;
+  return D_G2 * NdotL;
 }
 
 LUMINARY_FUNCTION float bsdf_microfacet_evaluate_sampled_microfacet(
@@ -238,7 +239,7 @@ LUMINARY_FUNCTION float bsdf_microfacet_evaluate_sampled_microfacet(
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+  const float G2 = fraction_evaluate(bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV));
 
   // NdotV == data.V.z
 
@@ -258,11 +259,13 @@ LUMINARY_FUNCTION float bsdf_microfacet_evaluate_sampled_diffuse(
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+  const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+
+  const float D_G2 = fraction_evaluate(fraction_multiply(D, G2));
 
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return D * G2 * PI;
+  return D_G2 * PI;
 }
 
 /*
@@ -290,14 +293,16 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_pdf(
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G1 = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
+  const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction G1 = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
+
+  const float D_G1 = fraction_evaluate(fraction_multiply(D, G1));
 
   float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
   // See Heitz14.
-  return D * G1 * (HdotV / NdotV) * (HdotL / denominator);
+  return D_G1 * (HdotV / NdotV) * (HdotL / denominator);
 }
 
 LUMINARY_FUNCTION vec3
@@ -312,15 +317,17 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_evaluate(
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
-  const float G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+  const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
+
+  const float D_G2 = fraction_evaluate(fraction_multiply(D, G2));
 
   float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
   // See Walter07.
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return 4.0f * NdotL * HdotV * HdotL * D * G2 / denominator;
+  return 4.0f * NdotL * HdotV * HdotL * D_G2 / denominator;
 }
 
 LUMINARY_FUNCTION float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -329,7 +336,7 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
+  const float G2_over_G1 = fraction_evaluate(bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV));
 
   // See Heitz14.
   return G2_over_G1;
@@ -360,7 +367,7 @@ LUMINARY_FUNCTION float bsdf_diffuse_evaluate_sampled_microfacet(
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  const float D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction D = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
 
   const float len2 = roughness4 * (V.x * V.x + V.y * V.y);
   const float t    = sqrtf(len2 + V.z * V.z);
@@ -369,7 +376,7 @@ LUMINARY_FUNCTION float bsdf_diffuse_evaluate_sampled_microfacet(
   const float s2 = s * s;
   const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * V.z * V.z);
 
-  return NdotL * (2.0f * (k * NdotV + t)) / (PI * D);
+  return NdotL * (2.0f * (k * NdotV + t)) * D.denominator / (PI * D.numerator);
 }
 
 ///////////////////////////////////////////////////
