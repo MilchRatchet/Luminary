@@ -137,9 +137,28 @@ static const LensTemplateData
         },
       [LUMINARY_LENS_TEMPLATE_PHYSICAL_F] =
         {
-          .num_interfaces      = 0,
-          .design_focal_length = 100.0f,
-          .aperture_point      = 0.0f,
+          .num_interfaces = 4,
+          {
+            [0] = {.radius = -337.378f, .vertex = 0.000f, .cylindrical_radius = 8.6875f},
+            [1] = {.radius = -32.0041f, .vertex = 1.2f, .cylindrical_radius = 8.6875f},
+            [2] = {.radius = 32.0041f, .vertex = 3.7f, .cylindrical_radius = 8.6875f},
+            [3] = {.radius = 51.416f, .vertex = 4.9f, .cylindrical_radius = 8.6875f},
+          },
+          .media =
+            {
+              [0] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+              [1] = {.design_ior = 1.57125f, .abbe = 55.8f, .cylindrical_radius = 8.6875f},
+              [2] = {.design_ior = 1.54408, .abbe = 73.0f, .cylindrical_radius = FLT_MAX},
+              [3] = {.design_ior = 1.67245f, .abbe = 45.8f, .cylindrical_radius = 8.6875f},
+              [4] = {.design_ior = IOR_AIR, .abbe = 0.0f, .cylindrical_radius = FLT_MAX},
+            },
+          .design_focal_length   = 100.0f,
+          .aperture_point        = 4.9f - 69.5f,
+          .exit_pupil_point      = 0.0f,
+          .exit_pupil_diameter   = 17.375f,
+          .last_vertex           = 4.9f,
+          .front_principal_plane = 4.9f - 0.03875f,
+          .back_principal_plane  = 4.9f - 1.83f,
         },
 };
 
