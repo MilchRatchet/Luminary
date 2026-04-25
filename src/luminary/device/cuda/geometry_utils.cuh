@@ -189,7 +189,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
   // If we have a translucent substrate and the IOR change is within some small threshold, treat the material as fully transparent.
   if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(flags) && (fabsf(1.0f - ior_in / ior_out) < 1e-4f)) {
     // Fudge the albedo to be a blend between the transparent color and the refraction color.
-    if ((flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) == 0.0f) {
+    if ((flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) == 0) {
       albedo.r = lerp(1.0f, albedo.r, albedo.a);
       albedo.g = lerp(1.0f, albedo.g, albedo.a);
       albedo.b = lerp(1.0f, albedo.b, albedo.a);

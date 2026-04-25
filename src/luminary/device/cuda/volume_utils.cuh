@@ -147,8 +147,8 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
   const float sd = sqrtf(d);
   const float q  = -dot - copysignf(sd, dot);
 
-  const float t0 = fmaxf(0.0f, c / q);
-  const float t1 = fmaxf(0.0f, q);
+  const float t0 = rn * fmaxf(0.0f, c / q);
+  const float t1 = rn * fmaxf(0.0f, q);
 
   const float start_xz = fminf(t0, t1);
   const float end_xz   = fmaxf(t0, t1);

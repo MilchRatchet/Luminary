@@ -380,7 +380,7 @@ LUMINARY_FUNCTION float random_grain(const uint32_t x, const uint32_t y, uint32_
   const float coarseness = device.camera.sensor.film_grain_coarseness;
   const float sigma      = 1.0f * coarseness + (1.0f / 3.0f) * (1.0f - coarseness);
 
-  const int32_t radius    = int(ceilf(3.0f * sigma));  // 3σ support
+  const int32_t radius    = min(int(ceilf(3.0f * sigma)), 3);  // 3σ support
   const float weight_term = 1.0f / (2.0f * sigma * sigma);
 
   LUMINARY_ASSUME(radius <= 3 && radius >= 0);

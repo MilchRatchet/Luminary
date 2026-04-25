@@ -154,22 +154,12 @@ LUMINARY_FUNCTION float ocean_intersection_distance(const vec3 origin, const vec
     return FLT_MAX;
   }
 
-  if (fabsf(ray.y) < eps) {
-    return (origin.y >= device.ocean.height && origin.y <= device.ocean.height) ? 0.0f : FLT_MAX;
-  }
-
-  const float d1 = device.ocean.height - origin.y;
-  const float d2 = device.ocean.height - origin.y;
-
-  const float inv_ray = 1.0f / ray.y;
-
-  const float s1 = d1 * inv_ray;
-  const float s2 = d2 * inv_ray;
-
-  if (s1 < 0.0f && s2 < 0.0f)
+  if (fabsf(ray.y) < eps)
     return FLT_MAX;
 
-  return (s1 * s2 < 0.0f) ? fmaxf(s1, s2) : fminf(s1, s2);
+  const float s = (device.ocean.height - origin.y) / ray.y;
+
+  return (s >= 0.0f) ? s : FLT_MAX;
 }
 
 // Coefficients taken from

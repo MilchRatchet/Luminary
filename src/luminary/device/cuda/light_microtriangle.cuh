@@ -10,37 +10,37 @@ LUMINARY_FUNCTION void light_microtriangle_id_to_bary(const uint32_t id, float2&
   uint32_t col_id;
 
   // Row 0
-  if (id <= 15) {
+  if (id < 15) {
     row_id = 0;
     col_id = (id >> 1);
   }
   // Row 1
-  else if (id <= 15 + 13) {
+  else if (id < 15 + 13) {
     row_id = 1;
     col_id = ((id - 15) >> 1);
   }
   // Row 2
-  else if (id <= 15 + 13 + 11) {
+  else if (id < 15 + 13 + 11) {
     row_id = 2;
     col_id = ((id - 15 - 13) >> 1);
   }
   // Row 3
-  else if (id <= 15 + 13 + 11 + 9) {
+  else if (id < 15 + 13 + 11 + 9) {
     row_id = 3;
     col_id = ((id - 15 - 13 - 11) >> 1);
   }
   // Row 4
-  else if (id <= 15 + 13 + 11 + 9 + 7) {
+  else if (id < 15 + 13 + 11 + 9 + 7) {
     row_id = 4;
     col_id = ((id - 15 - 13 - 11 - 9) >> 1);
   }
   // Row 5
-  else if (id <= 15 + 13 + 11 + 9 + 7 + 5) {
+  else if (id < 15 + 13 + 11 + 9 + 7 + 5) {
     row_id = 5;
     col_id = ((id - 15 - 13 - 11 - 9 - 7) >> 1);
   }
   // Row 6
-  else if (id <= 15 + 13 + 11 + 9 + 7 + 5 + 3) {
+  else if (id < 15 + 13 + 11 + 9 + 7 + 5 + 3) {
     row_id = 6;
     col_id = ((id - 15 - 13 - 11 - 9 - 7 - 5) >> 1);
   }
