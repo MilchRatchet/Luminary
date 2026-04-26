@@ -72,7 +72,7 @@ foreach(user_specified_arch ${user_specified_archs})
   if(${user_specified_arch} MATCHES "^sm_[0-9]+")
     list(APPEND kernel_archs ${user_specified_arch})
   else()
-    message(WARNING "${user_specified_arch} is not a valid CUDA architecture input. The input must be in the form of sm_120,sm90a,...")
+    message(WARNING "${user_specified_arch} is not a valid CUDA architecture input. The input must be in the form of sm_120,sm_90a,...")
   endif()
 endforeach()
 
