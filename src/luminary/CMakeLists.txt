@@ -221,6 +221,7 @@ ceb_embed_files(
   ${CMAKE_SOURCE_DIR}/data/spectral/cie1931_z_lut.bin
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
+  ${CMAKE_SOURCE_DIR}/data/bridge/bridge_lut_base.bin
   ${CMAKE_SOURCE_DIR}/data/bridge/bridge_lut.bin
   ${CMAKE_SOURCE_DIR}/data/icons/SplashScreen.bmp
 )

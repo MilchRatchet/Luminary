@@ -13,6 +13,8 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
+#define BRIDGES_USE_LOG_FACTORIAL_LUT
+
 LUMINARY_FUNCTION Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, initial_vertex));
   const vec3 actual_dir = normalize_vector(sub_vector(end_vertex, initial_vertex));
@@ -50,7 +52,37 @@ LUMINARY_FUNCTION Quaternion bridges_compute_rotation(const vec3 initial_vertex,
   return rotation;
 }
 
+#ifdef BRIDGES_USE_LOG_FACTORIAL_LUT
+
+static __constant__ float bridges_log_factorial_lut[16] = {
+  /* [0] = */ 0.0f,
+  /* [1] = */ 0.0f,
+  /* [2] = */ -0.0001434683799744f,
+  /* [3] = */ 0.6931126117706299f,
+  /* [4] = */ 1.7917456626892090f,
+  /* [5] = */ 3.1780471801757812f,
+  /* [6] = */ 4.7874870300292969f,
+  /* [7] = */ 6.5792484283447266f,
+  /* [8] = */ 8.5251598358154297f,
+  /* [9] = */ 10.6046009063720703f,
+  /* [10] = */ 12.8018264770507812f,
+  /* [11] = */ 15.1044120788574219f,
+  /* [12] = */ 17.5023078918457031f,
+  /* [13] = */ 19.9872150421142578f,
+  /* [14] = */ 22.5521621704101562f,
+  /* [15] = */ 25.1912231445312500f,
+};
+
+static_assert(
+  sizeof(bridges_log_factorial_lut) / sizeof(float) == BRIDGES_MAX_VERTEX_COUNT + 1,
+  "LUT is not compatible with current maximum vertex count.");
+
+#endif /* BRIDGES_USE_LOG_FACTORIAL_LUT */
+
 LUMINARY_FUNCTION float bridges_log_factorial(const uint32_t vertex_count) {
+#ifdef BRIDGES_USE_LOG_FACTORIAL_LUT
+  return bridges_log_factorial_lut[vertex_count];
+#else  /* BRIDGES_USE_LOG_FACTORIAL_LUT */
   if (vertex_count == 1)
     return 0.0f;
 
@@ -62,21 +94,28 @@ LUMINARY_FUNCTION float bridges_log_factorial(const uint32_t vertex_count) {
   const float t2 = 0.5f * logf(PI);
 
   return t0 + t1 + t2 - n;
+#endif /* !BRIDGES_USE_LOG_FACTORIAL_LUT */
 }
 
 // TODO: Package the LUT differently so I achieve good alignment, this can all be done using no more than 2 load instructions.
 LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
-  const uint32_t lut_offset = (vertex_count - 1) * 21;
+  constexpr uint32_t NUM_LUT_ENTRIES = BRIDGES_MAX_VERTEX_COUNT;
+  constexpr uint32_t NUM_STEPS       = 9;
 
-  const float min_dist    = __ldg(device.ptrs.bridge_lut + lut_offset + 0);
-  const float center_dist = __ldg(device.ptrs.bridge_lut + lut_offset + 1);
-  const float max_dist    = __ldg(device.ptrs.bridge_lut + lut_offset + 2);
+  const uint32_t lut_entry_id = vertex_count - 1;
+  const uint32_t data_offset  = NUM_LUT_ENTRIES * 2 + NUM_STEPS * lut_entry_id;
+
+  const float4 meta = __ldg(((const float4*) device.ptrs.bridge_lut) + lut_entry_id);
+
+  const float min_dist    = meta.x;
+  const float center_dist = meta.y;
+  const float max_dist    = meta.z;
 
   if (effective_dist > max_dist)
     return 0.0f;
 
   if (effective_dist < min_dist) {
-    const float linear_falloff = __ldg(device.ptrs.bridge_lut + lut_offset + 3);
+    const float linear_falloff = meta.w;
 
     return linear_falloff * effective_dist / min_dist;
   }
@@ -87,12 +126,15 @@ LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t verte
   const float step       = (high_dist - low_dist) * 0.25f;
   const uint32_t step_id = (uint32_t) ((effective_dist - low_dist) / step);
   const float floor_dist = low_dist + step_id * step;
-  const uint32_t index   = (effective_dist < center_dist) ? (3 + 2 * step_id) : (3 + 2 * (step_id + 4));
+  const uint32_t index   = (effective_dist < center_dist) ? step_id : (step_id + 4);
 
-  const float y0  = __ldg(device.ptrs.bridge_lut + lut_offset + index + 0);
-  const float dy0 = __ldg(device.ptrs.bridge_lut + lut_offset + index + 1);
-  const float y1  = __ldg(device.ptrs.bridge_lut + lut_offset + index + 2);
-  const float dy1 = __ldg(device.ptrs.bridge_lut + lut_offset + index + 3);
+  const float2 data0 = __ldg((((const float2*) device.ptrs.bridge_lut)) + data_offset + index + 0);
+  const float2 data1 = __ldg((((const float2*) device.ptrs.bridge_lut)) + data_offset + index + 1);
+
+  const float y0  = data0.x;
+  const float dy0 = data0.y * step;
+  const float y1  = data1.x;
+  const float dy1 = data1.y * step;
 
   const float t  = __saturatef((effective_dist - floor_dist) / step);
   const float t2 = t * t;
@@ -103,7 +145,7 @@ LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t verte
   const float h01 = -2.0f * t3 + 3.0f * t2;
   const float h11 = t3 - t2;
 
-  return h00 * y0 + h10 * step * dy0 + h01 * y1 + h11 * step * dy1;
+  return h00 * y0 + h10 * dy0 + h01 * y1 + h11 * dy1;
 }
 
 LUMINARY_FUNCTION uint32_t bridges_sample_vertex_count(
@@ -203,6 +245,7 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
   const RGBF scattering = ctx.descriptor.scattering;
   const RGBF absorption = ctx.descriptor.absorption;
 
+  // TODO: Scattering is a material constant, so logf(scattering) should be precomputed.
   RGBF path_weight = get_color(
     expf(vertex_count * logf(scattering.r) - sum_dist * (scattering.r + absorption.r)),
     expf(vertex_count * logf(scattering.g) - sum_dist * (scattering.g + absorption.g)),

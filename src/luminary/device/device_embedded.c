@@ -9,10 +9,12 @@
 // #define EMBEDDED_GENERATE
 
 static const char* embedded_file_names[DEVICE_EMBEDDED_FILE_COUNT] = {
-  [DEVICE_EMBEDDED_FILE_MOON_ALBEDO] = "moon_albedo.png",     [DEVICE_EMBEDDED_FILE_MOON_NORMAL] = "moon_normal.png",
-  [DEVICE_EMBEDDED_FILE_BLUENOISE1D] = "bluenoise_1D.bin",    [DEVICE_EMBEDDED_FILE_BLUENOISE2D] = "bluenoise_2D.bin",
-  [DEVICE_EMBEDDED_FILE_BRIDGE_LUT] = "bridge_lut.bin",       [DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT] = "cie1931_xy_lut.bin",
-  [DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT] = "cie1931_z_lut.bin", [DEVICE_EMBEDDED_FILE_CIE1931_CDF] = "cie1931_cdf.bin"};
+  [DEVICE_EMBEDDED_FILE_MOON_ALBEDO] = "moon_albedo.png",         [DEVICE_EMBEDDED_FILE_MOON_NORMAL] = "moon_normal.png",
+  [DEVICE_EMBEDDED_FILE_BLUENOISE1D] = "bluenoise_1D.bin",        [DEVICE_EMBEDDED_FILE_BLUENOISE2D] = "bluenoise_2D.bin",
+  [DEVICE_EMBEDDED_FILE_BRIDGE_BASE_LUT] = "bridge_lut_base.bin", [DEVICE_EMBEDDED_FILE_BRIDGE_LUT] = "bridge_lut.bin",
+  [DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT] = "cie1931_xy_lut.bin",   [DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT] = "cie1931_z_lut.bin",
+  [DEVICE_EMBEDDED_FILE_CIE1931_CDF] = "cie1931_cdf.bin",
+};
 
 ////////////////////////////////////////////////////////////////////
 // CIE1931 LUTs
@@ -1068,6 +1070,65 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
   return LUMINARY_SUCCESS;
 }
 
+////////////////////////////////////////////////////////////////////
+// Bridge LUT repack
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _embedded_generate_bridge_lut_optimized() {
+  const uint32_t old_stride = 21;
+
+  float* old_data;
+  int64_t old_size;
+  uint64_t info = 0;
+  ceb_access(embedded_file_names[DEVICE_EMBEDDED_FILE_BRIDGE_BASE_LUT], (void**) &old_data, &old_size, &info);
+
+  if (info) {
+    __RETURN_ERROR(LUMINARY_ERROR_MISSING_DATA, "Failed to load bridge_lut.bin for repacking.");
+  }
+
+  const uint32_t num_old_entries = (uint32_t) (old_size / (old_stride * sizeof(float)));
+  const uint32_t num_steps       = 9;
+  const uint32_t num_new_entries = 15;
+
+  __DEBUG_ASSERT(num_new_entries <= num_old_entries);
+
+  const size_t new_size = num_new_entries * ((4 * sizeof(float)) + num_steps * (2 * sizeof(float)));
+
+  LOCAL float* new_data;
+  __FAILURE_HANDLE(host_malloc_local(&new_data, new_size));
+
+  const uint32_t data_offset = 4 * num_new_entries;
+
+  for (uint32_t entry_id = 0; entry_id < num_new_entries; entry_id++) {
+    const uint32_t src_offset = old_stride * entry_id;
+
+    new_data[entry_id * 4 + 0] = old_data[src_offset + 0];
+    new_data[entry_id * 4 + 1] = old_data[src_offset + 1];
+    new_data[entry_id * 4 + 2] = old_data[src_offset + 2];
+    new_data[entry_id * 4 + 3] = old_data[src_offset + 3];
+
+    uint32_t data_offset_this_entry = data_offset + entry_id * 2 * num_steps;
+
+    for (uint32_t step_id = 0; step_id < num_steps; step_id++) {
+      new_data[data_offset_this_entry + 2 * step_id + 0] = old_data[src_offset + 3 + 2 * step_id + 0];
+      new_data[data_offset_this_entry + 2 * step_id + 1] = old_data[src_offset + 3 + 2 * step_id + 1];
+    }
+  }
+
+  FILE* file = fopen(embedded_file_names[DEVICE_EMBEDDED_FILE_BRIDGE_LUT], "wb");
+  if (file == (FILE*) 0) {
+    __FAILURE_HANDLE(host_free_local(&new_data));
+    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Could not open bridge_lut.bin for writing.");
+  }
+
+  fwrite(new_data, 1, new_size, file);
+  fclose(file);
+
+  __FAILURE_HANDLE(host_free_local(&new_data));
+
+  return LUMINARY_SUCCESS;
+}
+
 #endif /* EMBEDDED_GENERATE */
 
 ////////////////////////////////////////////////////////////////////
@@ -1079,6 +1140,8 @@ LuminaryResult device_embedded_load(const DeviceEmbeddedFile file, void** data, 
   __CHECK_NULL_ARGUMENT(size);
 
 #ifdef EMBEDDED_GENERATE
+  if (file == DEVICE_EMBEDDED_FILE_BRIDGE_LUT)
+    __FAILURE_HANDLE(_embedded_generate_bridge_lut_optimized());
   if (file == DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT || file == DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT || file == DEVICE_EMBEDDED_FILE_CIE1931_CDF)
     __FAILURE_HANDLE(_embedded_generate_cie1931_xyz_lut());
 #endif /* EMBEDDED_GENERATE */
