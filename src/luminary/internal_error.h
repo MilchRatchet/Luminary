@@ -1,30 +1,33 @@
 #ifndef LUMINARY_INTERNAL_ERROR_H
 #define LUMINARY_INTERNAL_ERROR_H
 
+#include "error_registry.h"
 #include "utils.h"
 
-#define __RETURN_ERROR(return_code, fmt, ...)      \
+#define __RETURN_ERROR(__lum_kind, __lum_fmt, ...)                      \
+  {                                                                     \
+    LuminaryResult __lum_result;                                        \
+    error_registry_allocate(&__lum_result);                             \
+                                                                        \
+    error_registry_set_kind(__lum_result, __lum_kind);                  \
+    error_registry_set_message(__lum_result, __lum_fmt, ##__VA_ARGS__); \
+    error_registry_add_stacktrace(__lum_result);                        \
+                                                                        \
+    return __lum_result;                                                \
+  }
+
+#define __CHECK_NULL_ARGUMENT(__lum_argument)                                     \
+  if (!(__lum_argument)) {                                                        \
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "%s is NULL.", #__lum_argument); \
+  }
+
+#define __FAILURE_HANDLE(__lum_command)            \
   {                                                \
-    if ((return_code) & LUMINARY_ERROR_PROPAGATED) \
-      log_message(fmt, ##__VA_ARGS__);             \
-    else                                           \
-      error_message(fmt, ##__VA_ARGS__);           \
-    return return_code;                            \
-  }
-
-#define __CHECK_NULL_ARGUMENT(argument)                                     \
-  if (!(argument)) {                                                        \
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "%s is NULL.", #argument); \
-  }
-
-#define __FAILURE_HANDLE(command)                                                                             \
-  {                                                                                                           \
-    LuminaryResult __lum_func_err = (command);                                                                \
-    if (__lum_func_err != LUMINARY_SUCCESS) {                                                                 \
-      __RETURN_ERROR(                                                                                         \
-        __lum_func_err | LUMINARY_ERROR_PROPAGATED, "Luminary internal function [=%s] returned %s", #command, \
-        luminary_result_to_string(__lum_func_err));                                                           \
-    }                                                                                                         \
+    LuminaryResult __lum_result = (__lum_command); \
+    if (__lum_result != LUMINARY_SUCCESS) {        \
+      error_registry_add_stacktrace(__lum_result); \
+      return __lum_result;                         \
+    }                                              \
   }
 
 ////////////////////////////////////////////////////////////////////
@@ -36,30 +39,32 @@
 #define __FAILURE_HANDLE_UNLOCK_CRITICAL() \
   __UNLOCKING_CRITICAL_LABEL:
 
-#define __FAILURE_HANDLE_CRITICAL(command)       \
-  {                                              \
-    LuminaryResult __lum_func_err = (command);   \
-    if (__lum_func_err != LUMINARY_SUCCESS) {    \
-      __locked_section_result |= __lum_func_err; \
-      goto __UNLOCKING_CRITICAL_LABEL;           \
-    }                                            \
+#define __FAILURE_HANDLE_CRITICAL(__lum_command)   \
+  {                                                \
+    LuminaryResult __lum_result = (__lum_command); \
+    if (__lum_result != LUMINARY_SUCCESS) {        \
+      __locked_section_result = __lum_result;      \
+      goto __UNLOCKING_CRITICAL_LABEL;             \
+    }                                              \
   }
 
-#define __FAILURE_HANDLE_CHECK_CRITICAL()                                                    \
-  if (__locked_section_result != LUMINARY_SUCCESS) {                                         \
-    __RETURN_ERROR(                                                                          \
-      __locked_section_result | LUMINARY_ERROR_PROPAGATED, "Error in critical section: %s.", \
-      luminary_result_to_string(__locked_section_result));                                   \
+#define __FAILURE_HANDLE_CHECK_CRITICAL()            \
+  {                                                  \
+    if (__locked_section_result != LUMINARY_SUCCESS) \
+      return __locked_section_result;                \
   }
 
-#define __RETURN_ERROR_CRITICAL(return_code, fmt, ...) \
-  {                                                    \
-    if ((return_code) & LUMINARY_ERROR_PROPAGATED)     \
-      log_message(fmt, ##__VA_ARGS__);                 \
-    else                                               \
-      error_message(fmt, ##__VA_ARGS__);               \
-    __locked_section_result |= return_code;            \
-    goto __UNLOCKING_CRITICAL_LABEL;                   \
+#define __RETURN_ERROR_CRITICAL(__lum_kind, __lum_fmt, ...)             \
+  {                                                                     \
+    LuminaryResult __lum_result;                                        \
+    error_registry_allocate(&__lum_result);                             \
+                                                                        \
+    error_registry_set_kind(__lum_result, __lum_kind);                  \
+    error_registry_set_message(__lum_result, __lum_fmt, ##__VA_ARGS__); \
+    error_registry_add_stacktrace(__lum_result);                        \
+                                                                        \
+    __locked_section_result = __lum_result;                             \
+    goto __UNLOCKING_CRITICAL_LABEL;                                    \
   }
 
 ////////////////////////////////////////////////////////////////////
@@ -68,14 +73,14 @@
 
 #ifdef LUM_DEBUG
 
-#define __DEBUG_ASSERT(condition)                                                           \
-  if ((condition) == false) {                                                               \
-    __RETURN_ERROR(LUMINARY_ERROR_DEBUG_ASSERT, "Condition: " #condition " was violated."); \
+#define __DEBUG_ASSERT(__lum_condition)                                                           \
+  if ((__lum_condition) == false) {                                                               \
+    __RETURN_ERROR(LUMINARY_ERROR_DEBUG_ASSERT, "Condition: " #__lum_condition " was violated."); \
   }
 
 #else /* LUM_DEBUG */
 
-#define __DEBUG_ASSERT(condition) (void) (condition)
+#define __DEBUG_ASSERT(__lum_condition) (void) (__lum_condition)
 
 #endif /* !LUM_DEBUG */
 

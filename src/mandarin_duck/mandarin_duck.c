@@ -165,6 +165,8 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
     double time_step;
     LUM_FAILURE_HANDLE(thread_status_get_time(ui_thread, &time_step));
 
+    LUM_FAILURE_HANDLE(luminary_host_get_last_error(duck->host));
+
     LUM_FAILURE_HANDLE(thread_status_start(ui_thread, "Process Frame"));
 
     if (display_dirty) {

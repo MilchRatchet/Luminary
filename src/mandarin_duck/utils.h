@@ -5,17 +5,17 @@
 
 #include <luminary/luminary.h>
 
-#define LUM_FAILURE_HANDLE(command)                                                           \
-  {                                                                                           \
-    LuminaryResult __lum_res = command;                                                       \
-    if (__lum_res != LUMINARY_SUCCESS) {                                                      \
-      crash_message("Luminary API returned error: %s", luminary_result_to_string(__lum_res)); \
-    }                                                                                         \
+#define LUM_FAILURE_HANDLE(__lum_command)                             \
+  {                                                                   \
+    LuminaryResult __lum_result = (__lum_command);                    \
+    if (__lum_result != LUMINARY_SUCCESS) {                           \
+      crash_message("Luminary API returned error: %u", __lum_result); \
+    }                                                                 \
   }
 
-#define MD_CHECK_NULL_ARGUMENT(arg)     \
-  if (!(arg)) {                         \
-    crash_message("%s is NULL.", #arg); \
+#define MD_CHECK_NULL_ARGUMENT(__md_argument)     \
+  if (!(__md_argument)) {                         \
+    crash_message("%s is NULL.", #__md_argument); \
   }
 
 #define MD_UNUSED(__macro_x) ((void) (__macro_x))

@@ -9,6 +9,8 @@ struct QueueWorkerMainArgs {
   Queue* queue;
   ThreadStatus* thread_status;
   void* worker_context;
+  uint64_t host_id;
+  bool is_async;
 } typedef QueueWorkerMainArgs;
 
 ////////////////////////////////////////////////////////////////////
@@ -21,6 +23,9 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
   __CHECK_NULL_ARGUMENT(args->queue);
   __CHECK_NULL_ARGUMENT(args->thread_status);
   __CHECK_NULL_ARGUMENT(args->worker_context);
+
+  if (args->is_async)
+    error_registry_register_thread(args->host_id);
 
   bool success = true;
 
@@ -68,7 +73,8 @@ static LuminaryResult _queue_worker_main(QueueWorkerMainArgs* args) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _queue_worker_start_common(QueueWorker* worker, const char* name, Queue* queue, void* worker_context) {
+static LuminaryResult _queue_worker_start_common(
+  QueueWorker* worker, const char* name, Queue* queue, void* worker_context, uint64_t host_id, bool is_async) {
   __CHECK_NULL_ARGUMENT(worker);
   __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(queue);
@@ -89,6 +95,8 @@ static LuminaryResult _queue_worker_start_common(QueueWorker* worker, const char
   main_args->queue          = queue;
   main_args->thread_status  = worker->thread_status;
   main_args->worker_context = worker_context;
+  main_args->host_id        = host_id;
+  main_args->is_async       = is_async;
 
   worker->status = QUEUE_WORKER_STATUS_ONLINE;
 
@@ -114,26 +122,26 @@ LuminaryResult queue_worker_create(QueueWorker** worker) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult queue_worker_start(QueueWorker* worker, const char* name, Queue* queue, void* worker_context) {
+LuminaryResult queue_worker_start(QueueWorker* worker, const char* name, Queue* queue, void* worker_context, uint64_t host_id) {
   __CHECK_NULL_ARGUMENT(worker);
   __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(queue);
   __CHECK_NULL_ARGUMENT(worker_context);
 
-  __FAILURE_HANDLE(_queue_worker_start_common(worker, name, queue, worker_context));
+  __FAILURE_HANDLE(_queue_worker_start_common(worker, name, queue, worker_context, host_id, true));
 
   __FAILURE_HANDLE(thread_start(worker->thread, (ThreadMainFunc) _queue_worker_main, (QueueWorkerMainArgs*) worker->main_args));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult queue_worker_start_synchronous(QueueWorker* worker, const char* name, Queue* queue, void* worker_context) {
+LuminaryResult queue_worker_start_synchronous(QueueWorker* worker, const char* name, Queue* queue, void* worker_context, uint64_t host_id) {
   __CHECK_NULL_ARGUMENT(worker);
   __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(queue);
   __CHECK_NULL_ARGUMENT(worker_context);
 
-  __FAILURE_HANDLE(_queue_worker_start_common(worker, name, queue, worker_context));
+  __FAILURE_HANDLE(_queue_worker_start_common(worker, name, queue, worker_context, host_id, false));
 
   __FAILURE_HANDLE(_queue_worker_main((QueueWorkerMainArgs*) worker->main_args));
 

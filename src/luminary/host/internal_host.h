@@ -19,6 +19,7 @@ struct HostLoadObjArgs {
 } typedef HostLoadObjArgs;
 
 struct LuminaryHost {
+  uint64_t id;
   DeviceManager* device_manager;
   QueueWorker* queue_worker_main;
   Queue* work_queue;

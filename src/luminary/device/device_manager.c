@@ -886,7 +886,8 @@ LuminaryResult device_manager_start_queue(DeviceManager* device_manager) {
     return LUMINARY_SUCCESS;
 
   __FAILURE_HANDLE(queue_set_is_blocking(device_manager->work_queue, true));
-  __FAILURE_HANDLE(queue_worker_start(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager));
+  __FAILURE_HANDLE(
+    queue_worker_start(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager, device_manager->host->id));
 
   return LUMINARY_SUCCESS;
 }
@@ -933,8 +934,8 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
 
   // If the device thread is not running, execute on current thread.
   if (device_thread_is_running == false) {
-    __FAILURE_HANDLE(
-      queue_worker_start_synchronous(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager));
+    __FAILURE_HANDLE(queue_worker_start_synchronous(
+      device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager, device_manager->host->id));
   }
 
   return LUMINARY_SUCCESS;
@@ -962,7 +963,8 @@ LuminaryResult device_manager_shutdown(DeviceManager* device_manager) {
   __FAILURE_HANDLE(queue_worker_shutdown(device_manager->queue_worker_main));
 
   // There could still be some unfinished work that was queued during shutdown, so execute that now.
-  __FAILURE_HANDLE(queue_worker_start_synchronous(device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager));
+  __FAILURE_HANDLE(queue_worker_start_synchronous(
+    device_manager->queue_worker_main, "Device", device_manager->work_queue, device_manager, device_manager->host->id));
 
   return LUMINARY_SUCCESS;
 }

@@ -150,4 +150,6 @@ LUMINARY_API LuminaryResult luminary_host_save_as_lumV5(LuminaryHost* host, Lumi
  */
 LUMINARY_API LuminaryResult luminary_host_request_sky_hdri_build(LuminaryHost* host);
 
+LUMINARY_API LuminaryResult luminary_host_get_last_error(LuminaryHost* host);
+
 #endif /* LUMINARY_HOST_H */

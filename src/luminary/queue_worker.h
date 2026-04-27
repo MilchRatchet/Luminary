@@ -32,8 +32,8 @@ struct QueueEntry {
 } typedef QueueEntry;
 
 LuminaryResult queue_worker_create(QueueWorker** worker);
-LuminaryResult queue_worker_start(QueueWorker* worker, const char* name, Queue* queue, void* worker_context);
-LuminaryResult queue_worker_start_synchronous(QueueWorker* worker, const char* name, Queue* queue, void* worker_context);
+LuminaryResult queue_worker_start(QueueWorker* worker, const char* name, Queue* queue, void* worker_context, uint64_t host_id);
+LuminaryResult queue_worker_start_synchronous(QueueWorker* worker, const char* name, Queue* queue, void* worker_context, uint64_t host_id);
 LuminaryResult queue_worker_is_running(QueueWorker* worker, bool* is_running);
 LuminaryResult queue_worker_shutdown(QueueWorker* worker);
 LuminaryResult queue_worker_destroy(QueueWorker** worker);

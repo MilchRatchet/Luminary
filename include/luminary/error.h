@@ -23,81 +23,38 @@
 
 typedef uint64_t LuminaryResult;
 
-/*
- * No error.
- */
 #define LUMINARY_SUCCESS (0ull)
 
-/*
- * Non-optional argument was NULL.
- */
-#define LUMINARY_ERROR_ARGUMENT_NULL (1ull)
+struct LuminaryStackTrace {
+  const char* function_name;
+  const char* file_name;
+  uint64_t line;
+  struct LuminaryStackTrace* caller;
+} typedef LuminaryStackTrace;
 
-/*
- * Encountered code path that was not implemented.
- */
-#define LUMINARY_ERROR_NOT_IMPLEMENTED (2ull)
+enum LuminaryErrorKind {
+  LUMINARY_ERROR_NONE,
+  LUMINARY_ERROR_UNKNOWN,               // Unknown
+  LUMINARY_ERROR_ARGUMENT_NULL,         // Non-optional argument was NULL.
+  LUMINARY_ERROR_NOT_IMPLEMENTED,       // Encountered code path that was not implemented.
+  LUMINARY_ERROR_INVALID_API_ARGUMENT,  // Argument given to an API function was invalid.
+  LUMINARY_ERROR_MEMORY_LEAK,           // Action would cause a memory leak.
+  LUMINARY_ERROR_OUT_OF_MEMORY,         // Insufficient memory for action.
+  LUMINARY_ERROR_C_STD,                 // Error in C standard library.
+  LUMINARY_ERROR_API_EXCEPTION,         // API function was used in a non-compliant way.
+  LUMINARY_ERROR_CUDA,                  // Error in CUDA library.
+  LUMINARY_ERROR_OPTIX,                 // Error in OptiX library.
+  LUMINARY_ERROR_PREVIOUS_ERROR,        // Error due to Luminary being in an unstable state caused by a previous error.
+  LUMINARY_ERROR_DEBUG_ASSERT,          // Error due to a debug condition being violated.
+  LUMINARY_ERROR_MISSING_DATA,          // Error due to embedded data missing.
+  LUMINARY_ERROR_INVALID_DEVICE,        // Error due to specifying an invalid device.
+} typedef LuminaryErrorKind;
 
-/*
- * Argument given to an API function was invalid.
- */
-#define LUMINARY_ERROR_INVALID_API_ARGUMENT (3ull)
-
-/*
- * Action would cause a memory leak.
- */
-#define LUMINARY_ERROR_MEMORY_LEAK (4ull)
-
-/*
- * Insufficient memory for action.
- */
-#define LUMINARY_ERROR_OUT_OF_MEMORY (5ull)
-
-/*
- * Error in C standard library.
- */
-#define LUMINARY_ERROR_C_STD (6ull)
-
-/*
- * API function was used in a non-compliant way.
- */
-#define LUMINARY_ERROR_API_EXCEPTION (7ull)
-
-/*
- * Error in CUDA library.
- */
-#define LUMINARY_ERROR_CUDA (8ull)
-
-/*
- * Error in OptiX library.
- */
-#define LUMINARY_ERROR_OPTIX (9ull)
-
-/*
- * Error due to Luminary being in an unstable state caused by a previous error.
- */
-#define LUMINARY_ERROR_PREVIOUS_ERROR (10ull)
-
-/*
- * Error due to a debug condition being violated.
- */
-#define LUMINARY_ERROR_DEBUG_ASSERT (11ull)
-
-/*
- * Error due to embedded data missing.
- */
-#define LUMINARY_ERROR_MISSING_DATA (12ull)
-
-/*
- * Error due to specifying an invalid device.
- */
-#define LUMINARY_ERROR_INVALID_DEVICE (13ull)
-
-/*
- * Error was propagated from an internal function returning an error.
- */
-#define LUMINARY_ERROR_PROPAGATED (0x8000000000000000ull)
-
-LUMINARY_API const char* luminary_result_to_string(LuminaryResult result);
+struct LuminaryError {
+  LuminaryErrorKind kind;
+  const char* message;
+  LuminaryStackTrace* trace;
+  uint64_t host_id;
+} typedef LuminaryError;
 
 #endif /* LUMINARY_API_ERROR_H */

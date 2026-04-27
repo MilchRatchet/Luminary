@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
@@ -13,6 +14,8 @@
 #include "mesh.h"
 #include "png.h"
 #include "wavefront.h"
+
+static _Atomic uint64_t _host_id_allocator_counter = 0;
 
 #define HOST_RINGBUFFER_SIZE (0x100000ull)
 #define HOST_QUEUE_SIZE (0x400ull)
@@ -387,6 +390,10 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   __FAILURE_HANDLE(host_malloc(host, sizeof(Host)));
   memset(*host, 0, sizeof(Host));
 
+  (*host)->id = atomic_fetch_add_explicit(&_host_id_allocator_counter, 1, memory_order_relaxed);
+
+  error_registry_register_thread((*host)->id);
+
   __FAILURE_HANDLE(output_handler_create(&(*host)->output_handler));
 
   __FAILURE_HANDLE(array_create(&(*host)->meshes, sizeof(Mesh*), 16));
@@ -414,7 +421,7 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
   (*host)->enable_output = false;
 
   __FAILURE_HANDLE(queue_worker_create(&(*host)->queue_worker_main));
-  __FAILURE_HANDLE(queue_worker_start((*host)->queue_worker_main, "Host", (*host)->work_queue, *host));
+  __FAILURE_HANDLE(queue_worker_start((*host)->queue_worker_main, "Host", (*host)->work_queue, *host, (*host)->id));
 
   __FAILURE_HANDLE(array_create(&(*host)->queue_worker_secondary, sizeof(QueueWorker*), HOST_NUM_SECONDARY_QUEUE_WORKERS));
 
@@ -425,7 +432,7 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
     char queue_worker_name[256];
     sprintf(queue_worker_name, "Worker %u", queue_worker_id);
 
-    __FAILURE_HANDLE(queue_worker_start(queue_worker, queue_worker_name, (*host)->secondary_work_queue, *host));
+    __FAILURE_HANDLE(queue_worker_start(queue_worker, queue_worker_name, (*host)->secondary_work_queue, *host, (*host)->id));
 
     __FAILURE_HANDLE(array_push(&(*host)->queue_worker_secondary, &queue_worker));
   }
@@ -1265,4 +1272,13 @@ LuminaryResult luminary_host_request_sky_hdri_build(Host* host) {
   __FAILURE_HANDLE(host_update_scene(host));
 
   return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_last_error(Host* host) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  LuminaryResult result;
+  error_registry_get_last(host->id, &result);
+
+  return result;
 }
