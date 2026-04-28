@@ -17,6 +17,6 @@ void _error_registry_add_stacktrace(LuminaryResult result, const char* function_
 void error_registry_allocate(LuminaryResult* result);
 void error_registry_register_thread(uint64_t host_id);
 void error_registry_get_last(uint64_t host_id, LuminaryResult* result);
-void error_registry_get_from_result(LuminaryResult result, LuminaryError** error);
+void error_registry_get_from_result(LuminaryResult result, const LuminaryError** error);
 
 #endif /* LUMINARY_ERROR_REGISTRY_H */

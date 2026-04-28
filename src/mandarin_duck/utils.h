@@ -5,12 +5,28 @@
 
 #include <luminary/luminary.h>
 
-#define LUM_FAILURE_HANDLE(__lum_command)                             \
-  {                                                                   \
-    LuminaryResult __lum_result = (__lum_command);                    \
-    if (__lum_result != LUMINARY_SUCCESS) {                           \
-      crash_message("Luminary API returned error: %u", __lum_result); \
-    }                                                                 \
+#define LUM_FAILURE_HANDLE(__lum_command)                                                                                          \
+  {                                                                                                                                \
+    LuminaryResult __lum_result = (__lum_command);                                                                                 \
+    if (__lum_result != LUMINARY_SUCCESS) {                                                                                        \
+      const LuminaryError* __lum_error;                                                                                            \
+      luminary_get_error_details(__lum_result, &__lum_error);                                                                      \
+                                                                                                                                   \
+      if (__lum_error != (const LuminaryError*) 0) {                                                                               \
+        error_message("Luminary API returned error code: %s.", luminary_strings_error_kind[__lum_error->kind]);                    \
+        error_message("Error message: %s.", __lum_error->message);                                                                 \
+        const LuminaryStackTrace* __lum_stacktrace = __lum_error->trace;                                                           \
+        while (__lum_stacktrace != (LuminaryStackTrace*) 0) {                                                                      \
+          error_message("\tat %s in %s:%u", __lum_stacktrace->function_name, __lum_stacktrace->file_name, __lum_stacktrace->line); \
+          __lum_stacktrace = __lum_stacktrace->caller;                                                                             \
+        }                                                                                                                          \
+      }                                                                                                                            \
+      else {                                                                                                                       \
+        error_message("Luminary API returned unspecified error.");                                                                 \
+      }                                                                                                                            \
+                                                                                                                                   \
+      crash_message("Luminary API ran into unrecoverable error.");                                                                 \
+    }                                                                                                                              \
   }
 
 #define MD_CHECK_NULL_ARGUMENT(__md_argument)     \

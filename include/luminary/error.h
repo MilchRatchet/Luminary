@@ -48,6 +48,7 @@ enum LuminaryErrorKind {
   LUMINARY_ERROR_DEBUG_ASSERT,          // Error due to a debug condition being violated.
   LUMINARY_ERROR_MISSING_DATA,          // Error due to embedded data missing.
   LUMINARY_ERROR_INVALID_DEVICE,        // Error due to specifying an invalid device.
+  LUMINARY_ERROR_KIND_COUNT,
 } typedef LuminaryErrorKind;
 
 struct LuminaryError {
@@ -56,5 +57,7 @@ struct LuminaryError {
   LuminaryStackTrace* trace;
   uint64_t host_id;
 } typedef LuminaryError;
+
+LUMINARY_API void luminary_get_error_details(LuminaryResult result, const LuminaryError** error);
 
 #endif /* LUMINARY_API_ERROR_H */

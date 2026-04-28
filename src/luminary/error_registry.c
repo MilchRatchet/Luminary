@@ -321,10 +321,26 @@ void error_registry_get_last(uint64_t host_id, LuminaryResult* result) {
   *result = return_val;
 }
 
-void error_registry_get_from_result(LuminaryResult result, LuminaryError** error) {
+void error_registry_get_from_result(LuminaryResult result, const LuminaryError** error) {
+  if (error == (const LuminaryError**) 0)
+    return;
+
   if (result == LUMINARY_SUCCESS) {
-    *error = (LuminaryError*) 0;
+    *error = (const LuminaryError*) 0;
+    return;
   }
 
-  *error = _registry.errors[result - 1];
+  _error_registry_lock();
+
+  uint64_t error_id = result - 1;
+
+  const LuminaryError* return_val = (const LuminaryError*) 0;
+
+  if (error_id < _registry.num_errors) {
+    return_val = _registry.errors[result - 1];
+  }
+
+  _error_registry_unlock();
+
+  *error = return_val;
 }
