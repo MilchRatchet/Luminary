@@ -385,14 +385,15 @@ static LuminaryResult _host_set_scene_entity_entry(Host* host, void* object, Sce
 ////////////////////////////////////////////////////////////////////
 
 LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
+  error_registry_make_host_current(LUMINARY_HOST_ID_UNKNOWN);
+
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(host_malloc(host, sizeof(Host)));
   memset(*host, 0, sizeof(Host));
 
   (*host)->id = atomic_fetch_add_explicit(&_host_id_allocator_counter, 1, memory_order_relaxed);
-
-  error_registry_register_thread((*host)->id);
+  error_registry_make_host_current((*host)->id);
 
   __FAILURE_HANDLE(output_handler_create(&(*host)->output_handler));
 
@@ -441,6 +442,8 @@ LuminaryResult luminary_host_create(Host** host, LuminaryHostCreateInfo info) {
 }
 
 LuminaryResult luminary_host_destroy(Host** host) {
+  error_registry_make_host_current((host && *host) ? (*host)->id : LUMINARY_HOST_ID_UNKNOWN);
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(*host);
 
@@ -525,6 +528,8 @@ LuminaryResult luminary_host_destroy(Host** host) {
 }
 
 LuminaryResult luminary_host_start_new_render(LuminaryHost* host) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   QueueEntry entry;
@@ -542,6 +547,8 @@ LuminaryResult luminary_host_start_new_render(LuminaryHost* host) {
 }
 
 LuminaryResult luminary_host_get_device_count(LuminaryHost* host, uint32_t* device_count) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(device_count);
 
@@ -551,6 +558,8 @@ LuminaryResult luminary_host_get_device_count(LuminaryHost* host, uint32_t* devi
 }
 
 LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device_id, LuminaryDeviceInfo* info) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(info);
 
@@ -578,6 +587,8 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
 }
 
 LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t device_id, bool enable) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   uint32_t num_devices;
@@ -671,6 +682,8 @@ static LuminaryResult _host_queue_load_lum_file(Host* host, Path* path) {
 }
 
 LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
@@ -683,6 +696,8 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
 }
 
 LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
@@ -692,6 +707,8 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
 }
 
 LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(sample_time_get_time(host->device_manager->sample_time, time));
@@ -700,6 +717,8 @@ LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
 }
 
 LuminaryResult luminary_host_get_num_queue_workers(const LuminaryHost* host, uint32_t* num_queue_workers) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(num_queue_workers);
 
@@ -709,6 +728,8 @@ LuminaryResult luminary_host_get_num_queue_workers(const LuminaryHost* host, uin
 }
 
 LuminaryResult luminary_host_get_queue_worker_name(const LuminaryHost* host, uint32_t queue_worker_id, const char** string) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
@@ -736,6 +757,8 @@ LuminaryResult luminary_host_get_queue_worker_name(const LuminaryHost* host, uin
 }
 
 LuminaryResult luminary_host_get_queue_worker_string(const LuminaryHost* host, uint32_t queue_worker_id, const char** string) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(string);
 
@@ -763,6 +786,8 @@ LuminaryResult luminary_host_get_queue_worker_string(const LuminaryHost* host, u
 }
 
 LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t queue_worker_id, double* time) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(time);
 
@@ -790,6 +815,8 @@ LuminaryResult luminary_host_get_queue_worker_time(const Host* host, uint32_t qu
 }
 
 LuminaryResult luminary_host_acquire_scene_lock(Host* host, bool* success) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(success);
 
@@ -806,6 +833,8 @@ LuminaryResult luminary_host_acquire_scene_lock(Host* host, bool* success) {
 }
 
 LuminaryResult luminary_host_release_scene_lock(Host* host) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   if (host->scene_locked_by_caller) {
@@ -817,6 +846,8 @@ LuminaryResult luminary_host_release_scene_lock(Host* host) {
 }
 
 LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
@@ -826,6 +857,8 @@ LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings
 }
 
 LuminaryResult luminary_host_set_settings(Host* host, const RendererSettings* settings) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
@@ -835,6 +868,8 @@ LuminaryResult luminary_host_set_settings(Host* host, const RendererSettings* se
 }
 
 LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
@@ -844,6 +879,8 @@ LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
 }
 
 LuminaryResult luminary_host_set_camera(Host* host, const Camera* camera) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
@@ -853,6 +890,8 @@ LuminaryResult luminary_host_set_camera(Host* host, const Camera* camera) {
 }
 
 LuminaryResult luminary_host_get_ocean(Host* host, Ocean* ocean) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
@@ -862,6 +901,8 @@ LuminaryResult luminary_host_get_ocean(Host* host, Ocean* ocean) {
 }
 
 LuminaryResult luminary_host_set_ocean(Host* host, const Ocean* ocean) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
@@ -871,6 +912,8 @@ LuminaryResult luminary_host_set_ocean(Host* host, const Ocean* ocean) {
 }
 
 LuminaryResult luminary_host_get_sky(Host* host, Sky* sky) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
@@ -880,6 +923,8 @@ LuminaryResult luminary_host_get_sky(Host* host, Sky* sky) {
 }
 
 LuminaryResult luminary_host_set_sky(Host* host, const Sky* sky) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
@@ -889,6 +934,8 @@ LuminaryResult luminary_host_set_sky(Host* host, const Sky* sky) {
 }
 
 LuminaryResult luminary_host_get_cloud(Host* host, Cloud* cloud) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
@@ -898,6 +945,8 @@ LuminaryResult luminary_host_get_cloud(Host* host, Cloud* cloud) {
 }
 
 LuminaryResult luminary_host_set_cloud(Host* host, const Cloud* cloud) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
@@ -907,6 +956,8 @@ LuminaryResult luminary_host_set_cloud(Host* host, const Cloud* cloud) {
 }
 
 LuminaryResult luminary_host_get_fog(Host* host, Fog* fog) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
@@ -916,6 +967,8 @@ LuminaryResult luminary_host_get_fog(Host* host, Fog* fog) {
 }
 
 LuminaryResult luminary_host_set_fog(Host* host, const Fog* fog) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
@@ -925,6 +978,8 @@ LuminaryResult luminary_host_set_fog(Host* host, const Fog* fog) {
 }
 
 LuminaryResult luminary_host_get_particles(Host* host, Particles* particles) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
@@ -934,6 +989,8 @@ LuminaryResult luminary_host_get_particles(Host* host, Particles* particles) {
 }
 
 LuminaryResult luminary_host_set_particles(Host* host, const Particles* particles) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
@@ -943,6 +1000,8 @@ LuminaryResult luminary_host_set_particles(Host* host, const Particles* particle
 }
 
 LuminaryResult luminary_host_get_material(Host* host, uint16_t id, LuminaryMaterial* material) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(material);
 
@@ -952,6 +1011,8 @@ LuminaryResult luminary_host_get_material(Host* host, uint16_t id, LuminaryMater
 }
 
 LuminaryResult luminary_host_set_material(Host* host, uint16_t id, const LuminaryMaterial* material) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(material);
 
@@ -961,6 +1022,8 @@ LuminaryResult luminary_host_set_material(Host* host, uint16_t id, const Luminar
 }
 
 LuminaryResult luminary_host_get_material_from_name(Host* host, const char* name, uint16_t* id) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(id);
@@ -996,6 +1059,8 @@ LuminaryResult luminary_host_get_material_from_name(Host* host, const char* name
 }
 
 LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInstance* instance) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
 
@@ -1008,6 +1073,8 @@ LuminaryResult luminary_host_get_instance(Host* host, uint32_t id, LuminaryInsta
 }
 
 LuminaryResult luminary_host_set_instance(Host* host, uint32_t id, const LuminaryInstance* instance) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(instance);
 
@@ -1020,6 +1087,8 @@ LuminaryResult luminary_host_set_instance(Host* host, uint32_t id, const Luminar
 }
 
 LuminaryResult luminary_host_get_instance_from_name(LuminaryHost* host, const char* name, uint32_t* id) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(id);
@@ -1049,6 +1118,8 @@ LuminaryResult luminary_host_get_instance_from_name(LuminaryHost* host, const ch
 }
 
 LuminaryResult luminary_host_get_mesh_from_name(LuminaryHost* host, const char* name, uint32_t* id) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(name);
   __CHECK_NULL_ARGUMENT(id);
@@ -1064,6 +1135,8 @@ LuminaryResult luminary_host_get_mesh_from_name(LuminaryHost* host, const char* 
 }
 
 LuminaryResult luminary_host_get_num_meshes(Host* host, uint32_t* num_meshes) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(num_meshes);
 
@@ -1073,6 +1146,8 @@ LuminaryResult luminary_host_get_num_meshes(Host* host, uint32_t* num_meshes) {
 }
 
 LuminaryResult luminary_host_get_num_materials(Host* host, uint32_t* num_materials) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(num_materials);
 
@@ -1082,6 +1157,8 @@ LuminaryResult luminary_host_get_num_materials(Host* host, uint32_t* num_materia
 }
 
 LuminaryResult luminary_host_get_num_instances(Host* host, uint32_t* num_instances) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(num_instances);
 
@@ -1091,6 +1168,8 @@ LuminaryResult luminary_host_get_num_instances(Host* host, uint32_t* num_instanc
 }
 
 LuminaryResult luminary_host_set_output_properties(Host* host, LuminaryOutputProperties properties) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_set_properties(host->output_handler, properties));
@@ -1100,6 +1179,8 @@ LuminaryResult luminary_host_set_output_properties(Host* host, LuminaryOutputPro
 }
 
 LuminaryResult luminary_host_request_output(Host* host, LuminaryOutputRequestProperties properties, LuminaryOutputPromiseHandle* handle) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(handle);
 
@@ -1124,6 +1205,8 @@ LuminaryResult luminary_host_request_output(Host* host, LuminaryOutputRequestPro
 }
 
 LuminaryResult luminary_host_try_await_output(Host* host, LuminaryOutputPromiseHandle handle, LuminaryOutputHandle* output_handle) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(output_handle);
 
@@ -1133,6 +1216,8 @@ LuminaryResult luminary_host_try_await_output(Host* host, LuminaryOutputPromiseH
 }
 
 LuminaryResult luminary_host_acquire_output(Host* host, LuminaryOutputHandle* output_handle) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(output_handle);
 
@@ -1142,6 +1227,8 @@ LuminaryResult luminary_host_acquire_output(Host* host, LuminaryOutputHandle* ou
 }
 
 LuminaryResult luminary_host_get_image(LuminaryHost* host, LuminaryOutputHandle output_handle, Image* image) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(image);
 
@@ -1151,6 +1238,8 @@ LuminaryResult luminary_host_get_image(LuminaryHost* host, LuminaryOutputHandle 
 }
 
 LuminaryResult luminary_host_release_output(Host* host, LuminaryOutputHandle output_handle) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_release(host->output_handler, output_handle));
@@ -1173,6 +1262,8 @@ static float _host_bfloat16_to_float32(uint16_t val) {
 }
 
 LuminaryResult luminary_host_get_pixel_info(Host* host, uint16_t x, uint16_t y, LuminaryPixelQueryResult* result) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(result);
 
@@ -1215,6 +1306,8 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
 }
 
 LuminaryResult luminary_host_save_png(Host* host, LuminaryOutputHandle handle, Path* path) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
@@ -1253,6 +1346,8 @@ LuminaryResult luminary_host_save_png(Host* host, LuminaryOutputHandle handle, P
 }
 
 LuminaryResult luminary_host_save_as_lumV5(Host* host, Path* path) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
@@ -1266,6 +1361,8 @@ LuminaryResult luminary_host_save_as_lumV5(Host* host, Path* path) {
 }
 
 LuminaryResult luminary_host_request_sky_hdri_build(Host* host) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(scene_set_hdri_dirty(host->scene_caller));
@@ -1275,6 +1372,8 @@ LuminaryResult luminary_host_request_sky_hdri_build(Host* host) {
 }
 
 LuminaryResult luminary_host_get_last_error(Host* host) {
+  LUMINARY_HOST_API_ENTRY
+
   __CHECK_NULL_ARGUMENT(host);
 
   LuminaryResult result;

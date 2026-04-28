@@ -14,7 +14,7 @@
                                                                                                                                    \
       if (__lum_error != (const LuminaryError*) 0) {                                                                               \
         error_message("Luminary API returned error code: %s.", luminary_strings_error_kind[__lum_error->kind]);                    \
-        error_message("Error message: %s.", __lum_error->message);                                                                 \
+        error_message("Error message: %s.", (__lum_error->message) ? __lum_error->message : "None");                               \
         const LuminaryStackTrace* __lum_stacktrace = __lum_error->trace;                                                           \
         while (__lum_stacktrace != (LuminaryStackTrace*) 0) {                                                                      \
           error_message("\tat %s in %s:%u", __lum_stacktrace->function_name, __lum_stacktrace->file_name, __lum_stacktrace->line); \

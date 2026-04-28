@@ -4,16 +4,12 @@
 #include "error_registry.h"
 #include "utils.h"
 
-#define __RETURN_ERROR(__lum_kind, __lum_fmt, ...)                      \
-  {                                                                     \
-    LuminaryResult __lum_result;                                        \
-    error_registry_allocate(&__lum_result);                             \
-                                                                        \
-    error_registry_set_kind(__lum_result, __lum_kind);                  \
-    error_registry_set_message(__lum_result, __lum_fmt, ##__VA_ARGS__); \
-    error_registry_add_stacktrace(__lum_result);                        \
-                                                                        \
-    return __lum_result;                                                \
+#define __RETURN_ERROR(__lum_kind, __lum_fmt, ...)                                 \
+  {                                                                                \
+    LuminaryResult __lum_result;                                                   \
+    error_registry_new_entry(&__lum_result, __lum_kind, __lum_fmt, ##__VA_ARGS__); \
+    error_registry_add_stacktrace(__lum_result);                                   \
+    return __lum_result;                                                           \
   }
 
 #define __CHECK_NULL_ARGUMENT(__lum_argument)                                     \
@@ -54,17 +50,13 @@
       return __locked_section_result;                \
   }
 
-#define __RETURN_ERROR_CRITICAL(__lum_kind, __lum_fmt, ...)             \
-  {                                                                     \
-    LuminaryResult __lum_result;                                        \
-    error_registry_allocate(&__lum_result);                             \
-                                                                        \
-    error_registry_set_kind(__lum_result, __lum_kind);                  \
-    error_registry_set_message(__lum_result, __lum_fmt, ##__VA_ARGS__); \
-    error_registry_add_stacktrace(__lum_result);                        \
-                                                                        \
-    __locked_section_result = __lum_result;                             \
-    goto __UNLOCKING_CRITICAL_LABEL;                                    \
+#define __RETURN_ERROR_CRITICAL(__lum_kind, __lum_fmt, ...)                        \
+  {                                                                                \
+    LuminaryResult __lum_result;                                                   \
+    error_registry_new_entry(&__lum_result, __lum_kind, __lum_fmt, ##__VA_ARGS__); \
+    error_registry_add_stacktrace(__lum_result);                                   \
+    __locked_section_result = __lum_result;                                        \
+    goto __UNLOCKING_CRITICAL_LABEL;                                               \
   }
 
 ////////////////////////////////////////////////////////////////////

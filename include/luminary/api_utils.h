@@ -24,6 +24,8 @@
 #define LUMINARY_API
 #define LUMINARY_DEPRECATED
 
+#define LUMINARY_HOST_ID_UNKNOWN ((uint64_t) -1)
+
 LUMINARY_API struct LuminaryVec3 {
   float x;
   float y;

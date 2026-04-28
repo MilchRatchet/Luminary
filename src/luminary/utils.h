@@ -10,6 +10,8 @@
 #include "internal_array.h"
 #include "sky_defines.h"
 
+#define LUMINARY_HOST_API_ENTRY (error_registry_make_host_current((host) ? host->id : LUMINARY_HOST_ID_UNKNOWN));
+
 // Determine architecture
 #if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64)
 #define LUMINARY_TARGET_ARCH_X86
