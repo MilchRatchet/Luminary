@@ -466,7 +466,7 @@ LUMINARY_KERNEL void tasks_sort() {
       warp_offsets[task_index] += type_count;
     }
 
-    if (thread_predicate)
+    if (index != SHADING_TASK_INDEX_INVALID)
       task_state_store(dst_task_base_address, state);
   }
 

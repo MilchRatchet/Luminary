@@ -290,8 +290,6 @@ static LuminaryResult _sky_hdri_compute(SkyHDRI* hdri, Device* device) {
 
   DeviceSkyHDRI* device_hdri = device->sky_hdri;
 
-  hdri->id++;
-
   bool has_changed;
   __FAILURE_HANDLE(device_sky_hdri_update(device_hdri, device, hdri, &has_changed));
 
@@ -335,6 +333,8 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
   const bool requires_rendering = hdri->output_is_dirty || (hdri->computed_sample_count < hdri->sample_count);
 
   if (requires_rendering) {
+    hdri->id++;
+
     if (hdri->output_is_dirty) {
       if (hdri->color_tex) {
         __FAILURE_HANDLE(texture_destroy(&hdri->color_tex));
@@ -364,8 +364,6 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
     }
 
     hdri->sky_is_dirty = false;
-
-    hdri->id++;
   }
 
   return LUMINARY_SUCCESS;

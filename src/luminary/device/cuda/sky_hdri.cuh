@@ -58,6 +58,9 @@ LUMINARY_FUNCTION float sky_hdri_warp_apply_median_of_means(float buckets[], con
 LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
   const uint32_t pixel_id = WARP_ID;
 
+  if (pixel_id >= args.dim * args.dim)
+    return;
+
   const uint32_t y = pixel_id / args.dim;
   const uint32_t x = pixel_id - y * args.dim;
 
