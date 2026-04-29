@@ -8,17 +8,9 @@
 #include <string.h>
 #include <threads.h>
 
-#define THREAD_ID_NOT_REGISTERED ((uint64_t) -1)
-
-static _Atomic uint64_t _thread_local_allocator_counter = 0;
-static _Thread_local uint64_t _thread_local_id          = THREAD_ID_NOT_REGISTERED;
+static _Thread_local uint64_t _thread_local_host_id = LUMINARY_HOST_ID_UNKNOWN;
 
 static _Atomic bool _error_has_occurred = false;
-
-struct HostThreadMapEntry {
-  uint64_t host_id;
-  uint64_t thread_id;
-};
 
 struct ErrorRegistry {
   mtx_t mutex;
@@ -26,10 +18,6 @@ struct ErrorRegistry {
   LuminaryError** errors;
   uint64_t num_errors;
   uint64_t num_allocated_errors;
-
-  struct HostThreadMapEntry* host_thread_map;
-  uint64_t num_host_thread_map_entries;
-  uint64_t num_allocated_host_thread_map_entries;
 };
 
 // TODO: Replace puts with crash_message!
@@ -70,11 +58,6 @@ void _error_registry_init() {
 
   _registry.num_errors           = 0;
   _registry.num_allocated_errors = 32;
-
-  _registry.host_thread_map = (struct HostThreadMapEntry*) malloc(sizeof(struct HostThreadMapEntry) * 128);
-
-  _registry.num_host_thread_map_entries           = 0;
-  _registry.num_allocated_host_thread_map_entries = 128;
 }
 
 void _error_registry_uninit() {
@@ -85,7 +68,6 @@ void _error_registry_uninit() {
     free(_registry.errors[error_id]);
 
   free(_registry.errors);
-  free(_registry.host_thread_map);
 
   _error_registry_unlock();
 
@@ -95,20 +77,9 @@ void _error_registry_uninit() {
 }
 
 void error_registry_new_entry(LuminaryResult* result, LuminaryErrorKind kind, const char* format, ...) {
-  const uint64_t thread_id = _thread_local_id;
+  const uint64_t host_id = _thread_local_host_id;
 
   _error_registry_lock();
-
-  uint64_t host_id = LUMINARY_HOST_ID_UNKNOWN;
-
-  if (thread_id != THREAD_ID_NOT_REGISTERED) {
-    for (uint64_t entry_id = 0; entry_id < _registry.num_host_thread_map_entries; entry_id++) {
-      if (_registry.host_thread_map[entry_id].thread_id == thread_id) {
-        host_id = _registry.host_thread_map[entry_id].host_id;
-        break;
-      }
-    }
-  }
 
   if (_registry.num_allocated_errors == _registry.num_errors) {
     _registry.num_allocated_errors *= 2;
@@ -220,44 +191,7 @@ void _error_registry_add_stacktrace(LuminaryResult result, const char* function_
 }
 
 void error_registry_make_host_current(uint64_t host_id) {
-  _error_registry_lock();
-
-  if (_thread_local_id == THREAD_ID_NOT_REGISTERED) {
-    _thread_local_id = atomic_fetch_add(&_thread_local_allocator_counter, 1);
-  }
-
-  const uint64_t thread_id = _thread_local_id;
-
-  struct HostThreadMapEntry new_entry = {.host_id = host_id, .thread_id = thread_id};
-
-  bool entry_already_present = false;
-  for (uint64_t entry_id = 0; entry_id < _registry.num_host_thread_map_entries; entry_id++) {
-    if (_registry.host_thread_map[entry_id].thread_id == thread_id) {
-      _registry.host_thread_map[entry_id] = new_entry;
-      entry_already_present               = true;
-      break;
-    }
-  }
-
-  if (entry_already_present == false) {
-    if (_registry.num_host_thread_map_entries == _registry.num_allocated_host_thread_map_entries) {
-      _registry.num_allocated_host_thread_map_entries *= 2;
-
-      struct HostThreadMapEntry* new_ptr = (struct HostThreadMapEntry*) realloc(
-        _registry.host_thread_map, sizeof(struct HostThreadMapEntry) * _registry.num_allocated_host_thread_map_entries);
-
-      if (new_ptr == (struct HostThreadMapEntry*) 0) {
-        puts("Failed to grow the host thread map for the Luminary error registry.");
-        exit(SIGABRT);
-      }
-
-      _registry.host_thread_map = new_ptr;
-    }
-
-    _registry.host_thread_map[_registry.num_host_thread_map_entries++] = new_entry;
-  }
-
-  _error_registry_unlock();
+  _thread_local_host_id = host_id;
 }
 
 void error_registry_get_last(uint64_t host_id, LuminaryResult* result) {
