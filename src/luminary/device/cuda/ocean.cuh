@@ -68,7 +68,6 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     uint16_t new_state = task.state;
 
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    new_state &= ~STATE_FLAG_ALLOW_EMISSION;
     new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
     DeviceTask bounce_task;

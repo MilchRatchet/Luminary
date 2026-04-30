@@ -121,72 +121,16 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 template <MaterialType TYPE>
 LUMINARY_FUNCTION DeviceTaskDirectLightSun
   direct_lighting_sun_caustic(MaterialContext<TYPE> ctx, const DeviceTaskMediumStack& medium, const PathID& path_id, const vec3 sky_pos) {
-  // Caustics are only for underwater starting with v1.2.0
-  constexpr bool IS_UNDERWATER = true;
+  float solid_angle;
+  const float2 sun_dir_random = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_SUN_RAY, path_id);
+  const vec3 sun_dir          = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
 
   ////////////////////////////////////////////////////////////////////
   // Sample a caustic connection vertex using RIS
   ////////////////////////////////////////////////////////////////////
 
-  float solid_angle;
-  const float2 sun_dir_random                  = random_2D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_SUN_RAY, path_id);
-  const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
-  const CausticsSamplingDomain sampling_domain = caustics_get_domain(ctx, sun_dir, IS_UNDERWATER);
-
-  if (sampling_domain.valid == false) {
-    DeviceTaskDirectLightSun task;
-    task.light_color = PACKED_RECORD_BLACK;
-    return task;
-  }
-
   vec3 connection_point;
-  float connection_weight;
-
-  if (sampling_domain.fast_path) {
-    vec3 sample_point;
-    float sample_weight;
-    caustics_find_connection_point(ctx, path_id, sampling_domain, IS_UNDERWATER, 0, 1, sample_point, sample_weight);
-
-    connection_point  = sample_point;
-    connection_weight = sample_weight;
-  }
-  else {
-    const float resampling_random = random_1D(MaterialContext<TYPE>::RANDOM_DL_SUN::CAUSTIC_RESAMPLING, path_id);
-    const uint32_t num_samples    = device.ocean.caustics_ris_sample_count + 1;
-
-    RISStratifiedReservoir reservoir = ris_stratified_reservoir_init(resampling_random, num_samples);
-
-    const float mis_weight = 1.0f / num_samples;
-
-    uint32_t index;
-    while (ris_stratified_reservoir_next(reservoir, index)) {
-      vec3 sample_point;
-      float sample_weight = 0.0f;
-      const bool valid_hit =
-        caustics_find_connection_point(ctx, path_id, sampling_domain, IS_UNDERWATER, index, num_samples, sample_point, sample_weight);
-
-      const float target = (valid_hit) ? 1.0f : 0.0f;
-      sample_weight      = (valid_hit) ? mis_weight * sample_weight : 0.0f;
-
-      if (ris_stratified_reservoir_add_sample(reservoir, target, sample_weight)) {
-        connection_point = sample_point;
-      }
-    }
-
-    connection_weight = ris_stratified_reservoir_get_sampling_weight(reservoir);
-
-    // Make no mistake. I do in fact have no idea what I am doing. So I just empirically gathered that these
-    // weights are correct (they are very unlikely to be correct). I will look into fixing this the moment
-    // I start caring.
-
-    // Inspired by the famous factor required for refraction when sampling importance. Note that one of the IOR is 1.0f.
-    connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index;
-
-    if (IS_UNDERWATER) {
-      // ... and why not apply it again, we are just sampling some extra importance clearly. And a 2.0f for good measure.
-      connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index * 2.0f;
-    }
-  }
+  float connection_weight = caustics_sample(ctx, sun_dir, path_id, connection_point);
 
   if (connection_weight == 0.0f) {
     DeviceTaskDirectLightSun task;
@@ -214,13 +158,6 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
     task.light_color = PACKED_RECORD_BLACK;
     return task;
   }
-
-  const vec3 ocean_normal =
-    (sampling_domain.fast_path) ? get_vector(0.0f, 1.0f, 0.0f) : ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
-  const vec3 normal = scale_vector(ocean_normal, (IS_UNDERWATER) ? -1.0f : 1.0f);
-
-  bool total_reflection;
-  const vec3 refraction_dir = refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior, total_reflection);
 
   ////////////////////////////////////////////////////////////////////
   // Volume transmittance
@@ -505,10 +442,13 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
   if (sample_is_valid && is_caustics_path && limit != FLT_MAX) {
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
+    // We are computing the BSDF part of the ocean intersection here because we have to compute the refraction direction anyway,
+    // so we skip doing this in the sampling stage and just do it all here.
+
     // Volume and particle rendering always use the geometry logic here, this means we get low variance sampling as we use the caustics fast
     // path, but then apply Fresnel here. This means we are essentially taking the integral over a very small subspace. It looks nice and is
     // fast.
-    const bool fast_path = caustics_is_fast_path<MATERIAL_GEOMETRY>(task.state);
+    const bool fast_path = caustics_is_fast_path(task.state);
 
     // Ocean normal points up, we come from below, so flip it
     const vec3 ocean_normal = (fast_path) ? get_vector(0.0f, -1.0f, 0.0f) : scale_vector(ocean_get_normal(ocean_pos), -1.0f);

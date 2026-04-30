@@ -103,7 +103,7 @@ LUMINARY_KERNEL void tasks_create() {
       continue;
 
     DeviceTask task;
-    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
+    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT;
     task.path_id = path_id_get(x, y, sample_id);
 
     CameraSampleResult camera_result = camera_sample(task.path_id);
@@ -265,7 +265,7 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
       continue;
 
     DeviceTask task;
-    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION | STATE_FLAG_ALLOW_AMBIENT;
+    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT;
     task.path_id = path_id_get(x, y, sample_id);
 
     CameraSampleResult camera_result = camera_sample(task.path_id);

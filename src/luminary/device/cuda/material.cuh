@@ -62,6 +62,8 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<0>;
   using RANDOM_DL_AMBIENT = RandomSet::BSDF<1>;
 
+  constexpr static bool FORCE_FAST_OCEAN_CAUSTICS = false;
+
   uint32_t instance_id;
   uint32_t tri_id;
   vec3 position;
@@ -80,6 +82,8 @@ struct MaterialContext<MATERIAL_VOLUME> {
   using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<1>;
   using RANDOM_DL_AMBIENT = RandomSet::BSDF<2>;
 
+  constexpr static bool FORCE_FAST_OCEAN_CAUSTICS = true;
+
   VolumeDescriptor descriptor;
   vec3 position;
   vec3 V;
@@ -94,6 +98,8 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<0>;
   using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<0>;
   using RANDOM_DL_AMBIENT = RandomSet::BSDF<1>;
+
+  constexpr static bool FORCE_FAST_OCEAN_CAUSTICS = true;
 
   uint32_t particle_id;
   vec3 position;

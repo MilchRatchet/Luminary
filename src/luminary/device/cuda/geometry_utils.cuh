@@ -121,7 +121,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
 
   const bool emissive_side    = (is_inside == false) || (mat.flags & DEVICE_MATERIAL_FLAG_BIDIRECTIONAL_EMISSION);
   const bool has_emission     = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && emissive_side;
-  const bool include_emission = has_emission && ((task.state & STATE_FLAG_ALLOW_EMISSION) != 0);
+  const bool include_emission = has_emission && ((task.state & STATE_FLAG_CAMERA_DIRECTION) != 0);
 
   RGBF emission = get_color(0.0f, 0.0f, 0.0f);
   if (include_emission) {

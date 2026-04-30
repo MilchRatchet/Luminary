@@ -279,7 +279,7 @@ LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, c
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);
 
-      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION);
       if (include_sun) {
         const vec3 sky_origin = world_to_sky_transform(origin);
 
@@ -308,14 +308,14 @@ LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const u
     default:
     case LUMINARY_SKY_MODE_DEFAULT: {
       const vec3 sky_origin  = world_to_sky_transform(origin);
-      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION);
 
       sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, path_id);
     } break;
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);
 
-      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_EMISSION);
+      const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION);
       if (include_sun) {
         const vec3 sky_origin = world_to_sky_transform(origin);
 

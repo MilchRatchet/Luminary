@@ -833,7 +833,7 @@ LUMINARY_FUNCTION vec3 angles_to_direction(const float altitude, const float azi
 }
 
 LUMINARY_FUNCTION void direction_to_angles(const vec3 dir, float& azimuth, float& altitude) {
-  altitude = asinf(dir.y);
+  altitude = asinf(__saturatef(dir.y));
   azimuth  = atan2f(dir.z, dir.x);
 
   if (azimuth < 0.0f)

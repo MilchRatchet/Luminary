@@ -123,7 +123,6 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     if (is_pass_through == false) {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-      new_state &= ~STATE_FLAG_ALLOW_EMISSION;
       new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
     }
 
