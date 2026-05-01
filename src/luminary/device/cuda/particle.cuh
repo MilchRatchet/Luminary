@@ -55,7 +55,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const BSDFSampleInfo<MATERIAL_PARTICLE> bounce_info = bsdf_sample<MaterialContextParticle::RANDOM_GI>(ctx, task.path_id);
+    BSDFSampleInfo<MATERIAL_PARTICLE> bounce_info = bsdf_sample<MaterialContextParticle::RANDOM_GI>(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Ambient
@@ -74,17 +74,17 @@ LUMINARY_KERNEL void particle_process_tasks() {
     new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
     new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
 
-    DeviceTask bounce_task;
-    bounce_task.state   = new_state;
-    bounce_task.origin  = ctx.position;
-    bounce_task.ray     = bounce_info.ray;
-    bounce_task.path_id = task.path_id;
+    if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
+      RGBF record = record_unpack(throughput.record);
+      record      = mul_color(record, bounce_info.weight);
 
-    RGBF record = record_unpack(throughput.record);
-    record      = mul_color(record, bounce_info.weight);
-
-    if (task_russian_roulette(bounce_task, task.state, record)) {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+      DeviceTask bounce_task;
+      bounce_task.state   = new_state;
+      bounce_task.origin  = ctx.position;
+      bounce_task.ray     = bounce_info.ray;
+      bounce_task.path_id = task.path_id;
 
       task_store(dst_task_base_address, bounce_task);
 

@@ -35,10 +35,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
     device_settings->window_height = settings->region_height * device_settings->height;
   }
 
-  // Scale so that 1.0f is a good default value
-  const float russian_roulette_scale = 0.1f;
-
-  device_settings->russian_roulette_threshold = settings->russian_roulette_threshold * russian_roulette_scale;
+  device_settings->russian_roulette_threshold = settings->russian_roulette_threshold;
 
   return LUMINARY_SUCCESS;
 }

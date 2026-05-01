@@ -3,10 +3,10 @@
 
 #include "bsdf.cuh"
 #include "direct_lighting.cuh"
-#include "directives.cuh"
 #include "geometry_utils.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "russian_roulette.cuh"
 
 LUMINARY_KERNEL void geometry_process_tasks() {
   HANDLE_DEVICE_ABORT();
@@ -67,7 +67,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
+    BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Ambient
@@ -114,8 +114,6 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       write_beauty_buffer(result_color, throughput.results_index);
     }
 
-    record = mul_color(record, bounce_info.weight);
-
     uint16_t new_state = task.state | STATE_FLAG_USE_IGNORE_HANDLE;
 
     if (is_delta_distribution == false)
@@ -126,14 +124,16 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
     }
 
-    DeviceTask bounce_task;
-    bounce_task.state   = new_state;
-    bounce_task.origin  = ctx.position;
-    bounce_task.ray     = bounce_info.ray;
-    bounce_task.path_id = task.path_id;
-
-    if (task_russian_roulette(bounce_task, task.state, record)) {
+    if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
+
+      record = mul_color(record, bounce_info.weight);
+
+      DeviceTask bounce_task;
+      bounce_task.state   = new_state;
+      bounce_task.origin  = ctx.position;
+      bounce_task.ray     = bounce_info.ray;
+      bounce_task.path_id = task.path_id;
 
       task_store(dst_task_base_address, bounce_task);
 

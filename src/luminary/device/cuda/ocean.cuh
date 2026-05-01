@@ -2,11 +2,11 @@
 #define CU_LUMINARY_OCEAN_H
 
 #include "bsdf.cuh"
-#include "directives.cuh"
 #include "math.cuh"
 #include "medium_stack.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
+#include "russian_roulette.cuh"
 #include "utils.cuh"
 
 LUMINARY_KERNEL void ocean_process_tasks() {
@@ -58,10 +58,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
-
-    RGBF record = record_unpack(throughput.record);
-    record      = mul_color(record, bounce_info.weight);
+    BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
 
     const vec3 bounce_pos = ocean_shift_vector(ctx, bounce_info.is_transparent_pass);
 
@@ -70,13 +67,16 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
 
-    DeviceTask bounce_task;
-    bounce_task.state   = new_state;
-    bounce_task.origin  = bounce_pos;
-    bounce_task.ray     = bounce_info.ray;
-    bounce_task.path_id = task.path_id;
+    if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
+      RGBF record = record_unpack(throughput.record);
+      record      = mul_color(record, bounce_info.weight);
 
-    if (task_russian_roulette(bounce_task, task.state, record)) {
+      DeviceTask bounce_task;
+      bounce_task.state   = new_state;
+      bounce_task.origin  = bounce_pos;
+      bounce_task.ray     = bounce_info.ray;
+      bounce_task.path_id = task.path_id;
+
       // Apply medium transition.
       if (bounce_info.is_transparent_pass) {
         const bool refraction_is_inside = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;

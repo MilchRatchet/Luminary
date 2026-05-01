@@ -1,10 +1,10 @@
 #ifndef CU_VOLUME_H
 #define CU_VOLUME_H
 
-#include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
 #include "particle_utils.cuh"
+#include "russian_roulette.cuh"
 #include "sky_integration.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
