@@ -22,15 +22,18 @@ struct RayTransferMatrix {
   float D;
 } typedef RayTransferMatrix;
 
-static RayTransferMatrix _physical_camera_run_ray_transfer_matrix_analysis(const LensTemplateData* template_data) {
+static RayTransferMatrix _physical_camera_run_ray_transfer_matrix_analysis(const LensTemplateData* template_data, const float z_start) {
   float A = 1.0f;
   float B = 0.0f;
   float C = 0.0f;
   float D = 1.0f;
 
-  float z_curr = -template_data->last_vertex;
+  float z_curr = -z_start;
 
   for (int32_t i = template_data->num_interfaces - 1; i >= 0; i--) {
+    if (template_data->interfaces[i].vertex > z_start)
+      continue;
+
     float z_v = -template_data->interfaces[i].vertex;
     float d   = z_v - z_curr;
 
@@ -107,20 +110,21 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const C
   float exit_pupil_point  = template_data.exit_pupil_point;
 
   if (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
-    const RayTransferMatrix matrix = _physical_camera_run_ray_transfer_matrix_analysis(&template_data);
-
     if (camera->lens.use_auto_focus) {
-      sensor_distance = _physical_camera_compute_auto_focus(&template_data, matrix, camera->lens.object_distance / camera->scale);
+      const RayTransferMatrix matrix     = _physical_camera_run_ray_transfer_matrix_analysis(&template_data, template_data.last_vertex);
+      const float scaled_object_distance = camera->lens.object_distance / camera->scale;
+
+      sensor_distance = _physical_camera_compute_auto_focus(&template_data, matrix, scaled_object_distance);
     }
     else {
       sensor_distance = camera->lens.sensor_distance;
     }
 
-    if (matrix.D != 0.0f) {
-      const float matrix_determinant = matrix.A * matrix.D - matrix.B * matrix.C;
+    RayTransferMatrix exit_pupil_mat = _physical_camera_run_ray_transfer_matrix_analysis(&template_data, template_data.aperture_point);
 
-      exit_pupil_point  = matrix.B / matrix.D;
-      exit_pupil_radius = fabsf(matrix_determinant / matrix.D) * aperture_radius;
+    if (exit_pupil_mat.D != 0.0f) {
+      exit_pupil_point  = template_data.interfaces[0].vertex + exit_pupil_mat.B / exit_pupil_mat.D;
+      exit_pupil_radius = fabsf(1.0f / exit_pupil_mat.D) * aperture_radius;
     }
   }
 
