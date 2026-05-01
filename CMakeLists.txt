@@ -86,7 +86,7 @@ message("Build Type                     ||  ${CMAKE_BUILD_TYPE}")
 message("C Compiler:                    ||  ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message("C Flags:                       ||  ${CMAKE_C_FLAGS}")
 
-if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
   message("C Debug Flags:                 ||  ${CMAKE_C_FLAGS_DEBUG}")
 else()
   message("C Release Flags:               ||  ${CMAKE_C_FLAGS_RELEASE}")
