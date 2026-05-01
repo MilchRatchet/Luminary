@@ -28,6 +28,7 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(LENS_RESAMPLING, 1, 1)                                                                //
   RANDOM_ALLOCATE(LENS_BLADE, 1, 1)                                                                     //
   RANDOM_ALLOCATE(LENS_WAVELENGTH, 1, 1)                                                                //
+  RANDOM_ALLOCATE(LENS_DIFFRACTION, RANDOM_LENS_MAX_SAMPLES, 1)                                         //
   RANDOM_ALLOCATE(BSDF_REFLECTION, 1, RANDOM_SET_BSDF_COUNT)                                            //
   RANDOM_ALLOCATE(BSDF_DIFFUSE, 1, RANDOM_SET_BSDF_COUNT)                                               //
   RANDOM_ALLOCATE(BSDF_REFRACTION, 1, RANDOM_SET_BSDF_COUNT)                                            //

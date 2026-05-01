@@ -48,12 +48,14 @@ struct CameraSimulationResult {
   bool has_reflected;
 } typedef CameraSimulationResult;
 
-LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, const vec3 ray, const float dist) {
+LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(
+  const vec3 origin, const vec3 ray, const float dist, float& edge_dist, vec3& hit_point, float2& edge_normal) {
   const float aperture_dist = (ray.z != 0.0f) ? (device.camera_aux.aperture_point - origin.z) / ray.z : -FLT_MAX;
   if (aperture_dist < 0.0f || aperture_dist > dist)
     return false;
 
   const vec3 aperture_hit = add_vector(origin, scale_vector(ray, aperture_dist));
+  hit_point               = aperture_hit;
 
   const float vertical_aperture_hit_dist_sq = aperture_hit.x * aperture_hit.x + aperture_hit.y * aperture_hit.y;
   const float aperture_radius               = device.camera_aux.aperture_radius;
@@ -61,8 +63,11 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, c
   if (vertical_aperture_hit_dist_sq > aperture_radius * aperture_radius)
     return true;
 
-  if (device.camera.aperture_shape == LUMINARY_APERTURE_ROUND)
+  if (device.camera.aperture_shape == LUMINARY_APERTURE_ROUND) {
+    edge_dist   = aperture_radius - sqrtf(vertical_aperture_hit_dist_sq);
+    edge_normal = make_float2(-aperture_hit.x, -aperture_hit.y);
     return false;
+  }
 
   float angle = atan2f(aperture_hit.y, aperture_hit.x);
   angle       = (angle < 0.0f) ? (angle + (2.0f * PI)) : angle;
@@ -80,13 +85,19 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_aperture(const vec3 origin, c
 
   const float2 blade_edge   = make_float2(point_b.x - point_a.x, point_b.y - point_a.y);
   const float2 blade_normal = make_float2(blade_edge.y, -blade_edge.x);
-  const float2 hit_rel_a    = make_float2(aperture_hit.x - point_a.x, aperture_hit.y - point_a.y);
+
+  const float blade_length       = sqrtf(blade_edge.x * blade_edge.x + blade_edge.y * blade_edge.y);
+  const float2 blade_normal_norm = make_float2(blade_normal.x / blade_length, blade_normal.y / blade_length);
+
+  const float2 hit_rel_a = make_float2(aperture_hit.x - point_a.x, aperture_hit.y - point_a.y);
 
   const float dot = blade_normal.x * hit_rel_a.x + blade_normal.y * hit_rel_a.y;
 
   if (dot >= 0.0f)
     return true;
 
+  edge_dist   = -(blade_normal_norm.x * hit_rel_a.x + blade_normal_norm.y * hit_rel_a.y);
+  edge_normal = blade_normal_norm;
   return false;
 }
 
@@ -140,6 +151,104 @@ LUMINARY_FUNCTION float camera_simulation_interface_intersection(CameraSimulatio
   return sphere_ray_intersection(state.ray, state.origin, center, fabsf(radius));
 }
 
+LUMINARY_FUNCTION vec3 camera_aperture_diffraction_sample(
+  const vec3 ray, const float edge_dist, const float2 edge_normal, const float wavelength, const float2 random, float& pdf) {
+  if (edge_dist <= 0.0f) {
+    pdf = 1.0f;
+    return ray;
+  }
+
+  // The base diffraction model based on the uncertainty principle:
+  // delta_theta ~ lambda / (2 * pi * x)
+  const float lambda_mm  = wavelength * 1e-6f;
+  const float base_angle = lambda_mm / (2.0f * PI * edge_dist);
+
+  // Sample a positive half-Cauchy distribution for the polar angular deviation
+  // This maps [0, 1) uniformly to [0, inf)
+  const float sample_u        = fmaxf(random.x, 1e-6f);
+  const float angle_deviation = base_angle * tanf((PI * 0.5f) * sample_u);
+
+  // PDF of the sampled theta (Cauchy distribution PDF)
+  const float theta_normalized = angle_deviation / base_angle;
+  const float pdf_theta        = 2.0f / (PI * base_angle * (1.0f + theta_normalized * theta_normalized));
+
+  // Construct a tangent basis aligned with the aperture edge normal
+  vec3 edge_normal_3d  = get_vector(edge_normal.x, edge_normal.y, 0.0f);
+  vec3 U               = sub_vector(edge_normal_3d, scale_vector(ray, dot_product(edge_normal_3d, ray)));
+  const float U_length = get_length(U);
+
+  if (U_length > 1e-6f) {
+    U = scale_vector(U, 1.0f / U_length);
+  }
+  else {
+    if (fabsf(ray.x) > fabsf(ray.y))
+      U = normalize_vector(get_vector(ray.z, 0.0f, -ray.x));
+    else
+      U = normalize_vector(get_vector(0.0f, -ray.z, ray.y));
+  }
+  vec3 V = cross_product(ray, U);
+
+  const float v_spread_angle = 1e-4f;
+  const float phi = (random.y > 0.5f ? 0.0f : PI) + (random.y > 0.5f ? (random.y - 0.75f) : (random.y - 0.25f)) * 4.0f * v_spread_angle;
+
+  const float cos_phi = cosf(phi);
+  const float sin_phi = sinf(phi);
+
+  // Apply perturbation
+  const float cos_theta = cosf(angle_deviation);
+  const float sin_theta = sinf(angle_deviation);
+
+  // Convert theta and phi to a solid angle PDF
+  // p(omega) = p(theta) * p(phi) / sin(theta)
+  const float pdf_phi = 1.0f / (4.0f * v_spread_angle);
+  pdf                 = pdf_theta * pdf_phi / fmaxf(sin_theta, eps);
+
+  const vec3 diffracted =
+    add_vector(scale_vector(ray, cos_theta), add_vector(scale_vector(U, sin_theta * cos_phi), scale_vector(V, sin_theta * sin_phi)));
+
+  return normalize_vector(diffracted);
+}
+
+LUMINARY_FUNCTION bool camera_aperture_interaction(
+  CameraSimulationState& state, const PathID& path_id, const uint32_t sample_id, const DeviceCameraInterface interface,
+  const vec3 semi_circle_center, float& dist) {
+  float edge_dist = FLT_MAX;
+  vec3 aperture_hit_point;
+  float2 edge_normal;
+  if (camera_simulation_intersect_aperture(state.origin, state.ray, dist, edge_dist, aperture_hit_point, edge_normal))
+    return true;
+
+  if (edge_dist != FLT_MAX && state.has_retro_reflected == false) {
+    state.origin                    = aperture_hit_point;
+    const float2 random_diffraction = random_2D(RANDOM_TARGET_LENS_DIFFRACTION + sample_id, path_id);
+
+    float pdf = 1.0f;
+    state.ray = camera_aperture_diffraction_sample(state.ray, edge_dist, edge_normal, state.wavelength, random_diffraction, pdf);
+    state.throughput *= pdf;
+    state.probability_density *= pdf;
+
+    dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
+    if (dist == FLT_MAX)
+      return true;
+  }
+
+  return false;
+}
+
+LUMINARY_FUNCTION bool camera_simulation_interaction(
+  CameraSimulationState& state, const PathID& path_id, const uint32_t sample_id, const DeviceCameraInterface interface,
+  const vec3 semi_circle_center, float& dist) {
+  dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
+
+  if (dist == FLT_MAX)
+    return true;
+
+  if (camera_aperture_interaction(state, path_id, sample_id, interface, semi_circle_center, dist))
+    return true;
+
+  return false;
+}
+
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 LUMINARY_FUNCTION int32_t camera_simulation_step(
   CameraSimulationState& state, const uint32_t iteration, const int32_t interface_id, const PathID& path_id, const uint32_t sample_id) {
@@ -147,15 +256,9 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
 
   const float center            = (interface.radius != FLT_MAX) ? interface.vertex - interface.radius : interface.vertex;
   const vec3 semi_circle_center = get_vector(0.0f, 0.0f, center);
-  float dist                    = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
 
-  // No hit
-  if (dist == FLT_MAX) {
-    state.throughput = 0.0f;
-    return 0;
-  }
-
-  if (camera_simulation_intersect_aperture(state.origin, state.ray, dist)) {
+  float dist = FLT_MAX;
+  if (camera_simulation_interaction(state, path_id, sample_id, interface, semi_circle_center, dist)) {
     state.throughput = 0.0f;
     return 0;
   }
@@ -165,16 +268,7 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < fabsf(interface.radius);
 
   if (camera_simulation_intersect_medium_cylinder(state.origin, state.ray, state.throughput, dist, state.cylindrical_radius, state.ior)) {
-    dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
-
-    state.has_forward_reflected = true;
-
-    if (dist == FLT_MAX) {
-      state.throughput = 0.0f;
-      return 0;
-    }
-
-    if (camera_simulation_intersect_aperture(state.origin, state.ray, dist)) {
+    if (camera_simulation_interaction(state, path_id, sample_id, interface, semi_circle_center, dist)) {
       state.throughput = 0.0f;
       return 0;
     }
