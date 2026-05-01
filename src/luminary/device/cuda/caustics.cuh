@@ -121,27 +121,28 @@ LUMINARY_FUNCTION bool caustics_find_connection_point(
 
   vec3 V = sub_vector(ctx.position, point);
 
-  const vec3 normal = scale_vector(ocean_get_normal_fast(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_refraction) ? -1.0f : 1.0f);
+  const vec3 base_normal = ocean_get_normal_fast(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
+  const vec3 normal      = (is_refraction) ? neg_vector(base_normal) : base_normal;
 
   // V does not need to be normalized here since we only care about the sign.
   if (dot_product(V, normal) < 0.0f)
     return false;
 
-  const float inv_dist_sq = 1.0f / dot_product(V, V);
+  const float dist_sq = dot_product(V, V);
 
-  V = scale_vector(V, sqrtf(inv_dist_sq));
+  V = scale_vector(V, rsqrtf(dist_sq));
 
   const vec3 L = caustics_transform(V, normal, is_refraction);
 
   const vec3 sky_point = world_to_sky_transform(point);
-  const bool sun_hit   = sphere_ray_hit(L, sky_point, device.sky.sun_pos, SKY_SUN_RADIUS);
+  const bool sun_hit   = sphere_ray_hit_outside(L, sky_point, device.sky.sun_pos, SKY_SUN_RADIUS);
 
   if (sun_hit == false)
     return false;
 
   // Assume flat plane for the dot product because that is how we sampled it.
   // Note: This is just one over the PDF, the target distribution is just a dirac delta.
-  sample_weight = fabsf(V.y) * domain.area * inv_dist_sq;
+  sample_weight = fabsf(V.y) * domain.area / dist_sq;
 
   return true;
 }

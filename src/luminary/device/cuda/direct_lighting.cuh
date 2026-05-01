@@ -30,7 +30,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 
   RGBF light_bsdf         = get_color(0.0f, 0.0f, 0.0f);
   bool is_refraction_bsdf = false;
-  if (sphere_ray_hit(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
+  if (sphere_ray_hit_outside(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
     light_bsdf = sky_get_sun_color(sky_pos, dir_bsdf);
 
     const RGBF value_bsdf = bsdf_evaluate(ctx, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);

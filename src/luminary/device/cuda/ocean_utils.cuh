@@ -17,8 +17,8 @@
 // The water is handled by the volume implementation.
 //
 
-#define OCEAN_ITERATIONS_NORMAL 10
-#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 10
+#define OCEAN_ITERATIONS_NORMAL 6
+#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 6
 
 LUMINARY_FUNCTION float ocean_hash(const float2 p) {
   const float x = fabsf(p.x + p.y * (311.7f / 127.1f));

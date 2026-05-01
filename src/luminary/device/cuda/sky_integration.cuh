@@ -179,7 +179,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
       const vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
       const vec3 bounce_ray = normalize_vector(sub_vector(device.sky.sun_pos, moon_pos));
 
-      if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS)) {
+      if (sphere_ray_hit_outside(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) == false) {
         vec3 normal = normalize_vector(sub_vector(moon_pos, device.sky.moon_pos));
 
         const float tex_u = 0.5f + device.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
@@ -227,7 +227,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
         const Star star     = star_load(i);
         const vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
 
-        if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
+        if (sphere_ray_hit_outside(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
           result = spectrum_add(result, spectrum_scale(transmittance, star.intensity * device.sky.stars_intensity));
         }
       }
@@ -284,7 +284,7 @@ LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, c
         const vec3 sky_origin = world_to_sky_transform(origin);
 
         // HDRI does not include the sun, compute sun visibility
-        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_sun   = sphere_ray_hit_outside(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
         const bool ray_hits_earth = (ocean_is_underwater(origin) == false) ? sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS) : false;
 
         if (ray_hits_sun && ray_hits_earth == false) {
@@ -320,7 +320,7 @@ LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const u
         const vec3 sky_origin = world_to_sky_transform(origin);
 
         // HDRI does not include the sun, compute sun visibility
-        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_sun   = sphere_ray_hit_outside(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
         const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
 
         if (ray_hits_sun && !ray_hits_earth) {

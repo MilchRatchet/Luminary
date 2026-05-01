@@ -234,6 +234,16 @@ LUMINARY_FUNCTION vec3 scale_vector(vec3 vector, const float scale) {
   return vector;
 }
 
+LUMINARY_FUNCTION vec3 neg_vector(vec3 vector) {
+  vec3 result;
+
+  result.x = -vector.x;
+  result.y = -vector.y;
+  result.z = -vector.z;
+
+  return result;
+}
+
 LUMINARY_FUNCTION vec3 reflect_vector(const vec3 V, const vec3 normal) {
   const float dot   = dot_product(V, normal);
   const vec3 result = sub_vector(scale_vector(normal, 2.0f * dot), V);
@@ -738,6 +748,28 @@ LUMINARY_FUNCTION bool sphere_ray_hit(const vec3 ray, const vec3 origin, const v
   const float t0 = c / q;
 
   return (t0 >= 0.0f);
+}
+
+/*
+ * Computes whether a ray hits a sphere. To compute the distance see sphere_ray_intersection.
+ * This is a special version that requires origin to be outside of the sphere.
+ * @param ray Normalized ray direction.
+ * @param origin Ray origin.
+ * @param p Center of the sphere.
+ * @param r Radius of the sphere.
+ * @result 1 if the ray hits the sphere, 0 else.
+ */
+LUMINARY_FUNCTION bool sphere_ray_hit_outside(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+  const vec3 diff = sub_vector(origin, p);
+  const float dot = dot_product(diff, ray);
+
+  if (dot >= 0.0f)
+    return false;
+
+  const float r2 = r * r;
+  const float c  = dot_product(diff, diff) - r2;
+
+  return c <= dot * dot;
 }
 
 /*
