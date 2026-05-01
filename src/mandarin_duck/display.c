@@ -88,35 +88,78 @@ static void _display_handle_display_change(Display* display) {
 }
 
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
-  uint32_t scale = display->display_base_scale;
+  int32_t scale = (int32_t) display->display_base_scale + display->zoom_handler->scale;
 
-  scale += display->zoom_handler->scale;
-
-  const uint32_t src_offset_x = display->zoom_handler->offset_x;
-  const uint32_t src_offset_y = display->zoom_handler->offset_y;
+  const int32_t src_offset_x = display->zoom_handler->offset_x;
+  const int32_t src_offset_y = display->zoom_handler->offset_y;
 
   const LuminaryARGB8* src = (const LuminaryARGB8*) image.buffer;
 
-  if (scale == 0) {
-    const uint32_t width  = (display->width < image.width) ? display->width : image.width;
-    const uint32_t height = (display->height < image.height) ? display->height : image.height;
+  if (scale >= 0) {
+    for (uint32_t y = 0; y < display->height; y++) {
+      uint32_t* dst_bg = (uint32_t*) (display->buffer + y * display->pitch);
+      int32_t src_y    = (int32_t) (y >> scale) + src_offset_y;
+      if (src_y < 0 || src_y >= (int32_t) image.height) {
+        for (uint32_t x = 0; x < display->width; x++) {
+          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
+        }
+        continue;
+      }
 
-    for (uint32_t y = 0; y < height; y++) {
-      memcpy(display->buffer + y * display->pitch, src + y * image.ld, sizeof(LuminaryARGB8) * width);
+      const LuminaryARGB8* src_row = src + src_y * image.ld;
+      LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
+
+      uint32_t x = 0;
+      for (; x < display->width; x++) {
+        int32_t src_x = (int32_t) (x >> scale) + src_offset_x;
+        if (src_x < 0 || src_x >= (int32_t) image.width) {
+          int32_t skip = 0;
+          if (src_x < 0) {
+            skip = -src_x;  // Number of pixels to skip padding
+          }
+          else {
+            break;
+          }
+          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
+        }
+        else {
+          dst_row[x] = src_row[src_x];
+        }
+      }
+
+      for (; x < display->width; x++) {
+        // Background filled natively due to loop breaks or conditions above
+        if ((int32_t) (x >> scale) + src_offset_x >= (int32_t) image.width) {
+          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
+        }
+      }
     }
-
-    return;
   }
+  else {
+    const uint32_t shift = -scale;
+    for (uint32_t y = 0; y < display->height; y++) {
+      uint32_t* dst_bg = (uint32_t*) (display->buffer + y * display->pitch);
+      int32_t src_y    = (int32_t) (y << shift) + src_offset_y;
+      if (src_y < 0 || src_y >= (int32_t) image.height) {
+        for (uint32_t x = 0; x < display->width; x++) {
+          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
+        }
+        continue;
+      }
 
-  for (uint32_t y = 0; y < display->height; y++) {
-    const LuminaryARGB8* src_row = src + ((y >> scale) + src_offset_y) * image.ld;
-    LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
+      const LuminaryARGB8* src_row = src + src_y * image.ld;
+      LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
 
-    for (uint32_t x = 0; x < display->width; x++) {
-      const LuminaryARGB8* src_element = src_row + ((x >> scale) + src_offset_x);
-      LuminaryARGB8* dst_element       = dst_row + x;
-
-      *dst_element = *src_element;
+      uint32_t x = 0;
+      for (; x < display->width; x++) {
+        int32_t src_x = (int32_t) (x << shift) + src_offset_x;
+        if (src_x < 0 || src_x >= (int32_t) image.width) {
+          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
+        }
+        else {
+          dst_row[x] = src_row[src_x];
+        }
+      }
     }
   }
 }
@@ -578,6 +621,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
     display_update_resolution(display, host, &settings);
+    display_zoom_handler_set_image_size(display->zoom_handler, settings.width, settings.height);
+    render_region_handler_set_image_size(display->region, settings.width, settings.height);
   }
 
   display->frametime = time_step;

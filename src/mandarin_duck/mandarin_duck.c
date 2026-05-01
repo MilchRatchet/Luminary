@@ -3,15 +3,18 @@
 #include <stdio.h>
 #include <string.h>
 
-static void _mandarin_duck_update_host_output_props(LuminaryHost* host, uint32_t width, uint32_t height) {
+static void _mandarin_duck_update_host_output_props(LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(host);
+
+  LuminaryRendererSettings settings;
+  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
   LuminaryOutputProperties properties;
   memset(&properties, 0, sizeof(LuminaryOutputProperties));
 
   properties.enabled = true;
-  properties.width   = width;
-  properties.height  = height;
+  properties.width   = settings.width;
+  properties.height  = settings.height;
 
   LUM_FAILURE_HANDLE(luminary_host_set_output_properties(host, properties));
 }
@@ -119,7 +122,7 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateInfo info) {
 
       display_create(&duck->display, renderer_settings.width, renderer_settings.height, info.sync_render_resolution);
 
-      _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
+      _mandarin_duck_update_host_output_props(duck->host);
     } break;
     case MANDARIN_DUCK_MODE_BENCHMARK: {
       duck->benchmark_name = info.benchmark_name;
@@ -170,7 +173,7 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
     LUM_FAILURE_HANDLE(thread_status_start(ui_thread, "Process Frame"));
 
     if (display_dirty) {
-      _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
+      _mandarin_duck_update_host_output_props(duck->host);
     }
 
     _mandarin_duck_handle_file_drop(duck, duck->host, file_drop_array);

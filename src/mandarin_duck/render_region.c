@@ -19,19 +19,29 @@ void render_region_handler_set_display_size(RenderRegion* region, uint32_t width
   region->display_height = height;
 }
 
+void render_region_handler_set_image_size(RenderRegion* region, uint32_t width, uint32_t height) {
+  MD_CHECK_NULL_ARGUMENT(region);
+
+  region->image_width  = width;
+  region->image_height = height;
+}
+
 static void _render_region_compute_size(RenderRegion* region) {
   MD_CHECK_NULL_ARGUMENT(region);
+
+  uint32_t bounds_width  = max(region->display_width, region->image_width);
+  uint32_t bounds_height = max(region->display_height, region->image_height);
 
   region->x      = fminf(region->x_internal, region->x_internal + region->width_internal);
   region->y      = fminf(region->y_internal, region->y_internal + region->height_internal);
   region->width  = fabsf(region->width_internal);
   region->height = fabsf(region->height_internal);
 
-  region->width  = fminf(region->width, region->display_width);
-  region->height = fminf(region->height, region->display_height);
+  region->width  = fminf(region->width, bounds_width);
+  region->height = fminf(region->height, bounds_height);
 
-  region->x = fminf(region->x, region->display_width - region->width);
-  region->y = fminf(region->y, region->display_height - region->height);
+  region->x = fminf(region->x, bounds_width - region->width);
+  region->y = fminf(region->y, bounds_height - region->height);
   region->x = fmaxf(region->x, 0.0f);
   region->y = fmaxf(region->y, 0.0f);
 }
@@ -49,10 +59,13 @@ static void _render_region_commit(RenderRegion* region, LuminaryHost* host) {
     LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
     if (region->is_active) {
-      settings.region_x      = region->x / region->display_width;
-      settings.region_y      = region->y / region->display_height;
-      settings.region_width  = ceilf(region->width) / region->display_width;
-      settings.region_height = ceilf(region->height) / region->display_height;
+      uint32_t bounds_width  = max(region->display_width, region->image_width);
+      uint32_t bounds_height = max(region->display_height, region->image_height);
+
+      settings.region_x      = region->x / bounds_width;
+      settings.region_y      = region->y / bounds_height;
+      settings.region_width  = ceilf(region->width) / bounds_width;
+      settings.region_height = ceilf(region->height) / bounds_height;
     }
     else {
       settings.region_x      = 0.0f;
@@ -97,10 +110,10 @@ void render_region_handle_inputs(
     region->is_selecting = true;
   }
 
-  const float scale = 1.0f / (1u << zoom->scale);
+  const float scale_factor = (zoom->scale > 0) ? (1.0f / (1u << zoom->scale)) : (float) (1u << -zoom->scale);
 
-  region->width_internal += mouse_state->x_motion * scale;
-  region->height_internal += mouse_state->y_motion * scale;
+  region->width_internal += mouse_state->x_motion * scale_factor;
+  region->height_internal += mouse_state->y_motion * scale_factor;
 
   _render_region_compute_size(region);
 }
