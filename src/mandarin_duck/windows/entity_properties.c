@@ -471,6 +471,9 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
     update_data |= _window_entity_properties_add_slider(data, "Scale", &camera.scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 0.1f);
 
+  if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
+    update_data |= _window_entity_properties_add_checkbox(data, "Diffraction", &camera.lens.enable_diffraction);
+
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 

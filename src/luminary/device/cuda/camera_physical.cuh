@@ -218,7 +218,7 @@ LUMINARY_FUNCTION bool camera_aperture_interaction(
   if (camera_simulation_intersect_aperture(state.origin, state.ray, dist, edge_dist, aperture_hit_point, edge_normal))
     return true;
 
-  if (edge_dist != FLT_MAX && state.has_retro_reflected == false) {
+  if (device.camera.enable_diffraction && edge_dist != FLT_MAX && state.has_retro_reflected == false) {
     state.origin                    = aperture_hit_point;
     const float2 random_diffraction = random_2D(RANDOM_TARGET_LENS_DIFFRACTION + sample_id, path_id);
 

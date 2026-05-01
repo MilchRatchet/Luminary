@@ -55,6 +55,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->is_thin_lens_template            = camera->lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS;
   device_camera->use_local_error_minimization     = camera->use_local_error_minimization;
   device_camera->use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
+  device_camera->enable_diffraction               = camera->lens.enable_diffraction;
 
   device_camera->lens.focal_length         = camera->lens.object_distance * CAMERA_COMMON_INV_SCALE;
   device_camera->lens.sensor_diagonal_size = camera->lens.sensor_diagonal_size;

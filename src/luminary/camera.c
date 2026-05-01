@@ -40,6 +40,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->lens.sensor_distance         = 1.0f;
   camera->lens.use_auto_focus          = false;
   camera->lens.object_distance         = 1.0f;
+  camera->lens.enable_diffraction      = false;
 
   camera->sensor = (LuminaryCameraSensor) {
     .aspect_ratio                     = 16.0f / 9.0f,
@@ -94,6 +95,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(lens.sensor_diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(lens.use_auto_focus, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
   __CAMERA_CHECK_DIRTY(lens.object_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
+  __CAMERA_CHECK_DIRTY(lens.enable_diffraction, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   __CAMERA_CHECK_DIRTY(sensor.aspect_ratio, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.use_aspect_ratio_from_resolution, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);

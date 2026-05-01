@@ -49,7 +49,8 @@ struct DeviceCamera {
   uint32_t is_thin_lens_template : 1;
   uint32_t use_local_error_minimization : 1;
   uint32_t use_aspect_ratio_from_resolution : 1;
-  // 17 bits spare
+  uint32_t enable_diffraction : 1;
+  // 16 bits spare
 
   vec3 pos;
   Quaternion rotation;

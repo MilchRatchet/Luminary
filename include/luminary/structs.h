@@ -162,6 +162,7 @@ LUMINARY_API struct LuminaryCameraLens {
   float sensor_diagonal_size;  // [mm]
   float object_distance;       // [m]
   bool use_auto_focus;
+  bool enable_diffraction;
 } typedef LuminaryCameraLens;
 
 LUMINARY_API struct LuminaryCameraSensor {
