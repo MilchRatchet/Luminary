@@ -19,8 +19,7 @@ LUMINARY_FUNCTION float adaptive_sampling_compute_tonemap_compression_factor(con
 }
 
 LUMINARY_FUNCTION float adaptive_sampling_compute_coefficient_of_variation(const float variance, const float mean) {
-  // TODO: Technically I need to take the Sqrt here.
-  return variance / (mean * mean + FLT_EPSILON);
+  return sqrtf(variance / (mean * mean + FLT_EPSILON));
 }
 
 LUMINARY_FUNCTION uint32_t adaptive_sampling_get_stage_sample_count(const uint32_t stage_sample_counts, const uint32_t stage_id) {
@@ -195,8 +194,48 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
 
   if ((THREAD_ID & (WARP_SIZE_MASK >> 1)) == 0) {
     args.dst_block_variance[adaptive_sampling_block] = block_variance;
+  }
+}
 
-    atomicAdd(args.dst_sum_variance, block_variance);
+LUMINARY_KERNEL void adaptive_sampling_filter_variance(const KernelArgsAdaptiveSamplingFilterVariance args) {
+  const uint32_t adaptive_sampling_block = THREAD_ID;
+
+  if (adaptive_sampling_block >= args.width * args.height)
+    return;
+
+  const uint32_t center_x = adaptive_sampling_block % args.width;
+  const uint32_t center_y = adaptive_sampling_block / args.width;
+
+  // 7x7 spatial filter in log space to calculate a geometric mean
+  const int32_t filter_radius = 3;
+
+  float variance_sum = 0.0f;
+  float weight_sum   = 0.0f;
+
+  for (int32_t dy = -filter_radius; dy <= filter_radius; dy++) {
+    for (int32_t dx = -filter_radius; dx <= filter_radius; dx++) {
+      int32_t x = (int32_t) center_x + dx;
+      int32_t y = (int32_t) center_y + dy;
+
+      if (x < 0 || x >= (int32_t) args.width || y < 0 || y >= (int32_t) args.height)
+        continue;
+
+      uint32_t block_id = (uint32_t) x + (uint32_t) y * args.width;
+      float variance    = args.src_block_variance[block_id];
+
+      variance_sum += variance;
+      weight_sum += 1.0f;
+    }
+  }
+
+  const float filtered_variance = variance_sum / weight_sum;
+  const float final_var         = fmaxf(filtered_variance, 0.0f);
+
+  args.dst_filtered_variance[adaptive_sampling_block] = final_var;
+
+  const float warp_sum = warp_reduce_sum(final_var);
+  if (THREAD_ID_IN_WARP == 0) {
+    atomicAdd(args.dst_sum_variance, warp_sum);
   }
 }
 

@@ -18,9 +18,10 @@ LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, Devic
   __CHECK_NULL_ARGUMENT(sampler);
   __CHECK_NULL_ARGUMENT(sizes);
 
-  sizes->stage_sample_counts_size     = sizeof(uint32_t) * sampler->width * sampler->height;
-  sizes->stage_total_task_counts_size = sizeof(uint32_t) * ADAPTIVE_SAMPLER_NUM_STAGES;
-  sizes->variance_buffer_size         = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  sizes->stage_sample_counts_size      = sizeof(uint32_t) * sampler->width * sampler->height;
+  sizes->stage_total_task_counts_size  = sizeof(uint32_t) * ADAPTIVE_SAMPLER_NUM_STAGES;
+  sizes->variance_buffer_size          = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  sizes->filtered_variance_buffer_size = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
   return LUMINARY_SUCCESS;
 }
@@ -137,7 +138,14 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
 
     sampler->allocated_variance_buffer_size = buffer_sizes.variance_buffer_size;
   }
+  if (buffer_sizes.filtered_variance_buffer_size != sampler->allocated_filtered_variance_buffer_size) {
+    if (sampler->filtered_variance_buffer)
+      __FAILURE_HANDLE(device_free(&sampler->filtered_variance_buffer));
 
+    __FAILURE_HANDLE(device_malloc(&sampler->filtered_variance_buffer, buffer_sizes.filtered_variance_buffer_size));
+
+    sampler->allocated_filtered_variance_buffer_size = buffer_sizes.filtered_variance_buffer_size;
+  }
   if (sampler->variance_sum_buffer == (float*) 0) {
     __FAILURE_HANDLE(device_malloc(&sampler->variance_sum_buffer, sizeof(float)));
   }
@@ -154,7 +162,6 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   {
     KernelArgsAdaptiveSamplingBlockReduceVariance args;
     args.dst_block_variance = DEVICE_PTR(sampler->variance_buffer);
-    args.dst_sum_variance   = DEVICE_PTR(sampler->variance_sum_buffer);
     args.current_stage_id   = sampler->allocator.stage_id;
     args.width              = sampler->render_width;
 
@@ -167,8 +174,23 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   }
 
   {
+    KernelArgsAdaptiveSamplingFilterVariance filter_args;
+    filter_args.src_block_variance    = DEVICE_PTR(sampler->variance_buffer);
+    filter_args.dst_filtered_variance = DEVICE_PTR(sampler->filtered_variance_buffer);
+    filter_args.dst_sum_variance      = DEVICE_PTR(sampler->variance_sum_buffer);
+    filter_args.width                 = sampler->render_width;
+    filter_args.height                = sampler->render_height;
+
+    const uint32_t num_blocks = (num_adaptive_sampling_blocks + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
+
+    __FAILURE_HANDLE(kernel_execute_custom(
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_FILTER_VARIANCE], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &filter_args,
+      device->stream_main));
+  }
+
+  {
     KernelArgsAdaptiveSamplingComputeStageSampleCounts args;
-    args.src_block_variance           = DEVICE_PTR(sampler->variance_buffer);
+    args.src_block_variance           = DEVICE_PTR(sampler->filtered_variance_buffer);
     args.src_sum_variance             = DEVICE_PTR(sampler->variance_sum_buffer);
     args.num_adaptive_sampling_blocks = num_adaptive_sampling_blocks;
     args.current_stage_id             = sampler->allocator.stage_id;
@@ -227,6 +249,9 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
   if (sampler->variance_buffer)
     __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
 
+  if (sampler->filtered_variance_buffer)
+    __FAILURE_HANDLE(device_free(&sampler->filtered_variance_buffer));
+
   if (sampler->variance_sum_buffer)
     __FAILURE_HANDLE(device_free(&sampler->variance_sum_buffer));
 
@@ -235,12 +260,14 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
     sampler->stage_build_event = (CUevent) 0;
   }
 
-  sampler->allocated_stage_sample_counts_size = 0;
-  sampler->width                              = 0;
-  sampler->height                             = 0;
-  sampler->render_width                       = 0;
-  sampler->render_height                      = 0;
-  sampler->queued_stage_build                 = ADAPTIVE_SAMPLING_STAGE_INVALID;
+  sampler->allocated_stage_sample_counts_size      = 0;
+  sampler->allocated_variance_buffer_size          = 0;
+  sampler->allocated_filtered_variance_buffer_size = 0;
+  sampler->width                                   = 0;
+  sampler->height                                  = 0;
+  sampler->render_width                            = 0;
+  sampler->render_height                           = 0;
+  sampler->queued_stage_build                      = ADAPTIVE_SAMPLING_STAGE_INVALID;
 
   return LUMINARY_SUCCESS;
 }
