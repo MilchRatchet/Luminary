@@ -148,6 +148,8 @@ LUMINARY_FUNCTION float camera_simulation_interface_intersection(
   float dist;
   if (radius == FLT_MAX) {
     dist = (state.ray.z != 0.0f) ? (center.z - state.origin.z) / state.ray.z : FLT_MAX;
+
+    dist = (state.is_forward) ? dist : -dist;
   }
   else {
     const vec3 diff = sub_vector(state.origin, center);
@@ -310,10 +312,6 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
     return 0;
   }
 
-  // This must happen before the origin gets modified
-  // TODO: Optimize
-  const bool is_inside = get_length(sub_vector(state.origin, semi_circle_center)) < fabsf(interface.radius);
-
   if (camera_simulation_intersect_medium_cylinder(state.origin, state.ray, state.throughput, dist, state.cylindrical_radius, state.ior)) {
     if (camera_simulation_interaction(state, path_id, sample_id, interface, semi_circle_center, dist)) {
       state.throughput = 0.0f;
@@ -330,8 +328,10 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   vec3 normal = (interface.radius != FLT_MAX) ? normalize_vector(sub_vector(state.origin, semi_circle_center))
                                               : get_vector(0.0f, 0.0f, (state.origin.z > center) ? 1.0f : -1.0f);
 
-  // Flip normal if we are inside
-  if (is_inside && interface.radius != FLT_MAX) {
+  bool interface_curving_away = interface.radius < 0.0f;
+  interface_curving_away ^= state.is_forward == false;
+
+  if (interface_curving_away == false && interface.radius != FLT_MAX) {
     normal = scale_vector(normal, -1.0f);
   }
 
