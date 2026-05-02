@@ -24,11 +24,7 @@ struct LensTemplateData {
   LensMedium media[LENS_MAX_NUM_MEDIA];
   float design_focal_length;
   float aperture_point;
-  float exit_pupil_point;
-  float exit_pupil_diameter;
   float last_vertex;
-  float front_principal_plane;
-  float back_principal_plane;
 } typedef LensTemplateData;
 
 LuminaryResult lens_library_get_template_data(LuminaryLensTemplate template, LensTemplateData* data);

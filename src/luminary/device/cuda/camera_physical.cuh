@@ -143,12 +143,61 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_medium_cylinder(
   return false;
 }
 
-LUMINARY_FUNCTION float camera_simulation_interface_intersection(CameraSimulationState& state, const vec3 center, const float radius) {
+LUMINARY_FUNCTION float camera_simulation_interface_intersection(
+  CameraSimulationState& state, vec3 center, float radius, float cylindrical_radius) {
+  float dist;
   if (radius == FLT_MAX) {
-    return (state.ray.z != 0.0f) ? (center.z - state.origin.z) / state.ray.z : FLT_MAX;
+    dist = (state.ray.z != 0.0f) ? (center.z - state.origin.z) / state.ray.z : FLT_MAX;
+  }
+  else {
+    const vec3 diff = sub_vector(state.origin, center);
+    const float dot = dot_product(diff, state.ray);
+    const float r2  = radius * radius;
+    const float c   = dot_product(diff, diff) - r2;
+    const vec3 k    = sub_vector(diff, scale_vector(state.ray, dot));
+    const float d   = r2 - dot_product(k, k);
+
+    if (d < 0.0f)
+      return FLT_MAX;
+
+    const float sd = sqrtf(d);
+    const float q  = -dot - copysignf(sd, dot);
+
+    float t0 = (q != 0.0f) ? c / q : FLT_MAX;
+    float t1 = q;
+
+    t0 = (t0 >= 0.0f) ? t0 : FLT_MAX;
+    t1 = (t1 >= 0.0f) ? t1 : FLT_MAX;
+
+    bool interface_curving_away = radius < 0.0f;
+    interface_curving_away ^= state.is_forward == false;
+
+    const float t_min = fminf(t0, t1);
+
+    dist = t_min;
+
+    // If the interface is curving away, we want the first hit
+    // If the interface is curving away, we always want the back hit, even if we in theory would have an earlier hit. This is simply a
+    // symptom of the interface representation being a sphere.
+    if (interface_curving_away == false) {
+      const float t_max = fmaxf(t0, t1);
+
+      dist = (t0 != FLT_MAX && t1 != FLT_MAX) ? t_max : t_min;
+    }
   }
 
-  return sphere_ray_intersection(state.ray, state.origin, center, fabsf(radius));
+  if (dist == FLT_MAX)
+    return FLT_MAX;
+
+  const vec3 interface_hit_point = add_vector(state.origin, scale_vector(state.ray, dist));
+
+  const float vertical_hit_dist_sq = interface_hit_point.x * interface_hit_point.x + interface_hit_point.y * interface_hit_point.y;
+
+  // Hit is past the vertical limits of the interface
+  if (vertical_hit_dist_sq > cylindrical_radius * cylindrical_radius)
+    dist = FLT_MAX;
+
+  return dist;
 }
 
 LUMINARY_FUNCTION vec3 camera_aperture_diffraction_sample(
@@ -227,18 +276,16 @@ LUMINARY_FUNCTION bool camera_aperture_interaction(
     state.throughput *= pdf;
     state.probability_density *= pdf;
 
-    dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
-    if (dist == FLT_MAX)
-      return true;
+    dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius, interface.cylindrical_radius);
   }
 
-  return false;
+  return (dist == FLT_MAX);
 }
 
 LUMINARY_FUNCTION bool camera_simulation_interaction(
   CameraSimulationState& state, const PathID& path_id, const uint32_t sample_id, const DeviceCameraInterface interface,
   const vec3 semi_circle_center, float& dist) {
-  dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius);
+  dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius, interface.cylindrical_radius);
 
   if (dist == FLT_MAX)
     return true;
@@ -279,13 +326,6 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   const float medium_ior          = camera_medium_get_ior<SPECTRAL_RENDERING>(medium, state.wavelength);
 
   state.origin = add_vector(state.origin, scale_vector(state.ray, dist));
-
-  const float vertical_hit_dist_sq = state.origin.x * state.origin.x + state.origin.y * state.origin.y;
-  if (vertical_hit_dist_sq > interface.cylindrical_radius * interface.cylindrical_radius) {
-    // Hit is past the vertical limits of the interface
-    state.throughput = 0.0f;
-    return 0;
-  }
 
   vec3 normal = (interface.radius != FLT_MAX) ? normalize_vector(sub_vector(state.origin, semi_circle_center))
                                               : get_vector(0.0f, 0.0f, (state.origin.z > center) ? 1.0f : -1.0f);

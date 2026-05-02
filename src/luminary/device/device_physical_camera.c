@@ -106,8 +106,8 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const C
   if (camera->lens.aperture_stop < 32.0f * 1024.0f)
     aperture_radius = (template_data.design_focal_length / camera->lens.aperture_stop) * 0.5f;
 
-  float exit_pupil_radius = template_data.exit_pupil_diameter * 0.5f;
-  float exit_pupil_point  = template_data.exit_pupil_point;
+  float exit_pupil_radius = 0.0f;
+  float exit_pupil_point  = 0.0f;
 
   if (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
     if (camera->lens.use_auto_focus) {
