@@ -313,6 +313,7 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   }
 
   if (camera_simulation_intersect_medium_cylinder(state.origin, state.ray, state.throughput, dist, state.cylindrical_radius, state.ior)) {
+    state.has_forward_reflected = true;
     if (camera_simulation_interaction(state, path_id, sample_id, interface, semi_circle_center, dist)) {
       state.throughput = 0.0f;
       return 0;
@@ -389,7 +390,7 @@ LUMINARY_FUNCTION int32_t camera_simulation_step(
   state.ray                 = sampled_refraction ? refraction : reflection;
   state.ior                 = sampled_refraction ? medium_ior : state.ior;
   state.cylindrical_radius  = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
-  state.is_forward          = sampled_refraction ? state.is_forward : !state.is_forward;
+  state.is_forward          = state.ray.z >= 0.0f;
   state.has_retro_reflected = sampled_refraction ? state.has_retro_reflected : true;
 
   return state.is_forward ? 1 : -1;
