@@ -17,77 +17,89 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Mandarin Duck - CPU Graphical User Interface for Luminary",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Mandarin Duck - CPU Graphical User Interface for Luminary",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Copyright(C) 2024 - 2025 Max Jenke",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 2024 - 2026 Max Jenke",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Licensed under the GNU Affero General Public Licence",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the GNU Affero General Public Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   window_margin(window, 24);
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Luminary - Path Tracing Renderer",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Luminary - Path Tracing Renderer",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Copyright(C) 2021 - 2025 Max Jenke",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 2021 - 2026 Max Jenke",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Licensed under the GNU Affero General Public Licence",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the GNU Affero General Public Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Current Render", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -96,30 +108,34 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   {
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.85f, .rel_height = 1.0f},
-                         .text         = "Sample Count",
-                         .center_x     = false,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.85f, .rel_height = 1.0f},
+        .text         = "Sample Count",
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
 
     char string[256];
     sprintf(string, "%5u", display->current_render_meta_data.sample_count);
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.15f, .rel_height = 1.0f},
-                         .text         = string,
-                         .center_x     = true,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = false,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.15f, .rel_height = 1.0f},
+        .text         = string,
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = false,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
   }
   window_pop_section(window);
 
@@ -127,30 +143,34 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
   {
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.85f, .rel_height = 1.0f},
-                         .text         = "Elapsed Time",
-                         .center_x     = false,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = true,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.85f, .rel_height = 1.0f},
+        .text         = "Elapsed Time",
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
 
     char string[256];
     sprintf(string, "%7.1fs", display->current_render_meta_data.elapsed_time);
 
     element_text(
       window, display, mouse_state,
-      (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                         .size         = (ElementSize) {.rel_width = 0.15f, .rel_height = 1.0f},
-                         .text         = string,
-                         .center_x     = true,
-                         .center_y     = true,
-                         .highlighting = false,
-                         .cache_text   = false,
-                         .auto_size    = false,
-                         .is_clickable = false});
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 0.15f, .rel_height = 1.0f},
+        .text         = string,
+        .center_x     = true,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = false,
+        .auto_size    = false,
+        .is_clickable = false,
+      });
   }
   window_pop_section(window);
 
@@ -171,22 +191,26 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
       if (device_info.is_unavailable) {
         element_button(
           window, display, mouse_state,
-          (ElementButtonArgs) {.shape              = ELEMENT_BUTTON_SHAPE_IMAGE,
-                               .image              = ELEMENT_BUTTON_IMAGE_ERROR,
-                               .size               = (ElementSize) {.width = 24, .height = 24},
-                               .color              = MD_COLOR_ACCENT_LIGHT_2,
-                               .tooltip_text       = "Device is unavailable, see logs.",
-                               .is_not_interactive = true});
+          (ElementButtonArgs) {
+            .shape              = ELEMENT_BUTTON_SHAPE_IMAGE,
+            .image              = ELEMENT_BUTTON_IMAGE_ERROR,
+            .size               = (ElementSize) {.width = 24, .height = 24},
+            .color              = MD_COLOR_ACCENT_LIGHT_2,
+            .tooltip_text       = "Device is unavailable, see logs.",
+            .is_not_interactive = true,
+          });
       }
       else if (device_info.is_main_device) {
         element_button(
           window, display, mouse_state,
-          (ElementButtonArgs) {.shape              = ELEMENT_BUTTON_SHAPE_IMAGE,
-                               .image              = ELEMENT_BUTTON_IMAGE_STAR,
-                               .size               = (ElementSize) {.width = 24, .height = 24},
-                               .color              = MD_COLOR_ACCENT_LIGHT_1,
-                               .tooltip_text       = "Main device",
-                               .is_not_interactive = true});
+          (ElementButtonArgs) {
+            .shape              = ELEMENT_BUTTON_SHAPE_IMAGE,
+            .image              = ELEMENT_BUTTON_IMAGE_STAR,
+            .size               = (ElementSize) {.width = 24, .height = 24},
+            .color              = MD_COLOR_ACCENT_LIGHT_1,
+            .tooltip_text       = "Main device",
+            .is_not_interactive = true,
+          });
       }
       else {
         element_checkbox(
@@ -196,15 +220,17 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 0.7f, .rel_height = 1.0f},
-                           .text         = device_info.name,
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = false});
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.7f, .rel_height = 1.0f},
+          .text         = device_info.name,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
 
       char memory_string[64];
 
@@ -219,15 +245,17 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 0.25f, .rel_height = 1.0f},
-                           .text         = memory_string,
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = false});
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.25f, .rel_height = 1.0f},
+          .text         = memory_string,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
     }
     window_pop_section(window);
 
@@ -241,185 +269,217 @@ static void _window_about_action(Window* window, Display* display, LuminaryHost*
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Simple DirectMedia Layer (SDL) Version 3.0",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Simple DirectMedia Layer (SDL) Version 3.0",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
-  if (element_text(
-        window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                           .text         = "https://github.com/libsdl-org/SDL",
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = true})) {
+  if (
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+        .text         = "https://github.com/libsdl-org/SDL",
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = true,
+      })) {
     SDL_OpenURL("https://github.com/libsdl-org/SDL");
   }
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Licensed under the Zlib Licence",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Zlib Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   window_margin(window, 24);
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "SDL_ttf Version 3.0",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "SDL_ttf Version 3.0",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
-  if (element_text(
-        window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                           .text         = "https://github.com/libsdl-org/SDL_ttf",
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = true})) {
+  if (
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+        .text         = "https://github.com/libsdl-org/SDL_ttf",
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = true,
+      })) {
     SDL_OpenURL("https://github.com/libsdl-org/SDL_ttf");
   }
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Copyright(C) 1997 - 2025 Sam Lantinga",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Licensed under the Zlib Licence",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Zlib Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   window_margin(window, 24);
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Freetype",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Freetype",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
-  if (element_text(
-        window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                           .text         = "https://github.com/freetype/freetype",
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = true})) {
+  if (
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+        .text         = "https://github.com/freetype/freetype",
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = true,
+      })) {
     SDL_OpenURL("https://github.com/freetype/freetype");
   }
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Licensed under the Freetype Licence",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Freetype Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
   window_margin(window, 24);
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Material Symbols",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Material Symbols",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 
-  if (element_text(
-        window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                           .text         = "https://github.com/google/material-design-icons",
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = true})) {
+  if (
+    element_text(
+      window, display, mouse_state,
+      (ElementTextArgs) {
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+        .text         = "https://github.com/google/material-design-icons",
+        .center_x     = false,
+        .center_y     = true,
+        .highlighting = false,
+        .cache_text   = true,
+        .auto_size    = false,
+        .is_clickable = true,
+      })) {
     SDL_OpenURL("https://github.com/google/material-design-icons");
   }
 
   element_text(
     window, display, mouse_state,
-    (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                       .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
-                       .text         = "Licensed under the Apache Version 2.0 Licence",
-                       .center_x     = false,
-                       .center_y     = true,
-                       .highlighting = false,
-                       .cache_text   = true,
-                       .auto_size    = false,
-                       .is_clickable = false});
+    (ElementTextArgs) {
+      .color        = 0xFFFFFFFF,
+      .size         = (ElementSize) {.rel_width = 1.0f, .height = 24},
+      .text         = "Licensed under the Apache Version 2.0 Licence",
+      .center_x     = false,
+      .center_y     = true,
+      .highlighting = false,
+      .cache_text   = true,
+      .auto_size    = false,
+      .is_clickable = false,
+    });
 }
 
 void window_about_create(Window** window) {
