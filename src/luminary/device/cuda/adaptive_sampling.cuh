@@ -206,8 +206,8 @@ LUMINARY_KERNEL void adaptive_sampling_filter_variance(const KernelArgsAdaptiveS
   const uint32_t center_x = adaptive_sampling_block % args.width;
   const uint32_t center_y = adaptive_sampling_block / args.width;
 
-  // 7x7 spatial filter in log space to calculate a geometric mean
-  const int32_t filter_radius = 3;
+  // 5x5 spatial filter in log space to calculate a geometric mean
+  const int32_t filter_radius = 2;
 
   float variance_sum = 0.0f;
   float weight_sum   = 0.0f;
@@ -250,10 +250,12 @@ LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelA
   // Zero out all the bits not currently occupied by valid data.
   adaptive_sampling_counts &= (1u << (args.current_stage_id * 8)) - 1;
 
-  uint32_t new_sample_count = (uint32_t) (remap(variance, 0.0f, avg_variance, 0.0f, args.avg_sampling_rate) + 0.5f);
+  const float global_rel_variance = (avg_variance > 0.0f) ? variance / avg_variance : 0.0f;
+  const float target_sample_rate  = global_rel_variance * global_rel_variance * args.avg_sampling_rate;
 
-  new_sample_count = max(new_sample_count, 1);
-  new_sample_count = min(new_sample_count, args.max_sampling_rate);
+  uint32_t new_sample_count = (uint32_t) (target_sample_rate + 0.5f);
+  new_sample_count          = max(new_sample_count, 1);
+  new_sample_count          = min(new_sample_count, args.max_sampling_rate);
 
   adaptive_sampling_counts |= (new_sample_count - 1) << (args.current_stage_id * 8);
 
