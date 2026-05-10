@@ -10,8 +10,10 @@
 
 LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
   CameraSampleResult result;
+  float camera_scale;
   if (device.camera.is_thin_lens_template) {
-    result = camera_thin_lens_sample(path_id);
+    result       = camera_thin_lens_sample(path_id);
+    camera_scale = 0.0f;
   }
   else {
     const bool allow_reflections  = device.camera.allow_reflections;
@@ -25,11 +27,13 @@ LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
       result = camera_physical_sample<false, true>(path_id);
     else
       result = camera_physical_sample<false, false>(path_id);
+
+    camera_scale = device.camera.scale * CAMERA_COMMON_SCALE;
   }
 
   // Transform result to world space
   result.origin = quaternion_apply(device.camera.rotation, result.origin);
-  result.origin = scale_vector(result.origin, device.camera.scale * CAMERA_COMMON_SCALE);
+  result.origin = scale_vector(result.origin, camera_scale);
   result.origin = add_vector(result.origin, device.camera.pos);
 
   result.ray = quaternion_apply(device.camera.rotation, result.ray);

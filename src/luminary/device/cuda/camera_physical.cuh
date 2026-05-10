@@ -443,7 +443,7 @@ LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_i
   float wavelength_pdf;
   const float wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, path_id), wavelength_pdf);
 
-  const vec3 sensor_point = camera_sample_sensor(path_id);
+  const vec3 sensor_point = camera_sample_sensor<false>(path_id);
 
   CameraSimulationResult selected_simulation_result;
   selected_simulation_result.origin              = get_vector(0.0f, 0.0f, 0.0f);

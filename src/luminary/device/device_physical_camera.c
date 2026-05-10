@@ -112,7 +112,7 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const C
   if (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
     if (camera->lens.use_auto_focus) {
       const RayTransferMatrix matrix     = _physical_camera_run_ray_transfer_matrix_analysis(&template_data, template_data.last_vertex);
-      const float scaled_object_distance = camera->lens.object_distance / camera->scale;
+      const float scaled_object_distance = camera->lens.object_distance / camera->lens.scale;
 
       sensor_distance = _physical_camera_compute_auto_focus(&template_data, matrix, scaled_object_distance);
     }

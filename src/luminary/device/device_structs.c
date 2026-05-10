@@ -50,15 +50,16 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->dithering                        = camera->dithering;
   device_camera->purkinje                         = camera->purkinje;
   device_camera->use_color_correction             = camera->use_color_correction;
-  device_camera->allow_reflections                = camera->allow_reflections;
-  device_camera->use_spectral_rendering           = camera->use_spectral_rendering;
+  device_camera->allow_reflections                = camera->lens.allow_reflections;
+  device_camera->use_spectral_rendering           = camera->lens.use_spectral_rendering;
   device_camera->is_thin_lens_template            = camera->lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS;
   device_camera->use_local_error_minimization     = camera->use_local_error_minimization;
   device_camera->use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
   device_camera->enable_diffraction               = camera->lens.enable_diffraction;
 
-  device_camera->lens.focal_length         = camera->lens.object_distance * CAMERA_COMMON_INV_SCALE;
-  device_camera->lens.sensor_diagonal_size = camera->lens.sensor_diagonal_size;
+  device_camera->thin_lens_focal_length  = camera->thin_lens.object_distance * CAMERA_COMMON_INV_SCALE;
+  device_camera->thin_lens_aperture_size = camera->thin_lens.aperture_size;
+  device_camera->sensor_diagonal_size    = camera->sensor.diagonal_size;
 
   device_camera->sensor.aspect_ratio          = camera->sensor.aspect_ratio;
   device_camera->sensor.film_grain_strength   = camera->sensor.film_grain_strength;
@@ -70,7 +71,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->exposure        = expf(camera->exposure);
   device_camera->purkinje_kappa1 = camera->purkinje_kappa1;
   device_camera->purkinje_kappa2 = camera->purkinje_kappa2;
-  device_camera->scale           = camera->scale;
+  device_camera->scale           = camera->lens.scale;
 
   return LUMINARY_SUCCESS;
 }

@@ -58,11 +58,9 @@ struct DeviceCamera {
   float purkinje_kappa1;
   float purkinje_kappa2;
   float scale;
-
-  struct {
-    float focal_length;
-    float sensor_diagonal_size;
-  } lens;
+  float thin_lens_focal_length;
+  float thin_lens_aperture_size;
+  float sensor_diagonal_size;
 
   struct {
     float aspect_ratio;
@@ -71,7 +69,7 @@ struct DeviceCamera {
     uint32_t film_grains_per_pixel;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x48u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x4Cu);
 
 struct DeviceCameraAux {
   uint32_t num_interfaces;

@@ -421,58 +421,79 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |=
     _window_entity_properties_add_slider(data, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
 
-  update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.allow_reflections);
-  update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.use_spectral_rendering);
-
   element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Lens", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
   update_data |= _window_entity_properties_add_dropdown(
     data, "Template", LUMINARY_LENS_TEMPLATE_COUNT, (char**) luminary_strings_lens_template, &lens_template);
 
-  update_data |= _window_entity_properties_add_slider_v2(
-    data, (WindowEntityPropertiesSliderArgsV2) {
-            .text              = "Aperture Stop",
-            .data_binding      = &camera.lens.aperture_stop,
-            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
-            .min               = 1.0f,
-            .max               = 32.0f * 1024.0f,
-            .change_rate       = 1.0f,
-            .value_string_func = _window_entity_properties_slider_value_string_func_aperture_stop,
-          });
-
-  update_data |= _window_entity_properties_add_dropdown(
-    data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
-
-  if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
-  }
-
-  if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
-    update_data |= _window_entity_properties_add_checkbox(data, "Auto Focus", &camera.lens.use_auto_focus);
-
-  if (camera.lens.use_auto_focus || camera.lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Object Distance", &camera.lens.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
-  }
-  else {
+  if (lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS) {
     update_data |= _window_entity_properties_add_slider_v2(
       data, (WindowEntityPropertiesSliderArgsV2) {
-              .text              = "Sensor Distance",
-              .data_binding      = &camera.lens.sensor_distance,
+              .text              = "Aperture Size",
+              .data_binding      = &camera.thin_lens.aperture_size,
               .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
               .min               = 0.0f,
               .max               = FLT_MAX,
               .change_rate       = 1.0f,
               .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
             });
+
+    update_data |= _window_entity_properties_add_dropdown(
+      data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
+
+    if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
+      update_data |= _window_entity_properties_add_slider(
+        data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+    }
+
+    update_data |= _window_entity_properties_add_slider(
+      data, "Object Distance", &camera.thin_lens.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
   }
+  else {
+    update_data |= _window_entity_properties_add_slider_v2(
+      data, (WindowEntityPropertiesSliderArgsV2) {
+              .text              = "Aperture Stop",
+              .data_binding      = &camera.lens.aperture_stop,
+              .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+              .min               = 1.0f,
+              .max               = 32.0f * 1024.0f,
+              .change_rate       = 1.0f,
+              .value_string_func = _window_entity_properties_slider_value_string_func_aperture_stop,
+            });
 
-  if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
-    update_data |= _window_entity_properties_add_slider(data, "Scale", &camera.scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 0.1f);
+    update_data |= _window_entity_properties_add_dropdown(
+      data, "Aperture Shape", LUMINARY_APERTURE_COUNT, (char**) luminary_strings_aperture, &aperture_shape);
 
-  if (camera.lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS)
+    if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
+      update_data |= _window_entity_properties_add_slider(
+        data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+    }
+
+    update_data |= _window_entity_properties_add_checkbox(data, "Auto Focus", &camera.lens.use_auto_focus);
+
+    if (camera.lens.use_auto_focus) {
+      update_data |= _window_entity_properties_add_slider(
+        data, "Object Distance", &camera.lens.object_distance, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
+    }
+    else {
+      update_data |= _window_entity_properties_add_slider_v2(
+        data, (WindowEntityPropertiesSliderArgsV2) {
+                .text              = "Sensor Distance",
+                .data_binding      = &camera.lens.sensor_distance,
+                .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+                .min               = 0.0f,
+                .max               = FLT_MAX,
+                .change_rate       = 1.0f,
+                .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
+              });
+    }
+
+    update_data |=
+      _window_entity_properties_add_slider(data, "Scale", &camera.lens.scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 0.1f);
+    update_data |= _window_entity_properties_add_checkbox(data, "Reflections", &camera.lens.allow_reflections);
+    update_data |= _window_entity_properties_add_checkbox(data, "Spectral", &camera.lens.use_spectral_rendering);
     update_data |= _window_entity_properties_add_checkbox(data, "Diffraction", &camera.lens.enable_diffraction);
+  }
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
@@ -480,7 +501,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider_v2(
     data, (WindowEntityPropertiesSliderArgsV2) {
             .text              = "Diameter",
-            .data_binding      = &camera.lens.sensor_diagonal_size,
+            .data_binding      = &camera.sensor.diagonal_size,
             .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
             .min               = 0.01f,
             .max               = FLT_MAX,

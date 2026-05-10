@@ -8,14 +8,14 @@
 // We force the weight to be 1, else the brightness of the image would depend on aperture size.
 // That would be realistic but not practical.
 LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const PathID& path_id) {
-  if (device.camera_aux.aperture_radius == 0.0f)
+  if (device.camera.thin_lens_aperture_size == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
   const float2 random = random_2D(RANDOM_TARGET_LENS, path_id);
 
   float2 sample;
 
-  const float aperture_size = device.camera_aux.aperture_radius * CAMERA_COMMON_INV_SCALE;
+  const float aperture_size = device.camera.thin_lens_aperture_size;
 
   switch (device.camera.aperture_shape) {
     default:
@@ -50,12 +50,12 @@ LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const PathID& path_id) {
 }
 
 LUMINARY_FUNCTION CameraSampleResult camera_thin_lens_sample(const PathID& path_id) {
-  const vec3 sensor_point = camera_sample_sensor(path_id);
+  const vec3 sensor_point = camera_sample_sensor<true>(path_id);
 
-  const vec3 sensor_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), sensor_point));
+  const vec3 sensor_to_focal_ray = normalize_vector(neg_vector(sensor_point));
 
   // The minus is because we are always looking in Z direction
-  const vec3 focal_point = scale_vector(sensor_to_focal_ray, device.camera.lens.focal_length / sensor_to_focal_ray.z);
+  const vec3 focal_point = scale_vector(sensor_to_focal_ray, device.camera.thin_lens_focal_length / sensor_to_focal_ray.z);
 
   const vec3 aperture_point = camera_thin_lens_sample_aperture(path_id);
 

@@ -22,13 +22,14 @@ LUMINARY_FUNCTION float2 camera_get_jitter(const PathID& path_id) {
   return random_2D_base_float(RANDOM_TARGET_CAMERA_JITTER, make_ushort2(0, 0), sample_id, 0);
 }
 
+template <bool IS_THIN_LENS>
 LUMINARY_FUNCTION vec3 camera_sample_sensor(const PathID& path_id) {
   const float2 jitter = camera_get_jitter(path_id);
 
   const float aspect_ratio = (device.camera.use_aspect_ratio_from_resolution) ? ((float) device.settings.width / device.settings.height)
                                                                               : device.camera.sensor.aspect_ratio;
 
-  const float sensor_height = device.camera.lens.sensor_diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
+  const float sensor_height = device.camera.sensor_diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
   const float sensor_width  = aspect_ratio * sensor_height;
 
   const float step_x = sensor_width / device.settings.width;
@@ -39,7 +40,7 @@ LUMINARY_FUNCTION vec3 camera_sample_sensor(const PathID& path_id) {
   vec3 sensor_point;
   sensor_point.x = 0.5f * sensor_width - step_x * (sensor_pixel.x + jitter.x);
   sensor_point.y = 0.5f * sensor_height - step_y * (sensor_pixel.y + jitter.y);
-  sensor_point.z = -device.camera_aux.sensor_distance;
+  sensor_point.z = (IS_THIN_LENS) ? -16.0f : -device.camera_aux.sensor_distance;
 
   // Flip vertically
   sensor_point.y *= -1.0f;

@@ -938,7 +938,6 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
-  dst_camera->scale                        = camera->scale;
 
 #if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;
@@ -1225,7 +1224,6 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
-  dst_camera->scale                        = camera->scale;
 
 #if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;
