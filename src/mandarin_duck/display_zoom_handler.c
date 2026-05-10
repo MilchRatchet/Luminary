@@ -84,7 +84,7 @@ static void _display_zoom_handler_handle_swipe(DisplayZoomHandler* zoom, MouseSt
   MD_CHECK_NULL_ARGUMENT(zoom);
   MD_CHECK_NULL_ARGUMENT(mouse);
 
-  if (mouse->right_down == false)
+  if (mouse->right_down == false || mouse->right_phase == MOUSE_PHASE_PRESSED)
     return;
 
   if (mouse->x_motion == 0.0f && mouse->y_motion == 0.0f)
