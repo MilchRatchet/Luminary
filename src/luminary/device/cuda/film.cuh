@@ -10,8 +10,8 @@ LUMINARY_FUNCTION float film_grain_layer_apply(const float value, uint32_t x, ui
 
   const uint32_t film_grains_per_pixel = device.camera.sensor.film_grains_per_pixel;
 
-  const float random              = random_grain(x, y, layer_id);
-  const uint32_t activated_grains = random_binomial_approx(film_grains_per_pixel, activation_probability, random);
+  const float random           = random_grain(x, y, layer_id);
+  const float activated_grains = random_binomial_approx(film_grains_per_pixel, activation_probability, random);
 
   const float activation_fraction = __saturatef(((float) activated_grains) / film_grains_per_pixel);
   const float exposure            = copysignf(logf(fmaxf(1.0f - activation_fraction, 1e-12f)), 1.0f);

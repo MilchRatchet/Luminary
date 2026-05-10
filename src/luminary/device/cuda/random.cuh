@@ -423,13 +423,11 @@ LUMINARY_FUNCTION uint32_t random_binomial_approx(const uint32_t n, const float 
   const float std_dev = sqrtf(mean * (1.0f - p));
 
   if (std_dev == 0.0f)
-    return (uint32_t) (mean + 0.5f);
+    return mean;
 
-  float x = mean + std_dev * random_normal_inverse_approx(random);
+  const float x = mean + std_dev * random_normal_inverse_approx(random);
 
-  x = fmaxf(fminf(x, n), 0.0f);
-
-  return (uint32_t) (x + 0.49999f);
+  return fmaxf(fminf(x, n), 0.0f);
 }
 
 #endif /* CU_RANDOM_H */
