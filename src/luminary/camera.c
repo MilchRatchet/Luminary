@@ -44,7 +44,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->lens.enable_diffraction      = false;
 
   camera->sensor = (LuminaryCameraSensor) {
-    .diagonal_size                    = 1.0f,
+    .diagonal_size                    = 43.3f,
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
     .film_grain_strength              = 0.0f,

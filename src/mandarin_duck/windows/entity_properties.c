@@ -372,22 +372,6 @@ static void _window_entity_properties_slider_value_string_func_aperture_stop(
     sprintf(text, "f/INFINITY");
 }
 
-static void _window_entity_properties_slider_value_string_func_sensor_diameter(
-  char* text, const void* data, ElementSliderDataType data_type) {
-  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
-    crash_message("Expected float data type.");
-
-  const float value_mm   = *(const float*) data;
-  const float value_inch = 0.0393701f * value_mm;
-
-  if (value_inch < 1.0f) {
-    sprintf(text, "1/%.2f\"", 1.0f / value_inch);
-  }
-  else {
-    sprintf(text, "%.2f\"", value_inch);
-  }
-}
-
 static void _window_entity_properties_camera_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -506,7 +490,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
             .min               = 0.01f,
             .max               = FLT_MAX,
             .change_rate       = 1.0f,
-            .value_string_func = _window_entity_properties_slider_value_string_func_sensor_diameter,
+            .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
           });
 
   update_data |= _window_entity_properties_add_checkbox(data, "Native Aspect Ratio", &camera.sensor.use_aspect_ratio_from_resolution);
