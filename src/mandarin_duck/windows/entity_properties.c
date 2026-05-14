@@ -360,8 +360,7 @@ static void _window_entity_properties_slider_value_string_func_millimeter(char* 
   sprintf(text, "%.2fmm", value);
 }
 
-static void _window_entity_properties_slider_value_string_func_aperture_stop(
-  char* text, const void* data, ElementSliderDataType data_type) {
+static void _window_entity_properties_slider_value_string_func_f_stop(char* text, const void* data, ElementSliderDataType data_type) {
   if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
     crash_message("Expected float data type.");
 
@@ -437,12 +436,12 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
     update_data |= _window_entity_properties_add_slider_v2(
       data, (WindowEntityPropertiesSliderArgsV2) {
               .text              = "Aperture Stop",
-              .data_binding      = &camera.lens.aperture_stop,
+              .data_binding      = &camera.lens.f_stop,
               .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
               .min               = 1.0f,
               .max               = 32.0f * 1024.0f,
               .change_rate       = 1.0f,
-              .value_string_func = _window_entity_properties_slider_value_string_func_aperture_stop,
+              .value_string_func = _window_entity_properties_slider_value_string_func_f_stop,
             });
 
     update_data |= _window_entity_properties_add_dropdown(

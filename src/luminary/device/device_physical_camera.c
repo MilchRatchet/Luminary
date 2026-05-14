@@ -22,7 +22,8 @@ struct RayTransferMatrix {
   float D;
 } typedef RayTransferMatrix;
 
-static RayTransferMatrix _physical_camera_run_ray_transfer_matrix_analysis(const LensTemplateData* template_data, const float z_start) {
+// Ray Transfer Matrix Analysis
+static RayTransferMatrix _physical_camera_analysis(const LensTemplateData* template_data, const float z_start, const float z_end) {
   float A = 1.0f;
   float B = 0.0f;
   float C = 0.0f;
@@ -31,10 +32,12 @@ static RayTransferMatrix _physical_camera_run_ray_transfer_matrix_analysis(const
   float z_curr = -z_start;
 
   for (int32_t i = template_data->num_interfaces - 1; i >= 0; i--) {
-    if (template_data->interfaces[i].vertex > z_start)
+    float vertex = template_data->interfaces[i].vertex;
+
+    if (vertex > z_start || vertex <= z_end)
       continue;
 
-    float z_v = -template_data->interfaces[i].vertex;
+    float z_v = -vertex;
     float d   = z_v - z_curr;
 
     float new_A = A + d * C;
@@ -63,6 +66,16 @@ static RayTransferMatrix _physical_camera_run_ray_transfer_matrix_analysis(const
       C         = M22 * C;
       D         = M22 * D;
     }
+  }
+
+  if (z_end != -FLT_MAX) {
+    float z_v = -z_end;
+    float d   = z_v - z_curr;
+
+    float new_A = A + d * C;
+    float new_B = B + d * D;
+    A           = new_A;
+    B           = new_B;
   }
 
   return (RayTransferMatrix) {.A = A, .B = B, .C = C, .D = D};
@@ -103,15 +116,15 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const C
   float sensor_distance = 1.0f;
 
   float aperture_radius = 0.0f;
-  if (camera->lens.aperture_stop < 32.0f * 1024.0f)
-    aperture_radius = (template_data.design_focal_length / camera->lens.aperture_stop) * 0.5f;
+  if (camera->lens.f_stop < 32.0f * 1024.0f)
+    aperture_radius = (template_data.design_focal_length / camera->lens.f_stop) * 0.5f;
 
   float exit_pupil_radius = 0.0f;
   float exit_pupil_point  = 0.0f;
 
   if (camera->lens_template != LUMINARY_LENS_TEMPLATE_THIN_LENS) {
     if (camera->lens.use_auto_focus) {
-      const RayTransferMatrix matrix     = _physical_camera_run_ray_transfer_matrix_analysis(&template_data, template_data.last_vertex);
+      const RayTransferMatrix matrix     = _physical_camera_analysis(&template_data, template_data.last_vertex, -FLT_MAX);
       const float scaled_object_distance = camera->lens.object_distance / camera->lens.scale;
 
       sensor_distance = _physical_camera_compute_auto_focus(&template_data, matrix, scaled_object_distance);
@@ -120,7 +133,19 @@ LuminaryResult physical_camera_generate(PhysicalCamera* physical_camera, const C
       sensor_distance = camera->lens.sensor_distance;
     }
 
-    RayTransferMatrix exit_pupil_mat = _physical_camera_run_ray_transfer_matrix_analysis(&template_data, template_data.aperture_point);
+    RayTransferMatrix entrance_pupil_mat =
+      _physical_camera_analysis(&template_data, template_data.last_vertex, template_data.aperture_point);
+
+    if (entrance_pupil_mat.A != 0.0f) {
+      // The entrance pupil radius is the physical aperture radius / A
+      // Since f_stop = EFL / (2 * EntrancePupilRadius), we can find physical aperture:
+      if (camera->lens.f_stop < 32.0f * 1024.0f) {
+        aperture_radius = (template_data.design_focal_length / camera->lens.f_stop) * 0.5f;
+        aperture_radius = aperture_radius * fabsf(entrance_pupil_mat.A);
+      }
+    }
+
+    RayTransferMatrix exit_pupil_mat = _physical_camera_analysis(&template_data, template_data.aperture_point, -FLT_MAX);
 
     if (exit_pupil_mat.D != 0.0f) {
       exit_pupil_point  = template_data.interfaces[0].vertex + exit_pupil_mat.B / exit_pupil_mat.D;

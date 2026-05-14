@@ -34,7 +34,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
   camera->thin_lens.aperture_size      = 0.0f;
   camera->thin_lens.object_distance    = 1.0f;
-  camera->lens.aperture_stop           = 1.0f;
+  camera->lens.f_stop                  = 1.0f;
   camera->lens.sensor_distance         = 1.0f;
   camera->lens.object_distance         = 1.0f;
   camera->lens.scale                   = 1.0f;
@@ -90,7 +90,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
     __CAMERA_CHECK_DIRTY(thin_lens.object_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   }
   else {
-    __CAMERA_CHECK_DIRTY(lens.aperture_stop, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
+    __CAMERA_CHECK_DIRTY(lens.f_stop, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
     __CAMERA_CHECK_DIRTY(lens.sensor_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
     __CAMERA_CHECK_DIRTY(lens.use_auto_focus, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
     __CAMERA_CHECK_DIRTY(lens.object_distance, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
