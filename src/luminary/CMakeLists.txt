@@ -4,7 +4,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # Find packages
 #=============================================================
 
-set(LUMINARY_CUDA_VERSION 13.0 CACHE INTERNAL "CUDA Version")
+set(LUMINARY_CUDA_VERSION 13.2 CACHE INTERNAL "CUDA Version")
 set(LUMINARY_OPTIX_VERSION 9.0 CACHE INTERNAL "OptiX Version")
 
 find_package(CUDAToolkit ${LUMINARY_CUDA_VERSION} REQUIRED QUIET)
