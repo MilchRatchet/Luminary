@@ -213,10 +213,16 @@ LUMINARY_FUNCTION RGBF
 
   pixel = scale_color(pixel, device.camera.exposure);
 
+  pixel = film_grain_apply(pixel, x, y);
+
+  // Convert radiometric exposure to photometric exposure (lux-seconds) using max luminous efficacy (~683 lm/W).
+  // Then normalize using the saturation-based standard ISO constant (ISO = 78 / H_sat) for standard tonemapper bounds.
+  const float photometric_scale = 683.0f / 78.0f;
+  pixel                         = scale_color(pixel, photometric_scale);
+
   if (device.camera.purkinje)
     pixel = purkinje_shift(pixel);
 
-  pixel = film_grain_apply(pixel, x, y);
   pixel = tonemap_apply_transform(pixel, agx_params);
 
   if (device.camera.use_color_correction) {

@@ -440,7 +440,7 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera_sensor[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, diagonal_size, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, aspect_ratio, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, use_aspect_ratio_from_resolution, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_sensitivity, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, iso, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_strength, 1, LUM_VERSION_CURRENT),
 };
 
@@ -590,7 +590,7 @@ static LuminaryResult _lum_builtin_camera_sensor_init(LumBuiltinCameraSensor* ca
   camera->diagonal_size                    = 43.0f;
   camera->aspect_ratio                     = 1.0f;
   camera->use_aspect_ratio_from_resolution = true;
-  camera->film_sensitivity                 = 100.0f;
+  camera->iso                              = 100.0f;
   camera->film_grain_strength              = 0.0f;
 
   return LUMINARY_SUCCESS;
@@ -981,7 +981,7 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->sensor.diagonal_size                    = camera->sensor.diagonal_size;
   dst_camera->sensor.aspect_ratio                     = camera->sensor.aspect_ratio;
   dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
-  dst_camera->sensor.film_sensitivity                 = camera->sensor.film_sensitivity;
+  dst_camera->sensor.iso                              = camera->sensor.iso;
   dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
 
   return LUMINARY_SUCCESS;
@@ -1279,7 +1279,7 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->sensor.diagonal_size                    = camera->sensor.diagonal_size;
   dst_camera->sensor.aspect_ratio                     = camera->sensor.aspect_ratio;
   dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
-  dst_camera->sensor.film_sensitivity                 = camera->sensor.film_sensitivity;
+  dst_camera->sensor.iso                              = camera->sensor.iso;
   dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
 
   return LUMINARY_SUCCESS;

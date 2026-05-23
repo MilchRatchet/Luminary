@@ -62,14 +62,15 @@ struct DeviceCamera {
   float thin_lens_aperture_size;
   float thin_lens_fov;
   float sensor_diagonal_size;
+  float exposure_time;
 
   struct {
     float aspect_ratio;
-    float film_sensitivity;
+    float iso;
     float film_grain_strength;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x4Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x50u);
 
 struct DeviceCameraAux {
   uint32_t num_interfaces;

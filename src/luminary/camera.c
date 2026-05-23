@@ -17,6 +17,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->aperture_shape               = LUMINARY_APERTURE_ROUND;
   camera->aperture_blade_count         = 7;
   camera->exposure                     = 0.0f;
+  camera->shutter_speed                = 100.0f;
   camera->bloom_blend                  = 0.01f;
   camera->dithering                    = 1;
   camera->tonemap                      = LUMINARY_TONEMAP_AGX;
@@ -48,7 +49,7 @@ LuminaryResult camera_get_default(Camera* camera) {
     .diagonal_size                    = 43.3f,
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
-    .film_sensitivity                 = 100.0f,
+    .iso                              = 100.0f,
     .film_grain_strength              = 0.0f,
   };
 
@@ -80,6 +81,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(rotation.z, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(lens_template, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
   __CAMERA_CHECK_DIRTY(aperture_shape, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   if (input->aperture_shape != LUMINARY_APERTURE_ROUND) {
     __CAMERA_CHECK_DIRTY(aperture_blade_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
@@ -104,7 +106,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(sensor.diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.aspect_ratio, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.use_aspect_ratio_from_resolution, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(sensor.film_sensitivity, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.iso, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.film_grain_strength, SCENE_DIRTY_FLAG_OUTPUT);
 
   __CAMERA_CHECK_DIRTY(use_local_error_minimization, SCENE_DIRTY_FLAG_OUTPUT);

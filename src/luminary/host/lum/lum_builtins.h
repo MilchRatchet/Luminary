@@ -193,7 +193,7 @@ struct LumBuiltinCameraSensor {
   float diagonal_size;
   float aspect_ratio;
   bool use_aspect_ratio_from_resolution;
-  float film_sensitivity;
+  float iso;
   float film_grain_strength;
 } typedef LumBuiltinCameraSensor;
 

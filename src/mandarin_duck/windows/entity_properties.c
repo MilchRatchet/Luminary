@@ -371,6 +371,18 @@ static void _window_entity_properties_slider_value_string_func_f_stop(char* text
     sprintf(text, "f/INFINITY");
 }
 
+static void _window_entity_properties_slider_value_string_func_shutter_speed(
+  char* text, const void* data, ElementSliderDataType data_type) {
+  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
+    crash_message("Expected float data type.");
+
+  const float value = *(const float*) data;
+  if (value < 32.0f * 1024.0f)
+    sprintf(text, "1/%.2fs", value);
+  else
+    sprintf(text, "0s");
+}
+
 static void _window_entity_properties_camera_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -498,6 +510,17 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
             });
   }
 
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Shutter Speed",
+            .data_binding      = &camera.shutter_speed,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 1.0f,
+            .max               = 32.0f * 1024.0f,
+            .change_rate       = 5.0f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_shutter_speed,
+          });
+
   update_data |= _window_entity_properties_add_checkbox(data, "Native Aspect Ratio", &camera.sensor.use_aspect_ratio_from_resolution);
 
   if (camera.sensor.use_aspect_ratio_from_resolution == false)
@@ -507,10 +530,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider(
     data, "Film Grain", &camera.sensor.film_grain_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
 
-  if (camera.sensor.film_grain_strength > 0.0f) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "Film ISO", &camera.sensor.film_sensitivity, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 100.0f, 65536.0f, 10.0f);
-  }
+  update_data |=
+    _window_entity_properties_add_slider(data, "ISO", &camera.sensor.iso, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 100.0f, 65536.0f, 10.0f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});

@@ -182,7 +182,7 @@ LUMINARY_API struct LuminaryCameraSensor {
   float diagonal_size;  // [mm]
   float aspect_ratio;
   bool use_aspect_ratio_from_resolution;
-  float film_sensitivity;
+  float iso;
   float film_grain_strength;
 } typedef LuminaryCameraSensor;
 
@@ -192,6 +192,7 @@ LUMINARY_API struct LuminaryCamera {
   LuminaryApertureShape aperture_shape;
   uint32_t aperture_blade_count;
   float exposure;
+  float shutter_speed;  // [s/*]
   LuminaryToneMap tonemap;
   float agx_custom_slope;
   float agx_custom_power;
