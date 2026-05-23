@@ -319,6 +319,16 @@ LUMINARY_FUNCTION RGBF sky_compute_color_from_spectrum(const Spectrum radiance) 
   return max_color(get_color(r, g, b), splat_color(0.0f));
 }
 
+LUMINARY_FUNCTION RGBF sky_evaluate_radiance_from_spectrum(const Spectrum radiance) {
+  // Multiply by integrating step size Delta lambda: (635 - 415) / 7 = 31.42857f
+  return scale_color(sky_compute_color_from_spectrum(radiance), 31.42857f);
+}
+
+LUMINARY_FUNCTION RGBF sky_evaluate_transmittance_from_spectrum(const Spectrum transmittance) {
+  // Normalization: T=1 should result in strictly RGB=(1,1,1). The raw sum of y-bar coefficients is 3.2579f.
+  return scale_color(sky_compute_color_from_spectrum(transmittance), 1.0f / 3.2579f);
+}
+
 // This is a quick way of obtaining the color of the sun disk times transmittance
 // Note that it is not checked whether the sun is actually hit by ray, it is simply assumed
 // Inscattering is not included
@@ -338,7 +348,7 @@ LUMINARY_FUNCTION RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, cons
   const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.sky.sun_strength);
   const Spectrum radiance     = spectrum_mul(extinction_sun, sun_radiance);
 
-  RGBF sun_color = sky_compute_color_from_spectrum(radiance);
+  RGBF sun_color = sky_evaluate_radiance_from_spectrum(radiance);
 
   if (include_cloud_hdri && device.cloud.active && device.sky.mode == LUMINARY_SKY_MODE_HDRI) {
     const float cloud_alpha = sky_hdri_sample_alpha(ray);

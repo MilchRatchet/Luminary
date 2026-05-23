@@ -249,7 +249,7 @@ LUMINARY_FUNCTION RGBF
 
   const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, path_id);
 
-  return sky_compute_color_from_spectrum(radiance);
+  return sky_evaluate_radiance_from_spectrum(radiance);
 }
 
 LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, const PathID& path_id) {
@@ -262,9 +262,9 @@ LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray,
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, path_id);
 
-  const RGBF inscattering = mul_color(sky_compute_color_from_spectrum(radiance), record);
+  const RGBF inscattering = mul_color(sky_evaluate_radiance_from_spectrum(radiance), record);
 
-  record = mul_color(record, sky_compute_color_from_spectrum(transmittance));
+  record = mul_color(record, sky_evaluate_transmittance_from_spectrum(transmittance));
 
   return inscattering;
 }
