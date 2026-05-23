@@ -48,9 +48,8 @@ LuminaryResult camera_get_default(Camera* camera) {
     .diagonal_size                    = 43.3f,
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
+    .film_sensitivity                 = 100.0f,
     .film_grain_strength              = 0.0f,
-    .film_grain_coarseness            = 0.0f,
-    .film_grains_per_pixel            = 256,
   };
 
   return LUMINARY_SUCCESS;
@@ -105,9 +104,8 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(sensor.diagonal_size, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.aspect_ratio, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.use_aspect_ratio_from_resolution, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(sensor.film_sensitivity, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(sensor.film_grain_strength, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(sensor.film_grain_coarseness, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(sensor.film_grains_per_pixel, SCENE_DIRTY_FLAG_OUTPUT);
 
   __CAMERA_CHECK_DIRTY(use_local_error_minimization, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(exposure, SCENE_DIRTY_FLAG_OUTPUT);

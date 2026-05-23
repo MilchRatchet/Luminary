@@ -6,15 +6,16 @@
 #include "utils.cuh"
 
 LUMINARY_FUNCTION float film_grain_layer_apply(const float value, uint32_t x, uint32_t y, uint32_t layer_id) {
-  const float activation_probability = 1.0f - expf(-value);
+  const float iso_factor             = fmaxf(device.camera.sensor.film_sensitivity, 1e-7f);
+  const float activation_probability = 1.0f - expf(-value / iso_factor);
 
-  const uint32_t film_grains_per_pixel = device.camera.sensor.film_grains_per_pixel;
+  const uint32_t film_grains_per_pixel = 512;
 
   const float random           = random_grain(x, y, layer_id);
   const float activated_grains = random_binomial_approx(film_grains_per_pixel, activation_probability, random);
 
   const float activation_fraction = __saturatef(((float) activated_grains) / film_grains_per_pixel);
-  const float exposure            = copysignf(logf(fmaxf(1.0f - activation_fraction, 1e-12f)), 1.0f);
+  const float exposure            = copysignf(logf(fmaxf(1.0f - activation_fraction, 1e-12f)), 1.0f) * iso_factor;
 
   return lerp(value, exposure, device.camera.sensor.film_grain_strength);
 }

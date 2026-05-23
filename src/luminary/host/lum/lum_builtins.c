@@ -440,9 +440,8 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera_sensor[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, diagonal_size, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, aspect_ratio, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, use_aspect_ratio_from_resolution, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_sensitivity, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_strength, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_coarseness, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grains_per_pixel, 1, LUM_VERSION_CURRENT),
 };
 
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
@@ -591,9 +590,8 @@ static LuminaryResult _lum_builtin_camera_sensor_init(LumBuiltinCameraSensor* ca
   camera->diagonal_size                    = 43.0f;
   camera->aspect_ratio                     = 1.0f;
   camera->use_aspect_ratio_from_resolution = true;
+  camera->film_sensitivity                 = 100.0f;
   camera->film_grain_strength              = 0.0f;
-  camera->film_grain_coarseness            = 1.0f;
-  camera->film_grains_per_pixel            = 1;
 
   return LUMINARY_SUCCESS;
 }
@@ -983,9 +981,8 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->sensor.diagonal_size                    = camera->sensor.diagonal_size;
   dst_camera->sensor.aspect_ratio                     = camera->sensor.aspect_ratio;
   dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
+  dst_camera->sensor.film_sensitivity                 = camera->sensor.film_sensitivity;
   dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
-  dst_camera->sensor.film_grain_coarseness            = camera->sensor.film_grain_coarseness;
-  dst_camera->sensor.film_grains_per_pixel            = camera->sensor.film_grains_per_pixel;
 
   return LUMINARY_SUCCESS;
 }
@@ -1282,9 +1279,8 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->sensor.diagonal_size                    = camera->sensor.diagonal_size;
   dst_camera->sensor.aspect_ratio                     = camera->sensor.aspect_ratio;
   dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
+  dst_camera->sensor.film_sensitivity                 = camera->sensor.film_sensitivity;
   dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
-  dst_camera->sensor.film_grain_coarseness            = camera->sensor.film_grain_coarseness;
-  dst_camera->sensor.film_grains_per_pixel            = camera->sensor.film_grains_per_pixel;
 
   return LUMINARY_SUCCESS;
 }
