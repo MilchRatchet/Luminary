@@ -12,8 +12,25 @@ static bool _path_is_absolute(const char* string) {
   // Windows C:, D:, ...
   const char* windows_disk_designator = strchr(string, ':');
 
-  // Unix /usr/ ...
-  return (windows_disk_designator || (string[0] == '/'));
+  // Unix /usr/ ... or Windows UNC/root
+  return (windows_disk_designator || (string[0] == '/') || (string[0] == '\\'));
+}
+
+static const char* _path_get_filename(const char* string) {
+  const char* last_forward_slash  = strrchr(string, '/');
+  const char* last_backward_slash = strrchr(string, '\\');
+
+  if (last_forward_slash && last_backward_slash) {
+    return (last_forward_slash > last_backward_slash) ? last_forward_slash + 1 : last_backward_slash + 1;
+  }
+  else if (last_forward_slash) {
+    return last_forward_slash + 1;
+  }
+  else if (last_backward_slash) {
+    return last_backward_slash + 1;
+  }
+
+  return string;
 }
 
 LuminaryResult luminary_path_create(Path** _path) {
@@ -51,9 +68,9 @@ LuminaryResult path_copy(Path** path, const Path* src_path) {
   (*path)->file_path_len           = src_path->file_path_len;
   (*path)->output_memory_available = src_path->output_memory_available;
 
-  (*path)->working_dir = (*path)->memory;
-  (*path)->file_path   = (*path)->working_dir + (*path)->working_dir_len + 1;
-  (*path)->output      = (*path)->file_path + (*path)->file_path_len + 1;
+  (*path)->working_dir = (src_path->working_dir) ? (*path)->memory + (src_path->working_dir - src_path->memory) : (char*) 0;
+  (*path)->file_path   = (src_path->file_path) ? (*path)->memory + (src_path->file_path - src_path->memory) : (char*) 0;
+  (*path)->output      = (src_path->output) ? (*path)->memory + (src_path->output - src_path->memory) : (char*) 0;
   (*path)->is_empty    = src_path->is_empty;
 
   return LUMINARY_SUCCESS;
@@ -73,34 +90,50 @@ LuminaryResult path_extend(Path** path, const Path* src_path, const char* extens
   else {
     __FAILURE_HANDLE(path_copy(path, src_path));
 
-    const char* last_forward_slash  = strrchr(extension, '/');
-    const char* last_backward_slash = strrchr(extension, '\\');
-
-    const char* file_path = (last_forward_slash) ? last_forward_slash + 1 : extension;
-    file_path             = (last_backward_slash) ? last_backward_slash + 1 : file_path;
+    const char* file_path = _path_get_filename(extension);
 
     const size_t file_path_len = strlen(file_path);
 
     const char* working_dir = (file_path != extension) ? extension : (const char*) 0;
 
+    size_t working_dir_len = 0;
     if (working_dir) {
-      const size_t working_dir_len = (working_dir) ? (size_t) (file_path - extension - 1) : 0;
-
-      if ((*path)->output_memory_available < working_dir_len + 1) {
-        __RETURN_ERROR(
-          LUMINARY_ERROR_OUT_OF_MEMORY, "Path exceeds path buffer size after extension. Working dir size increased by %llu bytes.",
-          working_dir_len + 1);
+      working_dir_len = (size_t) (file_path - extension - 1);
+      if (working_dir_len == 0 && (extension[0] == '/' || extension[0] == '\\')) {
+        working_dir_len = 1;
       }
+    }
 
+    if ((*path)->working_dir_len + working_dir_len + file_path_len + 3 > PATH_BUFFER_SIZE) {
+      __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Path exceeds path buffer size after extension. Extension is too long.");
+    }
+
+    if (working_dir) {
+      size_t working_dir_offset = 0;
+
+      if ((*path)->working_dir_len > 0) {
 #if defined(WIN32)
-      (*path)->memory[(*path)->working_dir_len] = '\\';
+        (*path)->memory[(*path)->working_dir_len] = '\\';
 #else  /* WIN32 */
-      (*path)->memory[(*path)->working_dir_len] = '/';
+        (*path)->memory[(*path)->working_dir_len] = '/';
 #endif /* !WIN32 */
 
-      memcpy((*path)->memory + (*path)->working_dir_len + 1, working_dir, working_dir_len);
-      (*path)->working_dir_len += working_dir_len + 1;
+        working_dir_offset = (*path)->working_dir_len + 1;
+      }
+
+      memcpy((*path)->memory + working_dir_offset, working_dir, working_dir_len);
+      if ((*path)->working_dir_len > 0) {
+        (*path)->working_dir_len += working_dir_len + 1;
+      }
+      else {
+        (*path)->working_dir_len = working_dir_len;
+      }
       (*path)->memory[(*path)->working_dir_len] = '\0';
+    }
+
+    if (!(*path)->working_dir) {
+      (*path)->working_dir    = (*path)->memory;
+      (*path)->working_dir[0] = '\0';
     }
 
     (*path)->file_path = (*path)->working_dir + (*path)->working_dir_len + 1;
@@ -121,17 +154,17 @@ LuminaryResult path_extend(Path** path, const Path* src_path, const char* extens
 LuminaryResult luminary_path_set_from_string(Path* path, const char* string) {
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(string);
+  __CHECK_NULL_ARGUMENT(path->memory);
 
-  const char* last_forward_slash  = strrchr(string, '/');
-  const char* last_backward_slash = strrchr(string, '\\');
-
-  const char* file_path = (last_forward_slash) ? last_forward_slash + 1 : string;
-  file_path             = (last_backward_slash) ? last_backward_slash + 1 : file_path;
+  const char* file_path = _path_get_filename(string);
 
   const size_t file_path_len = strlen(file_path);
 
-  const char* working_dir      = (file_path != string) ? string : (const char*) 0;
-  const size_t working_dir_len = (working_dir) ? (size_t) (file_path - string - 1) : 0;
+  const char* working_dir = (file_path != string) ? string : (const char*) 0;
+  size_t working_dir_len  = (working_dir) ? (size_t) (file_path - string - 1) : 0;
+  if (working_dir_len == 0 && working_dir && (string[0] == '/' || string[0] == '\\')) {
+    working_dir_len = 1;
+  }
 
   if (working_dir_len + file_path_len + 3 > PATH_BUFFER_SIZE) {
     __RETURN_ERROR(
@@ -186,16 +219,18 @@ static uint32_t _path_apply_working_dir(Path* path) {
     uint32_t read_offset = 0;
 
     // Skip past the automatically inserted characters
-    if (path->working_dir_len > read_offset && path->working_dir[read_offset] == '.')
-      read_offset++;
-
+    if (path->working_dir_len >= 2 && path->working_dir[0] == '.') {
 #if defined(WIN32)
-    if ((path->working_dir_len > read_offset) && ((path->working_dir[read_offset] == '\\') || (path->working_dir[read_offset] == '/')))
-      read_offset++;
+      if (path->working_dir[1] == '\\' || path->working_dir[1] == '/')
+        read_offset = 2;
 #else  /* WIN32 */
-    if ((path->working_dir_len > read_offset) && (path->working_dir[read_offset] == '/'))
-      read_offset++;
+      if (path->working_dir[1] == '/')
+        read_offset = 2;
 #endif /* !WIN32 */
+    }
+    else if (path->working_dir_len == 1 && path->working_dir[0] == '.') {
+      read_offset = 1;
+    }
 
     __DEBUG_ASSERT(path->working_dir_len >= read_offset);
 
@@ -205,11 +240,13 @@ static uint32_t _path_apply_working_dir(Path* path) {
     offset += copy_length;
   }
 
+  if (offset > 0 && path->output[offset - 1] != '\\' && path->output[offset - 1] != '/') {
 #if defined(WIN32)
-  path->output[offset++] = '\\';
+    path->output[offset++] = '\\';
 #else  /* WIN32 */
-  path->output[offset++] = '/';
+    path->output[offset++] = '/';
 #endif /* !WIN32 */
+  }
 
   return offset;
 }
@@ -217,11 +254,17 @@ static uint32_t _path_apply_working_dir(Path* path) {
 static LuminaryResult _path_apply_no_override(Path* path) {
   __CHECK_NULL_ARGUMENT(path);
 
+  if (path->is_empty) {
+    path->output    = path->memory;
+    path->output[0] = '\0';
+    return LUMINARY_SUCCESS;
+  }
+
   if (!path->working_dir || !path->file_path || !path->output) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Path was never initialized and no override was given either.");
   }
 
-  if (path->working_dir_len + path->file_path_len + 2 > path->output_memory_available) {
+  if (path->working_dir_len + path->file_path_len + 4 > path->output_memory_available) {
     __RETURN_ERROR(
       LUMINARY_ERROR_OUT_OF_MEMORY, "Ran out of memory when combining the path. Lengths are %llu and %llu.", path->working_dir_len,
       path->file_path_len);
@@ -240,18 +283,22 @@ static LuminaryResult _path_apply_override(Path* path, const char* override) {
 
   const size_t override_len = strlen(override);
 
-  if (override_len > path->output_memory_available) {
-    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Override path exceeded path buffer size. Override length is %llu.", override_len);
-  }
-
   // Path was never initialized, just output the override.
-  if (!path->working_dir || !path->file_path || !path->output) {
+  if (!path->working_dir || !path->file_path || !path->output || path->is_empty) {
     path->output_memory_available = PATH_BUFFER_SIZE;
+
+    if (override_len > path->output_memory_available) {
+      __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Override path exceeded path buffer size. Override length is %llu.", override_len);
+    }
 
     path->output = path->memory;
     memcpy(path->output, override, override_len + 1);
 
     return LUMINARY_SUCCESS;
+  }
+
+  if (override_len > path->output_memory_available) {
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Override path exceeded path buffer size. Override length is %llu.", override_len);
   }
 
   const bool override_is_absolute_path = _path_is_absolute(override);
@@ -262,7 +309,7 @@ static LuminaryResult _path_apply_override(Path* path, const char* override) {
     return LUMINARY_SUCCESS;
   }
 
-  if (path->working_dir_len + override_len + 2 > path->output_memory_available) {
+  if (path->working_dir_len + override_len + 4 > path->output_memory_available) {
     __RETURN_ERROR(
       LUMINARY_ERROR_OUT_OF_MEMORY, "Ran out of memory when combining the path with the override. Lengths are %llu and %llu.",
       path->working_dir_len, override_len);
@@ -279,9 +326,6 @@ LuminaryResult luminary_path_apply(Path* path, const char* override, const char*
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(string);
 
-  if (path->is_empty)
-    *string = "";
-
   if (override) {
     __FAILURE_HANDLE(_path_apply_override(path, override));
   }
@@ -297,7 +341,13 @@ LuminaryResult luminary_path_apply(Path* path, const char* override, const char*
 LuminaryResult luminary_path_clear(Path* path) {
   __CHECK_NULL_ARGUMENT(path);
 
-  path->is_empty = true;
+  path->working_dir             = (char*) 0;
+  path->file_path               = (char*) 0;
+  path->output                  = (char*) 0;
+  path->working_dir_len         = 0;
+  path->file_path_len           = 0;
+  path->output_memory_available = 0;
+  path->is_empty                = true;
 
   return LUMINARY_SUCCESS;
 }
