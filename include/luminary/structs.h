@@ -164,6 +164,7 @@ LUMINARY_API enum LuminaryApertureShape {
 LUMINARY_API struct LuminaryCameraThinLens {
   float aperture_size;    // [mm]
   float object_distance;  // [m]
+  float fov;
 } typedef LuminaryCameraThinLens;
 
 LUMINARY_API struct LuminaryCameraLens {

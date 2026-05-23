@@ -60,6 +60,7 @@ struct DeviceCamera {
   float scale;
   float thin_lens_focal_length;
   float thin_lens_aperture_size;
+  float thin_lens_fov;
   float sensor_diagonal_size;
 
   struct {
@@ -69,7 +70,7 @@ struct DeviceCamera {
     uint32_t film_grains_per_pixel;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x4Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x50u);
 
 struct DeviceCameraAux {
   uint32_t num_interfaces;

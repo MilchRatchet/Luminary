@@ -59,6 +59,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
 
   device_camera->thin_lens_focal_length  = camera->thin_lens.object_distance * CAMERA_COMMON_INV_SCALE;
   device_camera->thin_lens_aperture_size = camera->thin_lens.aperture_size;
+  device_camera->thin_lens_fov           = camera->thin_lens.fov;
   device_camera->sensor_diagonal_size    = camera->sensor.diagonal_size;
 
   device_camera->sensor.aspect_ratio          = camera->sensor.aspect_ratio;

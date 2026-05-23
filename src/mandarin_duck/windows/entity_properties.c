@@ -481,16 +481,22 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Sensor", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
-  update_data |= _window_entity_properties_add_slider_v2(
-    data, (WindowEntityPropertiesSliderArgsV2) {
-            .text              = "Diameter",
-            .data_binding      = &camera.sensor.diagonal_size,
-            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
-            .min               = 0.01f,
-            .max               = FLT_MAX,
-            .change_rate       = 1.0f,
-            .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
-          });
+  if (lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "FoV", &camera.thin_lens.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 0.1f);
+  }
+  else {
+    update_data |= _window_entity_properties_add_slider_v2(
+      data, (WindowEntityPropertiesSliderArgsV2) {
+              .text              = "Diameter",
+              .data_binding      = &camera.sensor.diagonal_size,
+              .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+              .min               = 0.01f,
+              .max               = FLT_MAX,
+              .change_rate       = 1.0f,
+              .value_string_func = _window_entity_properties_slider_value_string_func_millimeter,
+            });
+  }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Native Aspect Ratio", &camera.sensor.use_aspect_ratio_from_resolution);
 

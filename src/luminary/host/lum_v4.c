@@ -156,7 +156,7 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* FOV_____ */
     case 6872316419616689990u:
-      sscanf(value, "%f\n", &camera->sensor.diagonal_size);
+      sscanf(value, "%f\n", &camera->thin_lens.fov);
       break;
     /* FOCALLEN */
     case 5639997998747569990u:
@@ -749,8 +749,6 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
   if (legacy_settings.force_no_bloom) {
     content->camera.bloom_blend = 0.0f;
   }
-
-  content->camera.sensor.diagonal_size *= 32.0f;
 
   content->wavefront_args->legacy_smoothness            = legacy_settings.legacy_smoothness;
   content->wavefront_args->force_transparency_cutout    = legacy_settings.force_transparency_cutout;

@@ -939,6 +939,10 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
 
+  dst_camera->thin_lens.fov             = camera->thin_lens.fov;
+  dst_camera->thin_lens.aperture_size   = camera->thin_lens.aperture_size;
+  dst_camera->thin_lens.object_distance = camera->object_distance;
+
 #if 0
   dst_camera->use_physical_camera          = camera->use_physical_camera;
 
