@@ -1122,6 +1122,7 @@ LuminaryResult lum_compiler_create(LumCompiler** compiler) {
 
 LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerCompileInfo* info) {
   __CHECK_NULL_ARGUMENT(compiler);
+  __CHECK_NULL_ARGUMENT(info);
 
   LumCompilerState* state = (LumCompilerState*) compiler->data;
 
@@ -1129,6 +1130,8 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
 
   state->returned_stack_object_id = ALLOCATOR_OBJECT_ID_INVALID;
   state->binary                   = info->binary;
+  state->error_occurred           = false;
+  state->stack_ptr                = LUM_COMPILER_CONTEXT_STACK_EMPTY;
 
   LumToken token;
 
@@ -1167,7 +1170,7 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
       break;
   } while (token.type != LUM_TOKEN_TYPE_EOF);
 
-  if (state->stack_ptr != LUM_COMPILER_CONTEXT_STACK_EMPTY) {
+  if (state->error_occurred == false && state->stack_ptr != LUM_COMPILER_CONTEXT_STACK_EMPTY) {
     __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, &token, "unexpected end of file"));
   }
 
@@ -1204,6 +1207,10 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
   }
 
   __FAILURE_HANDLE(array_clear(state->messages));
+  __FAILURE_HANDLE(array_clear(state->instructions_main));
+  __FAILURE_HANDLE(array_clear(state->instructions_cleanup));
+
+  __FAILURE_HANDLE(_lum_compiler_stack_allocator_reset(state->stack_allocator));
 
   __FAILURE_HANDLE(_lum_compiler_constant_allocator_create_data_section(state->constant_allocator, state->binary));
   __FAILURE_HANDLE(_lum_compiler_constant_allocator_reset(state->constant_allocator));

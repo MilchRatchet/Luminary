@@ -30,7 +30,8 @@ const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "AdaptiveSamplingSettings",
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "CloudLayer",
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = "CameraThinLens",
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = "CameraPhysical",
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = "CameraLens",
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = "CameraSensor",
 };
 
 const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
@@ -57,7 +58,8 @@ const size_t lum_builtin_types_sizes[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(LumBuiltinAdaptiveSampling),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(LumBuiltinCloudLayer),
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = sizeof(LumBuiltinCameraThinLens),
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = sizeof(LumBuiltinCameraPhysical),
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = sizeof(LumBuiltinCameraLens),
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = sizeof(LumBuiltinCameraSensor),
 };
 
 const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
@@ -84,7 +86,8 @@ const char* lum_builtin_types_mnemonic[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = "asam",
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = "clol",
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = "camt",
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = "camp",
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = "caml",
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = "cams",
 };
 
 const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
@@ -111,7 +114,8 @@ const bool lum_builtin_types_addressable[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = false,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = false,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = false,
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = false,
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = false,
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = false,
 };
 
 const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT] = {
@@ -138,7 +142,8 @@ const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = true,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = false,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = true,
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = true,
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = true,
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = true,
 };
 
 #define __BUILTIN_ENUM_PAIR(__internal_macro_enum, __macro_min_ver, __macro_max_ver) \
@@ -184,6 +189,19 @@ const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   // LuminaryMaterialBaseSubstrate
   __BUILTIN_ENUM_PAIR(MATERIAL_BASE_SUBSTRATE_OPAQUE, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(MATERIAL_BASE_SUBSTRATE_TRANSLUCENT, 1, LUM_VERSION_CURRENT),
+  // LuminaryLensTemplate
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_THIN_LENS, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_A, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_B, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_C, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_D, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_E, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_F, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_G, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_H, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_I, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_J, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(LENS_TEMPLATE_PHYSICAL_K, 1, LUM_VERSION_CURRENT),
 };
 LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_BUILTIN_ENUM_COUNT);
 
@@ -202,7 +220,8 @@ LUM_STATIC_SIZE_ASSERT(lum_builtin_enums, sizeof(LumBuiltinEnumValuePair) * LUM_
     LumBuiltinAdaptiveSampling: LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,                    \
     LumBuiltinCloudLayer: LUM_BUILTIN_TYPE_CLOUDLAYER,                                \
     LumBuiltinCameraThinLens: LUM_BUILTIN_TYPE_CAMERATHINLENS,                        \
-    LumBuiltinCameraPhysical: LUM_BUILTIN_TYPE_CAMERAPHYSICAL)
+    LumBuiltinCameraLens: LUM_BUILTIN_TYPE_CAMERALENS,                                \
+    LumBuiltinCameraSensor: LUM_BUILTIN_TYPE_CAMERASENSOR)
 
 #define _LUM_BUILTIN_MEMBER(__macro_base_struct, __macro_member_name, __macro_min_ver, __macro_max_ver) \
   {.type        = _LUM_BUILTIN_C_TYPE_TO_BUILTIN_TYPE(__macro_base_struct, __macro_member_name),        \
@@ -257,12 +276,10 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa2, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_color_correction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, color_correction, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, film_grain, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, scale, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, object_distance, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_physical_camera, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, lens_template, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, thin_lens, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, physical, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, lens, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, sensor, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_ocean[] = {
@@ -389,7 +406,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_adaptive_sampling[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, max_sampling_rate, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, avg_sampling_rate, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, update_interval, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinAdaptiveSampling, output_mode, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_cloud_layer[] = {
@@ -409,20 +425,24 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera_thin_lens[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraThinLens, aperture_size, 1, LUM_VERSION_CURRENT),
 };
 
-static const LumBuiltinTypeMember _lum_builtin_member_camera_physical[] = {
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, allow_reflections, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, use_spectral_rendering, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, focal_length, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, front_focal_point, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, back_focal_point, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, front_principal_point, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, back_principal_point, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, aperture_point, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, aperture_diameter, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, exit_pupil_point, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, exit_pupil_diameter, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, image_plane_distance, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCameraPhysical, sensor_width, 1, LUM_VERSION_CURRENT),
+static const LumBuiltinTypeMember _lum_builtin_member_camera_lens[] = {
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, f_stop, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, sensor_distance, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, object_distance, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, scale, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, use_auto_focus, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, allow_reflections, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, use_spectral_rendering, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraLens, enable_diffraction, 1, LUM_VERSION_CURRENT),
+};
+
+static const LumBuiltinTypeMember _lum_builtin_member_camera_sensor[] = {
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, diagonal_size, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, aspect_ratio, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, use_aspect_ratio_from_resolution, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_strength, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_coarseness, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grains_per_pixel, 1, LUM_VERSION_CURRENT),
 };
 
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
@@ -449,7 +469,8 @@ const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = sizeof(_lum_builtin_member_adaptive_sampling) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = sizeof(_lum_builtin_member_cloud_layer) / sizeof(LumBuiltinTypeMember),
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = sizeof(_lum_builtin_member_camera_thin_lens) / sizeof(LumBuiltinTypeMember),
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = sizeof(_lum_builtin_member_camera_physical) / sizeof(LumBuiltinTypeMember),
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = sizeof(_lum_builtin_member_camera_lens) / sizeof(LumBuiltinTypeMember),
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = sizeof(_lum_builtin_member_camera_sensor) / sizeof(LumBuiltinTypeMember),
 };
 
 const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
@@ -476,7 +497,8 @@ const LumBuiltinTypeMember* lum_builtin_types_member[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = _lum_builtin_member_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = _lum_builtin_member_cloud_layer,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = _lum_builtin_member_camera_thin_lens,
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = _lum_builtin_member_camera_physical,
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = _lum_builtin_member_camera_lens,
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = _lum_builtin_member_camera_sensor,
 };
 
 LuminaryResult lum_builtin_assignment_is_valid(LumBuiltinType dst_type, LumBuiltinType src_type, bool* is_assignable) {
@@ -519,7 +541,6 @@ LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t 
     .max_sampling_rate = 256,
     .avg_sampling_rate = 2,
     .update_interval   = 64,
-    .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
   };
 
   return LUMINARY_SUCCESS;
@@ -539,33 +560,40 @@ static LuminaryResult _lum_builtin_camera_thin_lens_init(LumBuiltinCameraThinLen
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_builtin_camera_physical_init(LumBuiltinCameraPhysical* camera, uint32_t version) {
+static LuminaryResult _lum_builtin_camera_lens_init(LumBuiltinCameraLens* camera, uint32_t version) {
   __CHECK_NULL_ARGUMENT(camera);
 
-  memset(camera, 0, sizeof(LumBuiltinCameraPhysical));
+  memset(camera, 0, sizeof(LumBuiltinCameraLens));
 
   if (version < 1)
     return LUMINARY_SUCCESS;
 
+  camera->f_stop                 = 2.8f;
+  camera->sensor_distance        = 0.0f;
+  camera->object_distance        = 1.0f;
+  camera->scale                  = 1.0f;
+  camera->use_auto_focus         = true;
   camera->allow_reflections      = false;
   camera->use_spectral_rendering = false;
+  camera->enable_diffraction     = false;
 
-  // TODO: This needs to be revised once I have figured out a proper API for this
+  return LUMINARY_SUCCESS;
+}
 
-  const float scale             = 50.53f / 100.0f;
-  const float last_vertex_point = 88.18f * scale;
+static LuminaryResult _lum_builtin_camera_sensor_init(LumBuiltinCameraSensor* camera, uint32_t version) {
+  __CHECK_NULL_ARGUMENT(camera);
 
-  camera->focal_length          = 50.53f;
-  camera->front_focal_point     = last_vertex_point - (-22.69f);
-  camera->back_focal_point      = last_vertex_point - 65.18f;
-  camera->front_principal_point = last_vertex_point - 27.84f;
-  camera->back_principal_point  = last_vertex_point - 14.65f;
-  camera->aperture_point        = last_vertex_point - 28.02f;
-  camera->aperture_diameter     = 21.411f;
-  camera->exit_pupil_point      = 0.0f;   // last_vertex_point - 26.55f;
-  camera->exit_pupil_diameter   = 28.0f;  // 34.64f;
-  camera->image_plane_distance  = 65.18f - last_vertex_point;
-  camera->sensor_width          = 20.0f;
+  memset(camera, 0, sizeof(LumBuiltinCameraSensor));
+
+  if (version < 1)
+    return LUMINARY_SUCCESS;
+
+  camera->diagonal_size                    = 43.0f;
+  camera->aspect_ratio                     = 1.0f;
+  camera->use_aspect_ratio_from_resolution = true;
+  camera->film_grain_strength              = 0.0f;
+  camera->film_grain_coarseness            = 1.0f;
+  camera->film_grains_per_pixel            = 1;
 
   return LUMINARY_SUCCESS;
 }
@@ -601,13 +629,11 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->color_correction.r           = 0.0f;
   camera->color_correction.g           = 0.0f;
   camera->color_correction.b           = 0.0f;
-  camera->film_grain                   = 0.0f;
-  camera->scale                        = 1.0f;
-  camera->object_distance              = 1.0f;
-  camera->use_physical_camera          = false;
+  camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
 
   __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_init(&camera->thin_lens, version));
-  __FAILURE_HANDLE(_lum_builtin_camera_physical_init(&camera->physical, version));
+  __FAILURE_HANDLE(_lum_builtin_camera_lens_init(&camera->lens, version));
+  __FAILURE_HANDLE(_lum_builtin_camera_sensor_init(&camera->sensor, version));
 
   return LUMINARY_SUCCESS;
 }
@@ -867,7 +893,7 @@ LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, 
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
   dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
   dst_settings->adaptive_sampling_settings.update_interval   = settings->adaptive_sampling_settings.update_interval;
-  dst_settings->adaptive_sampling_settings.output_mode       = settings->adaptive_sampling_settings.output_mode;
+  dst_settings->adaptive_sampling_settings.output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY;
 
   return LUMINARY_SUCCESS;
 }
@@ -939,16 +965,27 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
 
+  dst_camera->lens_template = camera->lens_template;
+
   dst_camera->thin_lens.fov             = camera->thin_lens.fov;
   dst_camera->thin_lens.aperture_size   = camera->thin_lens.aperture_size;
-  dst_camera->thin_lens.object_distance = camera->object_distance;
+  dst_camera->thin_lens.object_distance = camera->thin_lens.object_distance;
 
-#if 0
-  dst_camera->use_physical_camera          = camera->use_physical_camera;
+  dst_camera->lens.f_stop                 = camera->lens.f_stop;
+  dst_camera->lens.sensor_distance        = camera->lens.sensor_distance;
+  dst_camera->lens.object_distance        = camera->lens.object_distance;
+  dst_camera->lens.scale                  = camera->lens.scale;
+  dst_camera->lens.use_auto_focus         = camera->lens.use_auto_focus;
+  dst_camera->lens.allow_reflections      = camera->lens.allow_reflections;
+  dst_camera->lens.use_spectral_rendering = camera->lens.use_spectral_rendering;
+  dst_camera->lens.enable_diffraction     = camera->lens.enable_diffraction;
 
-  __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_convert(&camera->thin_lens, &dst_camera->thin_lens, version));
-  __FAILURE_HANDLE(_lum_builtin_camera_physical_convert(&camera->physical, &dst_camera->physical, version));
-#endif
+  dst_camera->sensor.diagonal_size                    = camera->sensor.diagonal_size;
+  dst_camera->sensor.aspect_ratio                     = camera->sensor.aspect_ratio;
+  dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
+  dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
+  dst_camera->sensor.film_grain_coarseness            = camera->sensor.film_grain_coarseness;
+  dst_camera->sensor.film_grains_per_pixel            = camera->sensor.film_grains_per_pixel;
 
   return LUMINARY_SUCCESS;
 }
@@ -1168,7 +1205,6 @@ LuminaryResult lum_builtin_settings_serialize(const LuminaryRendererSettings* se
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
   dst_settings->adaptive_sampling_settings.avg_sampling_rate = settings->adaptive_sampling_settings.avg_sampling_rate;
   dst_settings->adaptive_sampling_settings.update_interval   = settings->adaptive_sampling_settings.update_interval;
-  dst_settings->adaptive_sampling_settings.output_mode       = settings->adaptive_sampling_settings.output_mode;
 
   return LUMINARY_SUCCESS;
 }
@@ -1229,12 +1265,26 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
 
-#if 0
-  dst_camera->use_physical_camera          = camera->use_physical_camera;
+  dst_camera->lens_template = camera->lens_template;
 
-  __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_serialize(&camera->thin_lens, &dst_camera->thin_lens));
-  __FAILURE_HANDLE(_lum_builtin_camera_physical_serialize(&camera->physical, &dst_camera->physical));
-#endif
+  dst_camera->thin_lens.fov           = camera->thin_lens.fov;
+  dst_camera->thin_lens.aperture_size = camera->thin_lens.aperture_size;
+
+  dst_camera->lens.f_stop                 = camera->lens.f_stop;
+  dst_camera->lens.sensor_distance        = camera->lens.sensor_distance;
+  dst_camera->lens.object_distance        = camera->lens.object_distance;
+  dst_camera->lens.scale                  = camera->lens.scale;
+  dst_camera->lens.use_auto_focus         = camera->lens.use_auto_focus;
+  dst_camera->lens.allow_reflections      = camera->lens.allow_reflections;
+  dst_camera->lens.use_spectral_rendering = camera->lens.use_spectral_rendering;
+  dst_camera->lens.enable_diffraction     = camera->lens.enable_diffraction;
+
+  dst_camera->sensor.diagonal_size                    = camera->sensor.diagonal_size;
+  dst_camera->sensor.aspect_ratio                     = camera->sensor.aspect_ratio;
+  dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
+  dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
+  dst_camera->sensor.film_grain_coarseness            = camera->sensor.film_grain_coarseness;
+  dst_camera->sensor.film_grains_per_pixel            = camera->sensor.film_grains_per_pixel;
 
   return LUMINARY_SUCCESS;
 }

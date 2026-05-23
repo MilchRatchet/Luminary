@@ -623,29 +623,57 @@ static LuminaryResult _lum_function_store_camera_thin_lens(LumVirtualMachine* vm
 }
 
 ////////////////////////////////////////////////////////////////////
-// Physical
+// Camera Lens
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _lum_function_load_camera_physical(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+static LuminaryResult _lum_function_load_camera_lens(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  LumBuiltinCameraPhysical* dst;
+  LumBuiltinCameraLens* dst;
   __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
 
-  *dst = vm->host->camera.physical;
+  *dst = vm->host->camera.lens;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _lum_function_store_camera_physical(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+static LuminaryResult _lum_function_store_camera_lens(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
   __CHECK_NULL_ARGUMENT(vm);
   __CHECK_NULL_ARGUMENT(info);
 
-  const LumBuiltinCameraPhysical* src;
+  const LumBuiltinCameraLens* src;
   __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
 
-  vm->host->camera.physical = *src;
+  vm->host->camera.lens = *src;
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Camera Sensor
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _lum_function_load_camera_sensor(LumVirtualMachine* vm, const LumFunctionLoadInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  LumBuiltinCameraSensor* dst;
+  __FAILURE_HANDLE(lum_function_resolve_stack_address(vm, &info->dst, (void**) &dst));
+
+  *dst = vm->host->camera.sensor;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _lum_function_store_camera_sensor(LumVirtualMachine* vm, const LumFunctionStoreInfo* info) {
+  __CHECK_NULL_ARGUMENT(vm);
+  __CHECK_NULL_ARGUMENT(info);
+
+  const LumBuiltinCameraSensor* src;
+  __FAILURE_HANDLE(lum_function_resolve_generic_address(vm, &info->src, (const void**) &src));
+
+  vm->host->camera.sensor = *src;
 
   return LUMINARY_SUCCESS;
 }
@@ -677,7 +705,8 @@ const LumFunctionLoad lum_function_tables_ldg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionLoad) _lum_function_load_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = (const LumFunctionLoad) 0,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = (const LumFunctionLoad) _lum_function_load_camera_thin_lens,
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = (const LumFunctionLoad) _lum_function_load_camera_physical,
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = (const LumFunctionLoad) _lum_function_load_camera_lens,
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = (const LumFunctionLoad) _lum_function_load_camera_sensor,
 };
 
 const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT] = {
@@ -703,5 +732,6 @@ const LumFunctionStore lum_function_tables_stg[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_ADAPTIVESAMPLING] = (const LumFunctionStore) _lum_function_store_adaptive_sampling,
   [LUM_BUILTIN_TYPE_CLOUDLAYER]       = (const LumFunctionStore) 0,
   [LUM_BUILTIN_TYPE_CAMERATHINLENS]   = (const LumFunctionStore) _lum_function_store_camera_thin_lens,
-  [LUM_BUILTIN_TYPE_CAMERAPHYSICAL]   = (const LumFunctionStore) _lum_function_store_camera_physical,
+  [LUM_BUILTIN_TYPE_CAMERALENS]       = (const LumFunctionStore) _lum_function_store_camera_lens,
+  [LUM_BUILTIN_TYPE_CAMERASENSOR]     = (const LumFunctionStore) _lum_function_store_camera_sensor,
 };

@@ -36,7 +36,8 @@ enum LumBuiltinType {
   LUM_BUILTIN_TYPE_ADAPTIVESAMPLING,
   LUM_BUILTIN_TYPE_CLOUDLAYER,
   LUM_BUILTIN_TYPE_CAMERATHINLENS,
-  LUM_BUILTIN_TYPE_CAMERAPHYSICAL,
+  LUM_BUILTIN_TYPE_CAMERALENS,
+  LUM_BUILTIN_TYPE_CAMERASENSOR,
   LUM_BUILTIN_TYPE_COUNT_VERSION_1,
 
   LUM_BUILTIN_TYPE_COUNT = LUM_BUILTIN_TYPE_COUNT_VERSION_1
@@ -54,7 +55,7 @@ extern const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT];
 
 #define LUM_BUILTIN_ENUM_COUNT                                                                                       \
   (LUMINARY_SHADING_MODE_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_APERTURE_COUNT + LUMINARY_JERLOV_WATER_TYPE_COUNT \
-   + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT)
+   + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT + LUMINARY_LENS_TEMPLATE_COUNT)
 
 struct LumBuiltinEnumValuePair {
   const char* string;
@@ -102,6 +103,19 @@ enum LumBuiltinEnum {
   // LuminaryMaterialBaseSubstrate
   LUM_BUILTIN_ENUM_MATERIAL_BASE_SUBSTRATE_OPAQUE      = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE,
   LUM_BUILTIN_ENUM_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT = LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT,
+  // LuminaryLensTemplate
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_THIN_LENS  = LUMINARY_LENS_TEMPLATE_THIN_LENS,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_A = LUMINARY_LENS_TEMPLATE_PHYSICAL_A,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_B = LUMINARY_LENS_TEMPLATE_PHYSICAL_B,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_C = LUMINARY_LENS_TEMPLATE_PHYSICAL_C,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_D = LUMINARY_LENS_TEMPLATE_PHYSICAL_D,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_E = LUMINARY_LENS_TEMPLATE_PHYSICAL_E,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_F = LUMINARY_LENS_TEMPLATE_PHYSICAL_F,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_G = LUMINARY_LENS_TEMPLATE_PHYSICAL_G,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_H = LUMINARY_LENS_TEMPLATE_PHYSICAL_H,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_I = LUMINARY_LENS_TEMPLATE_PHYSICAL_I,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_J = LUMINARY_LENS_TEMPLATE_PHYSICAL_J,
+  LUM_BUILTIN_ENUM_LENS_TEMPLATE_PHYSICAL_K = LUMINARY_LENS_TEMPLATE_PHYSICAL_K,
 } typedef LumBuiltinEnum;
 
 ////////////////////////////////////////////////////////////////////
@@ -140,7 +154,6 @@ struct LumBuiltinAdaptiveSampling {
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
   uint32_t update_interval;
-  LuminaryAdaptiveSamplingOutputMode output_mode;
 } typedef LumBuiltinAdaptiveSampling;
 
 struct LumBuiltinSettings {
@@ -162,23 +175,28 @@ struct LumBuiltinSettings {
 struct LumBuiltinCameraThinLens {
   float fov;
   float aperture_size;
+  float object_distance;
 } typedef LumBuiltinCameraThinLens;
 
-struct LumBuiltinCameraPhysical {
+struct LumBuiltinCameraLens {
+  float f_stop;
+  float sensor_distance;
+  float object_distance;
+  float scale;
+  bool use_auto_focus;
   bool allow_reflections;
   bool use_spectral_rendering;
-  float focal_length;
-  float front_focal_point;
-  float back_focal_point;
-  float front_principal_point;
-  float back_principal_point;
-  float aperture_point;
-  float aperture_diameter;
-  float exit_pupil_point;
-  float exit_pupil_diameter;
-  float image_plane_distance;
-  float sensor_width;
-} typedef LumBuiltinCameraPhysical;
+  bool enable_diffraction;
+} typedef LumBuiltinCameraLens;
+
+struct LumBuiltinCameraSensor {
+  float diagonal_size;
+  float aspect_ratio;
+  bool use_aspect_ratio_from_resolution;
+  float film_grain_strength;
+  float film_grain_coarseness;
+  uint32_t film_grains_per_pixel;
+} typedef LumBuiltinCameraSensor;
 
 struct LumBuiltinCamera {
   LuminaryVec3 pos;
@@ -198,12 +216,10 @@ struct LumBuiltinCamera {
   float purkinje_kappa2;
   bool use_color_correction;
   LuminaryRGBF color_correction;
-  float film_grain;
-  float scale;
-  float object_distance;
-  bool use_physical_camera;
+  LuminaryLensTemplate lens_template;
   LumBuiltinCameraThinLens thin_lens;
-  LumBuiltinCameraPhysical physical;
+  LumBuiltinCameraLens lens;
+  LumBuiltinCameraSensor sensor;
 } typedef LumBuiltinCamera;
 
 struct LumBuiltinOcean {
