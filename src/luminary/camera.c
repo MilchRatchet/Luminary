@@ -81,7 +81,14 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(rotation.z, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(lens_template, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
   __CAMERA_CHECK_DIRTY(aperture_shape, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+
+  // TODO: This condition will be whether motion blur is enabled or not.
+  if (false) {
+    __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  }
+  else {
+    __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_OUTPUT);
+  }
 
   if (input->aperture_shape != LUMINARY_APERTURE_ROUND) {
     __CAMERA_CHECK_DIRTY(aperture_blade_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);

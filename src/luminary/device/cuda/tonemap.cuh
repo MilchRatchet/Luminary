@@ -211,9 +211,9 @@ LUMINARY_FUNCTION RGBF
   if (device.settings.adaptive_sampling_output_mode != LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY)
     return pixel;
 
-  pixel = scale_color(pixel, device.camera.exposure);
-
   pixel = film_grain_apply(pixel, x, y);
+
+  pixel = scale_color(pixel, device.camera.exposure);
 
   // Convert radiometric exposure to photometric exposure (lux-seconds) using max luminous efficacy (~683 lm/W).
   // Then normalize using the saturation-based standard ISO constant (ISO = 78 / H_sat) for standard tonemapper bounds.

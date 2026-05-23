@@ -381,6 +381,29 @@ LUMINARY_FUNCTION float random_grain(const uint32_t x, const uint32_t y, uint32_
   return random_uint16_t_to_float(random_uint16_t_base(0xfcbd6e15 + layer_id, x + y * device.settings.width));
 }
 
+LUMINARY_FUNCTION float random_grain_smooth(const float fx, const float fy, const uint32_t layer_id) {
+  const uint32_t x0 = (uint32_t) floorf(fx);
+  const uint32_t y0 = (uint32_t) floorf(fy);
+  const uint32_t x1 = x0 + 1;
+  const uint32_t y1 = y0 + 1;
+
+  float tx = fx - floorf(fx);
+  float ty = fy - floorf(fy);
+
+  tx = tx * tx * (3.0f - 2.0f * tx);
+  ty = ty * ty * (3.0f - 2.0f * ty);
+
+  const float cx00 = random_grain(x0, y0, layer_id);
+  const float cx10 = random_grain(x1, y0, layer_id);
+  const float cx01 = random_grain(x0, y1, layer_id);
+  const float cx11 = random_grain(x1, y1, layer_id);
+
+  const float nx0 = cx00 + tx * (cx10 - cx00);
+  const float nx1 = cx01 + tx * (cx11 - cx01);
+
+  return nx0 + ty * (nx1 - nx0);
+}
+
 // Koopman, R. (2025). Some simple full-range inverse-normal approximations. J. Numer. Anal. Approx. Theory, 54(1), 111-116.
 LUMINARY_FUNCTION float random_normal_inverse_approx(float q) {
   const float sign = (q > 0.5f) ? -1.0f : 1.0f;

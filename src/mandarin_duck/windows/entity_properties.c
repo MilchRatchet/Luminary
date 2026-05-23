@@ -521,6 +521,9 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
             .value_string_func = _window_entity_properties_slider_value_string_func_shutter_speed,
           });
 
+  update_data |=
+    _window_entity_properties_add_slider(data, "ISO", &camera.sensor.iso, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 50.0f, 1600.0f, 10.0f);
+
   update_data |= _window_entity_properties_add_checkbox(data, "Native Aspect Ratio", &camera.sensor.use_aspect_ratio_from_resolution);
 
   if (camera.sensor.use_aspect_ratio_from_resolution == false)
@@ -529,9 +532,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   update_data |= _window_entity_properties_add_slider(
     data, "Film Grain", &camera.sensor.film_grain_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
-
-  update_data |=
-    _window_entity_properties_add_slider(data, "ISO", &camera.sensor.iso, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 100.0f, 65536.0f, 10.0f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
