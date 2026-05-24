@@ -364,6 +364,7 @@ LuminaryResult device_struct_triangle_texture_convert(
   device_triangle->vertex1_texture = device_pack_uv(*((UV*) &data->uv_buffer[tri_id * 6 + 2]));
   device_triangle->vertex2_texture = device_pack_uv(*((UV*) &data->uv_buffer[tri_id * 6 + 4]));
   device_triangle->material_id     = data->material_id_buffer[tri_id];
+  device_triangle->flags           = 0;
 
   return LUMINARY_SUCCESS;
 }

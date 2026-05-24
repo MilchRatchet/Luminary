@@ -385,10 +385,14 @@ LUMINARY_FUNCTION uint32_t mesh_id_load(const uint32_t instance_id) {
   return __ldg(device.ptrs.instance_mesh_ids + instance_id);
 }
 
-LUMINARY_FUNCTION uint16_t material_id_load(const uint32_t mesh_id, const uint32_t triangle_id) {
+LUMINARY_FUNCTION uint16_t material_id_and_flags_load(const uint32_t mesh_id, const uint32_t triangle_id, uint16_t& flags) {
   const DeviceTriangleTexture* ptr = device.ptrs.texture_triangles[mesh_id];
 
-  return __ldg(&ptr[triangle_id].material_id);
+  const ushort2 material_id_and_flags = __ldg((const ushort2*) &ptr[triangle_id].material_id);
+
+  flags = material_id_and_flags.y;
+
+  return material_id_and_flags.x;
 }
 
 LUMINARY_FUNCTION const DeviceTriangleVertex* triangle_vertex_ptr_load(const uint32_t mesh_id) {

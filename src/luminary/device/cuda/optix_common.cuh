@@ -20,8 +20,13 @@ enum OptixAlphaResult {
 LUMINARY_FUNCTION OptixAlphaResult optix_alpha_test(const TriangleHandle handle) {
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
-  const uint16_t tex         = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
+  uint16_t triangle_flags;
+  const uint16_t material_id = material_id_and_flags_load(mesh_id, handle.tri_id, triangle_flags);
+
+  if ((triangle_flags & DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE) == 0)
+    return OPTIX_ALPHA_RESULT_OPAQUE;
+
+  const uint16_t tex = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
 
   if (tex != TEXTURE_NONE) {
     const DeviceTextureObject texture = load_texture_object(tex);

@@ -64,7 +64,12 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
+  uint16_t triangle_flags;
+  const uint16_t material_id = material_id_and_flags_load(mesh_id, handle.tri_id, triangle_flags);
+
+  if ((triangle_flags & DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE) == 0) {
+    optixTerminateRay();
+  }
 
   // Currently, materials are just two loads so it makes no sense to only load parts of it.
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
@@ -109,7 +114,12 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_sun_trace)() {
 
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
+  uint16_t triangle_flags;
+  const uint16_t material_id = material_id_and_flags_load(mesh_id, handle.tri_id, triangle_flags);
+
+  if ((triangle_flags & DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE) == 0) {
+    optixTerminateRay();
+  }
 
   // Currently, materials are just two loads so it makes no sense to only load parts of it.
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
@@ -156,7 +166,8 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
 
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const uint16_t material_id = material_id_load(mesh_id, handle.tri_id);
+  uint16_t triangle_flags;
+  const uint16_t material_id = material_id_and_flags_load(mesh_id, handle.tri_id, triangle_flags);
 
   // Currently, materials are just two loads so it makes no sense to only load parts of it.
   const DeviceMaterial material = load_material(device.ptrs.materials, material_id);

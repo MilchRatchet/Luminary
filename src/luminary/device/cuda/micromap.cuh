@@ -39,6 +39,18 @@ LUMINARY_FUNCTION OMMTextureTriangle micromap_get_ommtexturetriangle(const uint3
   return omm_triangle;
 }
 
+LUMINARY_FUNCTION void micromap_set_triangle_opacity_flag(const uint32_t mesh_id, const uint32_t tri_id, const uint8_t opacity) {
+  DeviceTriangleTexture* tri_ptr = (DeviceTriangleTexture*) triangle_texture_ptr_load(mesh_id);
+
+  uint16_t flags = tri_ptr[tri_id].flags;
+
+  flags &= ~DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE;
+
+  flags |= (opacity != OPTIX_OPACITY_MICROMAP_STATE_OPAQUE) ? DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE : 0;
+
+  tri_ptr[tri_id].flags = flags;
+}
+
 // Load triangle only once for the refinement steps
 LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
   if (tri.tex_id == TEXTURE_NONE) {
@@ -195,6 +207,8 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
 
       args.dst_tri_work[work_offset] = tri_id;
     }
+
+    micromap_set_triangle_opacity_flag(args.mesh_id, tri_id, opacity);
 
     args.level_record[tri_id]  = level;
     args.offset_record[tri_id] = tri_id;

@@ -279,6 +279,8 @@ typedef uint8_t DeviceExecutionFlags;
 
 enum DeviceExecutionFlag { DEVICE_EXECUTION_FLAG_INTERACTIVE = 1 << 0 } typedef DeviceExecutionFlag;
 
+enum DeviceTriangleTextureFlag { DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE = 1 << 0 } typedef DeviceTriangleTextureFlag;
+
 ////////////////////////////////////////////////////////////////////
 // Light Importance Sampling Structs
 ////////////////////////////////////////////////////////////////////

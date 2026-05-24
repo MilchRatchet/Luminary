@@ -281,7 +281,7 @@ struct DeviceTriangleTexture {
   uint32_t vertex1_texture;
   uint32_t vertex2_texture;
   uint16_t material_id;
-  uint16_t padding;
+  uint16_t flags;
 } typedef DeviceTriangleTexture;
 
 typedef CUtexObject DeviceTextureHandle;
