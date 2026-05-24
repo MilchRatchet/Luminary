@@ -9,6 +9,7 @@ project("Luminary" LANGUAGES C VERSION 1.2.0)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Common options
 option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
