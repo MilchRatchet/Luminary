@@ -16,10 +16,13 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-#define PURKINJE_STRENGTH (32.0f)
-
 LUMINARY_FUNCTION RGBF purkinje_shift(const RGBF pixel) {
-  if (color_luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))
+  if (device.camera.purkinje == false)
+    return pixel;
+
+  const float luminance = color_luminance(pixel);
+
+  if (luminance >= 3.0f)
     return pixel;
 
   // sRGB => LMSR
@@ -84,7 +87,10 @@ LUMINARY_FUNCTION RGBF purkinje_shift(const RGBF pixel) {
 
   sRGB = max_color(sRGB, splat_color(0.0f));
 
-  float blend = __saturatef(1.0f - PURKINJE_STRENGTH * color_luminance(pixel));
+  // Logarithmic interpolation between scotopic (0.01 cd/m^2) and photopic (3.0 cd/m^2)
+  // log10(3.0) ~ 0.47712, log10(0.01) = -2.0
+  float log_lum = log10f(fmaxf(luminance, 1e-5f));
+  float blend   = __saturatef((0.47712f - log_lum) / 2.47712f);
 
   blend *= blend;
 
