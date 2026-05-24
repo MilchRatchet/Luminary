@@ -409,6 +409,7 @@ LUMINARY_FUNCTION float random_normal_inverse_approx(float q) {
   const float sign = (q > 0.5f) ? -1.0f : 1.0f;
 
   q = (q > 0.5f) ? 1.0f - q : q;
+  q = fmaxf(q, 1e-6f);
 
   const float t = -2.0f * logf(2.0f * q);
 
