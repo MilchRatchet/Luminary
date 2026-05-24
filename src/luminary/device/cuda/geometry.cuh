@@ -98,6 +98,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     const bool is_pass_through = bsdf_is_pass_through_ray(ctx, bounce_info);
 
+    if (is_pass_through)
+      is_delta_distribution = true;
+
     ////////////////////////////////////////////////////////////////////
     // Emission and record
     ////////////////////////////////////////////////////////////////////

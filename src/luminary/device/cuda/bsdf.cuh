@@ -140,7 +140,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   if (opacity < 1.0f) {
     const float transparency_random = random_1D(RANDOM_SET::OPACITY, path_id);
 
-    if (transparency_random > opacity) {
+    if (transparency_random >= opacity) {
       const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx.params);
 
       BSDFSampleInfo<MATERIAL_GEOMETRY> info;
