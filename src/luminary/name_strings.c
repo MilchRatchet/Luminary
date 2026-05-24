@@ -57,6 +57,12 @@ const char* const luminary_strings_lens_template[LUMINARY_LENS_TEMPLATE_COUNT] =
   [LUMINARY_LENS_TEMPLATE_PHYSICAL_J] = "Physical J", [LUMINARY_LENS_TEMPLATE_PHYSICAL_K] = "Physical K",
 };
 
+const char* const luminary_strings_sensor_response_model[LUMINARY_SENSOR_RESPONSE_COUNT] = {
+  [LUMINARY_SENSOR_RESPONSE_IDEAL]   = "Ideal",
+  [LUMINARY_SENSOR_RESPONSE_FILM]    = "Film Emulsion",
+  [LUMINARY_SENSOR_RESPONSE_DIGITAL] = "Digital (Microlens)",
+};
+
 const char* const luminary_strings_error_kind[LUMINARY_ERROR_KIND_COUNT] = {
   [LUMINARY_ERROR_NONE]                 = "LUMINARY_ERROR_NONE",
   [LUMINARY_ERROR_UNKNOWN]              = "LUMINARY_ERROR_UNKNOWN",

@@ -178,12 +178,22 @@ LUMINARY_API struct LuminaryCameraLens {
   bool enable_diffraction;
 } typedef LuminaryCameraLens;
 
+LUMINARY_API enum LuminarySensorResponseModel {
+  LUMINARY_SENSOR_RESPONSE_IDEAL,
+  LUMINARY_SENSOR_RESPONSE_FILM,
+  LUMINARY_SENSOR_RESPONSE_DIGITAL,
+  LUMINARY_SENSOR_RESPONSE_COUNT
+} typedef LuminarySensorResponseModel;
+
 LUMINARY_API struct LuminaryCameraSensor {
   float diagonal_size;  // [mm]
   float aspect_ratio;
   bool use_aspect_ratio_from_resolution;
   float iso;
   float film_grain_strength;
+  LuminarySensorResponseModel response_model;
+  float film_thickness;
+  float microlens_acceptance_angle;  // [radians]
 } typedef LuminaryCameraSensor;
 
 LUMINARY_API struct LuminaryCamera {

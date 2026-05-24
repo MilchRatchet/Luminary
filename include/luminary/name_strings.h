@@ -29,6 +29,7 @@ extern const char* const luminary_strings_jerlov_water_type[LUMINARY_JERLOV_WATE
 extern const char* const luminary_strings_sky_mode[LUMINARY_SKY_MODE_COUNT];
 extern const char* const luminary_strings_material_base_substrate[LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT];
 extern const char* const luminary_strings_lens_template[LUMINARY_LENS_TEMPLATE_COUNT];
+extern const char* const luminary_strings_sensor_response_model[LUMINARY_SENSOR_RESPONSE_COUNT];
 
 extern const char* const luminary_strings_error_kind[LUMINARY_ERROR_KIND_COUNT];
 

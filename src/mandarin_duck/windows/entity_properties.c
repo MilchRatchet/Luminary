@@ -533,6 +533,26 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |= _window_entity_properties_add_slider(
     data, "Film Grain", &camera.sensor.film_grain_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
 
+  uint32_t response_model = (uint32_t) camera.sensor.response_model;
+  update_data |= _window_entity_properties_add_dropdown(
+    data, "Response Model", LUMINARY_SENSOR_RESPONSE_COUNT, (char**) luminary_strings_sensor_response_model, &response_model);
+
+  if (response_model == LUMINARY_SENSOR_RESPONSE_FILM) {
+    update_data |= _window_entity_properties_add_slider(
+      data, "Film Thickness", &camera.sensor.film_thickness, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 0.5f);
+  }
+  else if (response_model == LUMINARY_SENSOR_RESPONSE_DIGITAL) {
+    update_data |= _window_entity_properties_add_slider_v2(
+      data, (WindowEntityPropertiesSliderArgsV2) {
+              .text         = "Microlens Acceptance Angle",
+              .data_binding = &camera.sensor.microlens_acceptance_angle,
+              .data_type    = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+              .min          = 0.01f,
+              .max          = 1.57079632679f,
+              .change_rate  = 0.1f,
+            });
+  }
+
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
@@ -577,9 +597,10 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   if (update_data) {
-    camera.lens_template  = (LuminaryLensTemplate) lens_template;
-    camera.tonemap        = (LuminaryToneMap) tonemap;
-    camera.aperture_shape = (LuminaryApertureShape) aperture_shape;
+    camera.lens_template         = (LuminaryLensTemplate) lens_template;
+    camera.tonemap               = (LuminaryToneMap) tonemap;
+    camera.aperture_shape        = (LuminaryApertureShape) aperture_shape;
+    camera.sensor.response_model = (LuminarySensorResponseModel) response_model;
 
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
   }

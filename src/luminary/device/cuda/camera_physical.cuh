@@ -22,7 +22,17 @@ LUMINARY_FUNCTION vec3
 
   const vec3 ray = normalize_vector(diff);
 
-  sampling_weight = area * fabsf(ray.z) / (dist * dist);
+  sampling_weight = area * fabsf(ray.z) * fabsf(ray.z) / (dist * dist);
+
+  if (device.camera.sensor.response_model == LUMINARY_SENSOR_RESPONSE_FILM) {
+    sampling_weight *= expf(-device.camera.sensor.film_thickness * (1.0f / fabsf(ray.z) - 1.0f));
+  }
+  else if (device.camera.sensor.response_model == LUMINARY_SENSOR_RESPONSE_DIGITAL) {
+    const float theta            = acosf(__saturatef(fabsf(ray.z)));
+    const float normalized_angle = theta / device.camera.sensor.microlens_acceptance_angle;
+    // Approximates typical microlens shading with smooth 4th-order falloff
+    sampling_weight *= fmaxf(0.0f, 1.0f - normalized_angle * normalized_angle * normalized_angle * normalized_angle);
+  }
 
   return ray;
 }

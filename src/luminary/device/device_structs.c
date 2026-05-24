@@ -63,9 +63,12 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->sensor_diagonal_size    = camera->sensor.diagonal_size;
   device_camera->exposure_time           = 1.0f / camera->shutter_speed;
 
-  device_camera->sensor.aspect_ratio        = camera->sensor.aspect_ratio;
-  device_camera->sensor.iso                 = camera->sensor.iso;
-  device_camera->sensor.film_grain_strength = camera->sensor.film_grain_strength;
+  device_camera->sensor.aspect_ratio               = camera->sensor.aspect_ratio;
+  device_camera->sensor.iso                        = camera->sensor.iso;
+  device_camera->sensor.film_grain_strength        = camera->sensor.film_grain_strength;
+  device_camera->sensor.response_model             = camera->sensor.response_model;
+  device_camera->sensor.film_thickness             = camera->sensor.film_thickness;
+  device_camera->sensor.microlens_acceptance_angle = camera->sensor.microlens_acceptance_angle;
 
   device_camera->pos             = camera->pos;
   device_camera->rotation        = rotation_euler_angles_to_quaternion(camera->rotation);
