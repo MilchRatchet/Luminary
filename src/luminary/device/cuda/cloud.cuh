@@ -87,7 +87,7 @@ LUMINARY_FUNCTION CloudRenderResult
 
     result.scattered_light = get_color(0.0f, 0.0f, 0.0f);
     result.transmittance   = 1.0f;
-    result.hit_dist        = start;
+    result.hit_dist        = FLT_MAX;
 
     return result;
   }
@@ -124,9 +124,10 @@ LUMINARY_FUNCTION CloudRenderResult
 
   start = fmaxf(0.0f, start);
 
-  const float step_size     = dist / step_count;
-  const float random_offset = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, path_id);
-  float reach               = start + (0.1f + random_offset * 0.9f) * step_size;
+  const float base_step_size = dist / step_count;
+  const float random_offset  = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, path_id);
+  float initial_step_size    = (0.1f + random_offset * 0.9f) * base_step_size;
+  float reach                = start + initial_step_size;
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
@@ -134,21 +135,23 @@ LUMINARY_FUNCTION CloudRenderResult
 
   float transmittance  = 1.0f;
   RGBF scattered_light = get_color(0.0f, 0.0f, 0.0f);
-  float hit_dist       = start;
+  float hit_dist       = FLT_MAX;
   bool hit             = false;
 
   const float2 ambient_r        = random_2D(RANDOM_TARGET_CLOUD_DIR, path_id);
   const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
-  // Evaluate ambient sky radiance and cloud self-shadowing once at the initial march position.
-  // Within the narrow cloud layer the variation of both quantities with position is small
-  // relative to the Monte Carlo noise, making a single evaluation a sound approximation.
   const vec3 initial_pos              = add_vector(origin, scale_vector(ray, reach));
   const RGBF ambient_color            = sky_get_color(initial_pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, path_id);
   const float ambient_extinction_base = cloud_extinction(initial_pos, ambient_ray, layer);
 
-  for (int i = 0; i < step_count; i++) {
+  float current_step_size  = initial_step_size;
+  int iteration            = 0;
+  const int max_iterations = step_count * 2;  // Safety net
+
+  while (reach <= start + dist && iteration < max_iterations) {
+    iteration++;
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     const float height = cloud_height(pos, layer);
@@ -160,13 +163,22 @@ LUMINARY_FUNCTION CloudRenderResult
     const CloudWeather weather = cloud_weather(pos, height, layer);
 
     if (!cloud_significant_point(height, weather, layer)) {
-      reach += step_size;
+      current_step_size = fminf(current_step_size * 2.0f, 4.0f * base_step_size);
+      reach += current_step_size;
       continue;
     }
 
     const float density = cloud_density(pos, height, weather, 0.0f, layer);
 
     if (density > 0.0f) {
+      // Retreat and refine if we jumped too far into density
+      if (current_step_size > base_step_size) {
+        reach -= current_step_size;
+        current_step_size = base_step_size;
+        reach += current_step_size;
+        continue;
+      }
+
       if (hit == false) {
         hit_dist = reach;
         hit      = true;
@@ -180,10 +192,8 @@ LUMINARY_FUNCTION CloudRenderResult
 
       const int sun_visible = !sph_ray_hit_p0(sun_ray, pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
-        sun_color = sky_get_sun_color(pos, sun_ray, false);
-
-        sun_cos_angle = dot_product(ray, sun_ray);
-
+        sun_color      = sky_get_sun_color(pos, sun_ray, false);
+        sun_cos_angle  = dot_product(ray, sun_ray);
         sun_extinction = cloud_extinction(pos, sun_ray, layer);
       }
       else {
@@ -196,14 +206,10 @@ LUMINARY_FUNCTION CloudRenderResult
       const float extinction_init = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
       float ambient_extinction    = ambient_extinction_base;
       float phase_factor          = 1.0f;
-      // Precompute step_trans for oct=0, anticipating the first CLOUD_OCTAVE_EXTINCTION_FACTOR
-      // halving. Subsequent octaves are obtained by taking the square root, which is valid
-      // because CLOUD_OCTAVE_EXTINCTION_FACTOR == 0.5: halving extinction squares step_trans.
-      const float step_trans_oct0 = expf(-extinction_init * CLOUD_OCTAVE_EXTINCTION_FACTOR * step_size);
+
+      const float step_trans_oct0 = expf(-extinction_init * CLOUD_OCTAVE_EXTINCTION_FACTOR * current_step_size);
       float step_trans_running    = step_trans_oct0;
-      // Precompute 1/extinction for oct=0 (== 2/extinction_init) and double each octave
-      // instead of recomputing via division, saving one MUFU.RCP per octave.
-      float rcp_extinction = 2.0f / extinction_init;
+      float rcp_extinction        = 2.0f / extinction_init;
 
       for (int oct = 0; oct < device.cloud.octaves; oct++) {
         scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
@@ -224,15 +230,10 @@ LUMINARY_FUNCTION CloudRenderResult
         S               = scale_color(sub_color(S, scale_color(S, step_trans_running)), rcp_extinction);
         scattered_light = add_color(scattered_light, scale_color(S, transmittance));
 
-        // Prepare for next octave: CLOUD_OCTAVE_EXTINCTION_FACTOR == 0.5 means halving
-        // extinction is equivalent to squaring step_trans; rcp_extinction doubles.
         step_trans_running = sqrtf(step_trans_running);
         rcp_extinction *= 2.0f;
       }
 
-      // step_trans_oct0^2 == expf(-extinction_init * step_size), valid because
-      // CLOUD_OCTAVE_EXTINCTION_FACTOR == 0.5 and extinction_init == fmaxf(...) which
-      // is effectively density * CLOUD_EXTINCTION_DENSITY for any meaningful density.
       transmittance *= step_trans_oct0 * step_trans_oct0;
 
       if (transmittance < 0.1f) {
@@ -241,7 +242,8 @@ LUMINARY_FUNCTION CloudRenderResult
       }
     }
 
-    reach += step_size;
+    current_step_size = base_step_size;  // reset to base after hitting density
+    reach += current_step_size;
   }
 
   CloudRenderResult result;
@@ -306,7 +308,7 @@ LUMINARY_FUNCTION float clouds_render(
     const CloudRenderResult result = results[order[i]];
 
     if (result.hit_dist == FLT_MAX)
-      break;
+      continue;
 
     if (device.cloud.atmosphere_scattering) {
       color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, path_id));
