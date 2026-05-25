@@ -40,6 +40,16 @@ struct AdaptiveSampler {
   DEVICE float* variance_buffer;
   DEVICE float* filtered_variance_buffer;
   DEVICE float* variance_sum_buffer;
+
+  struct OptixDenoiser_t* optix_denoiser;
+  void* denoiser_state;
+  void* denoiser_scratch;
+  void* optix_denoiser_input_buffer;
+  void* optix_denoiser_output_buffer;
+  size_t allocated_denoiser_state_size;
+  size_t allocated_denoiser_scratch_size;
+  size_t allocated_optix_denoiser_io_buffer_size;
+
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
   CUevent stage_build_event;

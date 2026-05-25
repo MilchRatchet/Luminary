@@ -198,13 +198,18 @@ struct KernelArgsAdaptiveSamplingBlockReduceVariance {
   uint32_t current_stage_id;
 } typedef KernelArgsAdaptiveSamplingBlockReduceVariance;
 
-struct KernelArgsAdaptiveSamplingFilterVariance {
+struct KernelArgsAdaptiveSamplingInflateVariance {
   float* src_block_variance;
+  float4* dst_inflated_variance;
+  uint32_t count;
+} typedef KernelArgsAdaptiveSamplingInflateVariance;
+
+struct KernelArgsAdaptiveSamplingDeflateAndSumVariance {
+  float4* src_inflated_variance;
   float* dst_filtered_variance;
   float* dst_sum_variance;
-  uint32_t width;
-  uint32_t height;
-} typedef KernelArgsAdaptiveSamplingFilterVariance;
+  uint32_t count;
+} typedef KernelArgsAdaptiveSamplingDeflateAndSumVariance;
 
 struct KernelArgsAdaptiveSamplingComputeStageSampleCounts {
   float* src_block_variance;

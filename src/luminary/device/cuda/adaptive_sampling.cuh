@@ -197,41 +197,26 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   }
 }
 
-LUMINARY_KERNEL void adaptive_sampling_filter_variance(const KernelArgsAdaptiveSamplingFilterVariance args) {
+LUMINARY_KERNEL void adaptive_sampling_inflate_variance(const KernelArgsAdaptiveSamplingInflateVariance args) {
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
-  if (adaptive_sampling_block >= args.width * args.height)
+  if (adaptive_sampling_block >= args.count)
     return;
 
-  const uint32_t center_x = adaptive_sampling_block % args.width;
-  const uint32_t center_y = adaptive_sampling_block / args.width;
+  float variance                                      = args.src_block_variance[adaptive_sampling_block];
+  float4 data                                         = make_float4(variance, variance, variance, 1.0f);
+  args.dst_inflated_variance[adaptive_sampling_block] = data;
+}
 
-  // 5x5 spatial filter in log space to calculate a geometric mean
-  const int32_t filter_radius = 2;
+LUMINARY_KERNEL void adaptive_sampling_deflate_and_sum_variance(const KernelArgsAdaptiveSamplingDeflateAndSumVariance args) {
+  const uint32_t adaptive_sampling_block = THREAD_ID;
 
-  float variance_sum = 0.0f;
-  float weight_sum   = 0.0f;
-
-  for (int32_t dy = -filter_radius; dy <= filter_radius; dy++) {
-    for (int32_t dx = -filter_radius; dx <= filter_radius; dx++) {
-      int32_t x = (int32_t) center_x + dx;
-      int32_t y = (int32_t) center_y + dy;
-
-      if (x < 0 || x >= (int32_t) args.width || y < 0 || y >= (int32_t) args.height)
-        continue;
-
-      uint32_t block_id = (uint32_t) x + (uint32_t) y * args.width;
-      float variance    = args.src_block_variance[block_id];
-
-      variance_sum += variance;
-      weight_sum += 1.0f;
-    }
+  float final_var = 0.0f;
+  if (adaptive_sampling_block < args.count) {
+    float4 data                                         = args.src_inflated_variance[adaptive_sampling_block];
+    final_var                                           = fmaxf(data.x, 0.0f);
+    args.dst_filtered_variance[adaptive_sampling_block] = final_var;
   }
-
-  const float filtered_variance = variance_sum / weight_sum;
-  const float final_var         = fmaxf(filtered_variance, 0.0f);
-
-  args.dst_filtered_variance[adaptive_sampling_block] = final_var;
 
   const float warp_sum = warp_reduce_sum(final_var);
   if (THREAD_ID_IN_WARP == 0) {

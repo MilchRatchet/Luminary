@@ -1,6 +1,7 @@
 #include "device_adaptive_sampler.h"
 
 #include "device.h"
+#include "device_nv_includes.h"
 #include "internal_error.h"
 #include "kernel.h"
 #include "kernel_args.h"
@@ -145,6 +146,53 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
     __FAILURE_HANDLE(device_malloc(&sampler->filtered_variance_buffer, buffer_sizes.filtered_variance_buffer_size));
 
     sampler->allocated_filtered_variance_buffer_size = buffer_sizes.filtered_variance_buffer_size;
+
+    if (sampler->optix_denoiser) {
+      optixDenoiserDestroy(sampler->optix_denoiser);
+      sampler->optix_denoiser = NULL;
+    }
+
+    if (sampler->render_width > 0 && sampler->render_height > 0) {
+      OptixDenoiserOptions denoiser_options;
+      memset(&denoiser_options, 0, sizeof(OptixDenoiserOptions));
+
+      OPTIX_FAILURE_HANDLE(
+        optixDenoiserCreate(device->optix_ctx, OPTIX_DENOISER_MODEL_KIND_AOV, &denoiser_options, &sampler->optix_denoiser));
+
+      OptixDenoiserSizes denoiser_sizes;
+      OPTIX_FAILURE_HANDLE(
+        optixDenoiserComputeMemoryResources(sampler->optix_denoiser, sampler->render_width, sampler->render_height, &denoiser_sizes));
+
+      if (sampler->allocated_denoiser_state_size != denoiser_sizes.stateSizeInBytes) {
+        if (sampler->denoiser_state)
+          device_free((void**) &sampler->denoiser_state);
+        __FAILURE_HANDLE(device_malloc((void**) &sampler->denoiser_state, denoiser_sizes.stateSizeInBytes));
+        sampler->allocated_denoiser_state_size = denoiser_sizes.stateSizeInBytes;
+      }
+
+      const size_t max_scratch = max(denoiser_sizes.withoutOverlapScratchSizeInBytes, denoiser_sizes.withOverlapScratchSizeInBytes);
+      if (sampler->allocated_denoiser_scratch_size != max_scratch) {
+        if (sampler->denoiser_scratch)
+          device_free((void**) &sampler->denoiser_scratch);
+        __FAILURE_HANDLE(device_malloc((void**) &sampler->denoiser_scratch, max_scratch));
+        sampler->allocated_denoiser_scratch_size = max_scratch;
+      }
+
+      const size_t io_buffer_size = sizeof(float) * 4 * sampler->render_width * sampler->render_height;
+      if (sampler->allocated_optix_denoiser_io_buffer_size != io_buffer_size) {
+        if (sampler->optix_denoiser_input_buffer)
+          device_free((void**) &sampler->optix_denoiser_input_buffer);
+        if (sampler->optix_denoiser_output_buffer)
+          device_free((void**) &sampler->optix_denoiser_output_buffer);
+        __FAILURE_HANDLE(device_malloc((void**) &sampler->optix_denoiser_input_buffer, io_buffer_size));
+        __FAILURE_HANDLE(device_malloc((void**) &sampler->optix_denoiser_output_buffer, io_buffer_size));
+        sampler->allocated_optix_denoiser_io_buffer_size = io_buffer_size;
+      }
+
+      OPTIX_FAILURE_HANDLE(optixDenoiserSetup(
+        sampler->optix_denoiser, device->stream_main, sampler->render_width, sampler->render_height, DEVICE_CUPTR(sampler->denoiser_state),
+        sampler->allocated_denoiser_state_size, DEVICE_CUPTR(sampler->denoiser_scratch), sampler->allocated_denoiser_scratch_size));
+    }
   }
   if (sampler->variance_sum_buffer == (float*) 0) {
     __FAILURE_HANDLE(device_malloc(&sampler->variance_sum_buffer, sizeof(float)));
@@ -174,18 +222,65 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   }
 
   {
-    KernelArgsAdaptiveSamplingFilterVariance filter_args;
-    filter_args.src_block_variance    = DEVICE_PTR(sampler->variance_buffer);
-    filter_args.dst_filtered_variance = DEVICE_PTR(sampler->filtered_variance_buffer);
-    filter_args.dst_sum_variance      = DEVICE_PTR(sampler->variance_sum_buffer);
-    filter_args.width                 = sampler->render_width;
-    filter_args.height                = sampler->render_height;
+    KernelArgsAdaptiveSamplingInflateVariance args;
+    args.src_block_variance    = DEVICE_PTR(sampler->variance_buffer);
+    args.dst_inflated_variance = (float4*) DEVICE_PTR(sampler->optix_denoiser_input_buffer);
+    args.count                 = num_adaptive_sampling_blocks;
 
     const uint32_t num_blocks = (num_adaptive_sampling_blocks + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;
 
     __FAILURE_HANDLE(kernel_execute_custom(
-      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_FILTER_VARIANCE], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &filter_args,
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_INFLATE_VARIANCE], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1, &args,
       device->stream_main));
+  }
+
+  if (sampler->optix_denoiser && num_adaptive_sampling_blocks > 0) {
+    OptixDenoiserLayer layer;
+    memset(&layer, 0, sizeof(OptixDenoiserLayer));
+    layer.input.data               = DEVICE_CUPTR(sampler->optix_denoiser_input_buffer);
+    layer.input.width              = sampler->render_width;
+    layer.input.height             = sampler->render_height;
+    layer.input.rowStrideInBytes   = sampler->render_width * sizeof(float) * 4;
+    layer.input.pixelStrideInBytes = sizeof(float) * 4;
+    layer.input.format             = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+    layer.output.data               = DEVICE_CUPTR(sampler->optix_denoiser_output_buffer);
+    layer.output.width              = sampler->render_width;
+    layer.output.height             = sampler->render_height;
+    layer.output.rowStrideInBytes   = sampler->render_width * sizeof(float) * 4;
+    layer.output.pixelStrideInBytes = sizeof(float) * 4;
+    layer.output.format             = OPTIX_PIXEL_FORMAT_FLOAT4;
+
+    OptixDenoiserGuideLayer guide_layer;
+    memset(&guide_layer, 0, sizeof(OptixDenoiserGuideLayer));
+
+    OptixDenoiserParams params;
+    memset(&params, 0, sizeof(OptixDenoiserParams));
+    params.blendFactor = 0.0f;
+
+    OPTIX_FAILURE_HANDLE(optixDenoiserInvoke(
+      sampler->optix_denoiser, device->stream_main, &params, DEVICE_CUPTR(sampler->denoiser_state), sampler->allocated_denoiser_state_size,
+      &guide_layer, &layer, 1, 0, 0, DEVICE_CUPTR(sampler->denoiser_scratch), sampler->allocated_denoiser_scratch_size));
+  }
+  else {
+    CUDA_FAILURE_HANDLE(cuMemcpyAsync(
+      DEVICE_CUPTR(sampler->optix_denoiser_output_buffer), DEVICE_CUPTR(sampler->optix_denoiser_input_buffer),
+      sizeof(float) * 4 * num_adaptive_sampling_blocks, device->stream_main));
+  }
+
+  {
+    KernelArgsAdaptiveSamplingDeflateAndSumVariance args;
+    args.src_inflated_variance = (float4*) DEVICE_PTR(sampler->optix_denoiser_output_buffer);
+    args.dst_filtered_variance = DEVICE_PTR(sampler->filtered_variance_buffer);
+    args.dst_sum_variance      = DEVICE_PTR(sampler->variance_sum_buffer);
+    args.count                 = num_adaptive_sampling_blocks;
+
+    // Use full warps for sum reduce
+    const uint32_t num_blocks = (((num_adaptive_sampling_blocks + WARP_SIZE - 1) >> WARP_SIZE_LOG) + warps_per_block - 1) / warps_per_block;
+
+    __FAILURE_HANDLE(kernel_execute_custom(
+      device->cuda_kernels[CUDA_KERNEL_TYPE_ADAPTIVE_SAMPLING_DEFLATE_AND_SUM_VARIANCE], MAX_THREADS_PER_BLOCK, 1, 1, num_blocks, 1, 1,
+      &args, device->stream_main));
   }
 
   {
@@ -255,6 +350,23 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
   if (sampler->variance_sum_buffer)
     __FAILURE_HANDLE(device_free(&sampler->variance_sum_buffer));
 
+  if (sampler->optix_denoiser_input_buffer)
+    __FAILURE_HANDLE(device_free((void**) &sampler->optix_denoiser_input_buffer));
+
+  if (sampler->optix_denoiser_output_buffer)
+    __FAILURE_HANDLE(device_free((void**) &sampler->optix_denoiser_output_buffer));
+
+  if (sampler->denoiser_scratch)
+    __FAILURE_HANDLE(device_free((void**) &sampler->denoiser_scratch));
+
+  if (sampler->denoiser_state)
+    __FAILURE_HANDLE(device_free((void**) &sampler->denoiser_state));
+
+  if (sampler->optix_denoiser) {
+    optixDenoiserDestroy(sampler->optix_denoiser);
+    sampler->optix_denoiser = NULL;
+  }
+
   if (sampler->stage_build_event != (CUevent) 0) {
     CUDA_FAILURE_HANDLE(cuEventDestroy(sampler->stage_build_event));
     sampler->stage_build_event = (CUevent) 0;
@@ -263,6 +375,9 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
   sampler->allocated_stage_sample_counts_size      = 0;
   sampler->allocated_variance_buffer_size          = 0;
   sampler->allocated_filtered_variance_buffer_size = 0;
+  sampler->allocated_optix_denoiser_io_buffer_size = 0;
+  sampler->allocated_denoiser_state_size           = 0;
+  sampler->allocated_denoiser_scratch_size         = 0;
   sampler->width                                   = 0;
   sampler->height                                  = 0;
   sampler->render_width                            = 0;
