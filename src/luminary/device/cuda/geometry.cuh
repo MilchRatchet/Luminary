@@ -29,6 +29,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
 
+    // We need to store the face normal so the DL shadowing kernel knows how to offset the origin.
+    task_trace_facenormal_store(task_base_address, ctx.face_normal);
+
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
     ////////////////////////////////////////////////////////////////////
@@ -117,7 +120,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       write_beauty_buffer(result_color, throughput.results_index);
     }
 
-    uint16_t new_state = task.state | STATE_FLAG_USE_IGNORE_HANDLE;
+    uint16_t new_state = task.state;
 
     if (is_delta_distribution == false)
       new_state &= ~STATE_FLAG_DELTA_PATH;
@@ -134,18 +137,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
       DeviceTask bounce_task;
       bounce_task.state   = new_state;
-      bounce_task.origin  = ctx.position;
+      bounce_task.origin  = apply_safe_offset(ctx.position, ctx.face_normal, bounce_info.ray);
       bounce_task.ray     = bounce_info.ray;
       bounce_task.path_id = task.path_id;
 
       task_store(dst_task_base_address, bounce_task);
-
-      // We need to store a trace result so the raytracing kernels knows which triangle to ignore.
-      DeviceTaskTrace bounce_trace;
-      bounce_trace.handle = triangle_handle_get(ctx.instance_id, ctx.tri_id);
-      bounce_trace.depth  = FLT_MAX;
-
-      task_trace_store(dst_task_base_address, bounce_trace);
 
       DeviceTaskThroughput bounce_throughput;
       bounce_throughput.record        = record_pack(record);

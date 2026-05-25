@@ -58,18 +58,11 @@ struct OptixKernelFunctionShadowTracePayload {
     };
   };
   union {
-    TriangleHandle handle_origin;
+    RGBF throughput;
     struct {
       unsigned int v2;
       unsigned int v3;
-    };
-  };
-  union {
-    RGBF throughput;
-    struct {
       unsigned int v4;
-      unsigned int v5;
-      unsigned int v6;
     };
   };
 } typedef OptixKernelFunctionShadowTracePayload;
@@ -77,8 +70,6 @@ struct OptixKernelFunctionShadowTracePayload {
 enum OptixKernelFunctionShadowTracePayloadValue {
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE3,
-  OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE4,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
   OPTIX_KERNEL_FUNCTION_SHADOW_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
@@ -87,25 +78,16 @@ enum OptixKernelFunctionShadowTracePayloadValue {
 
 struct OptixKernelFunctionShadowSunTracePayload {
   union {
-    TriangleHandle handle_origin;
+    RGBF throughput;
     struct {
       unsigned int v0;
       unsigned int v1;
-    };
-  };
-  union {
-    RGBF throughput;
-    struct {
       unsigned int v2;
-      unsigned int v3;
-      unsigned int v4;
     };
   };
 } typedef OptixKernelFunctionShadowSunTracePayload;
 
 enum OptixKernelFunctionShadowSunTracePayloadValue {
-  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
-  OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT2,
   OPTIX_KERNEL_FUNCTION_SHADOW_SUN_TRACE_PAYLOAD_VALUE_THROUGHPUT3,
@@ -114,36 +96,26 @@ enum OptixKernelFunctionShadowSunTracePayloadValue {
 
 struct OptixKernelFunctionLightBSDFTracePayload {
   union {
-    TriangleHandle ignore_handle;
-
-    struct {
-      unsigned int v0;
-      unsigned int v1;
-    };
-  };
-  union {
     uint32_t selected_light_id;
     struct {
-      unsigned int v2;
+      unsigned int v0;
     };
   };
   union {
     uint32_t num_hit_lights;
     struct {
-      unsigned int v3;
+      unsigned int v1;
     };
   };
   union {
     float random;
     struct {
-      unsigned int v4;
+      unsigned int v2;
     };
   };
 } typedef OptixKernelFunctionLightBSDFTracePayload;
 
 enum OptixKernelFunctionLightBSDFTracePayloadValue {
-  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE,
-  OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_TRIANGLE_HANDLE2,
   OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_SELECTED_LIGHT_ID,
   OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS,
   OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_RANDOM,

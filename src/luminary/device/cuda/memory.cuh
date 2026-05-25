@@ -246,6 +246,10 @@ LUMINARY_FUNCTION void task_trace_depth_store(const uint32_t base_address, const
   store_task_state<float, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.depth), data);
 }
 
+LUMINARY_FUNCTION void task_trace_facenormal_store(const uint32_t base_address, const PackedNormal data) {
+  store_task_state<PackedNormal, float>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, trace_result.face_normal), data);
+}
+
 // DeviceTaskThroughput
 
 LUMINARY_FUNCTION void task_throughput_store(const uint32_t base_address, const DeviceTaskThroughput data) {

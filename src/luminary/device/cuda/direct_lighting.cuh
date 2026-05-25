@@ -397,11 +397,13 @@ LUMINARY_FUNCTION RGBF direct_lighting_geometry_evaluate_task(
 
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  shadow_task.origin       = task.origin;
+  shadow_task.origin       = apply_safe_offset(task.origin, trace.face_normal, direct_light_task.ray);
   shadow_task.ray          = direct_light_task.ray;
   shadow_task.limit        = direct_light_task.dist;
-  shadow_task.target_light =
-    (sample_is_valid) ? device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id] : TRIANGLE_HANDLE_INVALID;
+  shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
+
+  if (sample_is_valid)
+    shadow_task.target_light = device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id];
 
   const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
 
@@ -429,7 +431,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
 
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  shadow_task.origin       = task.origin;
+  shadow_task.origin       = apply_safe_offset(task.origin, trace.face_normal, ray);
   shadow_task.ray          = ray;
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
@@ -503,7 +505,8 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
 
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  shadow_task.origin       = task.origin;
+
+  shadow_task.origin       = apply_safe_offset(task.origin, trace.face_normal, ray);
   shadow_task.ray          = ray;
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
@@ -559,21 +562,20 @@ LUMINARY_FUNCTION RGBF direct_lighting_bridges_evaluate_task(
 LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
   const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium,
   const DeviceTaskDirectLightBSDF& direct_light_task, const bool is_allowed) {
-  const TriangleHandle blocked_handle = trace.handle;
-
   bool sample_is_valid = is_allowed && direct_light_task.sampling_probability != 0.0f;
 
   OptixTraceStatus trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
 
   OptixKernelFunctionLightBSDFTracePayload payload;
-  payload.ignore_handle     = blocked_handle;
   payload.random            = random_1D(RANDOM_TARGET_LIGHT_BSDF_TRACE, task.path_id);
   payload.num_hit_lights    = 0;
   payload.selected_light_id = LIGHT_ID_INVALID;
 
+  const vec3 trace_origin = apply_safe_offset(task.origin, trace.face_normal, direct_light_task.ray);
+
   optixKernelFunctionLightBSDFTrace(
-    device.optix_bvh_light, task.origin, direct_light_task.ray, eps, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF),
-    OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT, trace_status, payload);
+    device.optix_bvh_light, trace_origin, direct_light_task.ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF),
+    OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT, trace_status, payload);
 
   const uint32_t light_id = payload.selected_light_id;
 
@@ -589,11 +591,11 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
     uint3 light_uv_packed;
     TriangleLight triangle_light = light_triangle_sample_init(light_handle, trans, light_uv_packed);
 
-    if (light_triangle_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, task.origin, direct_light_task.ray, dist)) {
+    if (light_triangle_sample_finalize_dist_and_uvs(triangle_light, light_uv_packed, trace_origin, direct_light_task.ray, dist)) {
       light_color = light_get_color(triangle_light);
 
       const float mis_weight = mis_compute_weight_gi(
-        task.origin, triangle_light, light_color, dist, direct_light_task.sampling_probability, direct_light_task.light_tree_root_sum);
+        trace_origin, triangle_light, light_color, dist, direct_light_task.sampling_probability, direct_light_task.light_tree_root_sum);
 
       light_color = scale_color(light_color, mis_weight * payload.num_hit_lights);
       light_color = mul_color(light_color, direct_light_task.weight);
@@ -605,7 +607,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
 
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  shadow_task.origin       = task.origin;
+  shadow_task.origin       = trace_origin;
   shadow_task.ray          = direct_light_task.ray;
   shadow_task.limit        = dist;
   shadow_task.target_light = light_handle;

@@ -1776,4 +1776,28 @@ LUMINARY_FUNCTION float ior_decompress(const uint32_t compressed_ior) {
   return ((__uint_as_float(0x3F800000u | (compressed_ior << 15)) - 1.0f) * 2.0f) + 1.0f;
 }
 
+// Raytracing Gems 1 Part 2 Chapter 6
+LUMINARY_FUNCTION vec3 apply_safe_offset(const vec3 p, PackedNormal face_normal, const vec3 ray) {
+  vec3 n = normal_unpack(face_normal);
+  n      = (dot_product(ray, n) < 0.0f) ? neg_vector(n) : n;
+
+  const float origin      = 1.0f / 32.0f;
+  const float float_scale = 1.0f / 65536.0f;
+  const float int_scale   = 256.0f;
+
+  int3 of_i = make_int3(int_scale * n.x, int_scale * n.y, int_scale * n.z);
+
+  vec3 p_i;
+  p_i.x = __int_as_float(__float_as_int(p.x) + ((p.x < 0) ? -of_i.x : of_i.x));
+  p_i.y = __int_as_float(__float_as_int(p.y) + ((p.y < 0) ? -of_i.y : of_i.y));
+  p_i.z = __int_as_float(__float_as_int(p.z) + ((p.z < 0) ? -of_i.z : of_i.z));
+
+  vec3 result;
+  result.x = fabsf(p.x) < origin ? p.x + float_scale * n.x : p_i.x;
+  result.y = fabsf(p.y) < origin ? p.y + float_scale * n.y : p_i.y;
+  result.z = fabsf(p.z) < origin ? p.z + float_scale * n.z : p_i.z;
+
+  return result;
+}
+
 #endif /* CU_MATH_H */

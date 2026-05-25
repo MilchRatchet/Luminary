@@ -71,7 +71,6 @@ LUMINARY_KERNEL void particle_process_tasks() {
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
     new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
 
     if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {

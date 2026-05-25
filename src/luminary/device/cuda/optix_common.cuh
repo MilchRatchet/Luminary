@@ -82,12 +82,11 @@ LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
   const TriangleHandle handle, const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light,
   const OptixTraceStatus status) {
   OptixKernelFunctionShadowTracePayload payload;
-  payload.handle        = target_light;
-  payload.throughput    = splat_color(1.0f);
-  payload.handle_origin = handle;
+  payload.handle     = target_light;
+  payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowTrace(
-    device.optix_bvh_shadow, position, dir, eps, dist, 0.0f, OptixVisibilityMask(0xFFFF),
+    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF),
     OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, status, payload);
 
   if (payload.handle.instance_id == HIT_TYPE_REJECT) {
@@ -100,11 +99,10 @@ LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
 LUMINARY_FUNCTION RGBF
   optix_sun_shadowing(const TriangleHandle handle, const vec3 position, const vec3 dir, const float dist, const OptixTraceStatus status) {
   OptixKernelFunctionShadowSunTracePayload payload;
-  payload.throughput    = splat_color(1.0f);
-  payload.handle_origin = handle;
+  payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowSunTrace(
-    device.optix_bvh_shadow, position, dir, eps, dist, 0.0f, OptixVisibilityMask(0xFFFF),
+    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF),
     OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, status, payload);
 
   return payload.throughput;

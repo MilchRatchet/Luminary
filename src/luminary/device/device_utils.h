@@ -372,7 +372,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
 struct DeviceTaskTrace {
   TriangleHandle handle;
   float depth;
-  uint32_t padding;
+  PackedNormal face_normal;  // Used only for surface DL
 } typedef DeviceTaskTrace;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 

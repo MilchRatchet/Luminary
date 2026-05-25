@@ -80,17 +80,16 @@ LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, Optix
 
 LUMINARY_FUNCTION void optix_raytrace_geometry(const DeviceTask task, OptixRaytraceResult& result) {
   OptixKernelFunctionGeometryTracePayload payload;
-  payload.depth  = result.depth;
-  payload.handle = result.handle;
-
-  OptixRayFlags ray_flag = ((task.state & STATE_FLAG_USE_IGNORE_HANDLE) != 0) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_NONE;
+  payload.depth = FLT_MAX;
 
   optixKernelFunctionGeometryTrace(
-    device.optix_bvh, task.origin, task.ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, OPTIX_TRACE_STATUS_EXECUTE,
-    payload);
+    device.optix_bvh, task.origin, task.ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE,
+    OPTIX_TRACE_STATUS_EXECUTE, payload);
 
-  result.depth  = payload.depth;
-  result.handle = payload.handle;
+  if (payload.depth != FLT_MAX) {
+    result.depth  = payload.depth;
+    result.handle = payload.handle;
+  }
 }
 
 LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, OptixRaytraceResult& result) {
@@ -158,13 +157,6 @@ extern "C" __global__ void __raygen__optix() {
   OptixRaytraceResult result;
   result.handle = triangle_handle_get(HIT_TYPE_SKY, 0);
   result.depth  = FLT_MAX;
-
-  // Load ignore handle if necessary
-  if ((task.state & STATE_FLAG_USE_IGNORE_HANDLE) != 0) {
-    const DeviceTaskTrace trace = task_trace_load(task_base_address);
-
-    result.handle = trace.handle;
-  }
 
   optix_raytrace_geometry(task, result);
   optix_raytrace_particles(task, result);

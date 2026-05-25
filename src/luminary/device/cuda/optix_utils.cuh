@@ -68,7 +68,7 @@ static LUMINARY_FUNCTION void optixKernelFunctionShadowTrace(
     optixTrace(
       OPTIX_TRACE_PAYLOAD_ID(SHADOW_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin, tmax,
       rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_TRACE), 0, 0, payload.v0, payload.v1, payload.v2, payload.v3,
-      payload.v4, payload.v5, payload.v6);
+      payload.v4);
 }
 
 static LUMINARY_FUNCTION void optixKernelFunctionShadowSunTrace(
@@ -78,8 +78,7 @@ static LUMINARY_FUNCTION void optixKernelFunctionShadowSunTrace(
   if (status == OPTIX_TRACE_STATUS_EXECUTE)
     optixTrace(
       OPTIX_TRACE_PAYLOAD_ID(SHADOW_SUN_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
-      payload.v3, payload.v4);
+      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(SHADOW_SUN_TRACE), 0, 0, payload.v0, payload.v1, payload.v2);
 }
 
 static LUMINARY_FUNCTION void optixKernelFunctionLightBSDFTrace(
@@ -89,8 +88,7 @@ static LUMINARY_FUNCTION void optixKernelFunctionLightBSDFTrace(
   if (status == OPTIX_TRACE_STATUS_EXECUTE)
     optixTrace(
       OPTIX_TRACE_PAYLOAD_ID(LIGHT_BSDF_TRACE), handle, make_float3(origin.x, origin.y, origin.z), make_float3(ray.x, ray.y, ray.z), tmin,
-      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(LIGHT_BSDF_TRACE), 0, 0, payload.v0, payload.v1, payload.v2,
-      payload.v3, payload.v4);
+      tmax, rayTime, visibilityMask, rayFlags, OPTIX_TRACE_SBT_OFFSET(LIGHT_BSDF_TRACE), 0, 0, payload.v0, payload.v1, payload.v2);
 }
 
 ////////////////////////////////////////////////////////////////////

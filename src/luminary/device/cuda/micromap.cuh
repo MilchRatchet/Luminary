@@ -55,12 +55,12 @@ LUMINARY_FUNCTION void micromap_set_triangle_opacity_flag(const uint32_t mesh_id
 LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
   if (tri.tex_id == TEXTURE_NONE) {
     // Materials without an albedo texture can have their opacity changed, so we cannot use OMMs there.
-    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
   }
 
   if (texture_is_valid(tri.tex) == false) {
     // Materials with an invalid texture are finicky, they rely on hardcoded behaviour, don't fast path such edge cases.
-    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
   }
 
   const float max_mip_level = fmaxf(floorf(log2f(min(tri.tex.width, tri.tex.height)) - 1.0f), 0.0f);
@@ -81,7 +81,7 @@ LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, con
   const float texels_v = span_v * tri.tex.height;
 
   if (texels_v <= 0.0f)
-    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
 
   const float mip_level_v = fmaxf(log2f(texels_v), 0.0f);
 
@@ -181,9 +181,9 @@ LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, con
 
   // This is a case that should never happen
   if (!found_opaque && !found_transparent)
-    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
+    return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
 
-  return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT;
+  return OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE;
 }
 
 //
@@ -197,7 +197,7 @@ LUMINARY_KERNEL void omm_level_0_format_4(const KernelArgsOMMLevel0Format4 args)
 
     const uint8_t opacity = micromap_get_opacity(tri, 0, 0);
 
-    const bool tri_requires_refinement = opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT && (args.max_num_levels > 1);
+    const bool tri_requires_refinement = opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE && (args.max_num_levels > 1);
 
     uint8_t level = 0;
     if (tri_requires_refinement) {
@@ -245,11 +245,11 @@ LUMINARY_KERNEL void omm_refine_format_4(const KernelArgsOMMRefineFormat4 args) 
       src_v         = (src_v >> (2 * (i & 0b11))) & 0b11;
 
       uint8_t dst_v = 0;
-      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT) {
+      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE) {
         for (uint32_t j = 0; j < 4; j++) {
           const uint8_t opacity = micromap_get_opacity(tri, args.dst_level, 4 * i + j);
 
-          tri_requires_refinement |= (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_TRANSPARENT);
+          tri_requires_refinement |= (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE);
 
           dst_v = dst_v | (opacity << (2 * j));
         }

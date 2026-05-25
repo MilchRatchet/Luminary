@@ -259,7 +259,6 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    new_state &= ~STATE_FLAG_USE_IGNORE_HANDLE;
     new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
 
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
