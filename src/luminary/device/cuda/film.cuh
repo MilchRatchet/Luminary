@@ -13,8 +13,8 @@ LUMINARY_FUNCTION float film_grain_layer_apply(const float value, const float ra
 
   const float activated_grains = random_binomial_approx(film_grains_per_pixel, activation_probability, random);
 
-  const float activation_fraction = __saturatef(((float) activated_grains) / film_grains_per_pixel);
-  const float exposure            = copysignf(logf(fmaxf(1.0f - activation_fraction, 1e-12f)), 1.0f);
+  const float activation_fraction = ((float) activated_grains) / film_grains_per_pixel;
+  const float exposure            = -logf(fmaxf(1.0f - activation_fraction, 1e-12f));
 
   return lerp(value, exposure, device.camera.sensor.film_grain_strength);
 }
@@ -43,7 +43,7 @@ LUMINARY_FUNCTION RGBF film_grain_apply(RGBF color, uint32_t x, uint32_t y) {
 
   const float lum              = color_luminance(color);
   const float lum_grain        = film_grain_layer_apply(lum, random_lum, film_grains_per_pixel);
-  const float grain_multiplier = (lum > 1e-6f) ? (lum_grain / lum) : 1.0f;
+  const float grain_multiplier = (lum > 0.0f) ? (lum_grain / lum) : 1.0f;
 
   const float r_grain = film_grain_layer_apply(color.r, random_r, film_grains_per_pixel);
   const float g_grain = film_grain_layer_apply(color.g, random_g, film_grains_per_pixel);

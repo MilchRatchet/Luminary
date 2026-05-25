@@ -420,7 +420,7 @@ LUMINARY_FUNCTION float random_normal_inverse_approx(float q) {
   return sign * sqrtf(t - logf(r));
 }
 
-LUMINARY_FUNCTION uint32_t random_binomial_approx(const uint32_t n, const float p, const float random) {
+LUMINARY_FUNCTION float random_binomial_approx(const uint32_t n, const float p, const float random) {
   const float mean    = n * p;
   const float std_dev = sqrtf(mean * (1.0f - p));
 
@@ -429,7 +429,7 @@ LUMINARY_FUNCTION uint32_t random_binomial_approx(const uint32_t n, const float 
 
   const float x = mean + std_dev * random_normal_inverse_approx(random);
 
-  return fmaxf(fminf(x, n), 0.0f);
+  return x;
 }
 
 #endif /* CU_RANDOM_H */
