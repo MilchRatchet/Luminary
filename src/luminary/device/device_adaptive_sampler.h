@@ -11,7 +11,6 @@ struct DeviceAdaptiveSamplerBufferSizes {
   size_t stage_sample_counts_size;
   size_t stage_total_task_counts_size;
   size_t variance_buffer_size;
-  size_t filtered_variance_buffer_size;
 } typedef DeviceAdaptiveSamplerBufferSizes;
 
 struct AdaptiveSamplerSetupInfo {
@@ -31,14 +30,12 @@ struct AdaptiveSampler {
   uint32_t render_height;
   size_t allocated_stage_sample_counts_size;
   size_t allocated_variance_buffer_size;
-  size_t allocated_filtered_variance_buffer_size;
   uint8_t queued_stage_build;
   DeviceSampleAllocation allocator;
   STAGING uint32_t* stage_sample_counts;
   STAGING uint32_t* stage_total_task_counts;
   DEVICE uint32_t* stage_total_task_counts_buffer;
   DEVICE float* variance_buffer;
-  DEVICE float* filtered_variance_buffer;
   DEVICE float* variance_sum_buffer;
 
   struct OptixDenoiser_t* optix_denoiser;

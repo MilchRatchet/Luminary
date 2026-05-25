@@ -19,10 +19,9 @@ LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, Devic
   __CHECK_NULL_ARGUMENT(sampler);
   __CHECK_NULL_ARGUMENT(sizes);
 
-  sizes->stage_sample_counts_size      = sizeof(uint32_t) * sampler->width * sampler->height;
-  sizes->stage_total_task_counts_size  = sizeof(uint32_t) * ADAPTIVE_SAMPLER_NUM_STAGES;
-  sizes->variance_buffer_size          = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
-  sizes->filtered_variance_buffer_size = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  sizes->stage_sample_counts_size     = sizeof(uint32_t) * sampler->width * sampler->height;
+  sizes->stage_total_task_counts_size = sizeof(uint32_t) * ADAPTIVE_SAMPLER_NUM_STAGES;
+  sizes->variance_buffer_size         = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
 
   return LUMINARY_SUCCESS;
 }
@@ -120,32 +119,6 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
       DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
 
     sampler->allocated_stage_sample_counts_size = buffer_sizes.stage_sample_counts_size;
-  }
-
-  if (sampler->stage_total_task_counts == (uint32_t*) 0) {
-    __FAILURE_HANDLE(device_malloc_staging(
-      &sampler->stage_total_task_counts, buffer_sizes.stage_total_task_counts_size, DEVICE_MEMORY_STAGING_FLAG_SHARED));
-  }
-
-  if (sampler->stage_total_task_counts_buffer == (uint32_t*) 0) {
-    __FAILURE_HANDLE(device_malloc(&sampler->stage_total_task_counts_buffer, buffer_sizes.stage_total_task_counts_size));
-  }
-
-  if (buffer_sizes.variance_buffer_size != sampler->allocated_variance_buffer_size) {
-    if (sampler->variance_buffer)
-      __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
-
-    __FAILURE_HANDLE(device_malloc(&sampler->variance_buffer, buffer_sizes.variance_buffer_size));
-
-    sampler->allocated_variance_buffer_size = buffer_sizes.variance_buffer_size;
-  }
-  if (buffer_sizes.filtered_variance_buffer_size != sampler->allocated_filtered_variance_buffer_size) {
-    if (sampler->filtered_variance_buffer)
-      __FAILURE_HANDLE(device_free(&sampler->filtered_variance_buffer));
-
-    __FAILURE_HANDLE(device_malloc(&sampler->filtered_variance_buffer, buffer_sizes.filtered_variance_buffer_size));
-
-    sampler->allocated_filtered_variance_buffer_size = buffer_sizes.filtered_variance_buffer_size;
 
     if (sampler->optix_denoiser) {
       optixDenoiserDestroy(sampler->optix_denoiser);
@@ -194,6 +167,25 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
         sampler->allocated_denoiser_state_size, DEVICE_CUPTR(sampler->denoiser_scratch), sampler->allocated_denoiser_scratch_size));
     }
   }
+
+  if (sampler->stage_total_task_counts == (uint32_t*) 0) {
+    __FAILURE_HANDLE(device_malloc_staging(
+      &sampler->stage_total_task_counts, buffer_sizes.stage_total_task_counts_size, DEVICE_MEMORY_STAGING_FLAG_SHARED));
+  }
+
+  if (sampler->stage_total_task_counts_buffer == (uint32_t*) 0) {
+    __FAILURE_HANDLE(device_malloc(&sampler->stage_total_task_counts_buffer, buffer_sizes.stage_total_task_counts_size));
+  }
+
+  if (buffer_sizes.variance_buffer_size != sampler->allocated_variance_buffer_size) {
+    if (sampler->variance_buffer)
+      __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
+
+    __FAILURE_HANDLE(device_malloc(&sampler->variance_buffer, buffer_sizes.variance_buffer_size));
+
+    sampler->allocated_variance_buffer_size = buffer_sizes.variance_buffer_size;
+  }
+
   if (sampler->variance_sum_buffer == (float*) 0) {
     __FAILURE_HANDLE(device_malloc(&sampler->variance_sum_buffer, sizeof(float)));
   }
@@ -271,7 +263,7 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
   {
     KernelArgsAdaptiveSamplingDeflateAndSumVariance args;
     args.src_inflated_variance = (float4*) DEVICE_PTR(sampler->optix_denoiser_output_buffer);
-    args.dst_filtered_variance = DEVICE_PTR(sampler->filtered_variance_buffer);
+    args.dst_filtered_variance = DEVICE_PTR(sampler->variance_buffer);
     args.dst_sum_variance      = DEVICE_PTR(sampler->variance_sum_buffer);
     args.count                 = num_adaptive_sampling_blocks;
 
@@ -285,7 +277,7 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
 
   {
     KernelArgsAdaptiveSamplingComputeStageSampleCounts args;
-    args.src_block_variance           = DEVICE_PTR(sampler->filtered_variance_buffer);
+    args.src_block_variance           = DEVICE_PTR(sampler->variance_buffer);
     args.src_sum_variance             = DEVICE_PTR(sampler->variance_sum_buffer);
     args.num_adaptive_sampling_blocks = num_adaptive_sampling_blocks;
     args.current_stage_id             = sampler->allocator.stage_id;
@@ -344,9 +336,6 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
   if (sampler->variance_buffer)
     __FAILURE_HANDLE(device_free(&sampler->variance_buffer));
 
-  if (sampler->filtered_variance_buffer)
-    __FAILURE_HANDLE(device_free(&sampler->filtered_variance_buffer));
-
   if (sampler->variance_sum_buffer)
     __FAILURE_HANDLE(device_free(&sampler->variance_sum_buffer));
 
@@ -374,7 +363,6 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
 
   sampler->allocated_stage_sample_counts_size      = 0;
   sampler->allocated_variance_buffer_size          = 0;
-  sampler->allocated_filtered_variance_buffer_size = 0;
   sampler->allocated_optix_denoiser_io_buffer_size = 0;
   sampler->allocated_denoiser_state_size           = 0;
   sampler->allocated_denoiser_scratch_size         = 0;

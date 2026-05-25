@@ -211,14 +211,16 @@ LUMINARY_KERNEL void adaptive_sampling_inflate_variance(const KernelArgsAdaptive
 LUMINARY_KERNEL void adaptive_sampling_deflate_and_sum_variance(const KernelArgsAdaptiveSamplingDeflateAndSumVariance args) {
   const uint32_t adaptive_sampling_block = THREAD_ID;
 
-  float final_var = 0.0f;
+  float final_variance = 0.0f;
   if (adaptive_sampling_block < args.count) {
-    float4 data                                         = args.src_inflated_variance[adaptive_sampling_block];
-    final_var                                           = fmaxf(data.x, 0.0f);
-    args.dst_filtered_variance[adaptive_sampling_block] = final_var;
+    const float4 data = args.src_inflated_variance[adaptive_sampling_block];
+
+    final_variance = fmaxf(data.x, 0.0f);
+
+    args.dst_filtered_variance[adaptive_sampling_block] = final_variance;
   }
 
-  const float warp_sum = warp_reduce_sum(final_var);
+  const float warp_sum = warp_reduce_sum(final_variance);
   if (THREAD_ID_IN_WARP == 0) {
     atomicAdd(args.dst_sum_variance, warp_sum);
   }
