@@ -134,7 +134,7 @@ LUMINARY_KERNEL void post_image_upsample(const KernelArgsPostImageUpsample args)
     pixel += post_sample_buffer_border(args.src, sx, sy + step_y, args.sw, args.sh, 2.0f);
     pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh);
 
-    pixel *= 1.0f / 20.0f;
+    pixel *= 1.0f / 16.0f;
     pixel *= args.sa;
 
     float base_pixel = __ldcs(args.base + x + y * args.tw);
