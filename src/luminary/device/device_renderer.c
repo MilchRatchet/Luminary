@@ -408,17 +408,6 @@ static LuminaryResult _device_renderer_handle_queue_action(
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
       break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-      if (device->is_main_device) {
-        if ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) != 0) {
-          __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(
-            renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT_UNDERSAMPLING, &work->launch_id));
-        }
-        else {
-          __FAILURE_HANDLE(
-            _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT, &work->launch_id));
-        }
-      }
-
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[work->event_id], device->stream_main));
       CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[work->event_id], CU_EVENT_WAIT_DEFAULT));
       CUDA_FAILURE_HANDLE(

@@ -259,11 +259,6 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
-  __FAILURE_HANDLE(device_output_wait_for_completion(output, device->stream_main));
-
-  // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
-  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
-
   uint32_t aggregate_sample_count;
   __FAILURE_HANDLE(device_renderer_get_total_executed_samples(device->renderer, &aggregate_sample_count));
 

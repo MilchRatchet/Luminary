@@ -1454,6 +1454,19 @@ LuminaryResult device_finish_render_iteration(Device* device, AdaptiveSampler* s
     __FAILURE_HANDLE(device_output_will_output(device->output, device->renderer, &does_output));
 
     if (does_output) {
+      __FAILURE_HANDLE(device_output_wait_for_completion(device->output, device->stream_main));
+
+      // The output settings could have changed since the the last rendered sample, make sure we use the current settings.
+      __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
+
+      if ((device->undersampling_state & UNDERSAMPLING_STAGE_MASK) != 0) {
+        __FAILURE_HANDLE(
+          kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT_UNDERSAMPLING], device->stream_main));
+      }
+      else {
+        __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_ACCUMULATION_GENERATE_RESULT], device->stream_main));
+      }
+
       __FAILURE_HANDLE(device_post_apply(device->post, device));
       __FAILURE_HANDLE(device_output_generate_output(device->output, device, callback_data->render_event_id));
     }
