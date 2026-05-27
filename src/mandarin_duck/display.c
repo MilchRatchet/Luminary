@@ -280,6 +280,9 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
 
   display->splash_screen = (const uint32_t*) (splash_screen_data + DISPLAY_SPLASHSCREEN_DATA_OFFSET);
 
+  LUM_FAILURE_HANDLE(array_create(&display->status_messages, sizeof(DisplayStatusMessage), 4));
+  display->screenshot_status_message_id = (uint32_t) -1;
+
   *_display = display;
 }
 
@@ -543,6 +546,8 @@ static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
   properties.width        = settings.width;
   properties.height       = settings.height;
 
+  display->screenshot_status_message_id = display_add_status_message(display, "Display", "Save PNG");
+
   LUM_FAILURE_HANDLE(luminary_host_request_output(host, properties, &display->output_promise_handle));
 }
 
@@ -792,6 +797,11 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
 
     LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
 
+    if (display->screenshot_status_message_id != (uint32_t) -1) {
+      display_remove_status_message(display, display->screenshot_status_message_id);
+      display->screenshot_status_message_id = (uint32_t) -1;
+    }
+
     display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
   }
 }
@@ -962,6 +972,8 @@ void display_destroy(Display** display) {
   display_zoom_handler_destroy(&(*display)->zoom_handler);
   file_dialog_handler_destroy(&(*display)->scene_file_path);
 
+  LUM_FAILURE_HANDLE(array_destroy(&(*display)->status_messages));
+
   LUM_FAILURE_HANDLE(host_free(display));
 
   __num_displays--;
@@ -970,4 +982,50 @@ void display_destroy(Display** display) {
     SDL_Quit();
     TTF_Quit();
   }
+}
+
+uint32_t display_add_status_message(Display* display, const char* name, const char* string) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  DisplayStatusMessage message;
+  memset(&message, 0, sizeof(DisplayStatusMessage));
+
+  strncpy(message.name, name ? name : "", sizeof(message.name) - 1);
+  strncpy(message.string, string ? string : "", sizeof(message.string) - 1);
+  message.start_time_ns = SDL_GetTicksNS();
+  message.active        = true;
+  message.id            = 0;
+
+  uint32_t num_elements;
+  array_get_num_elements(display->status_messages, &num_elements);
+
+  for (; message.id < num_elements; message.id++) {
+    if (display->status_messages[message.id].active == false) {
+      break;
+    }
+  }
+
+  if (message.id == num_elements) {
+    array_push(&display->status_messages, &message);
+  }
+  else {
+    display->status_messages[message.id] = message;
+  }
+
+  return message.id;
+}
+
+void display_remove_status_message(Display* display, uint32_t id) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  if (id == (uint32_t) -1)
+    return;
+
+  uint32_t num_elements;
+  array_get_num_elements(display->status_messages, &num_elements);
+
+  if (id >= num_elements)
+    crash_message("Message is out of bounds.");
+
+  display->status_messages[id].active = false;
 }

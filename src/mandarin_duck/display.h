@@ -32,6 +32,14 @@ struct DisplayFileDrop {
   const char* file_path;
 } typedef DisplayFileDrop;
 
+struct DisplayStatusMessage {
+  char name[128];
+  char string[256];
+  uint64_t start_time_ns;
+  bool active;
+  uint32_t id;
+} typedef DisplayStatusMessage;
+
 struct Display {
   uint64_t frame_id;
   uint64_t ticks_last_frame;
@@ -77,6 +85,8 @@ struct Display {
   DisplayZoomHandler* zoom_handler;
   FileDialogHandler* scene_file_path;
   bool queued_save_scene;
+  DisplayStatusMessage* status_messages;
+  uint32_t screenshot_status_message_id;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);
@@ -92,5 +102,8 @@ void display_update(Display* display);
 void display_resize(Display* display, uint32_t width, uint32_t height);
 void display_update_resolution(Display* display, LuminaryHost* host, const LuminaryRendererSettings* settings);
 void display_destroy(Display** display);
+
+uint32_t display_add_status_message(Display* display, const char* name, const char* string);
+void display_remove_status_message(Display* display, uint32_t id);
 
 #endif /* MANDARIN_DUCK_DISPLAY_H */

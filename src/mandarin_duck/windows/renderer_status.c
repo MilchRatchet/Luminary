@@ -33,27 +33,31 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 0.15f, .height = 24},
-                           .text         = name,
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = true,
-                           .auto_size    = false,
-                           .is_clickable = false});
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.15f, .height = 24},
+          .text         = name,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 0.65f, .height = 24},
-                           .text         = string,
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = false,
-                           .auto_size    = false,
-                           .is_clickable = false});
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.65f, .height = 24},
+          .text         = string,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = false,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
 
       char text[256];
 
@@ -64,15 +68,80 @@ static void _window_renderer_status_action(Window* window, Display* display, Lum
 
       element_text(
         window, display, mouse_state,
-        (ElementTextArgs) {.color        = 0xFFFFFFFF,
-                           .size         = (ElementSize) {.rel_width = 0.2f, .height = 24},
-                           .text         = text,
-                           .center_x     = false,
-                           .center_y     = true,
-                           .highlighting = false,
-                           .cache_text   = false,
-                           .auto_size    = false,
-                           .is_clickable = false});
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.2f, .height = 24},
+          .text         = text,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = false,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
+    }
+    window_pop_section(window);
+  }
+
+  uint32_t num_status_messages = 0;
+  if (display->status_messages)
+    array_get_num_elements(display->status_messages, &num_status_messages);
+
+  for (uint32_t i = 0; i < num_status_messages; i++) {
+    if (!display->status_messages[i].active)
+      continue;
+
+    window_push_section(window, 24, 0);
+    {
+      window_margin(window, 8);
+
+      element_text(
+        window, display, mouse_state,
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.15f, .height = 24},
+          .text         = display->status_messages[i].name,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = true,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
+
+      element_text(
+        window, display, mouse_state,
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.65f, .height = 24},
+          .text         = display->status_messages[i].string,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = false,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
+
+      char text[256];
+
+      double time = (SDL_GetTicksNS() - display->status_messages[i].start_time_ns) / 1e9;
+
+      sprintf(text, "(%.2fs)", time);
+
+      element_text(
+        window, display, mouse_state,
+        (ElementTextArgs) {
+          .color        = 0xFFFFFFFF,
+          .size         = (ElementSize) {.rel_width = 0.2f, .height = 24},
+          .text         = text,
+          .center_x     = false,
+          .center_y     = true,
+          .highlighting = false,
+          .cache_text   = false,
+          .auto_size    = false,
+          .is_clickable = false,
+        });
     }
     window_pop_section(window);
   }
