@@ -215,6 +215,8 @@ struct LumBuiltinCamera {
   float purkinje_kappa2;
   bool use_color_correction;
   LuminaryRGBF color_correction;
+  float white_balance_red_cyan;
+  float white_balance_blue_yellow;
   LuminaryLensTemplate lens_template;
   LumBuiltinCameraThinLens thin_lens;
   LumBuiltinCameraLens lens;

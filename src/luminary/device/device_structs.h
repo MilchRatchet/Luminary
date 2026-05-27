@@ -63,6 +63,8 @@ struct DeviceCamera {
   float thin_lens_fov;
   float sensor_diagonal_size;
   float exposure_time;
+  float white_balance_red_cyan;
+  float white_balance_blue_yellow;
 
   struct {
     float aspect_ratio;
@@ -73,7 +75,7 @@ struct DeviceCamera {
     float microlens_acceptance_angle;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x5Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x64u);
 
 struct DeviceCameraAux {
   uint32_t num_interfaces;

@@ -585,6 +585,11 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   update_data |= _window_entity_properties_add_checkbox(data, "Dithering", &camera.dithering);
 
+  update_data |= _window_entity_properties_add_slider(
+    data, "WB Red-Cyan", &camera.white_balance_red_cyan, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 0.5f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "WB Blue-Yellow", &camera.white_balance_blue_yellow, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 0.5f);
+
   update_data |= _window_entity_properties_add_checkbox(data, "Color Correction", &camera.use_color_correction);
 
   if (camera.use_color_correction) {

@@ -77,6 +77,9 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->purkinje_kappa2 = camera->purkinje_kappa2;
   device_camera->scale           = camera->lens.scale;
 
+  device_camera->white_balance_red_cyan    = camera->white_balance_red_cyan;
+  device_camera->white_balance_blue_yellow = camera->white_balance_blue_yellow;
+
   return LUMINARY_SUCCESS;
 }
 LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* device_ocean) {

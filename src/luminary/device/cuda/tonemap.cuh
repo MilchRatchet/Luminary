@@ -220,6 +220,12 @@ LUMINARY_FUNCTION RGBF
 
   pixel = film_grain_apply(pixel, x, y);
   pixel = scale_color(pixel, device.camera.exposure);
+
+  // White balance
+  pixel.r *= 1.0f + device.camera.white_balance_red_cyan;
+  pixel.g *= 1.0f + device.camera.white_balance_blue_yellow;
+  pixel.b *= 1.0f - (device.camera.white_balance_red_cyan + device.camera.white_balance_blue_yellow) * 0.5f;
+
   pixel = purkinje_shift(pixel);
   pixel = tonemap_apply_transform(pixel, agx_params);
 

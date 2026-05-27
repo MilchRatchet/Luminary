@@ -627,6 +627,8 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->color_correction.r           = 0.0f;
   camera->color_correction.g           = 0.0f;
   camera->color_correction.b           = 0.0f;
+  camera->white_balance_red_cyan       = 0.0f;
+  camera->white_balance_blue_yellow    = 0.0f;
   camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
 
   __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_init(&camera->thin_lens, version));
@@ -962,6 +964,8 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
+  dst_camera->white_balance_red_cyan       = camera->white_balance_red_cyan;
+  dst_camera->white_balance_blue_yellow    = camera->white_balance_blue_yellow;
 
   dst_camera->lens_template = camera->lens_template;
 
@@ -1261,6 +1265,8 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
   dst_camera->use_color_correction         = camera->use_color_correction;
   dst_camera->color_correction             = camera->color_correction;
+  dst_camera->white_balance_red_cyan       = camera->white_balance_red_cyan;
+  dst_camera->white_balance_blue_yellow    = camera->white_balance_blue_yellow;
 
   dst_camera->lens_template = camera->lens_template;
 
