@@ -1,5 +1,7 @@
 #include "image.h"
 
+#include <luminary/image.h>
+
 #include "host_local_memory.h"
 #include "internal_error.h"
 
@@ -41,6 +43,12 @@ static void* _image_realloc_stbi(void* data, size_t size) {
 #define STBI_REALLOC(p, newsz) _image_realloc_stbi(p, newsz)
 #define STBI_FREE(p) _image_free_stbi(p)
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#define STBIW_MALLOC(sz) _image_malloc_stbi(sz)
+#define STBIW_REALLOC(p, newsz) _image_realloc_stbi(p, newsz)
+#define STBIW_FREE(p) _image_free_stbi(p)
+
 // Disable warnings about unused static functions in stb_image. We assume that all non-MSVC compilers support GCC style pragmas.
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push)
@@ -51,6 +59,7 @@ static void* _image_realloc_stbi(void* data, size_t size) {
 #endif /* !_MSC_VER || __clang__ */
 
 #include "stb/stb_image.h"
+#include "stb/stb_image_write.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(pop)
@@ -170,4 +179,60 @@ LuminaryResult image_load(Texture* texture, const char* path) {
   __FAILURE_HANDLE(host_free_local(&file_mem));
 
   return result;
+}
+
+LuminaryResult luminary_image_save(const LuminaryImageSaveArgs* args) {
+  __CHECK_NULL_ARGUMENT(args);
+  __CHECK_NULL_ARGUMENT(args->file_path);
+  __CHECK_NULL_ARGUMENT(args->image.buffer);
+
+  const uint32_t width      = args->image.width;
+  const uint32_t height     = args->image.height;
+  const uint32_t image_size = width * height * 4;
+
+  uint8_t* buffer;
+  __FAILURE_HANDLE(host_malloc((void**) &buffer, image_size));
+
+  uint8_t* buffer_rgb8 = buffer;
+  for (uint32_t y = 0; y < height; y++) {
+    for (uint32_t x = 0; x < width; x++) {
+      buffer_rgb8[4 * (x + y * width) + 0] = args->image.buffer[4 * (x + y * args->image.ld) + 2];
+      buffer_rgb8[4 * (x + y * width) + 1] = args->image.buffer[4 * (x + y * args->image.ld) + 1];
+      buffer_rgb8[4 * (x + y * width) + 2] = args->image.buffer[4 * (x + y * args->image.ld) + 0];
+      buffer_rgb8[4 * (x + y * width) + 3] = args->image.buffer[4 * (x + y * args->image.ld) + 3];
+    }
+  }
+
+  const char* file_path_string;
+  LuminaryResult apply_result = luminary_path_apply(args->file_path, (const char*) 0, &file_path_string);
+  if (apply_result != LUMINARY_SUCCESS) {
+    __FAILURE_HANDLE(host_free((void**) &buffer));
+    return apply_result;
+  }
+
+  int stbi_result = 0;
+  switch (args->format) {
+    case LUMINARY_IMAGE_SAVE_FORMAT_PNG:
+      stbi_result = stbi_write_png(file_path_string, width, height, 4, buffer, width * 4);
+      break;
+    case LUMINARY_IMAGE_SAVE_FORMAT_JPG:
+      stbi_result = stbi_write_jpg(file_path_string, width, height, 4, buffer, args->jpeg_quality);
+      break;
+    case LUMINARY_IMAGE_SAVE_FORMAT_BMP:
+      stbi_result = stbi_write_bmp(file_path_string, width, height, 4, buffer);
+      break;
+    case LUMINARY_IMAGE_SAVE_FORMAT_TGA:
+      stbi_result = stbi_write_tga(file_path_string, width, height, 4, buffer);
+      break;
+    default:
+      break;
+  }
+
+  __FAILURE_HANDLE(host_free((void**) &buffer));
+
+  if (!stbi_result) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to save image.");
+  }
+
+  return LUMINARY_SUCCESS;
 }

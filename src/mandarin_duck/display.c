@@ -113,13 +113,6 @@ static void _display_blit_to_display_buffer(Display* display, LuminaryImage imag
       for (; x < display->width; x++) {
         int32_t src_x = (int32_t) (x >> scale) + src_offset_x;
         if (src_x < 0 || src_x >= (int32_t) image.width) {
-          int32_t skip = 0;
-          if (src_x < 0) {
-            skip = -src_x;  // Number of pixels to skip padding
-          }
-          else {
-            break;
-          }
           dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
         }
         else {
@@ -786,7 +779,14 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
 
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
-    LUM_FAILURE_HANDLE(luminary_host_save_png(host, output_handle, image_path));
+    LuminaryImageSaveArgs args = {
+      .image        = output_image,
+      .file_path    = image_path,
+      .format       = LUMINARY_IMAGE_SAVE_FORMAT_PNG,
+      .jpeg_quality = 100,
+    };
+
+    LUM_FAILURE_HANDLE(luminary_image_save(&args));
 
     LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
 

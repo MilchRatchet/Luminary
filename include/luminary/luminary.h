@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2021-2025 Max Jenke
+  Copyright (C) 2021-2026 Max Jenke
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU Affero General Public License as published
@@ -21,6 +21,7 @@
 #include <luminary/api_utils.h>
 #include <luminary/error.h>
 #include <luminary/host.h>
+#include <luminary/image.h>
 #include <luminary/name_strings.h>
 #include <luminary/path.h>
 #include <luminary/structs.h>
