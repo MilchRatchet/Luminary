@@ -24,6 +24,9 @@ LuminaryResult device_mesh_set(DeviceMesh* device_mesh, Device* device, const Me
   device_mesh->triangle_count = mesh->data.triangle_count;
   device_mesh->id             = mesh->id;
 
+  if (device_mesh->vertices)
+    __FAILURE_HANDLE(device_free(&device_mesh->vertices));
+
   __FAILURE_HANDLE(device_malloc(&device_mesh->vertices, sizeof(DeviceTriangleVertex) * device_mesh->triangle_count * 3));
 
   // TODO: This will fail for very large meshes.
@@ -35,6 +38,9 @@ LuminaryResult device_mesh_set(DeviceMesh* device_mesh, Device* device, const Me
   for (uint32_t vertex_id = 0; vertex_id < device_mesh->triangle_count * 3; vertex_id++) {
     __FAILURE_HANDLE(device_struct_vertex_convert(&mesh->data, vertex_id, vertex_buffer_access + vertex_id));
   }
+
+  if (device_mesh->texture_triangles)
+    __FAILURE_HANDLE(device_free(&device_mesh->texture_triangles));
 
   __FAILURE_HANDLE(device_malloc(&device_mesh->texture_triangles, sizeof(DeviceTriangleTexture) * device_mesh->triangle_count));
 
