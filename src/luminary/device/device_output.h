@@ -35,8 +35,7 @@ struct DeviceOutput {
   CUevent event_output_callback[DEVICE_OUTPUT_CALLBACK_COUNT];
   uint32_t callback_index;
   ARRAY DeviceOutputRequest* output_requests;
-  RGBF color_correction;
-  AGXCustomParams agx_params;
+  LuminaryTonemapParams tonemap_params;
   bool recurring_output_is_dirty;
 } typedef DeviceOutput;
 

@@ -79,8 +79,7 @@ struct KernelArgsLightComputeIntensity {
 } typedef KernelArgsLightComputeIntensity;
 
 struct KernelArgsGenerateFinalImage {
-  RGBF color_correction;
-  AGXCustomParams agx_params;
+  LuminaryTonemapParams tonemap_params;
   uint8_t undersampling;
 } typedef KernelArgsGenerateFinalImage;
 

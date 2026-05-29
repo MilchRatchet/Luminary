@@ -16,13 +16,9 @@ const char* const luminary_strings_adaptive_sampling_output_mode[LUMINARY_ADAPTI
 };
 
 const char* const luminary_strings_tonemap[LUMINARY_TONEMAP_COUNT] = {
-  [LUMINARY_TONEMAP_NONE]       = "None",
-  [LUMINARY_TONEMAP_ACES]       = "ACES",
-  [LUMINARY_TONEMAP_REINHARD]   = "Reinhard",
-  [LUMINARY_TONEMAP_UNCHARTED2] = "Uncharted 2",
-  [LUMINARY_TONEMAP_AGX]        = "Agx",
-  [LUMINARY_TONEMAP_AGX_PUNCHY] = "Agx Punchy",
-  [LUMINARY_TONEMAP_AGX_CUSTOM] = "Agx Custom",
+  [LUMINARY_TONEMAP_NONE] = "None",         [LUMINARY_TONEMAP_ACES] = "ACES",
+  [LUMINARY_TONEMAP_REINHARD] = "Reinhard", [LUMINARY_TONEMAP_UNCHARTED2] = "Uncharted 2",
+  [LUMINARY_TONEMAP_AGX] = "Agx",           [LUMINARY_TONEMAP_AGX_PUNCHY] = "Agx Punchy",
 };
 
 const char* const luminary_strings_aperture[LUMINARY_APERTURE_COUNT] = {

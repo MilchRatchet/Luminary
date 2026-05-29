@@ -563,14 +563,19 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   update_data |=
     _window_entity_properties_add_dropdown(data, "Tonemap", LUMINARY_TONEMAP_COUNT, (char**) luminary_strings_tonemap, &tonemap);
 
-  if (tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
-    update_data |= _window_entity_properties_add_slider(
-      data, "AGX Power", &camera.agx_custom_power, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "AGX Saturation", &camera.agx_custom_saturation, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "AGX Slope", &camera.agx_custom_slope, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-  }
+  update_data |= _window_entity_properties_add_slider(
+    data, "Highlights", &camera.tonemap_params.highlights, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Shadows", &camera.tonemap_params.shadows, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Saturation", &camera.tonemap_params.saturation, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Dynamic Range", &camera.tonemap_params.dynamic_range, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 100.0f, 400.0f, 50.0f);
+
+  update_data |= _window_entity_properties_add_slider(
+    data, "WB Red-Cyan", &camera.tonemap_params.white_balance_red_cyan, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 0.5f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "WB Blue-Yellow", &camera.tonemap_params.white_balance_blue_yellow, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 0.5f);
 
   update_data |= _window_entity_properties_add_checkbox(data, "Local Error Minimization", &camera.use_local_error_minimization);
 
@@ -584,22 +589,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   }
 
   update_data |= _window_entity_properties_add_checkbox(data, "Dithering", &camera.dithering);
-
-  update_data |= _window_entity_properties_add_slider(
-    data, "WB Red-Cyan", &camera.white_balance_red_cyan, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 0.5f);
-  update_data |= _window_entity_properties_add_slider(
-    data, "WB Blue-Yellow", &camera.white_balance_blue_yellow, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 0.5f);
-
-  update_data |= _window_entity_properties_add_checkbox(data, "Color Correction", &camera.use_color_correction);
-
-  if (camera.use_color_correction) {
-    update_data |=
-      _window_entity_properties_add_slider(data, "Hue", &camera.color_correction.r, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Saturation", &camera.color_correction.g, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 1.0f);
-    update_data |=
-      _window_entity_properties_add_slider(data, "Value", &camera.color_correction.b, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -1.0f, 1.0f, 1.0f);
-  }
 
   if (update_data) {
     camera.lens_template         = (LuminaryLensTemplate) lens_template;

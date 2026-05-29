@@ -34,8 +34,14 @@ LuminaryResult device_output_create(DeviceOutput** output) {
 
   device_output_set_properties(*output, properties);
 
-  (*output)->color_correction = (RGBF) {.r = 1.0f, .g = 1.0f, .b = 1.0f};
-  (*output)->agx_params       = (AGXCustomParams) {.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
+  (*output)->tonemap_params = (LuminaryTonemapParams) {
+    .dynamic_range             = 100.0f,
+    .highlights                = 0.0f,
+    .saturation                = 0.0f,
+    .shadows                   = 0.0f,
+    .white_balance_blue_yellow = 0.0f,
+    .white_balance_red_cyan    = 0.0f,
+  };
 
   return LUMINARY_SUCCESS;
 }
@@ -124,9 +130,7 @@ LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camer
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(camera);
 
-  output->color_correction = camera->color_correction;
-  output->agx_params =
-    (AGXCustomParams) {.power = camera->agx_custom_power, .saturation = camera->agx_custom_saturation, .slope = camera->agx_custom_slope};
+  output->tonemap_params = camera->tonemap_params;
 
   return LUMINARY_SUCCESS;
 }
@@ -263,10 +267,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __FAILURE_HANDLE(device_renderer_get_total_executed_samples(device->renderer, &aggregate_sample_count));
 
   KernelArgsGenerateFinalImage generate_final_image_args;
-
-  generate_final_image_args.color_correction = output->color_correction;
-  generate_final_image_args.agx_params       = output->agx_params;
-  generate_final_image_args.undersampling    = device->undersampling_state;
+  generate_final_image_args.tonemap_params = output->tonemap_params;
+  generate_final_image_args.undersampling  = device->undersampling_state;
 
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], (void*) &generate_final_image_args, device->stream_main));

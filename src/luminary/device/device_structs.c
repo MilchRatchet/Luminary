@@ -49,7 +49,6 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->tonemap                          = camera->tonemap;
   device_camera->dithering                        = camera->dithering;
   device_camera->purkinje                         = camera->purkinje;
-  device_camera->use_color_correction             = camera->use_color_correction;
   device_camera->allow_reflections                = camera->lens.allow_reflections;
   device_camera->use_spectral_rendering           = camera->lens.use_spectral_rendering;
   device_camera->is_thin_lens_template            = camera->lens_template == LUMINARY_LENS_TEMPLATE_THIN_LENS;
@@ -76,9 +75,6 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->purkinje_kappa1 = camera->purkinje_kappa1;
   device_camera->purkinje_kappa2 = camera->purkinje_kappa2;
   device_camera->scale           = camera->lens.scale;
-
-  device_camera->white_balance_red_cyan    = camera->white_balance_red_cyan;
-  device_camera->white_balance_blue_yellow = camera->white_balance_blue_yellow;
 
   return LUMINARY_SUCCESS;
 }

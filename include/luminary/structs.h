@@ -129,13 +129,12 @@ LUMINARY_API struct LuminaryImage {
 
 // 3 bits reserved
 LUMINARY_API enum LuminaryToneMap {
-  LUMINARY_TONEMAP_NONE       = 0,
-  LUMINARY_TONEMAP_ACES       = 1,
-  LUMINARY_TONEMAP_REINHARD   = 2,
-  LUMINARY_TONEMAP_UNCHARTED2 = 3,
-  LUMINARY_TONEMAP_AGX        = 4,
-  LUMINARY_TONEMAP_AGX_PUNCHY = 5,
-  LUMINARY_TONEMAP_AGX_CUSTOM = 6,
+  LUMINARY_TONEMAP_NONE,
+  LUMINARY_TONEMAP_ACES,
+  LUMINARY_TONEMAP_REINHARD,
+  LUMINARY_TONEMAP_UNCHARTED2,
+  LUMINARY_TONEMAP_AGX,
+  LUMINARY_TONEMAP_AGX_PUNCHY,
   LUMINARY_TONEMAP_COUNT
 } typedef LuminaryToneMap;
 
@@ -196,6 +195,15 @@ LUMINARY_API struct LuminaryCameraSensor {
   float microlens_acceptance_angle;  // [radians]
 } typedef LuminaryCameraSensor;
 
+LUMINARY_API struct LuminaryTonemapParams {
+  float highlights;
+  float shadows;
+  float saturation;
+  float dynamic_range;
+  float white_balance_red_cyan;
+  float white_balance_blue_yellow;
+} typedef LuminaryTonemapParams;
+
 LUMINARY_API struct LuminaryCamera {
   LuminaryVec3 pos;
   LuminaryVec3 rotation;
@@ -204,19 +212,13 @@ LUMINARY_API struct LuminaryCamera {
   float exposure;
   float shutter_speed;  // [s/*]
   LuminaryToneMap tonemap;
-  float agx_custom_slope;
-  float agx_custom_power;
-  float agx_custom_saturation;
   bool use_local_error_minimization;
   float bloom_blend;
   bool dithering;
   bool purkinje;
   float purkinje_kappa1;
   float purkinje_kappa2;
-  bool use_color_correction;
-  LuminaryRGBF color_correction;
-  float white_balance_red_cyan;
-  float white_balance_blue_yellow;
+  LuminaryTonemapParams tonemap_params;
   LuminaryLensTemplate lens_template;
   LuminaryCameraThinLens thin_lens;
   LuminaryCameraLens lens;

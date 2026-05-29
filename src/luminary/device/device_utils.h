@@ -229,12 +229,6 @@ struct Quad {
   vec3 normal;
 } typedef Quad;
 
-struct AGXCustomParams {
-  float slope;
-  float power;
-  float saturation;
-} typedef AGXCustomParams;
-
 struct TriangleHandle {
   uint32_t instance_id;
   uint32_t tri_id;

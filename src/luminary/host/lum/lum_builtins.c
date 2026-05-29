@@ -167,7 +167,6 @@ const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   __BUILTIN_ENUM_PAIR(TONEMAP_UNCHARTED2, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(TONEMAP_AGX, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(TONEMAP_AGX_PUNCHY, 1, LUM_VERSION_CURRENT),
-  __BUILTIN_ENUM_PAIR(TONEMAP_AGX_CUSTOM, 1, LUM_VERSION_CURRENT),
   // LuminaryAperture
   __BUILTIN_ENUM_PAIR(APERTURE_ROUND, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(APERTURE_BLADED, 1, LUM_VERSION_CURRENT),
@@ -276,6 +275,12 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa2, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_color_correction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, color_correction, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, white_balance_red_cyan, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, white_balance_blue_yellow, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, highlights, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, shadows, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, saturation, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, dynamic_range, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, lens_template, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, thin_lens, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, lens, 1, LUM_VERSION_CURRENT),
@@ -629,6 +634,13 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->color_correction.b           = 0.0f;
   camera->white_balance_red_cyan       = 0.0f;
   camera->white_balance_blue_yellow    = 0.0f;
+  camera->highlights                   = 0.0f;
+  camera->shadows                      = 0.0f;
+  camera->saturation                   = 0.0f;
+  camera->dynamic_range                = 100.0f;
+  camera->lens_template                = LUMINARY_LENS_TEMPLATE_PHYSICAL_B;
+  camera->white_balance_red_cyan       = 0.0f;
+  camera->white_balance_blue_yellow    = 0.0f;
   camera->lens_template                = LUMINARY_LENS_TEMPLATE_THIN_LENS;
 
   __FAILURE_HANDLE(_lum_builtin_camera_thin_lens_init(&camera->thin_lens, version));
@@ -953,19 +965,12 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->aperture_blade_count         = camera->aperture_blade_count;
   dst_camera->exposure                     = camera->exposure;
   dst_camera->tonemap                      = camera->tonemap;
-  dst_camera->agx_custom_slope             = camera->agx_custom_slope;
-  dst_camera->agx_custom_power             = camera->agx_custom_power;
-  dst_camera->agx_custom_saturation        = camera->agx_custom_saturation;
   dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
   dst_camera->bloom_blend                  = camera->bloom_blend;
   dst_camera->dithering                    = camera->dithering;
   dst_camera->purkinje                     = camera->purkinje;
   dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
-  dst_camera->use_color_correction         = camera->use_color_correction;
-  dst_camera->color_correction             = camera->color_correction;
-  dst_camera->white_balance_red_cyan       = camera->white_balance_red_cyan;
-  dst_camera->white_balance_blue_yellow    = camera->white_balance_blue_yellow;
 
   dst_camera->lens_template = camera->lens_template;
 
@@ -1254,19 +1259,12 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->aperture_blade_count         = camera->aperture_blade_count;
   dst_camera->exposure                     = camera->exposure;
   dst_camera->tonemap                      = camera->tonemap;
-  dst_camera->agx_custom_slope             = camera->agx_custom_slope;
-  dst_camera->agx_custom_power             = camera->agx_custom_power;
-  dst_camera->agx_custom_saturation        = camera->agx_custom_saturation;
   dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
   dst_camera->bloom_blend                  = camera->bloom_blend;
   dst_camera->dithering                    = camera->dithering;
   dst_camera->purkinje                     = camera->purkinje;
   dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;
   dst_camera->purkinje_kappa2              = camera->purkinje_kappa2;
-  dst_camera->use_color_correction         = camera->use_color_correction;
-  dst_camera->color_correction             = camera->color_correction;
-  dst_camera->white_balance_red_cyan       = camera->white_balance_red_cyan;
-  dst_camera->white_balance_blue_yellow    = camera->white_balance_blue_yellow;
 
   dst_camera->lens_template = camera->lens_template;
 

@@ -226,15 +226,18 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* AGXSLOPE */
     case 4994579175988283201u:
-      sscanf(value, "%f\n", &camera->agx_custom_slope);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->agx_custom_slope);
       break;
     /* AGXPOWER */
     case 5928240482665121601u:
-      sscanf(value, "%f\n", &camera->agx_custom_power);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->agx_custom_power);
       break;
     /* AGXSATUR */
     case 5932740723678398273u:
-      sscanf(value, "%f\n", &camera->agx_custom_saturation);
+      // Legacy
+      // sscanf(value, "%f\n", &camera->agx_custom_saturation);
       break;
     /* FILTER__ */
     case 6872302014111172934u:

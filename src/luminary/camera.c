@@ -14,32 +14,23 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->rotation.x                   = 0.0f;
   camera->rotation.y                   = 0.0f;
   camera->rotation.z                   = 0.0f;
-  camera->aperture_shape               = LUMINARY_APERTURE_ROUND;
+  camera->aperture_shape               = LUMINARY_APERTURE_BLADED;
   camera->aperture_blade_count         = 7;
   camera->exposure                     = 0.0f;
-  camera->shutter_speed                = 100.0f;
+  camera->shutter_speed                = 200.0f;
   camera->bloom_blend                  = 0.01f;
   camera->dithering                    = 1;
   camera->tonemap                      = LUMINARY_TONEMAP_AGX;
   camera->use_local_error_minimization = false;
-  camera->agx_custom_slope             = 1.0f;
-  camera->agx_custom_power             = 1.0f;
-  camera->agx_custom_saturation        = 1.0f;
-  camera->purkinje                     = 1;
+  camera->purkinje                     = false;
   camera->purkinje_kappa1              = 0.2f;
   camera->purkinje_kappa2              = 0.29f;
-  camera->use_color_correction         = 0;
-  camera->color_correction.r           = 0.0f;
-  camera->color_correction.g           = 0.0f;
-  camera->color_correction.b           = 0.0f;
-  camera->white_balance_red_cyan       = 0.0f;
-  camera->white_balance_blue_yellow    = 0.0f;
-  camera->lens_template                = LUMINARY_LENS_TEMPLATE_PHYSICAL_B;
+  camera->lens_template                = LUMINARY_LENS_TEMPLATE_PHYSICAL_G;
   camera->thin_lens.aperture_size      = 0.0f;
   camera->thin_lens.object_distance    = 1.0f;
   camera->thin_lens.fov                = 1.0f;
-  camera->lens.f_stop                  = 2.8f;
-  camera->lens.sensor_distance         = 1.0f;
+  camera->lens.f_stop                  = 2.0f;
+  camera->lens.sensor_distance         = 40.0f;
   camera->lens.object_distance         = 10.0f;
   camera->lens.scale                   = 1.0f;
   camera->lens.use_auto_focus          = true;
@@ -51,11 +42,20 @@ LuminaryResult camera_get_default(Camera* camera) {
     .diagonal_size                    = 43.3f,
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
-    .iso                              = 100.0f,
+    .iso                              = 200.0f,
     .film_grain_strength              = 0.0f,
     .response_model                   = LUMINARY_SENSOR_RESPONSE_IDEAL,
     .film_thickness                   = 1.0f,
     .microlens_acceptance_angle       = PI * (25.0f / 180.0f),
+  };
+
+  camera->tonemap_params = (LuminaryTonemapParams) {
+    .highlights                = 0.0f,
+    .shadows                   = 0.0f,
+    .saturation                = 0.0f,
+    .dynamic_range             = 100.0f,
+    .white_balance_red_cyan    = 0.0f,
+    .white_balance_blue_yellow = 0.0f,
   };
 
   return LUMINARY_SUCCESS;
@@ -138,21 +138,13 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(purkinje, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje_kappa1, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje_kappa2, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(use_color_correction, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(white_balance_red_cyan, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(white_balance_blue_yellow, SCENE_DIRTY_FLAG_OUTPUT);
 
-  if (input->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
-    __CAMERA_CHECK_DIRTY(agx_custom_slope, SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(agx_custom_power, SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(agx_custom_saturation, SCENE_DIRTY_FLAG_OUTPUT);
-  }
-
-  if (input->use_color_correction) {
-    __CAMERA_CHECK_DIRTY(color_correction.r, SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(color_correction.g, SCENE_DIRTY_FLAG_OUTPUT);
-    __CAMERA_CHECK_DIRTY(color_correction.b, SCENE_DIRTY_FLAG_OUTPUT);
-  }
+  __CAMERA_CHECK_DIRTY(tonemap_params.highlights, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(tonemap_params.shadows, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(tonemap_params.saturation, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(tonemap_params.dynamic_range, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(tonemap_params.white_balance_red_cyan, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(tonemap_params.white_balance_blue_yellow, SCENE_DIRTY_FLAG_OUTPUT);
 
   return LUMINARY_SUCCESS;
 }

@@ -43,14 +43,13 @@ struct DeviceCamera {
   uint32_t tonemap : 3;
   uint32_t dithering : 1;
   uint32_t purkinje : 1;
-  uint32_t use_color_correction : 1;
   uint32_t allow_reflections : 1;
   uint32_t use_spectral_rendering : 1;
   uint32_t is_thin_lens_template : 1;
   uint32_t use_local_error_minimization : 1;
   uint32_t use_aspect_ratio_from_resolution : 1;
   uint32_t enable_diffraction : 1;
-  // 16 bits spare
+  // 17 bits spare
 
   vec3 pos;
   Quaternion rotation;
@@ -63,8 +62,6 @@ struct DeviceCamera {
   float thin_lens_fov;
   float sensor_diagonal_size;
   float exposure_time;
-  float white_balance_red_cyan;
-  float white_balance_blue_yellow;
 
   struct {
     float aspect_ratio;
@@ -75,7 +72,7 @@ struct DeviceCamera {
     float microlens_acceptance_angle;
   } sensor;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x64u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x5Cu);
 
 struct DeviceCameraAux {
   uint32_t num_interfaces;

@@ -81,7 +81,6 @@ enum LumBuiltinEnum {
   LUM_BUILTIN_ENUM_TONEMAP_UNCHARTED2 = LUMINARY_TONEMAP_UNCHARTED2,
   LUM_BUILTIN_ENUM_TONEMAP_AGX        = LUMINARY_TONEMAP_AGX,
   LUM_BUILTIN_ENUM_TONEMAP_AGX_PUNCHY = LUMINARY_TONEMAP_AGX_PUNCHY,
-  LUM_BUILTIN_ENUM_TONEMAP_AGX_CUSTOM = LUMINARY_TONEMAP_AGX_CUSTOM,
   // LuminaryAperture
   LUM_BUILTIN_ENUM_APERTURE_ROUND  = LUMINARY_APERTURE_ROUND,
   LUM_BUILTIN_ENUM_APERTURE_BLADED = LUMINARY_APERTURE_BLADED,
@@ -217,6 +216,10 @@ struct LumBuiltinCamera {
   LuminaryRGBF color_correction;
   float white_balance_red_cyan;
   float white_balance_blue_yellow;
+  float highlights;
+  float shadows;
+  float saturation;
+  float dynamic_range;
   LuminaryLensTemplate lens_template;
   LumBuiltinCameraThinLens thin_lens;
   LumBuiltinCameraLens lens;

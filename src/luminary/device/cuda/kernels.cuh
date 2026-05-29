@@ -527,7 +527,7 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
         const float blue  = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index);
 
         RGBF pixel = get_color(red, green, blue);
-        pixel      = tonemap_apply(pixel, x, y, args.color_correction, args.agx_params);
+        pixel      = tonemap_apply(pixel, x, y, args.tonemap_params);
 
         color = add_color(color, pixel);
       }

@@ -159,19 +159,7 @@ LUMINARY_FUNCTION RGBF tonemap_agx_punchy(RGBF pixel) {
   return pixel;
 }
 
-LUMINARY_FUNCTION RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params) {
-  pixel = agx_conversion(pixel);
-
-  const RGBF slope = splat_color(agx_params.slope);
-  const RGBF power = splat_color(agx_params.power);
-
-  pixel = agx_look(pixel, slope, power, agx_params.saturation);
-  pixel = agx_inv_conversion(pixel);
-
-  return pixel;
-}
-
-LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel, const AGXCustomParams agx_params = {1.0f, 1.0f, 1.0f}) {
+LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel) {
   RGBF result;
 
   switch (device.camera.tonemap) {
@@ -193,16 +181,44 @@ LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel, const AGXCustom
     case LUMINARY_TONEMAP_AGX_PUNCHY:
       result = tonemap_agx_punchy(pixel);
       break;
-    case LUMINARY_TONEMAP_AGX_CUSTOM:
-      result = tonemap_agx_custom(pixel, agx_params);
-      break;
   }
 
   return result;
 }
 
-LUMINARY_FUNCTION RGBF
-  tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const RGBF color_correction, const AGXCustomParams agx_params) {
+LUMINARY_FUNCTION RGBF tonemap_custom_apply(RGBF pixel, float highlight, float shadow, float saturation, float dynamic_range) {
+  pixel = max_color(pixel, splat_color(0.0f));
+
+  if (dynamic_range > 100.0f) {
+    const float dr_factor = dynamic_range / 100.0f;
+    const float power     = 1.0f / (log2f(dr_factor) * 0.5f + 1.0f);
+    pixel.r               = powf(pixel.r, power);
+    pixel.g               = powf(pixel.g, power);
+    pixel.b               = powf(pixel.b, power);
+  }
+
+  const float luma    = __saturatef(color_luminance(pixel));
+  const float falloff = 2.5f;
+
+  const float shadow_weight    = powf(1.0f - luma, falloff);
+  const float highlight_weight = powf(luma, falloff);
+
+  const float shadow_mult    = exp2f(-shadow * shadow_weight);
+  const float highlight_mult = exp2f(highlight * highlight_weight);
+
+  pixel = scale_color(pixel, shadow_mult * highlight_mult);
+
+  if (saturation != 0.0f) {
+    const float sat_scale = 1.0f + saturation;
+    RGBF hsv              = rgb_to_hsv(pixel);
+    hsv.g                 = __saturatef(hsv.g * sat_scale);
+    pixel                 = hsv_to_rgb(hsv);
+  }
+
+  return pixel;
+}
+
+LUMINARY_FUNCTION RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const LuminaryTonemapParams tonemap_params) {
   pixel = max_color(pixel, splat_color(0.0f));
 
   if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
@@ -219,31 +235,20 @@ LUMINARY_FUNCTION RGBF
   pixel = scale_color(pixel, device.camera.exposure_time * iso_factor * photometric_scale);
 
   pixel = film_grain_apply(pixel, x, y);
-  pixel = scale_color(pixel, device.camera.exposure);
+
+  const float dynamic_range_scale = 100.0f / fmaxf(tonemap_params.dynamic_range, 100.0f);
+  pixel                           = scale_color(pixel, device.camera.exposure * dynamic_range_scale);
 
   // White balance
-  pixel.r *= 1.0f + device.camera.white_balance_red_cyan;
-  pixel.g *= 1.0f + device.camera.white_balance_blue_yellow;
-  pixel.b *= 1.0f - (device.camera.white_balance_red_cyan + device.camera.white_balance_blue_yellow) * 0.5f;
+  pixel.r *= 1.0f + tonemap_params.white_balance_red_cyan;
+  pixel.g *= 1.0f + tonemap_params.white_balance_blue_yellow;
+  pixel.b *= 1.0f - (tonemap_params.white_balance_red_cyan + tonemap_params.white_balance_blue_yellow) * 0.5f;
 
   pixel = purkinje_shift(pixel);
-  pixel = tonemap_apply_transform(pixel, agx_params);
+  pixel = tonemap_apply_transform(pixel);
 
-  if (device.camera.use_color_correction) {
-    RGBF hsv = rgb_to_hsv(pixel);
-
-    hsv = add_color(hsv, color_correction);
-
-    if (hsv.r < 0.0f)
-      hsv.r += 1.0f;
-    if (hsv.r > 1.0f)
-      hsv.r -= 1.0f;
-    hsv.g = __saturatef(hsv.g);
-    if (hsv.b < 0.0f)
-      hsv.b = 0.0f;
-
-    pixel = hsv_to_rgb(hsv);
-  }
+  pixel =
+    tonemap_custom_apply(pixel, tonemap_params.highlights, tonemap_params.shadows, tonemap_params.saturation, tonemap_params.dynamic_range);
 
   return pixel;
 }
