@@ -575,7 +575,6 @@ struct DeviceConstantMemory {
   DeviceCameraAux camera_aux;
   // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   OptixTraversableHandle optix_bvh;
-  OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_particles;
   OptixTraversableHandle optix_bvh_light;
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX

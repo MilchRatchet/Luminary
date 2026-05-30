@@ -879,7 +879,6 @@ LuminaryResult device_update_instances(Device* device, const MeshInstanceManager
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.instance_transforms, ptrs.instance_transforms);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.instance_mesh_ids, ptrs.instance_mesh_ids);
     DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh, ptrs.bvh);
-    DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_shadow, ptrs.bvh_shadow);
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));

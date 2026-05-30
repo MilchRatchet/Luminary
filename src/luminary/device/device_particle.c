@@ -112,8 +112,7 @@ LuminaryResult device_particles_handle_update(
 
       __FAILURE_HANDLE(optix_bvh_particles_gas_build(particles_handle->geometry_bvh, device, particles_handle));
 
-      __FAILURE_HANDLE(
-        _device_particles_instances_create(particles_handle, device, particles_handle->geometry_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]));
+      __FAILURE_HANDLE(_device_particles_instances_create(particles_handle, device, particles_handle->geometry_bvh->traversable));
 
       __FAILURE_HANDLE(optix_bvh_particles_ias_build(particles_handle->instance_bvh, device, particles_handle));
     }
@@ -129,7 +128,7 @@ LuminaryResult device_particles_handle_get_ptrs(DeviceParticlesHandle* particles
   __CHECK_NULL_ARGUMENT(ptrs);
 
   ptrs->quads = DEVICE_CUPTR(particles_handle->quad_buffer);
-  ptrs->bvh   = particles_handle->instance_bvh->traversable[OPTIX_BVH_TYPE_DEFAULT];
+  ptrs->bvh   = particles_handle->instance_bvh->traversable;
 
   return LUMINARY_SUCCESS;
 }

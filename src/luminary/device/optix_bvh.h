@@ -9,12 +9,10 @@ struct Device typedef Device;
 struct OpacityMicromap typedef OpacityMicromap;
 struct MeshInstanceProcessedUpdate typedef MeshInstanceProcessedUpdate;
 
-enum OptixBVHType { OPTIX_BVH_TYPE_DEFAULT = 0, OPTIX_BVH_TYPE_SHADOW = 1, OPTIX_BVH_TYPE_COUNT } typedef OptixBVHType;
-
 struct OptixBVHInstanceCache {
   uint32_t num_instances_allocated;
   uint32_t num_instances;
-  DEVICE OptixInstance* instances[OPTIX_BVH_TYPE_COUNT];
+  DEVICE OptixInstance* instances;
 } typedef OptixBVHInstanceCache;
 
 LuminaryResult optix_bvh_instance_cache_create(OptixBVHInstanceCache** cache);
@@ -24,9 +22,9 @@ DEVICE_CTX_FUNC LuminaryResult optix_bvh_instance_cache_destroy(OptixBVHInstance
 
 struct OptixBVH {
   bool fast_trace;
-  bool allocated_mask[OPTIX_BVH_TYPE_COUNT];
-  OptixTraversableHandle traversable[OPTIX_BVH_TYPE_COUNT];
-  DEVICE void* bvh_data[OPTIX_BVH_TYPE_COUNT];
+  bool allocated_mask;
+  OptixTraversableHandle traversable;
+  DEVICE void* bvh_data;
 } typedef OptixBVH;
 
 DEVICE_CTX_FUNC LuminaryResult optix_bvh_create(OptixBVH** bvh);

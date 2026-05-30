@@ -236,8 +236,7 @@ LuminaryResult device_mesh_instance_manager_get_ptrs(DeviceMeshInstanceManager* 
   ptrs->texture_triangles   = DEVICE_CUPTR(manager->texture_triangles);
   ptrs->instance_transforms = DEVICE_CUPTR(manager->instance_transforms);
   ptrs->instance_mesh_ids   = DEVICE_CUPTR(manager->instance_mesh_ids);
-  ptrs->bvh                 = (manager->bvh) ? manager->bvh->traversable[OPTIX_BVH_TYPE_DEFAULT] : (OptixTraversableHandle) 0;
-  ptrs->bvh_shadow          = (manager->bvh) ? manager->bvh->traversable[OPTIX_BVH_TYPE_SHADOW] : (OptixTraversableHandle) 0;
+  ptrs->bvh                 = (manager->bvh) ? manager->bvh->traversable : (OptixTraversableHandle) 0;
 
   return LUMINARY_SUCCESS;
 }

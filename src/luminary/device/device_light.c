@@ -2416,7 +2416,7 @@ LuminaryResult device_light_tree_get_ptrs(DeviceLightTree* tree, DeviceLightTree
   ptrs->root           = DEVICE_CUPTR(tree->root);
   ptrs->nodes          = DEVICE_CUPTR(tree->nodes);
   ptrs->tri_handle_map = DEVICE_CUPTR(tree->tri_handle_map);
-  ptrs->bvh            = tree->bvh->traversable[OPTIX_BVH_TYPE_DEFAULT];
+  ptrs->bvh            = tree->bvh->traversable;
 
   return LUMINARY_SUCCESS;
 }

@@ -86,7 +86,7 @@ LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
   payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowTrace(
-    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF),
+    device.optix_bvh, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF),
     OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, status, payload);
 
   if (payload.handle.instance_id == HIT_TYPE_REJECT) {
@@ -102,7 +102,7 @@ LUMINARY_FUNCTION RGBF
   payload.throughput = splat_color(1.0f);
 
   optixKernelFunctionShadowSunTrace(
-    device.optix_bvh_shadow, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF),
+    device.optix_bvh, position, dir, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF),
     OPTIX_RAY_FLAG_ENFORCE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, status, payload);
 
   return payload.throughput;

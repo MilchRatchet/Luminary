@@ -32,7 +32,6 @@ struct DeviceMeshInstanceManagerPtrs {
   CUdeviceptr instance_transforms;
   CUdeviceptr instance_mesh_ids;
   OptixTraversableHandle bvh;
-  OptixTraversableHandle bvh_shadow;
 } typedef DeviceMeshInstanceManagerPtrs;
 
 struct DeviceMeshInstanceManager {
