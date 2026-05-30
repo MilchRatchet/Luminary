@@ -174,36 +174,6 @@ static LuminaryResult _host_add_output_request_queue_work(Host* host, HostAddOut
   return LUMINARY_SUCCESS;
 }
 
-struct HostSavePNGArgs {
-  char* path;
-  LuminaryOutputHandle handle;
-} typedef HostSavePNGArgs;
-
-static LuminaryResult _host_save_png_clear_work(Host* host, HostSavePNGArgs* args) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(args);
-
-  __FAILURE_HANDLE(output_handler_release(host->output_handler, args->handle));
-
-  __FAILURE_HANDLE(host_free(&args->path));
-
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostSavePNGArgs)));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _host_save_png_queue_work(Host* host, HostSavePNGArgs* args) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(args);
-
-  LuminaryImage output_image;
-  __FAILURE_HANDLE(luminary_host_get_image(host, args->handle, &output_image));
-
-  __FAILURE_HANDLE(png_store_image(output_image, args->path));
-
-  return LUMINARY_SUCCESS;
-}
-
 struct HostEnableDeviceArgs {
   bool enable;
   uint32_t device_id;
@@ -1298,46 +1268,6 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   entry.name       = "Copy Output";
   entry.function   = (QueueEntryFunction) _host_copy_output_queue_work;
   entry.clear_func = (QueueEntryFunction) _host_copy_output_clear_work;
-  entry.args       = (void*) args;
-
-  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult luminary_host_save_png(Host* host, LuminaryOutputHandle handle, Path* path) {
-  LUMINARY_HOST_API_ENTRY
-
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(path);
-
-  if (handle == LUMINARY_OUTPUT_HANDLE_INVALID) {
-    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Invalid output handle.");
-  }
-
-  __FAILURE_HANDLE(output_handler_acquire(host->output_handler, handle));
-
-  const char* file_path_string;
-  __FAILURE_HANDLE(luminary_path_apply(path, (const char*) 0, &file_path_string));
-
-  const size_t path_length = strlen(file_path_string);
-
-  HostSavePNGArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostSavePNGArgs), (void**) &args));
-
-  args->handle = handle;
-
-  __FAILURE_HANDLE(host_malloc(&(args->path), path_length + 1));
-
-  memcpy(args->path, file_path_string, path_length);
-  args->path[path_length] = '\0';
-
-  QueueEntry entry;
-  memset(&entry, 0, sizeof(QueueEntry));
-
-  entry.name       = "Save PNG";
-  entry.function   = (QueueEntryFunction) _host_save_png_queue_work;
-  entry.clear_func = (QueueEntryFunction) _host_save_png_clear_work;
   entry.args       = (void*) args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));

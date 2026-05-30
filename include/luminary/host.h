@@ -140,8 +140,6 @@ LUMINARY_API LuminaryResult luminary_host_get_num_meshes(LuminaryHost* host, uin
 LUMINARY_API LuminaryResult luminary_host_get_num_materials(LuminaryHost* host, uint32_t* num_materials);
 LUMINARY_API LuminaryResult luminary_host_get_num_instances(LuminaryHost* host, uint32_t* num_instances);
 
-LUMINARY_API LuminaryResult luminary_host_save_png(LuminaryHost* host, LuminaryOutputHandle handle, LuminaryPath* path);
-
 LUMINARY_API LuminaryResult luminary_host_save_as_lumV5(LuminaryHost* host, LuminaryPath* path);
 
 /*
