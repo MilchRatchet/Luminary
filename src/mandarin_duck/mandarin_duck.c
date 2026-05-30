@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "worker.h"
+
 static void _mandarin_duck_update_host_output_props(LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(host);
 
@@ -178,6 +180,8 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
 
     _mandarin_duck_handle_file_drop(duck, duck->host, file_drop_array);
 
+    display_process_tasks(duck->display);
+
     display_handle_inputs(duck->display, duck->host, time_step);
     display_handle_outputs(duck->display, duck->host, duck->output_directory);
 
@@ -189,6 +193,30 @@ static void _mandarin_duck_run_mode_default(MandarinDuck* duck) {
   LUM_FAILURE_HANDLE(array_destroy(&file_drop_array));
 
   LUM_FAILURE_HANDLE(thread_status_destroy(&ui_thread));
+}
+
+struct BenchmarkSaveImageTaskArgs {
+  LuminaryImageSaveArgs save_args;
+  LuminaryHost* host;
+  LuminaryOutputHandle output_handle;
+} typedef BenchmarkSaveImageTaskArgs;
+
+static void _benchmark_save_image_task_continuation(void* args) {
+  BenchmarkSaveImageTaskArgs* task_args = (BenchmarkSaveImageTaskArgs*) args;
+
+  luminary_host_release_output(task_args->host, task_args->output_handle);
+}
+
+static void _benchmark_save_image_task(void* args, MDPromise* promise) {
+  BenchmarkSaveImageTaskArgs* task_args = (BenchmarkSaveImageTaskArgs*) args;
+
+  LUM_FAILURE_HANDLE(luminary_image_save(&task_args->save_args));
+  LUM_FAILURE_HANDLE(luminary_path_destroy(&task_args->save_args.file_path));
+
+  SDL_LockMutex(promise->mutex);
+  promise->continuation      = _benchmark_save_image_task_continuation;
+  promise->continuation_args = task_args;
+  SDL_UnlockMutex(promise->mutex);
 }
 
 void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
@@ -209,7 +237,20 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
 
   uint32_t obtained_outputs = 0;
 
-  while (obtained_outputs != num_benchmark_outputs) {
+  MDThreadPool* thread_pool;
+  md_thread_pool_create(&thread_pool);
+
+  MDTaskNode* active_promises = NULL;
+
+  while (obtained_outputs != num_benchmark_outputs || active_promises != NULL) {
+    md_task_list_process(&active_promises);
+
+    if (obtained_outputs == num_benchmark_outputs) {
+      // Just wait a little if we are only burning out the remaining promises
+      SDL_Delay(5);
+      continue;
+    }
+
     for (uint32_t output_id = 0; output_id < num_benchmark_outputs; output_id++) {
       LuminaryOutputPromiseHandle promise_handle = duck->benchmark_output_promises[output_id];
 
@@ -238,15 +279,31 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
 
       LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
-      LUM_FAILURE_HANDLE(luminary_host_save_png(duck->host, output_handle, image_path));
+      BenchmarkSaveImageTaskArgs* task_args;
+      LUM_FAILURE_HANDLE(host_malloc(&task_args, sizeof(BenchmarkSaveImageTaskArgs)));
 
-      LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
+      task_args->save_args.image        = output_image;
+      task_args->save_args.file_path    = image_path;
+      task_args->save_args.format       = LUMINARY_IMAGE_SAVE_FORMAT_PNG;
+      task_args->save_args.jpeg_quality = 100;
+      task_args->host                   = duck->host;
+      task_args->output_handle          = output_handle;
 
-      LUM_FAILURE_HANDLE(luminary_host_release_output(duck->host, output_handle));
+      MDPromise* promise = md_thread_pool_enqueue(thread_pool, _benchmark_save_image_task, task_args);
+
+      MDTaskNode* node;
+      LUM_FAILURE_HANDLE(host_malloc(&node, sizeof(MDTaskNode)));
+
+      node->task.promise = promise;
+      node->task.args    = task_args;
+      node->next         = active_promises;
+      active_promises    = node;
 
       duck->benchmark_output_promises[output_id] = LUMINARY_OUTPUT_HANDLE_INVALID;
     }
   }
+
+  md_thread_pool_destroy(&thread_pool);
 
   fclose(render_times_file);
 }

@@ -283,6 +283,9 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   LUM_FAILURE_HANDLE(array_create(&display->status_messages, sizeof(DisplayStatusMessage), 4));
   display->screenshot_status_message_id = (uint32_t) -1;
 
+  md_thread_pool_create(&display->thread_pool);
+  display->active_promises = NULL;
+
   *_display = display;
 }
 
@@ -762,6 +765,40 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   }
 }
 
+struct SaveImageTaskArgs {
+  LuminaryImageSaveArgs save_args;
+  LuminaryHost* host;
+  LuminaryOutputHandle output_handle;
+  Display* display;
+} typedef SaveImageTaskArgs;
+
+static void _save_image_task_continuation(void* args) {
+  SaveImageTaskArgs* task_args = (SaveImageTaskArgs*) args;
+
+  LUM_FAILURE_HANDLE(luminary_host_release_output(task_args->host, task_args->output_handle));
+
+  if (task_args->display->screenshot_status_message_id != (uint32_t) -1) {
+    display_remove_status_message(task_args->display, task_args->display->screenshot_status_message_id);
+    task_args->display->screenshot_status_message_id = (uint32_t) -1;
+  }
+}
+
+static void _save_image_task(void* args, MDPromise* promise) {
+  SaveImageTaskArgs* task_args = (SaveImageTaskArgs*) args;
+
+  LUM_FAILURE_HANDLE(luminary_image_save(&task_args->save_args));
+  LUM_FAILURE_HANDLE(luminary_path_destroy(&task_args->save_args.file_path));
+
+  SDL_LockMutex(promise->mutex);
+  promise->continuation      = _save_image_task_continuation;
+  promise->continuation_args = task_args;
+  SDL_UnlockMutex(promise->mutex);
+}
+
+void display_process_tasks(Display* display) {
+  md_task_list_process(&display->active_promises);
+}
+
 void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -784,23 +821,26 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
 
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
-    LuminaryImageSaveArgs args = {
-      .image        = output_image,
-      .file_path    = image_path,
-      .format       = LUMINARY_IMAGE_SAVE_FORMAT_PNG,
-      .jpeg_quality = 100,
-    };
+    SaveImageTaskArgs* task_args;
+    LUM_FAILURE_HANDLE(host_malloc(&task_args, sizeof(SaveImageTaskArgs)));
 
-    LUM_FAILURE_HANDLE(luminary_image_save(&args));
+    task_args->save_args.image        = output_image;
+    task_args->save_args.file_path    = image_path;
+    task_args->save_args.format       = LUMINARY_IMAGE_SAVE_FORMAT_PNG;
+    task_args->save_args.jpeg_quality = 100;
+    task_args->host                   = host;
+    task_args->output_handle          = output_handle;
+    task_args->display                = display;
 
-    LUM_FAILURE_HANDLE(luminary_path_destroy(&image_path));
+    MDPromise* promise = md_thread_pool_enqueue(display->thread_pool, _save_image_task, task_args);
 
-    LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
+    MDTaskNode* node;
+    LUM_FAILURE_HANDLE(host_malloc(&node, sizeof(MDTaskNode)));
 
-    if (display->screenshot_status_message_id != (uint32_t) -1) {
-      display_remove_status_message(display, display->screenshot_status_message_id);
-      display->screenshot_status_message_id = (uint32_t) -1;
-    }
+    node->task.promise       = promise;
+    node->task.args          = task_args;
+    node->next               = display->active_promises;
+    display->active_promises = node;
 
     display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
   }
@@ -953,6 +993,14 @@ void display_update_resolution(Display* display, LuminaryHost* host, const Lumin
 void display_destroy(Display** display) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(*display);
+
+  while ((*display)->active_promises) {
+    md_task_list_process(&(*display)->active_promises);
+  }
+
+  if ((*display)->thread_pool) {
+    md_thread_pool_destroy(&(*display)->thread_pool);
+  }
 
   SDL_SetCursor((SDL_Cursor*) 0);
 

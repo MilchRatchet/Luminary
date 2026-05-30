@@ -14,6 +14,7 @@
 #include "ui_renderer.h"
 #include "user_interface.h"
 #include "utils.h"
+#include "worker.h"
 
 enum DisplayMouseMode {
   DISPLAY_MOUSE_MODE_DEFAULT,
@@ -87,6 +88,8 @@ struct Display {
   bool queued_save_scene;
   DisplayStatusMessage* status_messages;
   uint32_t screenshot_status_message_id;
+  MDThreadPool* thread_pool;
+  MDTaskNode* active_promises;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution);
@@ -94,6 +97,7 @@ void display_set_mouse_visible(Display* display, bool enable);
 void display_set_cursor(Display* display, SDL_SystemCursor cursor);
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode);
 void display_query_events(Display* display, DisplayFileDrop** file_drop_array, bool* exit_requested, bool* dirty);
+void display_process_tasks(Display* display);
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step);
 void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory);
 void display_handle_maximize(Display* display, LuminaryHost* host, bool reinstate_position);
