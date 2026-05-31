@@ -1275,6 +1275,51 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_texture(LuminaryHost* host, LuminaryPath* path, uint16_t* id) {
+  LUMINARY_HOST_API_ENTRY
+
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(id);
+
+  const char* tex_file_path;
+  __FAILURE_HANDLE(luminary_path_apply(path, (const char*) 0, &tex_file_path));
+
+  uint32_t existing_tex_id;
+  bool found;
+  __FAILURE_HANDLE(dictionary_find_by_name(host->texture_name_dict, tex_file_path, &existing_tex_id, &found));
+
+  if (found) {
+    __DEBUG_ASSERT(existing_tex_id < TEXTURE_ID_INVALID);
+
+    *id = existing_tex_id;
+
+    return LUMINARY_SUCCESS;
+  }
+
+  Texture* tex;
+  __FAILURE_HANDLE(texture_create(&tex));
+
+  uint32_t new_texture_id;
+  __FAILURE_HANDLE(array_get_num_elements(host->textures, &new_texture_id));
+
+  if (new_texture_id >= TEXTURE_ID_INVALID) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Too many textures.");
+  }
+
+  __FAILURE_HANDLE(dictionary_add_entry(host->texture_name_dict, new_texture_id, tex_file_path));
+
+  __FAILURE_HANDLE(array_push(&host->textures, &tex));
+
+  tex->mipmap = TEXTURE_MIPMAP_MODE_GENERATE;
+
+  __FAILURE_HANDLE(texture_load_async(tex, host->work_queue, tex_file_path));
+
+  *id = new_texture_id;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_save_as_lumV5(Host* host, Path* path) {
   LUMINARY_HOST_API_ENTRY
 

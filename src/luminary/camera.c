@@ -26,17 +26,23 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->purkinje_kappa1              = 0.2f;
   camera->purkinje_kappa2              = 0.29f;
   camera->lens_template                = LUMINARY_LENS_TEMPLATE_PHYSICAL_G;
-  camera->thin_lens.aperture_size      = 0.0f;
-  camera->thin_lens.object_distance    = 1.0f;
-  camera->thin_lens.fov                = 1.0f;
-  camera->lens.f_stop                  = 2.0f;
-  camera->lens.sensor_distance         = 40.0f;
-  camera->lens.object_distance         = 10.0f;
-  camera->lens.scale                   = 1.0f;
-  camera->lens.use_auto_focus          = true;
-  camera->lens.use_spectral_rendering  = false;
-  camera->lens.allow_reflections       = false;
-  camera->lens.enable_diffraction      = false;
+
+  camera->thin_lens = (LuminaryCameraThinLens) {
+    .aperture_size   = 0.0f,
+    .object_distance = 1.0f,
+    .fov             = 1.0f,
+  };
+
+  camera->lens = (LuminaryCameraLens) {
+    .f_stop                 = 2.0f,
+    .sensor_distance        = 40.0f,
+    .object_distance        = 10.0f,
+    .scale                  = 1.0f,
+    .use_auto_focus         = true,
+    .use_spectral_rendering = false,
+    .allow_reflections      = false,
+    .enable_diffraction     = false,
+  };
 
   camera->sensor = (LuminaryCameraSensor) {
     .diagonal_size                    = 43.3f,
@@ -50,6 +56,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   };
 
   camera->tonemap_params = (LuminaryTonemapParams) {
+    .lut_texture_id            = TEXTURE_ID_INVALID,
     .highlights                = 0.0f,
     .shadows                   = 0.0f,
     .saturation                = 0.0f,

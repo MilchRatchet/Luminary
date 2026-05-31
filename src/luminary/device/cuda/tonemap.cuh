@@ -5,6 +5,7 @@
 #include "math.cuh"
 #include "purkinje.cuh"
 #include "random.cuh"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 
 LUMINARY_FUNCTION RGBF tonemap_aces(RGBF pixel) {
@@ -186,11 +187,16 @@ LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel) {
   return result;
 }
 
-LUMINARY_FUNCTION RGBF tonemap_custom_apply(RGBF pixel, float highlight, float shadow, float saturation, float dynamic_range) {
+LUMINARY_FUNCTION RGBF tonemap_custom_apply(RGBF pixel, const LuminaryTonemapParams tonemap_params) {
   pixel = max_color(pixel, splat_color(0.0f));
 
-  if (dynamic_range > 100.0f) {
-    const float dr_factor = dynamic_range / 100.0f;
+  // White balance
+  pixel.r *= 1.0f + tonemap_params.white_balance_red_cyan;
+  pixel.g *= 1.0f + tonemap_params.white_balance_blue_yellow;
+  pixel.b *= 1.0f - (tonemap_params.white_balance_red_cyan + tonemap_params.white_balance_blue_yellow) * 0.5f;
+
+  if (tonemap_params.dynamic_range > 100.0f) {
+    const float dr_factor = tonemap_params.dynamic_range / 100.0f;
     const float power     = 1.0f / (log2f(dr_factor) * 0.5f + 1.0f);
     pixel.r               = powf(pixel.r, power);
     pixel.g               = powf(pixel.g, power);
@@ -203,13 +209,13 @@ LUMINARY_FUNCTION RGBF tonemap_custom_apply(RGBF pixel, float highlight, float s
   const float shadow_weight    = powf(1.0f - luma, falloff);
   const float highlight_weight = powf(luma, falloff);
 
-  const float shadow_mult    = exp2f(-shadow * shadow_weight);
-  const float highlight_mult = exp2f(highlight * highlight_weight);
+  const float shadow_mult    = exp2f(-tonemap_params.shadows * shadow_weight);
+  const float highlight_mult = exp2f(tonemap_params.highlights * highlight_weight);
 
   pixel = scale_color(pixel, shadow_mult * highlight_mult);
 
-  if (saturation != 0.0f) {
-    const float sat_scale = 1.0f + saturation;
+  if (tonemap_params.saturation != 0.0f) {
+    const float sat_scale = 1.0f + tonemap_params.saturation;
     RGBF hsv              = rgb_to_hsv(pixel);
     hsv.g                 = __saturatef(hsv.g * sat_scale);
     pixel                 = hsv_to_rgb(hsv);
@@ -239,16 +245,18 @@ LUMINARY_FUNCTION RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_
   const float dynamic_range_scale = 100.0f / fmaxf(tonemap_params.dynamic_range, 100.0f);
   pixel                           = scale_color(pixel, device.camera.exposure * dynamic_range_scale);
 
-  // White balance
-  pixel.r *= 1.0f + tonemap_params.white_balance_red_cyan;
-  pixel.g *= 1.0f + tonemap_params.white_balance_blue_yellow;
-  pixel.b *= 1.0f - (tonemap_params.white_balance_red_cyan + tonemap_params.white_balance_blue_yellow) * 0.5f;
-
   pixel = purkinje_shift(pixel);
   pixel = tonemap_apply_transform(pixel);
 
-  pixel =
-    tonemap_custom_apply(pixel, tonemap_params.highlights, tonemap_params.shadows, tonemap_params.saturation, tonemap_params.dynamic_range);
+  if (tonemap_params.lut_texture_id != TEXTURE_ID_INVALID) {
+    const DeviceTextureObject tex = load_texture_object(tonemap_params.lut_texture_id);
+
+    const float4 lut_result = texture_load(tex, make_float3(pixel.r, pixel.g, pixel.b));
+
+    pixel = get_color(lut_result.x, lut_result.y, lut_result.z);
+  }
+
+  pixel = tonemap_custom_apply(pixel, tonemap_params);
 
   return pixel;
 }

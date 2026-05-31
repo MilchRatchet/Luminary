@@ -44,4 +44,24 @@ LUMINARY_FUNCTION float4 texture_load(DeviceTextureObject tex, UV uv, const Text
   return result;
 }
 
+LUMINARY_FUNCTION float4 texture_load(DeviceTextureObject tex, float3 uvw, const TextureLoadArgs args = texture_get_default_args()) {
+  if (texture_is_valid(tex) == false)
+    return args.default_result;
+
+  const float u = uvw.x;
+  const float v = args.flip_v ? 1.0f - uvw.y : uvw.y;
+  const float w = uvw.z;
+
+  float4 result = tex3DLod<float4>(tex.handle, u, v, w, args.mip_level);
+
+  if (args.apply_gamma) {
+    result.x = powf(result.x, tex.gamma);
+    result.y = powf(result.y, tex.gamma);
+    result.z = powf(result.z, tex.gamma);
+    //  Gamma is never applied to the alpha of a texture according to PNG standard.
+  }
+
+  return result;
+}
+
 #endif /* CU_TEXTURE_UTILS_H */

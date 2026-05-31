@@ -250,6 +250,7 @@ static bool _window_entity_properties_add_file_dialog(
         .file_dialog_handler = handler,
         .window_title        = window_title,
         .size                = (ElementSize) {.rel_width = 1.0f, .rel_height = 0.75f},
+        .dialog_type         = SDL_FILEDIALOG_OPENFILE,
       });
   }
   window_pop_section(data.window);
@@ -555,6 +556,8 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  update_data |= _window_entity_properties_add_file_dialog(data, "LUT", display->entity_properties_path, "Select Tonemapping LUT");
 
   update_data |=
     _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);

@@ -15,6 +15,7 @@ struct ElementFileDialogArgs {
   FileDialogHandler* file_dialog_handler;
   const char* window_title;
   ElementSize size;
+  SDL_FileDialogType dialog_type;
 } typedef ElementFileDialogArgs;
 
 bool element_file_dialog(Window* window, Display* display, const MouseState* mouse_state, ElementFileDialogArgs args);

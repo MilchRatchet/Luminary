@@ -249,6 +249,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   render_region_create(&display->region);
   display_zoom_handler_create(&display->zoom_handler);
   file_dialog_handler_create(&display->scene_file_path);
+  file_dialog_handler_create(&display->entity_properties_path);
 
   _display_handle_display_change(display);
   _display_handle_resize(display);
@@ -609,6 +610,8 @@ static void _display_query_scene_path(Display* display, LuminaryHost* host) {
   FileDialogHandlerOpenArgs open_args;
   open_args.sdl_window   = display->sdl_window;
   open_args.dialog_title = "Select scene file path";
+  open_args.dialog_type  = SDL_FILEDIALOG_SAVEFILE;
+  open_args.filter_type  = FILE_DIALOG_HANDLER_FILTER_TYPE_SCENE;
 
   file_dialog_handler_open_dialog(display->scene_file_path, &open_args);
 }
@@ -1019,6 +1022,7 @@ void display_destroy(Display** display) {
   render_region_destroy(&(*display)->region);
   display_zoom_handler_destroy(&(*display)->zoom_handler);
   file_dialog_handler_destroy(&(*display)->scene_file_path);
+  file_dialog_handler_destroy(&(*display)->entity_properties_path);
 
   LUM_FAILURE_HANDLE(array_destroy(&(*display)->status_messages));
 

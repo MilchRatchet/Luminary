@@ -5,6 +5,12 @@
 
 #include "utils.h"
 
+enum FileDialogHandlerFilterType {
+  FILE_DIALOG_HANDLER_FILTER_TYPE_SCENE,
+  FILE_DIALOG_HANDLER_FILTER_TYPE_TEXTURE,
+  FILE_DIALOG_HANDLER_FILTER_TYPE_COUNT,
+} typedef FileDialogHandlerFilterType;
+
 struct FileDialogHandler {
   LuminaryMutex* mutex;
   LuminaryPath* path;
@@ -14,6 +20,8 @@ struct FileDialogHandler {
 struct FileDialogHandlerOpenArgs {
   SDL_Window* sdl_window;
   const char* dialog_title;
+  SDL_FileDialogType dialog_type;
+  FileDialogHandlerFilterType filter_type;
 } typedef FileDialogHandlerOpenArgs;
 
 void file_dialog_handler_create(FileDialogHandler** handler);

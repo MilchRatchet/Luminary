@@ -196,6 +196,7 @@ LUMINARY_API struct LuminaryCameraSensor {
 } typedef LuminaryCameraSensor;
 
 LUMINARY_API struct LuminaryTonemapParams {
+  uint16_t lut_texture_id;
   float highlights;
   float shadows;
   float saturation;

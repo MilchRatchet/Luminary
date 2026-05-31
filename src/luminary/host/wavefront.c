@@ -753,7 +753,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   read_buffer[READ_BUFFER_SIZE - 1]      = '\0';
   read_buffer_swap[READ_BUFFER_SIZE - 1] = '\0';
 
-  uint16_t current_object = UINT16_MAX;
+  uint16_t current_object = (uint16_t) -1;
 
   size_t offset = 0;
 

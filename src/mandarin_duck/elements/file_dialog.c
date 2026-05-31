@@ -23,6 +23,11 @@ static void _element_file_dialog_render_func(Element* file_dialog, Display* disp
     const char* text;
     LUM_FAILURE_HANDLE(luminary_path_apply(path, (const char*) 0, &text));
 
+    size_t length = strlen(text);
+
+    if (length >= 32)
+      text += length - 32;
+
     uint32_t text_width;
     text_renderer_render(
       display->text_renderer, display, text, TEXT_RENDERER_FONT_REGULAR, text_color, file_dialog->x + (file_dialog->width >> 1),
@@ -66,6 +71,8 @@ bool element_file_dialog(Window* window, Display* display, const MouseState* mou
     FileDialogHandlerOpenArgs open_args;
     open_args.sdl_window   = display->sdl_window;
     open_args.dialog_title = args.window_title;
+    open_args.dialog_type  = args.dialog_type;
+    open_args.filter_type  = FILE_DIALOG_HANDLER_FILTER_TYPE_TEXTURE;
 
     dialog_opened = file_dialog_handler_open_dialog(args.file_dialog_handler, &open_args);
 

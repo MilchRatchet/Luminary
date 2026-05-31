@@ -85,6 +85,7 @@ struct Display {
   const uint32_t* splash_screen;
   DisplayZoomHandler* zoom_handler;
   FileDialogHandler* scene_file_path;
+  FileDialogHandler* entity_properties_path;
   bool queued_save_scene;
   DisplayStatusMessage* status_messages;
   uint32_t screenshot_status_message_id;
