@@ -6,20 +6,19 @@
 LuminaryResult cloud_get_default(Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(cloud);
 
-  cloud->active                = false;
-  cloud->steps                 = 96;
-  cloud->shadow_steps          = 8;
-  cloud->atmosphere_scattering = true;
-  cloud->seed                  = CLOUD_DEFAULT_SEED;
-  cloud->offset_x              = 0.0f;
-  cloud->offset_z              = 0.0f;
-  cloud->noise_shape_scale     = 1.0f;
-  cloud->noise_detail_scale    = 1.0f;
-  cloud->noise_weather_scale   = 1.0f;
-  cloud->octaves               = 9;
-  cloud->droplet_diameter      = 25.0f;
-  cloud->density               = 1.0f;
-  cloud->mipmap_bias           = 0.0f;
+  cloud->active              = false;
+  cloud->steps               = 128;
+  cloud->shadow_steps        = 8;
+  cloud->seed                = CLOUD_DEFAULT_SEED;
+  cloud->offset_x            = 0.0f;
+  cloud->offset_z            = 0.0f;
+  cloud->noise_shape_scale   = 1.0f;
+  cloud->noise_detail_scale  = 1.0f;
+  cloud->noise_weather_scale = 1.0f;
+  cloud->octaves             = 9;
+  cloud->droplet_diameter    = 25.0f;
+  cloud->density             = 1.0f;
+  cloud->mipmap_bias         = 0.0f;
 
   cloud->low = (CloudLayer) {
     .active       = true,
@@ -97,7 +96,6 @@ LuminaryResult cloud_check_for_dirty(const Cloud* input, const Cloud* old, uint3
   __CLOUD_CHECK_DIRTY(active);
 
   if (input->active) {
-    __CLOUD_CHECK_DIRTY(atmosphere_scattering);
     __CLOUD_CHECK_DIRTY(offset_x);
     __CLOUD_CHECK_DIRTY(offset_z);
     __CLOUD_CHECK_DIRTY(density);

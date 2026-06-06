@@ -867,8 +867,6 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
   update_data |= _window_entity_properties_add_checkbox(data, "Active", &cloud.active);
 
   if (cloud.active) {
-    update_data |= _window_entity_properties_add_checkbox(data, "Atmosphere Scattering", &cloud.atmosphere_scattering);
-
     update_data |=
       _window_entity_properties_add_slider(data, "Offset X", &cloud.offset_x, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
     update_data |=

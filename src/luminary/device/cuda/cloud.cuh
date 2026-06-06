@@ -278,30 +278,28 @@ LUMINARY_FUNCTION float clouds_render(
   Spectrum radiance      = spectrum_set1(0.0f);
   Spectrum transmittance = spectrum_set1(1.0f);
 
+  transmittance_cloud_only = 1.0f;
+
   for (int i = 0; i < 3; i++) {
     const CloudRenderResult result = results[order[i]];
 
     if (result.hit_dist == FLT_MAX)
       continue;
 
-    if (device.cloud.atmosphere_scattering) {
-      uint32_t next_step_id = sky_get_nearest_step_id(params, result.hit_dist);
-
-      Spectrum segment_radiance = sky_compute_atmosphere<false, true>(transmittance, origin, ray, params, prev_step_id, next_step_id);
-      radiance                  = spectrum_add(radiance, segment_radiance);
-
-      prev_step_id = next_step_id;
-    }
+    uint32_t next_step_id     = sky_get_nearest_step_id(params, result.hit_dist);
+    Spectrum segment_radiance = sky_compute_atmosphere<false, true>(transmittance, origin, ray, params, prev_step_id, next_step_id);
+    radiance                  = spectrum_add(radiance, segment_radiance);
 
     radiance      = spectrum_add(radiance, spectrum_mul(result.radiance, transmittance));
     transmittance = spectrum_scale(transmittance, result.transmittance);
     transmittance_cloud_only *= result.transmittance;
 
-    prev_start = result.hit_dist;
+    prev_start   = result.hit_dist;
+    prev_step_id = next_step_id;
   }
 
-  if (device.cloud.atmosphere_scattering)
-    radiance = spectrum_add(radiance, sky_compute_atmosphere<true, true>(transmittance, origin, ray, params, prev_step_id, NUM_STEPS));
+  if (limit == FLT_MAX)
+    radiance = spectrum_add(radiance, sky_compute_atmosphere<false, true>(transmittance, origin, ray, params, prev_step_id, NUM_STEPS));
 
   color  = add_color(color, mul_color(sky_evaluate_radiance_from_spectrum(radiance), record));
   record = mul_color(record, sky_evaluate_transmittance_from_spectrum(transmittance));
@@ -329,7 +327,7 @@ LUMINARY_KERNEL void cloud_process_tasks() {
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
     float depth              = trace.depth;
-    const float sky_max_dist = world_to_sky_scale(depth);
+    const float sky_max_dist = (depth != FLT_MAX) ? world_to_sky_scale(depth) : depth;
     vec3 sky_origin          = world_to_sky_transform(task.origin);
 
     RGBF record = record_unpack(throughput.record);
@@ -338,10 +336,7 @@ LUMINARY_KERNEL void cloud_process_tasks() {
     float cloud_transmittance;
     const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.path_id, color, record, cloud_transmittance);
 
-    if (depth == FLT_MAX) {
-      record = splat_color(0.0f);
-    }
-    else {
+    if (depth != FLT_MAX) {
       // Move past the clouds
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);

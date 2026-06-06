@@ -419,8 +419,9 @@ static LuminaryResult parse_cloud_settings(Cloud* cloud, char* line) {
       break;
     /* INSCATTE */
     case 4995710525939863113u:
-      sscanf(value, "%u\n", &bool_uint);
-      cloud->atmosphere_scattering = bool_uint;
+      // Legacy
+      // sscanf(value, "%u\n", &bool_uint);
+      // cloud->atmosphere_scattering = bool_uint;
       break;
     /* MIPMAPBI */
     case 5278869954631846221u:

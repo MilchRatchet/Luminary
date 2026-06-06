@@ -95,7 +95,7 @@ LUMINARY_FUNCTION uint32_t sky_get_nearest_step_id(const SkyIntegrationParams pa
   if (params.step_size == 0.0f)
     return 0;
 
-  return (uint32_t) (((dist - params.start) / params.step_size) + 0.5f);
+  return (uint32_t) fmaxf(((dist - params.start) / params.step_size) + 0.5f, 0.0f);
 }
 
 template <bool CELESTIALS, bool CLOUD_SHADOWS>
@@ -326,9 +326,10 @@ LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const u
     case LUMINARY_SKY_MODE_DEFAULT: {
       const vec3 sky_origin  = world_to_sky_transform(origin);
       const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION);
+      const float limit      = (device.cloud.active || device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT) ? 0.0f : FLT_MAX;
 
-      sky = (include_sun) ? sky_get_color<true>(sky_origin, ray, FLT_MAX, device.sky.steps, path_id)
-                          : sky_get_color<false>(sky_origin, ray, FLT_MAX, device.sky.steps, path_id);
+      sky = (include_sun) ? sky_get_color<true>(sky_origin, ray, limit, device.sky.steps, path_id)
+                          : sky_get_color<false>(sky_origin, ray, limit, device.sky.steps, path_id);
     } break;
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);

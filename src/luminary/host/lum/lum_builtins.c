@@ -332,7 +332,6 @@ static const LumBuiltinTypeMember _lum_builtin_member_sky[] = {
 
 static const LumBuiltinTypeMember _lum_builtin_member_cloud[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, active, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCloud, atmosphere_scattering, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, low, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, mid, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCloud, top, 1, LUM_VERSION_CURRENT),
@@ -724,20 +723,19 @@ LuminaryResult lum_builtin_cloud_init(LumBuiltinCloud* cloud, uint32_t version) 
   if (version < 1)
     return LUMINARY_SUCCESS;
 
-  cloud->active                = false;
-  cloud->steps                 = 96;
-  cloud->shadow_steps          = 8;
-  cloud->atmosphere_scattering = true;
-  cloud->seed                  = 0;
-  cloud->offset_x              = 0.0f;
-  cloud->offset_z              = 0.0f;
-  cloud->noise_shape_scale     = 1.0f;
-  cloud->noise_detail_scale    = 1.0f;
-  cloud->noise_weather_scale   = 1.0f;
-  cloud->octaves               = 9;
-  cloud->droplet_diameter      = 25.0f;
-  cloud->density               = 1.0f;
-  cloud->mipmap_bias           = 0.0f;
+  cloud->active              = false;
+  cloud->steps               = 96;
+  cloud->shadow_steps        = 8;
+  cloud->seed                = 0;
+  cloud->offset_x            = 0.0f;
+  cloud->offset_z            = 0.0f;
+  cloud->noise_shape_scale   = 1.0f;
+  cloud->noise_detail_scale  = 1.0f;
+  cloud->noise_weather_scale = 1.0f;
+  cloud->octaves             = 9;
+  cloud->droplet_diameter    = 25.0f;
+  cloud->density             = 1.0f;
+  cloud->mipmap_bias         = 0.0f;
 
   cloud->low = (LumBuiltinCloudLayer) {
     .active       = true,
@@ -1083,20 +1081,19 @@ LuminaryResult lum_builtin_cloud_convert(const LumBuiltinCloud* cloud, LuminaryC
   if (version < 1)
     return LUMINARY_SUCCESS;
 
-  dst_cloud->active                = cloud->active;
-  dst_cloud->atmosphere_scattering = cloud->atmosphere_scattering;
-  dst_cloud->offset_x              = cloud->offset_x;
-  dst_cloud->offset_z              = cloud->offset_z;
-  dst_cloud->density               = cloud->density;
-  dst_cloud->seed                  = cloud->seed;
-  dst_cloud->droplet_diameter      = cloud->droplet_diameter;
-  dst_cloud->steps                 = cloud->steps;
-  dst_cloud->shadow_steps          = cloud->shadow_steps;
-  dst_cloud->noise_shape_scale     = cloud->noise_shape_scale;
-  dst_cloud->noise_detail_scale    = cloud->noise_detail_scale;
-  dst_cloud->noise_weather_scale   = cloud->noise_weather_scale;
-  dst_cloud->mipmap_bias           = cloud->mipmap_bias;
-  dst_cloud->octaves               = cloud->octaves;
+  dst_cloud->active              = cloud->active;
+  dst_cloud->offset_x            = cloud->offset_x;
+  dst_cloud->offset_z            = cloud->offset_z;
+  dst_cloud->density             = cloud->density;
+  dst_cloud->seed                = cloud->seed;
+  dst_cloud->droplet_diameter    = cloud->droplet_diameter;
+  dst_cloud->steps               = cloud->steps;
+  dst_cloud->shadow_steps        = cloud->shadow_steps;
+  dst_cloud->noise_shape_scale   = cloud->noise_shape_scale;
+  dst_cloud->noise_detail_scale  = cloud->noise_detail_scale;
+  dst_cloud->noise_weather_scale = cloud->noise_weather_scale;
+  dst_cloud->mipmap_bias         = cloud->mipmap_bias;
+  dst_cloud->octaves             = cloud->octaves;
 
   __FAILURE_HANDLE(_lum_builtin_cloud_layer_convert(&cloud->low, &dst_cloud->low, version));
   __FAILURE_HANDLE(_lum_builtin_cloud_layer_convert(&cloud->mid, &dst_cloud->mid, version));
@@ -1364,20 +1361,19 @@ LuminaryResult lum_builtin_cloud_serialize(const LuminaryCloud* cloud, LumBuilti
   __CHECK_NULL_ARGUMENT(cloud);
   __CHECK_NULL_ARGUMENT(dst_cloud);
 
-  dst_cloud->active                = cloud->active;
-  dst_cloud->atmosphere_scattering = cloud->atmosphere_scattering;
-  dst_cloud->offset_x              = cloud->offset_x;
-  dst_cloud->offset_z              = cloud->offset_z;
-  dst_cloud->density               = cloud->density;
-  dst_cloud->seed                  = cloud->seed;
-  dst_cloud->droplet_diameter      = cloud->droplet_diameter;
-  dst_cloud->steps                 = cloud->steps;
-  dst_cloud->shadow_steps          = cloud->shadow_steps;
-  dst_cloud->noise_shape_scale     = cloud->noise_shape_scale;
-  dst_cloud->noise_detail_scale    = cloud->noise_detail_scale;
-  dst_cloud->noise_weather_scale   = cloud->noise_weather_scale;
-  dst_cloud->mipmap_bias           = cloud->mipmap_bias;
-  dst_cloud->octaves               = cloud->octaves;
+  dst_cloud->active              = cloud->active;
+  dst_cloud->offset_x            = cloud->offset_x;
+  dst_cloud->offset_z            = cloud->offset_z;
+  dst_cloud->density             = cloud->density;
+  dst_cloud->seed                = cloud->seed;
+  dst_cloud->droplet_diameter    = cloud->droplet_diameter;
+  dst_cloud->steps               = cloud->steps;
+  dst_cloud->shadow_steps        = cloud->shadow_steps;
+  dst_cloud->noise_shape_scale   = cloud->noise_shape_scale;
+  dst_cloud->noise_detail_scale  = cloud->noise_detail_scale;
+  dst_cloud->noise_weather_scale = cloud->noise_weather_scale;
+  dst_cloud->mipmap_bias         = cloud->mipmap_bias;
+  dst_cloud->octaves             = cloud->octaves;
 
   __FAILURE_HANDLE(_lum_builtin_cloud_layer_serialize(&cloud->low, &dst_cloud->low));
   __FAILURE_HANDLE(_lum_builtin_cloud_layer_serialize(&cloud->mid, &dst_cloud->mid));

@@ -61,7 +61,7 @@ LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, con
 }
 
 LUMINARY_FUNCTION float cloud_shadow(const vec3 origin, const vec3 ray) {
-  if (!device.cloud.active || !device.cloud.atmosphere_scattering) {
+  if (!device.cloud.active) {
     return 1.0f;
   }
 

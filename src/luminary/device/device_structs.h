@@ -142,13 +142,13 @@ LUM_STATIC_SIZE_ASSERT(DeviceCloudLayer, 0x24u);
 
 struct DeviceCloud {
   uint32_t active : 1;
-  uint32_t atmosphere_scattering : 1;
   uint32_t steps : 10;
   uint32_t shadow_steps : 10;
   uint32_t octaves : 4;
   uint32_t low_active : 1;
   uint32_t mid_active : 1;
   uint32_t top_active : 1;
+  // 1 bit spare
 
   float offset_x;
   float offset_z;

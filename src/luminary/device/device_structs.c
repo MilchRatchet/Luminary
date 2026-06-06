@@ -185,14 +185,13 @@ LuminaryResult device_struct_cloud_convert(const Cloud* cloud, DeviceCloud* devi
   __CHECK_NULL_ARGUMENT(cloud);
   __CHECK_NULL_ARGUMENT(device_cloud);
 
-  device_cloud->active                = cloud->active;
-  device_cloud->atmosphere_scattering = cloud->atmosphere_scattering;
-  device_cloud->steps                 = cloud->steps;
-  device_cloud->shadow_steps          = cloud->shadow_steps;
-  device_cloud->octaves               = cloud->octaves;
-  device_cloud->low_active            = cloud->low.active;
-  device_cloud->mid_active            = cloud->mid.active;
-  device_cloud->top_active            = cloud->top.active;
+  device_cloud->active       = cloud->active;
+  device_cloud->steps        = cloud->steps;
+  device_cloud->shadow_steps = cloud->shadow_steps;
+  device_cloud->octaves      = cloud->octaves;
+  device_cloud->low_active   = cloud->low.active;
+  device_cloud->mid_active   = cloud->mid.active;
+  device_cloud->top_active   = cloud->top.active;
 
   device_cloud->offset_x            = cloud->offset_x;
   device_cloud->offset_z            = cloud->offset_z;
