@@ -277,6 +277,7 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
     }
 
     hdri->sample_count = max(sky->hdri_samples, 1);
+    hdri->sample_count = ((hdri->sample_count + 31) / 32) * 32;  // Round up to next multiple of 32.
   }
 
   return LUMINARY_SUCCESS;
