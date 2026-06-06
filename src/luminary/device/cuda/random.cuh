@@ -39,6 +39,7 @@ enum RandomTarget : uint16_t {
   RANDOM_ALLOCATE(CAMERA_TIME, 1, 1)                                                                    //
   RANDOM_ALLOCATE(CLOUD_STEP_OFFSET, 3, 1)                                                              //
   RANDOM_ALLOCATE(CLOUD_STEP_COUNT, 3, 1)                                                               //
+  RANDOM_ALLOCATE(CLOUD_COLOR_STEP, 3, 1)                                                               //
   RANDOM_ALLOCATE(CLOUD_DIR, 1, 1)                                                                      //
   RANDOM_ALLOCATE(SKY_STEP_OFFSET, 1, 1)                                                                //
   RANDOM_ALLOCATE(SKY_INSCATTERING_STEP, 1, 1)                                                          //

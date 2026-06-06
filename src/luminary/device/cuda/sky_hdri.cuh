@@ -94,7 +94,7 @@ LUMINARY_KERNEL void sky_compute_hdri(const KernelArgsSkyComputeHDRI args) {
       sky_origin = add_vector(sky_origin, scale_vector(ray, offset));
     }
 
-    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.sky.steps, path_id);
+    const RGBF sky = sky_get_color<false>(sky_origin, ray, FLT_MAX, device.sky.steps, path_id);
 
     sky_color = add_color(sky_color, mul_color(sky, transmittance));
 

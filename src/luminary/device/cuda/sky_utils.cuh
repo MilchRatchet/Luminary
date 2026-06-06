@@ -102,22 +102,6 @@ struct Spectrum {
   float v[8];
 } typedef Spectrum;
 
-// This is the spectrum that transforms to the identity color (1,1,1)
-LUMINARY_FUNCTION Spectrum spectrum_get_ident() {
-  Spectrum result;
-
-  result.v[0] = 8.4205e-03f;
-  result.v[1] = 2.6449e-01f;
-  result.v[2] = 4.0273e-01f;
-  result.v[3] = 1.6624e-01f;
-  result.v[4] = 2.4324e-01f;
-  result.v[5] = 3.5849e-01f;
-  result.v[6] = 3.6342e-01f;
-  result.v[7] = 2.4177e-01f;
-
-  return result;
-}
-
 LUMINARY_FUNCTION Spectrum spectrum_set1(const float v) {
   Spectrum result;
 
@@ -343,7 +327,7 @@ LUMINARY_FUNCTION RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, cons
   const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
   const float4 transmittance_low  = texture_load(device.sky_lut_transmission_low_tex, transmittance_uv, tex_load_args);
   const float4 transmittance_high = texture_load(device.sky_lut_transmission_high_tex, transmittance_uv, tex_load_args);
-  const Spectrum extinction_sun   = spectrum_mul(spectrum_get_ident(), spectrum_merge(transmittance_low, transmittance_high));
+  const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
   const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.sky.sun_strength);
   const Spectrum radiance     = spectrum_mul(extinction_sun, sun_radiance);

@@ -6,11 +6,12 @@
 #include "sky_defines.h"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, const int step_count, const CloudLayerType layer) {
+template <CloudLayerType LAYER_TYPE>
+LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, const int step_count) {
   float2 cloud_layer_intersect;
   float max_dist;
 
-  switch (layer) {
+  switch (LAYER_TYPE) {
     case CLOUD_LAYER_LOW: {
       cloud_layer_intersect = cloud_get_lowlayer_intersection(origin, ray, FLT_MAX);
       max_dist              = 6.0f * (device.cloud.low.height_max - device.cloud.low.height_min);
@@ -38,16 +39,16 @@ LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, con
     for (int i = 0; i < step_count; i++) {
       const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-      const float height = cloud_height(pos, layer);
+      const float height = cloud_height<LAYER_TYPE>(pos);
 
       if (height < 0.0f || height > 1.0f) {
-        break;
+        continue;
       }
 
-      const CloudWeather weather = cloud_weather(pos, height, layer);
+      const CloudWeather weather = cloud_weather<LAYER_TYPE>(pos, height);
 
-      if (cloud_significant_point(height, weather, layer)) {
-        if (cloud_density(pos, height, weather, 2.0f, layer) > 0.0f) {
+      if (cloud_significant_point<LAYER_TYPE>(height, weather)) {
+        if (cloud_density<LAYER_TYPE>(pos, height, weather, 2.0f) > 0.0f) {
           return true;
         }
       }
@@ -65,19 +66,19 @@ LUMINARY_FUNCTION float cloud_shadow(const vec3 origin, const vec3 ray) {
   }
 
   if (device.cloud.low_active) {
-    if (cloud_shadow_layer(origin, ray, device.cloud.steps / 3, CLOUD_LAYER_LOW)) {
+    if (cloud_shadow_layer<CLOUD_LAYER_LOW>(origin, ray, device.cloud.steps / 3)) {
       return 0.0f;
     }
   }
 
   if (device.cloud.mid_active) {
-    if (cloud_shadow_layer(origin, ray, device.cloud.steps / 16, CLOUD_LAYER_MID)) {
+    if (cloud_shadow_layer<CLOUD_LAYER_MID>(origin, ray, device.cloud.steps / 16)) {
       return 0.1f;
     }
   }
 
   if (device.cloud.top_active) {
-    if (cloud_shadow_layer(origin, ray, device.cloud.steps / 32, CLOUD_LAYER_TOP)) {
+    if (cloud_shadow_layer<CLOUD_LAYER_TOP>(origin, ray, device.cloud.steps / 32)) {
       return 0.5f;
     }
   }

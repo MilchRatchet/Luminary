@@ -28,7 +28,7 @@
 #define CLOUD_OCTAVE_EXTINCTION_FACTOR 0.5f
 #define CLOUD_OCTAVE_PHASE_FACTOR 0.5f
 
-#define CLOUD_WEATHER_CUTOFF 0.05f
+#define CLOUD_WEATHER_CUTOFF 0.00f
 
 ////////////////////////////////////////////////////////////////////
 // Structs
@@ -57,8 +57,9 @@ LUMINARY_FUNCTION float cloud_gradient(float4 gradient, float height) {
   return smoothstep(height, gradient.x, gradient.y) - smoothstep(height, gradient.z, gradient.w);
 }
 
-LUMINARY_FUNCTION float cloud_height(const vec3 pos, const CloudLayerType layer) {
-  switch (layer) {
+template <CloudLayerType LAYER_TYPE>
+LUMINARY_FUNCTION float cloud_height(const vec3 pos) {
+  switch (LAYER_TYPE) {
     case CLOUD_LAYER_LOW:
       return (sky_height(pos) - device.cloud.low.height_min) / (device.cloud.low.height_max - device.cloud.low.height_min);
     case CLOUD_LAYER_MID:
@@ -70,7 +71,8 @@ LUMINARY_FUNCTION float cloud_height(const vec3 pos, const CloudLayerType layer)
   }
 }
 
-LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerType layer) {
+template <CloudLayerType LAYER_TYPE>
+LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height) {
   pos.x += device.cloud.offset_x;
   pos.z += device.cloud.offset_z;
 
@@ -78,8 +80,8 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height, Cloud
   tex_load_args.flip_v          = false;
   tex_load_args.apply_gamma     = false;
 
-  switch (layer) {
-    default:
+  CloudWeather weather;
+  switch (LAYER_TYPE) {
     case CLOUD_LAYER_LOW: {
       vec3 weather_pos = pos;
       weather_pos.x    = weather_pos.x + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_cos;
@@ -88,11 +90,8 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height, Cloud
 
       float4 tex = texture_load(device.cloud_noise_weather_tex, get_uv(weather_pos.x, weather_pos.z), tex_load_args);
 
-      CloudWeather weather;
       weather.coverage = __saturatef(remap(tex.x * device.cloud.low.coverage, 0.0f, 1.0f, device.cloud.low.coverage_min, 1.0f));
       weather.type     = __saturatef(remap(tex.y * device.cloud.low.type, 0.0f, 1.0f, device.cloud.low.type_min, 1.0f));
-
-      return weather;
     }
     case CLOUD_LAYER_MID: {
       vec3 weather_pos = pos;
@@ -102,11 +101,8 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height, Cloud
 
       float4 tex = texture_load(device.cloud_noise_weather_tex, get_uv(weather_pos.x, weather_pos.z), tex_load_args);
 
-      CloudWeather weather;
       weather.coverage = __saturatef(remap(tex.z * device.cloud.mid.coverage, 0.0f, 1.0f, device.cloud.mid.coverage_min, 1.0f));
       weather.type     = __saturatef(remap(tex.w * device.cloud.mid.type, 0.0f, 1.0f, device.cloud.mid.type_min, 1.0f));
-
-      return weather;
     }
     case CLOUD_LAYER_TOP: {
       vec3 weather_pos = pos;
@@ -116,14 +112,13 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height, Cloud
 
       float4 tex = texture_load(device.cloud_noise_weather_tex, get_uv(weather_pos.x, weather_pos.z), tex_load_args);
 
-      CloudWeather w;
-      w.coverage  = __saturatef(remap(tex.x * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
-      w.coverage1 = __saturatef(remap(tex.y * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
-      w.coverage2 = __saturatef(remap(tex.z * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
-
-      return w;
+      weather.coverage  = __saturatef(remap(tex.x * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
+      weather.coverage1 = __saturatef(remap(tex.y * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
+      weather.coverage2 = __saturatef(remap(tex.z * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
     }
   }
+
+  return weather;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -368,14 +363,14 @@ LUMINARY_FUNCTION float cloud_erode_density(const vec3 pos, float density, const
   return density;
 }
 
-LUMINARY_FUNCTION float cloud_density(
-  vec3 pos, const float height, const CloudWeather weather, const float mip_bias, const CloudLayerType layer) {
+template <CloudLayerType LAYER_TYPE>
+LUMINARY_FUNCTION float cloud_density(vec3 pos, const float height, const CloudWeather weather, const float mip_bias) {
   pos.x += device.cloud.offset_x;
   pos.z += device.cloud.offset_z;
 
   float density;
 
-  switch (layer) {
+  switch (LAYER_TYPE) {
     case CLOUD_LAYER_LOW:
       density = cloud_base_density_low(pos, height, weather, mip_bias);
       density = cloud_erode_density(pos, density, height, weather, mip_bias);
@@ -387,9 +382,6 @@ LUMINARY_FUNCTION float cloud_density(
     case CLOUD_LAYER_TOP:
       density = cloud_base_density_top(pos, height, weather, mip_bias);
       break;
-    default:
-      density = 0.0f;
-      break;
   }
 
   return fmaxf(density * device.cloud.density, 0.0f);
@@ -399,8 +391,9 @@ LUMINARY_FUNCTION float cloud_density(
 // Cutoff function
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION bool cloud_significant_point(const float height, const CloudWeather weather, const CloudLayerType layer) {
-  switch (layer) {
+template <CloudLayerType LAYER_TYPE>
+LUMINARY_FUNCTION bool cloud_significant_point(const float height, const CloudWeather weather) {
+  switch (LAYER_TYPE) {
     case CLOUD_LAYER_LOW: {
       const float4 type = cloud_density_height_gradient_type_low_level(weather);
       return (weather.coverage > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);

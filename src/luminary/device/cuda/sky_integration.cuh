@@ -73,9 +73,9 @@ LUMINARY_FUNCTION float2 sky_compute_path(const vec3 origin, const vec3 ray, con
 // Atmosphere Integration
 ////////////////////////////////////////////////////////////////////
 
+template <bool CELESTIALS, bool CLOUD_SHADOWS>
 LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
-  Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const bool cloud_shadows,
-  const int steps, const PathID& path_id) {
+  Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
   Spectrum result = spectrum_set1(0.0f);
 
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
@@ -83,7 +83,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
   const float start    = path.x;
   const float distance = fminf(path.y, limit - start);
 
-  Spectrum transmittance = spectrum_get_ident();
+  Spectrum transmittance = spectrum_set1(1.0f);
 
   if (distance > 0.0f) {
     float reach = start;
@@ -109,7 +109,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
       const float phase_mie        = sky_mie_phase(cos_angle, mie_params);
 
       float shadow;
-      if (cloud_shadows) {
+      if constexpr (CLOUD_SHADOWS) {
         shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : cloud_shadow(pos, ray_scatter);
       }
       else {
@@ -165,7 +165,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
     result                      = spectrum_mul(result, sun_radiance);
   }
 
-  if (celestials) {
+  if constexpr (CELESTIALS) {
     const float sun_hit   = sphere_ray_intersection(ray, origin, device.sky.sun_pos, SKY_SUN_RADIUS);
     const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
     const float moon_hit  = sphere_ray_intersection(ray, origin, device.sky.moon_pos, SKY_MOON_RADIUS);
@@ -243,11 +243,11 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION RGBF
-  sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, const PathID& path_id) {
+template <bool CELESTIALS>
+LUMINARY_FUNCTION RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
   Spectrum unused = spectrum_set1(0.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, path_id);
+  const Spectrum radiance = sky_compute_atmosphere<CELESTIALS, false>(unused, origin, ray, limit, steps, path_id);
 
   return sky_evaluate_radiance_from_spectrum(radiance);
 }
@@ -255,12 +255,7 @@ LUMINARY_FUNCTION RGBF
 LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, const PathID& path_id) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const float base_range = (IS_PRIMARY_RAY) ? 40.0f : 80.0f;
-
-  const int steps =
-    fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6) + random_1D(RANDOM_TARGET_SKY_INSCATTERING_STEP, path_id) - 0.5f;
-
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, path_id);
+  const Spectrum radiance = sky_compute_atmosphere<false, true>(transmittance, origin, ray, limit, 32, path_id);
 
   const RGBF inscattering = mul_color(sky_evaluate_radiance_from_spectrum(radiance), record);
 
@@ -310,7 +305,8 @@ LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const u
       const vec3 sky_origin  = world_to_sky_transform(origin);
       const bool include_sun = state & (STATE_FLAG_CAMERA_DIRECTION);
 
-      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, path_id);
+      sky = (include_sun) ? sky_get_color<true>(sky_origin, ray, FLT_MAX, device.sky.steps, path_id)
+                          : sky_get_color<false>(sky_origin, ray, FLT_MAX, device.sky.steps, path_id);
     } break;
     case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray);
