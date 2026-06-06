@@ -85,39 +85,34 @@ template <CloudLayerType LAYER_TYPE>
 LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, float dist, const PathID& path_id) {
   if (dist < 0.0f || start == FLT_MAX) {
     CloudRenderResult result;
-
-    result.scattered_light = get_color(0.0f, 0.0f, 0.0f);
-    result.transmittance   = 1.0f;
-    result.hit_dist        = FLT_MAX;
+    result.radiance      = spectrum_set1(0.0f);
+    result.transmittance = 1.0f;
+    result.hit_dist      = FLT_MAX;
 
     return result;
   }
 
-  int step_count;
+  uint32_t step_count;
   if constexpr (LAYER_TYPE == CLOUD_LAYER_LOW) {
     const float span = device.cloud.low.height_max - device.cloud.low.height_min;
-    dist             = fminf(6.0f * span, dist);
-    step_count       = device.cloud.steps * __saturatef(dist / (6.0f * span));
+    dist             = fminf(8.0f * span, dist);
+    step_count       = device.cloud.steps;
   }
   else if constexpr (LAYER_TYPE == CLOUD_LAYER_MID) {
     const float span = device.cloud.mid.height_max - device.cloud.mid.height_min;
-    dist             = fminf(6.0f * span, dist);
-    step_count       = (device.cloud.steps / 4) * __saturatef(dist / (6.0f * span));
+    dist             = fminf(8.0f * span, dist);
+    step_count       = device.cloud.steps / 4;
   }
   else if constexpr (LAYER_TYPE == CLOUD_LAYER_TOP) {
     const float span = device.cloud.top.height_max - device.cloud.top.height_min;
-    dist             = fminf(6.0f * span, dist);
-    step_count       = (device.cloud.steps / 8) * __saturatef(dist / (6.0f * span));
+    dist             = fminf(8.0f * span, dist);
+    step_count       = device.cloud.steps / 8;
   }
-
-  step_count += 8.0f * random_1D(RANDOM_TARGET_CLOUD_STEP_COUNT + LAYER_TYPE, path_id);
 
   start = fmaxf(0.0f, start);
 
-  const float step_size     = dist / step_count;
-  const float random_offset = random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + LAYER_TYPE, path_id);
-  float initial_step_size   = (0.1f + random_offset * 0.9f) * step_size;
-  float reach               = start + initial_step_size;
+  const float step_size = dist / step_count;
+  float reach = start + step_size * remap(random_1D(RANDOM_TARGET_CLOUD_STEP_OFFSET + LAYER_TYPE, path_id), 0.0f, 1.0f, 0.1f, 0.9f);
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
@@ -136,28 +131,15 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
   const float color_sampling_dist = random_1D(RANDOM_TARGET_CLOUD_COLOR_STEP + LAYER_TYPE, path_id);
   const vec3 color_sampling_pos   = add_vector(origin, scale_vector(ray, color_sampling_dist));
 
-  const RGBF ambient_color = sky_get_color<false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps / 2, path_id);
-
-  RGBF sun_color;
-  float sun_cos_angle;
-
-  const vec3 sun_ray = normalize_vector(sub_vector(device.sky.sun_pos, color_sampling_pos));
+  const vec3 sun_ray        = normalize_vector(sub_vector(device.sky.sun_pos, color_sampling_pos));
+  const float sun_cos_angle = dot_product(ray, sun_ray);
 
   const bool sun_visible = sph_ray_hit_p0(sun_ray, color_sampling_pos, SKY_EARTH_RADIUS) == false;
-  if (sun_visible) {
-    sun_color     = sky_get_sun_color(color_sampling_pos, sun_ray, false);
-    sun_cos_angle = dot_product(ray, sun_ray);
-  }
-  else {
-    sun_color     = get_color(0.0f, 0.0f, 0.0f);
-    sun_cos_angle = 0.0f;
-  }
 
-  int iteration            = 0;
-  const int max_iterations = step_count * 2;  // Safety net
+  for (uint32_t step_id = 0; step_id < step_count; step_id++) {
+    if (reach >= start + dist)
+      break;
 
-  while (reach <= start + dist && iteration < max_iterations) {
-    iteration++;
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     const float height = cloud_height<LAYER_TYPE>(pos);
@@ -220,7 +202,7 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
 
     transmittance *= step_trans_base;
 
-    if (transmittance < 0.01f) {
+    if (transmittance < 0.001f) {
       transmittance = 0.0f;
       break;
     }
@@ -228,13 +210,14 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
     reach += step_size;
   }
 
-  RGBF scattered_light = add_color(scale_color(sun_color, scattered_sun_light), scale_color(ambient_color, scattered_ambient_light));
+  const Spectrum sun_radiance     = (sun_visible) ? sky_get_sun_color_spectral(color_sampling_pos, sun_ray, false) : spectrum_set1(0.0f);
+  const Spectrum ambient_radiance = sky_get_color_spectral<false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps, path_id);
 
   CloudRenderResult result;
-
-  result.scattered_light = scattered_light;
-  result.transmittance   = transmittance;
-  result.hit_dist        = hit_dist;
+  result.radiance =
+    spectrum_add(spectrum_scale(sun_radiance, scattered_sun_light), spectrum_scale(ambient_radiance, scattered_ambient_light));
+  result.transmittance = transmittance;
+  result.hit_dist      = hit_dist;
 
   return result;
 }
@@ -244,8 +227,7 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION float clouds_render(
-  vec3 origin, const vec3 ray, const float limit, const PathID& path_id, RGBF& color, RGBF& transmittance,
-  float& transmittance_cloud_only) {
+  vec3 origin, const vec3 ray, const float limit, const PathID& path_id, RGBF& color, RGBF& record, float& transmittance_cloud_only) {
   float2 intersections[3];
   CloudRenderResult results[3];
 
@@ -286,7 +268,15 @@ LUMINARY_FUNCTION float clouds_render(
     order[2] = (less01) ? 1 : 0;
   }
 
-  float prev_start = 0.0f;
+  constexpr uint32_t NUM_STEPS = 128;
+
+  float prev_start      = 0.0f;
+  uint32_t prev_step_id = 0;
+
+  SkyIntegrationParams params = sky_get_integration_params(origin, ray, limit, NUM_STEPS, path_id);
+
+  Spectrum radiance      = spectrum_set1(0.0f);
+  Spectrum transmittance = spectrum_set1(1.0f);
 
   for (int i = 0; i < 3; i++) {
     const CloudRenderResult result = results[order[i]];
@@ -295,18 +285,26 @@ LUMINARY_FUNCTION float clouds_render(
       continue;
 
     if (device.cloud.atmosphere_scattering) {
-      const float scattering_dist = result.hit_dist - prev_start;
+      uint32_t next_step_id = sky_get_nearest_step_id(params, result.hit_dist);
 
-      color  = add_color(color, sky_trace_inscattering(origin, ray, scattering_dist, transmittance, path_id));
-      origin = add_vector(origin, scale_vector(ray, scattering_dist));
+      Spectrum segment_radiance = sky_compute_atmosphere<false, true>(transmittance, origin, ray, params, prev_step_id, next_step_id);
+      radiance                  = spectrum_add(radiance, segment_radiance);
+
+      prev_step_id = next_step_id;
     }
 
-    color         = add_color(color, mul_color(result.scattered_light, transmittance));
-    transmittance = scale_color(transmittance, result.transmittance);
+    radiance      = spectrum_add(radiance, spectrum_mul(result.radiance, transmittance));
+    transmittance = spectrum_scale(transmittance, result.transmittance);
     transmittance_cloud_only *= result.transmittance;
 
     prev_start = result.hit_dist;
   }
+
+  if (device.cloud.atmosphere_scattering)
+    radiance = spectrum_add(radiance, sky_compute_atmosphere<true, true>(transmittance, origin, ray, params, prev_step_id, NUM_STEPS));
+
+  color  = add_color(color, mul_color(sky_evaluate_radiance_from_spectrum(radiance), record));
+  record = mul_color(record, sky_evaluate_transmittance_from_spectrum(transmittance));
 
   return prev_start;
 }
@@ -340,18 +338,19 @@ LUMINARY_KERNEL void cloud_process_tasks() {
     float cloud_transmittance;
     const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.path_id, color, record, cloud_transmittance);
 
-    // Move past the clouds
-    if (device.cloud.atmosphere_scattering) {
+    if (depth == FLT_MAX) {
+      record = splat_color(0.0f);
+    }
+    else {
+      // Move past the clouds
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
         task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
         task_store(task_base_address, task);
 
-        if (depth != FLT_MAX) {
-          depth -= cloud_world_offset;
-          task_trace_depth_store(task_base_address, depth);
-        }
+        depth -= cloud_world_offset;
+        task_trace_depth_store(task_base_address, depth);
       }
     }
 

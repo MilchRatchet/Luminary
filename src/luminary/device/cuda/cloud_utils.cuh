@@ -28,7 +28,7 @@
 #define CLOUD_OCTAVE_EXTINCTION_FACTOR 0.5f
 #define CLOUD_OCTAVE_PHASE_FACTOR 0.5f
 
-#define CLOUD_WEATHER_CUTOFF 0.00f
+#define CLOUD_WEATHER_CUTOFF 0.001f
 
 ////////////////////////////////////////////////////////////////////
 // Structs
@@ -44,7 +44,7 @@ struct CloudWeather {
 } typedef CloudWeather;
 
 struct CloudRenderResult {
-  RGBF scattered_light;
+  Spectrum radiance;
   float transmittance;
   float hit_dist;
 } typedef CloudRenderResult;

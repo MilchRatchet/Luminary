@@ -316,7 +316,8 @@ LUMINARY_FUNCTION RGBF sky_evaluate_transmittance_from_spectrum(const Spectrum t
 // This is a quick way of obtaining the color of the sun disk times transmittance
 // Note that it is not checked whether the sun is actually hit by ray, it is simply assumed
 // Inscattering is not included
-LUMINARY_FUNCTION RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool include_cloud_hdri = true) {
+
+LUMINARY_FUNCTION Spectrum sky_get_sun_color_spectral(const vec3 origin, const vec3 ray, const bool include_cloud_hdri = true) {
   const float height           = sky_height(origin);
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 
@@ -330,16 +331,19 @@ LUMINARY_FUNCTION RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, cons
   const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
   const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.sky.sun_strength);
-  const Spectrum radiance     = spectrum_mul(extinction_sun, sun_radiance);
 
-  RGBF sun_color = sky_evaluate_radiance_from_spectrum(radiance);
+  Spectrum radiance = spectrum_mul(extinction_sun, sun_radiance);
 
   if (include_cloud_hdri && device.cloud.active && device.sky.mode == LUMINARY_SKY_MODE_HDRI) {
     const float cloud_alpha = sky_hdri_sample_alpha(ray);
-    sun_color               = scale_color(sun_color, cloud_alpha);
+    radiance                = spectrum_scale(radiance, cloud_alpha);
   }
 
-  return sun_color;
+  return radiance;
+}
+
+LUMINARY_FUNCTION RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool include_cloud_hdri = true) {
+  return sky_evaluate_radiance_from_spectrum(sky_get_sun_color_spectral(origin, ray, include_cloud_hdri));
 }
 
 #endif /* SKY_UTILS_CUH */

@@ -368,7 +368,7 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
     DeviceTask task                  = task_load(task_base_address);
     DeviceTaskTrace trace            = task_trace_load(task_base_address);
 
-    if (trace.handle.instance_id == HIT_TYPE_SKY)
+    if (trace.handle.instance_id == HIT_TYPE_SKY || trace.handle.instance_id == HIT_TYPE_INVALID)
       continue;
 
     const vec3 sky_origin          = world_to_sky_transform(task.origin);

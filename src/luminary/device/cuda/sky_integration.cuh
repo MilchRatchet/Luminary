@@ -73,31 +73,43 @@ LUMINARY_FUNCTION float2 sky_compute_path(const vec3 origin, const vec3 ray, con
 // Atmosphere Integration
 ////////////////////////////////////////////////////////////////////
 
-template <bool CELESTIALS, bool CLOUD_SHADOWS>
-LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
-  Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
-  Spectrum result = spectrum_set1(0.0f);
+struct SkyIntegrationParams {
+  float start;
+  float step_size;
+} typedef SkyIntegrationParams;
 
+LUMINARY_FUNCTION SkyIntegrationParams
+  sky_get_integration_params(vec3 origin, vec3 ray, float limit, uint32_t steps, const PathID& path_id) {
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
 
-  const float start    = path.x;
-  const float distance = fminf(path.y, limit - start);
+  SkyIntegrationParams params;
+  params.start     = path.x;
+  params.step_size = fminf(path.y, limit - path.x) / steps;
 
-  Spectrum transmittance = spectrum_set1(1.0f);
+  params.start += params.step_size * remap(random_1D(RANDOM_TARGET_SKY_STEP_OFFSET, path_id), 0.0f, 1.0f, 0.1f, 0.9f);
 
-  if (distance > 0.0f) {
-    float reach = start;
-    float step_size;
+  return params;
+}
 
-    const float light_angle   = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, origin);
-    const float random_offset = random_1D(RANDOM_TARGET_SKY_STEP_OFFSET, path_id);
+LUMINARY_FUNCTION uint32_t sky_get_nearest_step_id(const SkyIntegrationParams params, const float dist) {
+  if (params.step_size == 0.0f)
+    return 0;
+
+  return (uint32_t) (((dist - params.start) / params.step_size) + 0.5f);
+}
+
+template <bool CELESTIALS, bool CLOUD_SHADOWS>
+LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
+  Spectrum& transmittance, const vec3 origin, const vec3 ray, SkyIntegrationParams params, uint32_t start_step, uint32_t end_step) {
+  Spectrum result = spectrum_set1(0.0f);
+
+  if (params.step_size > 0.0f) {
+    const float light_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, origin);
 
     const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.sky.mie_diameter);
 
-    for (int i = 0; i < steps; i++) {
-      const float new_reach = start + distance * (i + random_offset) / steps;
-      step_size             = new_reach - reach;
-      reach                 = new_reach;
+    for (uint32_t step_id = start_step; step_id < end_step; step_id++) {
+      const float reach = params.start + step_id * params.step_size;
 
       const vec3 pos     = add_vector(origin, scale_vector(ray, reach));
       const float height = sky_height(pos);
@@ -152,7 +164,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
       const Spectrum S = spectrum_add(ss_radiance, ms_radiance);
 
       Spectrum step_transmittance = extinction;
-      step_transmittance          = spectrum_scale(step_transmittance, -step_size);
+      step_transmittance          = spectrum_scale(step_transmittance, -params.step_size);
       step_transmittance          = spectrum_exp(step_transmittance);
 
       const Spectrum Sint = spectrum_mul(spectrum_sub(S, spectrum_mul(S, step_transmittance)), spectrum_inv(extinction));
@@ -234,8 +246,6 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
     }
   }
 
-  transmittance_out = spectrum_mul(transmittance_out, transmittance);
-
   return result;
 }
 
@@ -244,18 +254,30 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
 ////////////////////////////////////////////////////////////////////
 
 template <bool CELESTIALS>
+LUMINARY_FUNCTION Spectrum
+  sky_get_color_spectral(const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
+  Spectrum transmittance = spectrum_set1(1.0f);
+
+  SkyIntegrationParams params = sky_get_integration_params(origin, ray, limit, steps, path_id);
+
+  return sky_compute_atmosphere<CELESTIALS, false>(transmittance, origin, ray, params, 0, steps);
+}
+
+template <bool CELESTIALS>
 LUMINARY_FUNCTION RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
-  Spectrum unused = spectrum_set1(0.0f);
+  return sky_evaluate_radiance_from_spectrum(sky_get_color_spectral<CELESTIALS>(origin, ray, limit, steps, path_id));
+}
 
-  const Spectrum radiance = sky_compute_atmosphere<CELESTIALS, false>(unused, origin, ray, limit, steps, path_id);
-
-  return sky_evaluate_radiance_from_spectrum(radiance);
+LUMINARY_FUNCTION Spectrum
+  sky_trace_inscattering_spectral(const vec3 origin, const vec3 ray, const float limit, Spectrum& transmittance, const PathID& path_id) {
+  SkyIntegrationParams params = sky_get_integration_params(origin, ray, limit, 32, path_id);
+  return sky_compute_atmosphere<false, true>(transmittance, origin, ray, params, 0, 32);
 }
 
 LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, const PathID& path_id) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere<false, true>(transmittance, origin, ray, limit, 32, path_id);
+  const Spectrum radiance = sky_trace_inscattering_spectral(origin, ray, limit, transmittance, path_id);
 
   const RGBF inscattering = mul_color(sky_evaluate_radiance_from_spectrum(radiance), record);
 
