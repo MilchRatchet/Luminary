@@ -8,26 +8,32 @@
 
 LUMINARY_FUNCTION bool accumulation_reduce_sample(
   const RGBF value, const uint32_t index, RGBF& first_moment, float& second_moment_lumiance) {
-  const uint32_t index_mask = __match_any_sync(__activemask(), index);
-
+  const uint32_t index_mask  = __match_any_sync(__activemask(), index);
   const bool is_first_thread = (__ffs(index_mask) - 1) == THREAD_ID_IN_WARP;
-
-  // TODO: Implement fast path for when index_mask == 0xFFFFFFFF
 
   first_moment           = value;
   second_moment_lumiance = color_luminance(mul_color(value, value));
 
-  for (uint32_t mask = index_mask & ~(1u << THREAD_ID_IN_WARP); mask != 0; mask &= mask - 1) {
-    uint32_t other_thread_id = __ffs(mask) - 1;
+  if (index_mask == 0xFFFFFFFF) {
+    first_moment.r = warp_reduce_sum(first_moment.r);
+    first_moment.g = warp_reduce_sum(first_moment.g);
+    first_moment.b = warp_reduce_sum(first_moment.b);
 
-    const float red   = __shfl_sync(index_mask, value.r, other_thread_id);
-    const float green = __shfl_sync(index_mask, value.g, other_thread_id);
-    const float blue  = __shfl_sync(index_mask, value.b, other_thread_id);
+    second_moment_lumiance = warp_reduce_sum(second_moment_lumiance);
+  }
+  else {
+    for (uint32_t mask = index_mask & ~(1u << THREAD_ID_IN_WARP); mask != 0; mask &= mask - 1) {
+      uint32_t other_thread_id = __ffs(mask) - 1;
 
-    const RGBF color = get_color(red, green, blue);
+      const float red   = __shfl_sync(index_mask, value.r, other_thread_id);
+      const float green = __shfl_sync(index_mask, value.g, other_thread_id);
+      const float blue  = __shfl_sync(index_mask, value.b, other_thread_id);
 
-    first_moment = add_color(first_moment, color);
-    second_moment_lumiance += color_luminance(mul_color(color, color));
+      const RGBF color = get_color(red, green, blue);
+
+      first_moment = add_color(first_moment, color);
+      second_moment_lumiance += color_luminance(mul_color(color, color));
+    }
   }
 
   return is_first_thread;
