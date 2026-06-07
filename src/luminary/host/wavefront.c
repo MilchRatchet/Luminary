@@ -695,7 +695,7 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
       tris       = 2;
     } break;
     default: {
-      error_message("A face is of unsupported format. %s\n", str);
+      error_message("A face is of unsupported format. %s", str);
       tris = 0;
     } break;
   }

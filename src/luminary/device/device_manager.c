@@ -770,8 +770,6 @@ static LuminaryResult _device_manager_init(DeviceManager* device_manager, Device
 
   _device_init();
 
-  __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
-
   __FAILURE_HANDLE(device_library_create(&device_manager->library));
 
   int32_t device_count;
@@ -837,6 +835,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(sample_time_create(&device_manager->sample_time));
+  __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
 
   ////////////////////////////////////////////////////////////////////
   // Create work queue

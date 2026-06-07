@@ -330,7 +330,7 @@ static void _window_entity_properties_renderer_settings_action(
       data, "Avg. Sampling Rate", &settings.adaptive_sampling_settings.avg_sampling_rate, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 128.0f,
       1.0f);
     update_data |= _window_entity_properties_add_slider(
-      data, "Update Interval", &settings.adaptive_sampling_settings.update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 1024.0f, 1.0f);
+      data, "Update Interval", &settings.adaptive_sampling_settings.update_interval, ELEMENT_SLIDER_DATA_TYPE_UINT, 4.0f, 255.0f, 1.0f);
     update_data |= _window_entity_properties_add_dropdown(
       data, "Output Mode", LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_COUNT, (char**) luminary_strings_adaptive_sampling_output_mode,
       &adaptive_sampling_output_mode);

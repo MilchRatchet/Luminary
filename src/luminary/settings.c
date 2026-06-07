@@ -23,7 +23,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
     .enable            = true,
     .max_sampling_rate = 256,
     .avg_sampling_rate = 2,
-    .update_interval   = 64,
+    .update_interval   = 128,
     .output_mode       = LUMINARY_ADAPTIVE_SAMPLING_OUTPUT_MODE_BEAUTY,
   };
 
