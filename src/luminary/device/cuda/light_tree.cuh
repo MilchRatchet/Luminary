@@ -222,19 +222,23 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
 #pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
-      const float target               = light_tree_child_importance<TYPE>(ctx, section, base, exp, exp_v, rel_child_id);
-      const RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
+      const float target         = light_tree_child_importance<TYPE>(ctx, section, base, exp, exp_v, rel_child_id);
+      RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
 
-      if (ris_sample.resampling_probability == 0.0f)
+      if (ris_sample.resampling_probability <= 0.0f)
         continue;
+
+      ris_sample_handle_finalize(ris_sample);
 
       if constexpr (TYPE == MATERIAL_GEOMETRY)
         sum += target;
 
+      const uint32_t child_id = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
+
 #pragma unroll
       for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
         if (ris_lane_add_sample(ris_lane[lane_id], ris_sample)) {
-          selected[lane_id] = section_id * LIGHT_TREE_MAX_CHILDREN_PER_SECTION + rel_child_id;
+          selected[lane_id] = child_id;
 
           _LIGHT_TREE_DEBUG_SELECT_CHILD_TOKEN(lane_id, selected[lane_id], target);
         }

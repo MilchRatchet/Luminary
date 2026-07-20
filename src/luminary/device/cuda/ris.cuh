@@ -90,6 +90,8 @@ struct RISAggregator {
 
 struct RISSampleHandle {
   float resampling_probability;
+  float rcp_resampling_probability;
+  float rcp_neg_resampling_probability;
   float target;
 } typedef RISSampleHandle;
 
@@ -122,6 +124,11 @@ LUMINARY_FUNCTION RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggre
   return handle;
 }
 
+LUMINARY_FUNCTION void ris_sample_handle_finalize(RISSampleHandle& handle) {
+  handle.rcp_resampling_probability     = 1.0f / handle.resampling_probability;
+  handle.rcp_neg_resampling_probability = 1.0f / (1.0f - handle.resampling_probability);
+}
+
 LUMINARY_FUNCTION void ris_lane_reset(RISLane& lane) {
   lane.selected_target = 0.0f;
 }
@@ -142,9 +149,9 @@ LUMINARY_FUNCTION bool ris_lane_add_sample(RISLane& lane, const RISSampleHandle 
 
   lane.selected_target     = (sample_accepted) ? sample.target : lane.selected_target;
   const float random_shift = (sample_accepted) ? 0.0f : resampling_probability;
-  const float random_scale = (sample_accepted) ? resampling_probability : 1.0f - resampling_probability;
+  const float random_scale = (sample_accepted) ? sample.rcp_resampling_probability : sample.rcp_neg_resampling_probability;
 
-  lane.random = random_saturate((lane.random - random_shift) / random_scale);
+  lane.random = random_saturate((lane.random - random_shift) * random_scale);
 
   return sample_accepted;
 }
