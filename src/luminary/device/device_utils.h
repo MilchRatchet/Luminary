@@ -293,11 +293,11 @@ struct DeviceLightTreeNode {
   uint16_t padding2;
   uint32_t child_ptr;
   uint32_t light_ptr;
-  uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_std_dev[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint8_t rel_mean_x[LIGHT_TREE_CHILDREN_PER_NODE];
+  uint8_t rel_mean_y[LIGHT_TREE_CHILDREN_PER_NODE];
+  uint8_t rel_mean_z[LIGHT_TREE_CHILDREN_PER_NODE];
+  uint8_t rel_std_dev[LIGHT_TREE_CHILDREN_PER_NODE];
+  uint8_t rel_power[LIGHT_TREE_CHILDREN_PER_NODE];
 } typedef DeviceLightTreeNode;
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
 
@@ -317,13 +317,13 @@ struct DeviceLightTreeRootHeader {
 LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootHeader, 0x10);
 
 struct DeviceLightTreeRootSection {
-  uint8_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
-  uint8_t rel_std_dev[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint16_t rel_mean_x[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint16_t rel_mean_y[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint16_t rel_mean_z[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
+  uint16_t rel_std_dev[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
   uint16_t rel_power[LIGHT_TREE_MAX_CHILDREN_PER_SECTION];
 } typedef DeviceLightTreeRootSection;
-LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x30);
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeRootSection, 0x50);
 
 #define MAX_NUM_INDIRECT_BUCKETS 3
 

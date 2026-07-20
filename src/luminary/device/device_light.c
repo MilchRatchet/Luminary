@@ -877,10 +877,10 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
   min_mean.y = device_unpack_float(header.y);
   min_mean.z = device_unpack_float(header.z);
 
-  header.exp_x       = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 255.0f)) : 0;
-  header.exp_y       = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 255.0f)) : 0;
-  header.exp_z       = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 255.0f)) : 0;
-  header.exp_std_dev = (int8_t) ceilf(log2f(max_std_dev * 1.0f / 255.0f));
+  header.exp_x       = (int8_t) (max_mean.x != min_mean.x) ? ceilf(log2f((max_mean.x - min_mean.x) * 1.0f / 0xFFFF)) : 0;
+  header.exp_y       = (int8_t) (max_mean.y != min_mean.y) ? ceilf(log2f((max_mean.y - min_mean.y) * 1.0f / 0xFFFF)) : 0;
+  header.exp_z       = (int8_t) (max_mean.z != min_mean.z) ? ceilf(log2f((max_mean.z - min_mean.z) * 1.0f / 0xFFFF)) : 0;
+  header.exp_std_dev = (int8_t) ceilf(log2f(max_std_dev * 1.0f / 0xFFFF));
 
   const float compression_x = 1.0f / exp2f(header.exp_x);
   const float compression_y = 1.0f / exp2f(header.exp_y);
@@ -920,10 +920,10 @@ static LuminaryResult _light_tree_collapse_root(LightTreeCollapseWork* cwork, co
       uint64_t child_rel_std_dev = (uint64_t) (sqrtf(child_node.variance) * compression_v + 0.5f);
       uint64_t child_rel_power   = (uint64_t) floorf(0xFFFF * child_node.power / max_power + 0.5f);
 
-      __DEBUG_ASSERT((child_rel_mean_x & 0xFF) == child_rel_mean_x);
-      __DEBUG_ASSERT((child_rel_mean_y & 0xFF) == child_rel_mean_y);
-      __DEBUG_ASSERT((child_rel_mean_z & 0xFF) == child_rel_mean_z);
-      __DEBUG_ASSERT((child_rel_std_dev & 0xFF) == child_rel_std_dev);
+      __DEBUG_ASSERT((child_rel_mean_x & 0xFFFF) == child_rel_mean_x);
+      __DEBUG_ASSERT((child_rel_mean_y & 0xFFFF) == child_rel_mean_y);
+      __DEBUG_ASSERT((child_rel_mean_z & 0xFFFF) == child_rel_mean_z);
+      __DEBUG_ASSERT((child_rel_std_dev & 0xFFFF) == child_rel_std_dev);
       __DEBUG_ASSERT((child_rel_power & 0xFFFF) == child_rel_power);
 
       // Power may not be zero as zero implies NULL node and a node with 0 power cannot be sampled.
