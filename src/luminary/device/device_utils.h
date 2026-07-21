@@ -307,8 +307,7 @@ struct DeviceLightTreeRootHeader {
   uint16_t z;
   uint16_t num_root_lights;
   uint16_t power_normalization;
-  uint8_t num_sections;
-  uint8_t padding1;
+  uint16_t num_sections;
   int8_t exp_x;
   int8_t exp_y;
   int8_t exp_z;

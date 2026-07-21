@@ -16,8 +16,8 @@
 static_assert(LIGHT_TREE_NUM_OUTPUTS <= LIGHT_GEO_MAX_SAMPLES, "Update random allocations if you increase number of output samples.");
 
 struct LightTreeContinuation {
-  // 3 bits spare
-  uint32_t is_light : 1, child_index : 8, probability : 20;
+  uint32_t is_light : 1, child_index : 8, probability : 20;  // 3 Spare
+  static_assert((1 << 8) >= LIGHT_TREE_ROOT_MAX_CHILD_COUNT, "There are too many root children, increase the number of child index bits!");
 } typedef LightTreeContinuation;
 LUM_STATIC_SIZE_ASSERT(LightTreeContinuation, 0x04);
 
@@ -70,8 +70,7 @@ LUMINARY_FUNCTION float light_tree_importance(const MaterialContext<TYPE> ctx, c
 
 template <>
 LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
-  const MaterialContextGeometry ctx, const float power, const vec3 mean, const float std_dev) {
-  const vec3 PO       = sub_vector(mean, ctx.position);
+  const MaterialContextGeometry ctx, const float power, const vec3 PO, const float std_dev) {
   const float dist_sq = dot_product(PO, PO);
 
   const float variance = std_dev * std_dev;
@@ -93,9 +92,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
 
 template <>
 LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
-  const MaterialContextVolume ctx, const float power, const vec3 mean, const float std_dev) {
-  const vec3 PO = sub_vector(mean, ctx.position);
-
+  const MaterialContextVolume ctx, const float power, const vec3 PO, const float std_dev) {
   // Distance to the mean projected onto the ray
   const float dist_along_ray = -dot_product(PO, ctx.V);
 
@@ -125,8 +122,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
 
 template <>
 LUMINARY_FUNCTION float light_tree_importance<MATERIAL_PARTICLE>(
-  const MaterialContextParticle ctx, const float power, const vec3 mean, const float std_dev) {
-  const vec3 PO       = sub_vector(mean, ctx.position);
+  const MaterialContextParticle ctx, const float power, const vec3 PO, const float std_dev) {
   const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
 
   return power / dist_sq;
@@ -134,7 +130,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_PARTICLE>(
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION float light_tree_child_importance(
-  const MaterialContext<TYPE> ctx, const DeviceLightTreeRootSection section, const vec3 base, const vec3 exp, const float exp_v,
+  const MaterialContext<TYPE> ctx, const DeviceLightTreeRootSection section, const vec3 rel_base, const vec3 exp, const float exp_v,
   const uint32_t i) {
   if (section.rel_power[i] == 0)
     return 0.0f;
@@ -143,14 +139,15 @@ LUMINARY_FUNCTION float light_tree_child_importance(
   const float std_dev = section.rel_std_dev[i] * exp_v;
 
   const vec3 rel_mean = get_vector(section.rel_mean_x[i], section.rel_mean_y[i], section.rel_mean_z[i]);
-  const vec3 mean     = add_vector(mul_vector(rel_mean, exp), base);
+  const vec3 mean     = add_vector(mul_vector(rel_mean, exp), rel_base);
 
   return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION float light_tree_child_importance(
-  const MaterialContext<TYPE> ctx, const DeviceLightTreeNode node, const vec3 base, const vec3 exp, const float exp_v, const uint32_t i) {
+  const MaterialContext<TYPE> ctx, const DeviceLightTreeNode node, const vec3 rel_base, const vec3 exp, const float exp_v,
+  const uint32_t i) {
   if (node.rel_power[i] == 0)
     return 0.0f;
 
@@ -158,7 +155,7 @@ LUMINARY_FUNCTION float light_tree_child_importance(
   const float std_dev = node.rel_std_dev[i] * exp_v;
 
   const vec3 rel_mean = get_vector(node.rel_mean_x[i], node.rel_mean_y[i], node.rel_mean_z[i]);
-  const vec3 mean     = add_vector(mul_vector(rel_mean, exp), base);
+  const vec3 mean     = add_vector(mul_vector(rel_mean, exp), rel_base);
 
   return fmaxf(light_tree_importance<TYPE>(ctx, power, mean, std_dev), 0.0f);
 }
@@ -177,7 +174,7 @@ LUMINARY_FUNCTION uint32_t light_tree_get_write_ptr(uint32_t& inplace_output_ptr
 }
 
 LUMINARY_FUNCTION LightTreeContinuation
-  _light_tree_continuation_pack(const uint8_t child_index, const float probability, const bool is_light) {
+  _light_tree_continuation_pack(const uint32_t child_index, const float probability, const bool is_light) {
   LightTreeContinuation continuation;
 
   continuation.is_light    = is_light ? 1 : 0;
@@ -207,7 +204,9 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   const vec3 exp    = get_vector(exp2f(header.exp_x), exp2f(header.exp_y), exp2f(header.exp_z));
   const float exp_v = exp2f(header.exp_std_dev);
 
-  uint8_t selected[LIGHT_TREE_NUM_OUTPUTS];
+  const vec3 rel_base = sub_vector(base, ctx.position);
+
+  uint32_t selected[LIGHT_TREE_NUM_OUTPUTS];
   float sum = 0.0f;
 
   LUMINARY_ASSUME(header.num_sections <= LIGHT_TREE_ROOT_MAX_NUM_SECTIONS);
@@ -222,7 +221,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
 #pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_MAX_CHILDREN_PER_SECTION; rel_child_id++) {
-      const float target         = light_tree_child_importance<TYPE>(ctx, section, base, exp, exp_v, rel_child_id);
+      const float target         = light_tree_child_importance<TYPE>(ctx, section, rel_base, exp, exp_v, rel_child_id);
       RISSampleHandle ris_sample = ris_aggregator_add_sample(ris_aggregator, target, 1.0f);
 
       if (ris_sample.resampling_probability <= 0.0f)
@@ -251,9 +250,9 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
-    const bool is_light = selected[lane_id] < header.num_root_lights;
-    const uint8_t index = (is_light) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
-    work.data[lane_id]  = _light_tree_continuation_pack(index, ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), is_light);
+    const bool is_light  = selected[lane_id] < header.num_root_lights;
+    const uint32_t index = (is_light) ? selected[lane_id] : selected[lane_id] - header.num_root_lights;
+    work.data[lane_id]   = _light_tree_continuation_pack(index, ris_lane_get_sampling_prob(ris_lane[lane_id], ris_aggregator), is_light);
 
     _LIGHT_TREE_DEBUG_STORE_CONTINUATION_TOKEN(lane_id, work.data[lane_id]);
   }
@@ -293,11 +292,13 @@ LUMINARY_FUNCTION LightTreeResult
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
     const float exp_v = exp2f(node.exp_std_dev);
 
-    uint8_t selected_child = 0xFF;
+    const vec3 rel_base = sub_vector(base, ctx.position);
+
+    uint32_t selected_child = 0xFF;
 
 #pragma unroll
     for (uint32_t rel_child_id = 0; rel_child_id < LIGHT_TREE_CHILDREN_PER_NODE; rel_child_id++) {
-      const float target = light_tree_child_importance<TYPE>(ctx, node, base, exp, exp_v, rel_child_id);
+      const float target = light_tree_child_importance<TYPE>(ctx, node, rel_base, exp, exp_v, rel_child_id);
 
       if (ris_reservoir_add_sample(reservoir, target, 1.0f)) {
         selected_child = rel_child_id;
