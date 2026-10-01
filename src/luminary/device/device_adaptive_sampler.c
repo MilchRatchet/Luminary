@@ -201,9 +201,10 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
 
   {
     KernelArgsAdaptiveSamplingBlockReduceVariance args;
-    args.dst_block_variance = DEVICE_PTR(sampler->variance_buffer);
-    args.current_stage_id   = sampler->allocator.stage_id;
-    args.width              = sampler->render_width;
+    args.num_adaptive_sampling_blocks = num_adaptive_sampling_blocks;
+    args.dst_block_variance           = DEVICE_PTR(sampler->variance_buffer);
+    args.current_stage_id             = sampler->allocator.stage_id;
+    args.width                        = sampler->render_width;
 
     // Half a warp per adaptive sampler block
     const uint32_t num_blocks = ((num_adaptive_sampling_blocks << (WARP_SIZE_LOG - 1)) + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK;

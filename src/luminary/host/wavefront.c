@@ -570,7 +570,7 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
   const uint32_t num_check = 0b00110000;
   const uint32_t num_mask  = 0b11110000;
 
-  uint32_t data[12];
+  int32_t data[12];
   uint32_t data_ptr = 0;
 
   int32_t sign = 1;
@@ -590,7 +590,7 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
       c = str[ptr++];
     }
 
-    if (c == '/' || c == ' ' || c == '\0' || c == '\n') {
+    if (c == '/' || c == ' ' || c == '\0' || c == '\n' || c == '\r') {
       if (data_ptr >= 12) {
         data_ptr++;
         break;
@@ -763,7 +763,7 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
     fread(read_buffer + offset, 1, READ_BUFFER_SIZE - offset - 1, file);
 
     char* line = read_buffer;
-    char* eol;
+    char* eol  = NULL;
 
     while ((eol = strchr(line, '\n'))) {
       *eol = '\0';

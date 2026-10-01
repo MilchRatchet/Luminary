@@ -82,11 +82,14 @@ static void _argument_parser_arg_func_device(ArgumentParser* parser, LuminaryHos
   if (num_arguments > 0) {
     const uint32_t device_id = atoi(arguments[0]);
 
+    if (device_id > 31)
+      crash_message("Invalid device ID %u", device_id);
+
     // If a device was selected, deselect all devices and only use the onces specified by the user.
     if (parser->results.device_mask == LUMINARY_HOST_CREATE_INFO_DEVICE_MASK_ALL_DEVICES)
       parser->results.device_mask = 0;
 
-    parser->results.device_mask |= 1 << device_id;
+    parser->results.device_mask |= 1u << device_id;
   }
 }
 

@@ -775,6 +775,11 @@ static LuminaryResult _device_manager_init(DeviceManager* device_manager, Device
   int32_t device_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
 
+  if (device_count > LUMINARY_MAX_NUM_DEVICES) {
+    warn_message("CUDA reported %d devices but Luminary only supports %u devices.", device_count, LUMINARY_MAX_NUM_DEVICES);
+    device_count = LUMINARY_MAX_NUM_DEVICES;
+  }
+
   __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
 
   for (int32_t device_id = 0; device_id < device_count; device_id++) {

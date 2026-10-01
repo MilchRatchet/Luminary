@@ -174,6 +174,9 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   // Two blocks per warp
   const uint32_t adaptive_sampling_block = THREAD_ID >> (WARP_SIZE_LOG - 1);
 
+  if (adaptive_sampling_block >= args.num_adaptive_sampling_blocks)
+    return;
+
   const uint32_t sample_count = adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
   const float denominator     = 1.0f / sample_count;
 
@@ -228,6 +231,9 @@ LUMINARY_KERNEL void adaptive_sampling_deflate_and_sum_variance(const KernelArgs
 
 LUMINARY_KERNEL void adaptive_sampling_compute_stage_sample_counts(const KernelArgsAdaptiveSamplingComputeStageSampleCounts args) {
   const uint32_t adaptive_sampling_block = THREAD_ID;
+
+  if (adaptive_sampling_block >= args.num_adaptive_sampling_blocks)
+    return;
 
   const float avg_variance = *args.src_sum_variance / args.num_adaptive_sampling_blocks;
 
