@@ -28,8 +28,8 @@ struct WavefrontTriangle {
   int32_t vn1;
   int32_t vn2;
   int32_t vn3;
-  uint16_t material;
-  uint16_t object;
+  uint32_t material;
+  uint32_t object;
 } typedef WavefrontTriangle;
 
 enum WavefrontTextureType { WF_ALBEDO, WF_LUMINANCE, WF_ROUGHNESS, WF_METALLIC, WF_NORMAL, WF_TEX_TYPE_COUNT } typedef WavefrontTextureType;
@@ -52,7 +52,6 @@ struct WavefrontTextureInstance {
 
 struct WavefrontArguments {
   bool legacy_smoothness;
-  bool force_transparency_cutout;
   float emission_scale;
   bool force_bidirectional_emission;
   const char* name_prefix;

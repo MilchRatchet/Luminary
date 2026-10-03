@@ -53,23 +53,19 @@ static LuminaryResult parse_general_settings(
     case 6868910012049477442u:
       sscanf(value, "%u\n", &settings->max_ray_depth);
       break;
-#if 0
     /* SAMPLES_ */
     case 6868910050737209683u:
-      sscanf(value, "%u\n", &general->samples);
-      break;
-#endif
+      // sscanf(value, "%u\n", &general->samples);
+      // break;
     /* NUMLIGHT */
     case 6073182477647435086u:
       // Legacy
       // sscanf(value, "%u\n", &settings->light_num_rays);
       break;
-#if 0
     /* OUTPUTFN */
     case 5640288308724782415u:
-      sscanf(value, "%s\n", general->output_path);
-      break;
-#endif
+      // sscanf(value, "%s\n", general->output_path);
+      // break;
     default:
       warn_message("%8.8s (%zu) is not a valid GENERAL setting.", line, key);
       break;
@@ -85,39 +81,34 @@ static void parse_material_settings(LegacyLumFileSettings* settings, char* line)
   uint32_t bool_uint = 0;
 
   switch (key) {
-#if 0
     /* LIGHTSON */
     case 5642820479573510476u:
-      sscanf(value, "%u\n", &material->lights_active);
-      break;
+      // sscanf(value, "%u\n", &material->lights_active);
+      // break;
     /* OVERRIDE */
     case 4991194904949773903u:
-      sscanf(value, "%u\n", &material->override_materials);
-      break;
+      // sscanf(value, "%u\n", &material->override_materials);
+      // break;
     /* SMOOTHNE */
     case 4994008563745508691u:
-      sscanf(value, "%f\n", &material->default_material.r);
-      break;
+      // sscanf(value, "%f\n", &material->default_material.r);
+      // break;
     /* METALLIC */
     case 4848490364238316877u:
-      sscanf(value, "%f\n", &material->default_material.g);
-      break;
-#endif
+      // sscanf(value, "%f\n", &material->default_material.g);
+      // break;
     /* EMISSION */
     case 5642809480346946885u:
       sscanf(value, "%f\n", &settings->emission_scale);
       break;
-#if 0
     /* ALPHACUT */
     case 6076837219871509569u:
-      sscanf(value, "%f\n", &material->alpha_cutoff);
-      break;
-#endif
+      // sscanf(value, "%f\n", &material->alpha_cutoff);
+      // break;
     /* COLORTRA */
     case 4706917273050042179u:
-      sscanf(value, "%u\n", &bool_uint);
-      settings->force_transparency_cutout = bool_uint;
-      break;
+      // sscanf(value, "%u\n", &bool_uint);
+      // break;
     /* IORSHADO */
     case 5711762006303985481u:
       sscanf(value, "%u\n", &bool_uint);
@@ -128,12 +119,10 @@ static void parse_material_settings(LegacyLumFileSettings* settings, char* line)
       sscanf(value, "%u\n", &bool_uint);
       settings->legacy_smoothness = bool_uint;
       break;
-#if 0
     /* ROUGHCLA */
     case 4705209688408805202u:
-      sscanf(value, "%f\n", &material->caustic_roughness_clamp);
-      break;
-#endif
+      // sscanf(value, "%f\n", &material->caustic_roughness_clamp);
+      // break;
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
@@ -755,7 +744,6 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
   }
 
   content->wavefront_args->legacy_smoothness            = legacy_settings.legacy_smoothness;
-  content->wavefront_args->force_transparency_cutout    = legacy_settings.force_transparency_cutout;
   content->wavefront_args->emission_scale               = legacy_settings.emission_scale;
   content->wavefront_args->force_bidirectional_emission = true;
 

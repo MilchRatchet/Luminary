@@ -670,6 +670,9 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
         }
       }
 
+      if (material_id >= MATERIAL_ID_INVALID)
+        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Exceeded maximum number of allowed materials.");
+
       MaterialUpdate update;
       update.material_id = material_id;
 
