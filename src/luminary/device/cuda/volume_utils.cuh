@@ -103,10 +103,10 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
     end_y   = (ocean_fast_path == false) ? fminf(ocean_intersection_distance(origin, ray), limit) : limit;
   }
   else {
-    if (fabsf(ray.y) < 0.005f) {
+    if (fabsf(ray.y) < 2.0f * eps) {
       if (origin.y >= volume.min_height && origin.y <= volume.max_height) {
         start_y = 0.0f;
-        end_y   = volume.dist;
+        end_y   = 2.0f * volume.dist;
       }
       else {
         return make_volume_path(-FLT_MAX, 0.0f);
@@ -125,33 +125,51 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
   }
 
   // Horizontal intersection
-  const float rn = rsqrtf(ray.x * ray.x + ray.z * ray.z);
-  const float rx = ray.x * rn;
-  const float rz = ray.z * rn;
+  const float hdot = ray.x * ray.x + ray.z * ray.z;
+
+  float start_xz = 0.0f;
+  float end_xz   = 0.0f;
 
   const float dx = origin.x - device.camera.pos.x;
   const float dz = origin.z - device.camera.pos.z;
 
-  const float dot = dx * rx + dz * rz;
-  const float r2  = volume.dist * volume.dist;
-  const float c   = (dx * dx + dz * dz) - r2;
+  if (hdot < 2.0f * eps) {
+    const float dot = sqrtf(dx * dx + dz * dz);
 
-  const float kx = dx - rx * dot;
-  const float kz = dz - rz * dot;
+    if (dot < volume.dist) {
+      start_xz = 0.0f;
+      end_xz   = 2.0f * volume.dist;
+    }
+    else {
+      return make_volume_path(-FLT_MAX, 0.0f);
+    }
+  }
+  else {
+    const float rn = rsqrtf(ray.x * ray.x + ray.z * ray.z);
+    const float rx = ray.x * rn;
+    const float rz = ray.z * rn;
 
-  const float d = r2 - (kx * kx + kz * kz);
+    const float dot = dx * rx + dz * rz;
+    const float r2  = volume.dist * volume.dist;
+    const float c   = (dx * dx + dz * dz) - r2;
 
-  if (d < 0.0f)
-    return make_volume_path(-FLT_MAX, 0.0f);
+    const float kx = dx - rx * dot;
+    const float kz = dz - rz * dot;
 
-  const float sd = sqrtf(d);
-  const float q  = -dot - copysignf(sd, dot);
+    const float d = r2 - (kx * kx + kz * kz);
 
-  const float t0 = rn * fmaxf(0.0f, c / q);
-  const float t1 = rn * fmaxf(0.0f, q);
+    if (d < 0.0f)
+      return make_volume_path(-FLT_MAX, 0.0f);
 
-  const float start_xz = fminf(t0, t1);
-  const float end_xz   = fmaxf(t0, t1);
+    const float sd = sqrtf(d);
+    const float q  = -dot - copysignf(sd, dot);
+
+    const float t0 = rn * fmaxf(0.0f, c / q);
+    const float t1 = rn * fmaxf(0.0f, q);
+
+    start_xz = fminf(t0, t1);
+    end_xz   = fmaxf(t0, t1);
+  }
 
   if (end_xz < start_xz || limit < start_xz)
     return make_volume_path(-FLT_MAX, 0.0f);
