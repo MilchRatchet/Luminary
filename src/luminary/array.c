@@ -130,6 +130,9 @@ LuminaryResult _array_copy(void** dst, const void* src, const char* buf_name, co
   __CHECK_NULL_ARGUMENT(src);
   __CHECK_NULL_ARGUMENT(dst);
 
+  if (*dst == src)
+    return LUMINARY_SUCCESS;
+
   __FAILURE_HANDLE(array_clear(*dst));
   __FAILURE_HANDLE(_array_append(dst, src, buf_name, func, line));
 

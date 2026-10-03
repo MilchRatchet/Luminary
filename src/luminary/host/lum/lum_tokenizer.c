@@ -130,6 +130,11 @@ static uint32_t _lum_literal_parse_string(LumTokenizer* tokenizer, LumToken* tok
     read_chars++;
   }
 
+  if (write_offset == tokenizer->allocated_string_mem) {
+    tokenizer->allocated_string_mem *= 2;
+    __FAILURE_HANDLE(host_realloc(&tokenizer->string_mem, tokenizer->allocated_string_mem));
+  }
+
   tokenizer->string_mem[write_offset++] = '\0';
 
   token->literal.val_string = (LumTokenLiteralString) {.data = tokenizer->string_mem, .length = write_offset - 1};

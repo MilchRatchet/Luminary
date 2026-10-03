@@ -695,9 +695,7 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
   // Legacy scenes cannot use physical camera
   content->camera.lens_template = LUMINARY_LENS_TEMPLATE_THIN_LENS;
 
-  while (1) {
-    fgets(line, LINE_SIZE, file);
-
+  while (fgets(line, LINE_SIZE, file) != NULL) {
     if (line[0] == 'G') {
       __FAILURE_HANDLE(parse_general_settings(&content->settings, &content->obj_file_path_strings, &content->instances, line + 7 + 1));
     }
@@ -734,10 +732,10 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
     else {
       warn_message("Scene file contains unknown line!\n Content: %s", line);
     }
-
-    if (feof(file))
-      break;
   }
+
+  if (ferror(file) != 0)
+    error_message("LumV4 FILE stream set error condition. Scene may have not been fully parsed.");
 
   if (legacy_settings.force_no_bloom) {
     content->camera.bloom_blend = 0.0f;

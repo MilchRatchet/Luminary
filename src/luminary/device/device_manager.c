@@ -1048,8 +1048,8 @@ LuminaryResult device_manager_add_output_request(DeviceManager* device_manager, 
   memset(&entry, 0, sizeof(QueueEntry));
 
   entry.name       = "Add output request";
-  entry.function   = (QueueEntryFunction) _device_manager_add_output_request_clear_work;
-  entry.clear_func = (QueueEntryFunction) _device_manager_add_output_request_queue_work;
+  entry.function   = (QueueEntryFunction) _device_manager_add_output_request_queue_work;
+  entry.clear_func = (QueueEntryFunction) _device_manager_add_output_request_clear_work;
   entry.args       = args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));

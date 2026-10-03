@@ -431,7 +431,10 @@ static LuminaryResult _wavefront_parse_map(
     path = command;
   }
 
-  const size_t hash   = hash_djb2((unsigned char*) path);
+  const char* tex_file_path;
+  __FAILURE_HANDLE(luminary_path_apply(mtl_file_path, path, &tex_file_path));
+
+  const size_t hash   = hash_djb2((unsigned char*) tex_file_path);
   uint16_t texture_id = _wavefront_find_texture(content, hash);
 
   if (texture_id == TEXTURE_NONE) {
@@ -447,9 +450,6 @@ static LuminaryResult _wavefront_parse_map(
     WavefrontTextureInstance texture_instance;
     texture_instance.hash       = hash;
     texture_instance.texture_id = texture_id;
-
-    const char* tex_file_path;
-    __FAILURE_HANDLE(luminary_path_apply(mtl_file_path, path, &tex_file_path));
 
     Texture* tex;
     __FAILURE_HANDLE(texture_create(&tex));

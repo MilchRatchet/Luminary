@@ -54,12 +54,12 @@ LuminaryResult queue_push(Queue* queue, void* object) {
   __CHECK_NULL_ARGUMENT(object);
   __CHECK_NULL_ARGUMENT(queue->buffer);
 
-  if (queue->elements_in_queue >= queue->element_count) {
-    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
-  }
-
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
+
+  if (queue->elements_in_queue >= queue->element_count) {
+    __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
+  }
 
   uint8_t* dst_ptr = ((uint8_t*) (queue->buffer)) + (queue->write_ptr * queue->element_size);
 
@@ -89,12 +89,12 @@ LuminaryResult queue_push_unique(LuminaryQueue* queue, void* object, LuminaryEqO
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
-  if (queue->elements_in_queue == queue->element_count) {
-    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
-  }
-
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
+
+  if (queue->elements_in_queue == queue->element_count) {
+    __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
+  }
 
   size_t ptr = queue->read_ptr;
 
@@ -128,13 +128,10 @@ LuminaryResult queue_push_unique(LuminaryQueue* queue, void* object, LuminaryEqO
 
 LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
   __CHECK_NULL_ARGUMENT(queue);
+  __CHECK_NULL_ARGUMENT(object);
 
   if (!queue->buffer) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
-  }
-
-  if (!object) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object is NULL.");
   }
 
   if (queue->elements_in_queue == 0) {
@@ -207,8 +204,14 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object, bool* success) {
 LuminaryResult queue_set_is_blocking(Queue* queue, bool is_blocking) {
   __CHECK_NULL_ARGUMENT(queue);
 
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
+
   queue->is_blocking = is_blocking;
-  __FAILURE_HANDLE(condition_variable_broadcast(queue->cond_var));
+  __FAILURE_HANDLE_CRITICAL(condition_variable_broadcast(queue->cond_var));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(queue->mutex));
 
   return LUMINARY_SUCCESS;
 }

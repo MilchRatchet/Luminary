@@ -143,7 +143,7 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance(const uint32_t x, c
   luminance = color_luminance(get_color(red1, green1, blue1));
 
   const float luminance2   = __ldg(device.ptrs.frame_second_moment_luminance + index) * inv_n;
-  const float luminance_sq = color_luminance(get_color(red1 * red1, green1 * green1, blue1 * blue1));
+  const float luminance_sq = luminance * luminance;
 
   return fmaxf(luminance2 - luminance_sq, 0.0f);
 }
@@ -165,7 +165,8 @@ LUMINARY_FUNCTION float adaptive_sampling_get_pixel_variance_and_color(const uin
   color = get_color(red1, green1, blue1);
 
   const float luminance2   = __ldg(device.ptrs.frame_second_moment_luminance + index) * inv_n;
-  const float luminance_sq = color_luminance(get_color(red1 * red1, green1 * green1, blue1 * blue1));
+  const float luminance    = color_luminance(color);
+  const float luminance_sq = luminance * luminance;
 
   return fmaxf(luminance2 - luminance_sq, 0.0f);
 }
