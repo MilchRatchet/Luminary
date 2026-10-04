@@ -56,7 +56,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   };
 
   camera->tonemap_params = (LuminaryTonemapParams) {
-    .lut_texture_id            = TEXTURE_ID_INVALID,
     .highlights                = 0.0f,
     .shadows                   = 0.0f,
     .saturation                = 0.0f,

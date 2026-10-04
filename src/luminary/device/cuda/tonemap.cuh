@@ -247,15 +247,6 @@ LUMINARY_FUNCTION RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_
 
   pixel = purkinje_shift(pixel);
   pixel = tonemap_apply_transform(pixel);
-
-  if (tonemap_params.lut_texture_id != TEXTURE_ID_INVALID) {
-    const DeviceTextureObject tex = load_texture_object(tonemap_params.lut_texture_id);
-
-    const float4 lut_result = texture_load(tex, make_float3(pixel.r, pixel.g, pixel.b));
-
-    pixel = get_color(lut_result.x, lut_result.y, lut_result.z);
-  }
-
   pixel = tonemap_custom_apply(pixel, tonemap_params);
 
   return pixel;

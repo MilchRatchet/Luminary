@@ -557,8 +557,6 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Post Process", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 
-  update_data |= _window_entity_properties_add_file_dialog(data, "LUT", display->entity_properties_path, "Select Tonemapping LUT");
-
   update_data |=
     _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);

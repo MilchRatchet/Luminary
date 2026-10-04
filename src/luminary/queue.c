@@ -213,6 +213,8 @@ LuminaryResult queue_set_is_blocking(Queue* queue, bool is_blocking) {
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(queue->mutex));
 
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
   return LUMINARY_SUCCESS;
 }
 
