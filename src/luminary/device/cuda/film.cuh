@@ -5,54 +5,43 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION float film_grain_layer_apply(const float value, const float random, const uint32_t film_grains_per_pixel) {
-  if (device.camera.sensor.film_grain_strength == 0.0f)
-    return value;
+#define FILM_GRAIN_BASE_LOG_SIGMA 0.035f
+#define FILM_GRAIN_MAX_LOG_SIGMA 0.5f
+#define FILM_GRAIN_MIN_EXPOSURE 0.03f
 
-  const float activation_probability = 1.0f - expf(-value);
-
-  const float activated_grains = random_binomial_approx(film_grains_per_pixel, activation_probability, random);
-
-  const float activation_fraction = ((float) activated_grains) / film_grains_per_pixel;
-  const float exposure            = -logf(fmaxf(1.0f - activation_fraction, 1e-12f));
-
-  return lerp(value, exposure, device.camera.sensor.film_grain_strength);
+LUMINARY_FUNCTION float film_grain_noise_multiplier(const float noise, const float log_sigma) {
+  return expf(log_sigma * noise - 0.5f * log_sigma * log_sigma);
 }
 
-LUMINARY_FUNCTION RGBF film_grain_apply(RGBF color, uint32_t x, uint32_t y) {
-  const float iso_factor = fmaxf(device.camera.sensor.iso, 1e-7f);
-
-  // High quality film typically has tens of thousands of grains per digital pixel area at base ISO
-  const uint32_t film_grains_per_pixel = fmaxf(1.0f, 65536.0f * 100.0f / iso_factor);
-
-  color = scale_color(color, device.camera.exposure_time * iso_factor);
-
-  if (device.camera.sensor.film_grain_strength == 0.0f)
+LUMINARY_FUNCTION RGBF
+  film_grain_apply(RGBF color, const float film_x_mm, const float film_y_mm, const float pixel_width_mm, const float pixel_height_mm) {
+  const float strength = fminf(fmaxf(device.camera.sensor.film_grain_strength, 0.0f), 1.0f);
+  if (strength == 0.0f)
     return color;
 
-  // Real film grain clump sizes scale with film speed.
-  // At low and medium ISOs (<= 400), grains are roughly digital-pixel-scale (size 1.0)
-  const float grain_size = fmaxf(1.0f, sqrtf(iso_factor / 400.0f));
-  const float fx         = x / grain_size;
-  const float fy         = y / grain_size;
+  const float fx          = film_x_mm / device.camera.sensor.film_grain_size;
+  const float fy          = film_y_mm / device.camera.sensor.film_grain_size;
+  const float half_width  = 0.5f * pixel_width_mm / device.camera.sensor.film_grain_size;
+  const float half_height = 0.5f * pixel_height_mm / device.camera.sensor.film_grain_size;
 
-  const float random_lum = random_grain_smooth(fx, fy, 3);
-  const float random_r   = random_grain_smooth(fx, fy, 2);
-  const float random_g   = random_grain_smooth(fx, fy, 1);
-  const float random_b   = random_grain_smooth(fx, fy, 0);
+  const float4 grain_noise = random_grain_filtered(fx, fy, half_width, half_height);
+  const float shared_noise = grain_noise.x;
+  const float red_noise    = grain_noise.y;
+  const float green_noise  = grain_noise.z;
+  const float blue_noise   = grain_noise.w;
 
-  const float lum              = color_luminance(color);
-  const float lum_grain        = film_grain_layer_apply(lum, random_lum, film_grains_per_pixel);
-  const float grain_multiplier = (lum > 0.0f) ? (lum_grain / lum) : 1.0f;
+  const float luminance = fmaxf(color_luminance(color), 0.0f);
+  const float amplitude = FILM_GRAIN_BASE_LOG_SIGMA * device.camera.sensor.film_grain_amplitude;
 
-  const float r_grain = film_grain_layer_apply(color.r, random_r, film_grains_per_pixel);
-  const float g_grain = film_grain_layer_apply(color.g, random_g, film_grains_per_pixel);
-  const float b_grain = film_grain_layer_apply(color.b, random_b, film_grains_per_pixel);
+  float log_sigma = fminf(amplitude * rsqrtf(fmaxf(luminance, FILM_GRAIN_MIN_EXPOSURE)), FILM_GRAIN_MAX_LOG_SIGMA);
+  log_sigma       = log_sigma * strength;
 
-  const float chroma_weight = 0.3f;
-  color.r                   = lerp(color.r * grain_multiplier, r_grain, chroma_weight);
-  color.g                   = lerp(color.g * grain_multiplier, g_grain, chroma_weight);
-  color.b                   = lerp(color.b * grain_multiplier, b_grain, chroma_weight);
+  const float shared_weight      = 0.6f;
+  const float independent_weight = 0.4f;
+
+  color.r *= film_grain_noise_multiplier(shared_weight * shared_noise + independent_weight * red_noise, log_sigma);
+  color.g *= film_grain_noise_multiplier(shared_weight * shared_noise + independent_weight * green_noise, log_sigma);
+  color.b *= film_grain_noise_multiplier(shared_weight * shared_noise + independent_weight * blue_noise, log_sigma);
 
   return color;
 }

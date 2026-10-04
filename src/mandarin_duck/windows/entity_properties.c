@@ -361,6 +361,23 @@ static void _window_entity_properties_slider_value_string_func_millimeter(char* 
   sprintf(text, "%.2fmm", value);
 }
 
+static void _window_entity_properties_slider_value_string_func_micrometer(char* text, const void* data, ElementSliderDataType data_type) {
+  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
+    crash_message("Expected float data type.");
+
+  const float value = *(const float*) data;
+  sprintf(text, "%.1fum", value);
+}
+
+static void _window_entity_properties_slider_value_string_func_grain_amplitude(
+  char* text, const void* data, ElementSliderDataType data_type) {
+  if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
+    crash_message("Expected float data type.");
+
+  const float value = *(const float*) data;
+  sprintf(text, "%.2fx", value);
+}
+
 static void _window_entity_properties_slider_value_string_func_f_stop(char* text, const void* data, ElementSliderDataType data_type) {
   if (data_type != ELEMENT_SLIDER_DATA_TYPE_FLOAT)
     crash_message("Expected float data type.");
@@ -532,7 +549,29 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
       data, "Aspect Ratio", &camera.sensor.aspect_ratio, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.01f, FLT_MAX, 1.0f);
 
   update_data |= _window_entity_properties_add_slider(
-    data, "Film Grain", &camera.sensor.film_grain_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
+    data, "Grain Amount", &camera.sensor.film_grain_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
+
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Grain Size",
+            .data_binding      = &camera.sensor.film_grain_size,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 1.0f,
+            .max               = 100.0f,
+            .change_rate       = 0.5f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_micrometer,
+          });
+
+  update_data |= _window_entity_properties_add_slider_v2(
+    data, (WindowEntityPropertiesSliderArgsV2) {
+            .text              = "Grain Amplitude",
+            .data_binding      = &camera.sensor.film_grain_amplitude,
+            .data_type         = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+            .min               = 0.1f,
+            .max               = 4.0f,
+            .change_rate       = 0.1f,
+            .value_string_func = _window_entity_properties_slider_value_string_func_grain_amplitude,
+          });
 
   uint32_t response_model = (uint32_t) camera.sensor.response_model;
   update_data |= _window_entity_properties_add_dropdown(

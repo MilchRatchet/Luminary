@@ -377,31 +377,17 @@ LUMINARY_FUNCTION float random_dither_mask(const uint32_t x, const uint32_t y) {
   return random_uint16_t_to_float(blue_noise);
 }
 
-LUMINARY_FUNCTION float random_grain(const uint32_t x, const uint32_t y, uint32_t layer_id) {
-  return random_uint16_t_to_float(random_uint16_t_base(0xfcbd6e15 + layer_id, x + y * device.settings.width));
-}
+LUMINARY_FUNCTION float random_grain(
+  const int32_t x, const int32_t y, const uint32_t point_id, const uint32_t stream_id, const uint32_t layer_id) {
+  uint32_t hash = ((uint32_t) x * 0x9E3779B9u) ^ ((uint32_t) y * 0x85EBCA6Bu) ^ ((point_id + 1) * 0xC2B2AE35u)
+                  ^ ((stream_id + 1) * 0x27D4EB2Fu) ^ ((layer_id + 1) * 0x165667B1u);
+  hash ^= hash >> 16;
+  hash *= 0x7FEB352Du;
+  hash ^= hash >> 15;
+  hash *= 0x846CA68Bu;
+  hash ^= hash >> 16;
 
-LUMINARY_FUNCTION float random_grain_smooth(const float fx, const float fy, const uint32_t layer_id) {
-  const uint32_t x0 = (uint32_t) floorf(fx);
-  const uint32_t y0 = (uint32_t) floorf(fy);
-  const uint32_t x1 = x0 + 1;
-  const uint32_t y1 = y0 + 1;
-
-  float tx = fx - floorf(fx);
-  float ty = fy - floorf(fy);
-
-  tx = tx * tx * (3.0f - 2.0f * tx);
-  ty = ty * ty * (3.0f - 2.0f * ty);
-
-  const float cx00 = random_grain(x0, y0, layer_id);
-  const float cx10 = random_grain(x1, y0, layer_id);
-  const float cx01 = random_grain(x0, y1, layer_id);
-  const float cx11 = random_grain(x1, y1, layer_id);
-
-  const float nx0 = cx00 + tx * (cx10 - cx00);
-  const float nx1 = cx01 + tx * (cx11 - cx01);
-
-  return nx0 + ty * (nx1 - nx0);
+  return random_uint32_t_to_float(hash);
 }
 
 // Koopman, R. (2025). Some simple full-range inverse-normal approximations. J. Numer. Anal. Approx. Theory, 54(1), 111-116.
@@ -421,16 +407,75 @@ LUMINARY_FUNCTION float random_normal_inverse_approx(float q) {
   return sign * sqrtf(t - logf(r));
 }
 
-LUMINARY_FUNCTION float random_binomial_approx(const uint32_t n, const float p, const float random) {
-  const float mean    = n * p;
-  const float std_dev = sqrtf(mean * (1.0f - p));
+LUMINARY_FUNCTION uint32_t random_grain_poisson_count(const float random) {
+  if (random < 0.36787945f)
+    return 0;
+  if (random < 0.73575890f)
+    return 1;
+  if (random < 0.91969860f)
+    return 2;
+  if (random < 0.98101185f)
+    return 3;
+  if (random < 0.99634015f)
+    return 4;
+  if (random < 0.99940580f)
+    return 5;
+  if (random < 0.99991675f)
+    return 6;
 
-  if (std_dev == 0.0f)
-    return mean;
+  return 7;
+}
 
-  const float x = mean + std_dev * random_normal_inverse_approx(random);
+LUMINARY_FUNCTION float random_grain_gaussian_box_weight(const float center, const float half_extent, const float grain_center) {
+  const float sigma = 0.35f;
 
-  return x;
+  if (half_extent < 0.001f)
+    return expf(-0.5f * (center - grain_center) * (center - grain_center) / (sigma * sigma));
+
+  const float inv_sqrt_two_sigma = 0.70710678f / sigma;
+  const float left               = (center - half_extent - grain_center) * inv_sqrt_two_sigma;
+  const float right              = (center + half_extent - grain_center) * inv_sqrt_two_sigma;
+
+  return 1.25331414f * sigma * (erff(right) - erff(left)) / (2.0f * half_extent);
+}
+
+LUMINARY_FUNCTION float4 random_grain_filtered(const float fx, const float fy, const float half_width, const float half_height) {
+  const float support_radius = 1.05f;
+  const int32_t min_x        = (int32_t) floorf(fx - half_width - support_radius);
+  const int32_t max_x        = (int32_t) floorf(fx + half_width + support_radius);
+  const int32_t min_y        = (int32_t) floorf(fy - half_height - support_radius);
+  const int32_t max_y        = (int32_t) floorf(fy + half_height + support_radius);
+
+  float4 noise = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+  for (int32_t cell_y = min_y; cell_y <= max_y; cell_y++) {
+    for (int32_t cell_x = min_x; cell_x <= max_x; cell_x++) {
+      const float count_random   = random_grain(cell_x, cell_y, 0, 0, 0);
+      const uint32_t point_count = random_grain_poisson_count(count_random);
+
+      for (uint32_t point_id = 0; point_id < point_count; point_id++) {
+        const float grain_x = (float) cell_x + random_grain(cell_x, cell_y, point_id, 1, 0);
+        const float grain_y = (float) cell_y + random_grain(cell_x, cell_y, point_id, 2, 0);
+
+        const float weight_x = random_grain_gaussian_box_weight(fx, half_width, grain_x);
+        const float weight_y = random_grain_gaussian_box_weight(fy, half_height, grain_y);
+        const float weight   = weight_x * weight_y;
+
+        noise.x += random_normal_inverse_approx(random_grain(cell_x, cell_y, point_id, 3, 3)) * weight;
+        noise.y += random_normal_inverse_approx(random_grain(cell_x, cell_y, point_id, 3, 2)) * weight;
+        noise.z += random_normal_inverse_approx(random_grain(cell_x, cell_y, point_id, 3, 1)) * weight;
+        noise.w += random_normal_inverse_approx(random_grain(cell_x, cell_y, point_id, 3, 0)) * weight;
+      }
+    }
+  }
+
+  const float normalization = 0.56418958f / 0.35f;
+  noise.x *= normalization;
+  noise.y *= normalization;
+  noise.z *= normalization;
+  noise.w *= normalization;
+
+  return noise;
 }
 
 #endif /* CU_RANDOM_H */

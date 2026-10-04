@@ -190,6 +190,8 @@ LUMINARY_API struct LuminaryCameraSensor {
   bool use_aspect_ratio_from_resolution;
   float iso;
   float film_grain_strength;
+  float film_grain_size;  // [um]
+  float film_grain_amplitude;
   LuminarySensorResponseModel response_model;
   float film_thickness;
   float microlens_acceptance_angle;  // [radians]

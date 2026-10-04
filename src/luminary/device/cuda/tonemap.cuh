@@ -224,7 +224,9 @@ LUMINARY_FUNCTION RGBF tonemap_custom_apply(RGBF pixel, const LuminaryTonemapPar
   return pixel;
 }
 
-LUMINARY_FUNCTION RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const LuminaryTonemapParams tonemap_params) {
+LUMINARY_FUNCTION RGBF tonemap_apply(
+  RGBF pixel, const float film_x_mm, const float film_y_mm, const float pixel_width_mm, const float pixel_height_mm,
+  const LuminaryTonemapParams tonemap_params) {
   pixel = max_color(pixel, splat_color(0.0f));
 
   if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
@@ -240,7 +242,7 @@ LUMINARY_FUNCTION RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_
 
   pixel = scale_color(pixel, device.camera.exposure_time * iso_factor * photometric_scale);
 
-  pixel = film_grain_apply(pixel, x, y);
+  pixel = film_grain_apply(pixel, film_x_mm, film_y_mm, pixel_width_mm, pixel_height_mm);
 
   const float dynamic_range_scale = 100.0f / fmaxf(tonemap_params.dynamic_range, 100.0f);
   pixel                           = scale_color(pixel, device.camera.exposure * dynamic_range_scale);

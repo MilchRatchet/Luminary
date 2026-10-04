@@ -504,6 +504,13 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
   const uint32_t input_width  = device.settings.width >> undersampling_input;
   const uint32_t input_height = device.settings.height >> undersampling_input;
 
+  const float aspect_ratio    = (device.camera.use_aspect_ratio_from_resolution) ? ((float) device.settings.width / device.settings.height)
+                                                                                 : device.camera.sensor.aspect_ratio;
+  const float sensor_height   = device.camera.sensor_diagonal_size / sqrtf(aspect_ratio * aspect_ratio + 1.0f);
+  const float sensor_width    = aspect_ratio * sensor_height;
+  const float pixel_width_mm  = sensor_width / input_width;
+  const float pixel_height_mm = sensor_height / input_height;
+
   const uint32_t output_amount = output_width * output_height;
 
   for (uint32_t output_pixel = THREAD_ID; output_pixel < output_amount; output_pixel += blockDim.x * gridDim.x) {
@@ -526,8 +533,11 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
         const float green = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_GREEN] + index);
         const float blue  = __ldg(device.ptrs.frame_result[FRAME_CHANNEL_BLUE] + index);
 
+        const float film_x_mm = (0.5f - ((float) pixel_x + 0.5f) / input_width) * sensor_width;
+        const float film_y_mm = (((float) pixel_y + 0.5f) / input_height - 0.5f) * sensor_height;
+
         RGBF pixel = get_color(red, green, blue);
-        pixel      = tonemap_apply(pixel, x, y, args.tonemap_params);
+        pixel      = tonemap_apply(pixel, film_x_mm, film_y_mm, pixel_width_mm, pixel_height_mm, args.tonemap_params);
 
         color = add_color(color, pixel);
       }

@@ -446,6 +446,8 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera_sensor[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, use_aspect_ratio_from_resolution, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, iso, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_strength, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_size, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCameraSensor, film_grain_amplitude, 1, LUM_VERSION_CURRENT),
 };
 
 const uint32_t lum_builtin_types_member_counts[LUM_BUILTIN_TYPE_COUNT] = {
@@ -596,6 +598,8 @@ static LuminaryResult _lum_builtin_camera_sensor_init(LumBuiltinCameraSensor* ca
   camera->use_aspect_ratio_from_resolution = true;
   camera->iso                              = 100.0f;
   camera->film_grain_strength              = 0.0f;
+  camera->film_grain_size                  = 10.0f;
+  camera->film_grain_amplitude             = 1.0f;
 
   return LUMINARY_SUCCESS;
 }
@@ -990,6 +994,8 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
   dst_camera->sensor.iso                              = camera->sensor.iso;
   dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
+  dst_camera->sensor.film_grain_size                  = camera->sensor.film_grain_size;
+  dst_camera->sensor.film_grain_amplitude             = camera->sensor.film_grain_amplitude;
 
   return LUMINARY_SUCCESS;
 }
@@ -1282,6 +1288,8 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->sensor.use_aspect_ratio_from_resolution = camera->sensor.use_aspect_ratio_from_resolution;
   dst_camera->sensor.iso                              = camera->sensor.iso;
   dst_camera->sensor.film_grain_strength              = camera->sensor.film_grain_strength;
+  dst_camera->sensor.film_grain_size                  = camera->sensor.film_grain_size;
+  dst_camera->sensor.film_grain_amplitude             = camera->sensor.film_grain_amplitude;
 
   return LUMINARY_SUCCESS;
 }
