@@ -120,14 +120,17 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
           const float center_error = center_variance * normalization;
 
-          const uint32_t xi_start = max(x, offset_x + 1) - 1;
-          const uint32_t xi_end   = min(x, offset_x + width - 1) + 1;
+          const uint32_t window_x_end = offset_x + width - 1;
+          const uint32_t window_y_end = offset_y + height - 1;
+          const uint32_t xi_start     = max(x, offset_x + 1) - 1;
+          const uint32_t xi_end       = (x < window_x_end) ? x + 1 : x;
 
           const uint32_t yi_start = max(y, offset_y + 1) - 1;
-          const uint32_t yi_end   = min(y, offset_y + height - 1) + 1;
+          const uint32_t yi_end   = (y < window_y_end) ? y + 1 : y;
 
-          RGBF neighbour_mean   = splat_color(0.0f);
-          float neighbour_error = 0.0f;
+          RGBF neighbour_mean      = splat_color(0.0f);
+          float neighbour_error    = 0.0f;
+          uint32_t neighbour_count = 0;
           for (uint32_t yi = yi_start; yi <= yi_end; yi++) {
             for (uint32_t xi = xi_start; xi <= xi_end; xi++) {
               if (xi == x && yi == y)
@@ -143,15 +146,21 @@ LUMINARY_KERNEL void accumulation_generate_result() {
 
               // TODO: Use coefficient of variation
               neighbour_error += variance * norm_neighbour;
+              neighbour_count++;
             }
           }
 
-          const float neighbour_norm = 1.0f / ((xi_end - xi_start + 1) * (yi_end - yi_start + 1) - 1);
-          neighbour_mean             = scale_color(neighbour_mean, neighbour_norm);
-          neighbour_error *= neighbour_norm;
+          if (neighbour_count > 0) {
+            const float neighbour_norm = 1.0f / neighbour_count;
+            neighbour_mean             = scale_color(neighbour_mean, neighbour_norm);
+            neighbour_error *= neighbour_norm;
 
-          const float t = remap01(center_error, 0.0f, 8.0f * neighbour_error);
-          result        = lerp_color(center_mean, neighbour_mean, t);
+            const float t = remap01(center_error, 0.0f, 8.0f * neighbour_error);
+            result        = lerp_color(center_mean, neighbour_mean, t);
+          }
+          else {
+            result = center_mean;
+          }
         }
         else {
           result.r = __ldcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + index) * normalization;
