@@ -31,6 +31,9 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     const MaterialContextGeometry ctx = ocean_get_context(task, medium);
 
+    // We need to store the face normal so the DL shadowing kernel knows how to offset the origin.
+    task_trace_facenormal_store(task_base_address, ctx.face_normal);
+
     const uint32_t task_direct_lighting_base_address =
       task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 

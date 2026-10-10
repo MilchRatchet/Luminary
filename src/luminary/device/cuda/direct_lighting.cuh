@@ -395,9 +395,11 @@ LUMINARY_FUNCTION RGBF direct_lighting_geometry_evaluate_task(
   const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskDirectLightGeo& direct_light_task, const bool is_allowed) {
   const bool sample_is_valid = (direct_light_task.light_id != LIGHT_ID_INVALID) && is_allowed;
 
+  const bool requires_ray_offset = task_requires_ray_offset(trace.handle.instance_id);
+
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  shadow_task.origin       = apply_safe_offset(task.origin, trace.face_normal, direct_light_task.ray);
+  shadow_task.origin       = (requires_ray_offset) ? apply_safe_offset(task.origin, trace.face_normal, direct_light_task.ray) : task.origin;
   shadow_task.ray          = direct_light_task.ray;
   shadow_task.limit        = direct_light_task.dist;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
@@ -427,11 +429,12 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
     limit = (dist > 0.0f) ? dist : FLT_MAX;
   }
 
-  const bool sample_is_valid = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
+  const bool sample_is_valid     = (direct_light_task.light_color.x != 0 || direct_light_task.light_color.y != 0) && is_allowed;
+  const bool requires_ray_offset = task_requires_ray_offset(trace.handle.instance_id);
 
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-  shadow_task.origin       = apply_safe_offset(task.origin, trace.face_normal, ray);
+  shadow_task.origin       = (requires_ray_offset) ? apply_safe_offset(task.origin, trace.face_normal, ray) : task.origin;
   shadow_task.ray          = ray;
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
@@ -503,10 +506,11 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
     sample_is_valid = false;
   }
 
+  const bool requires_ray_offset = task_requires_ray_offset(trace.handle.instance_id);
+
   ShadowTraceTask shadow_task;
   shadow_task.trace_status = sample_is_valid ? OPTIX_TRACE_STATUS_EXECUTE : OPTIX_TRACE_STATUS_ABORT;
-
-  shadow_task.origin       = apply_safe_offset(task.origin, trace.face_normal, ray);
+  shadow_task.origin       = (requires_ray_offset) ? apply_safe_offset(task.origin, trace.face_normal, ray) : task.origin;
   shadow_task.ray          = ray;
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
@@ -571,7 +575,9 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
   payload.num_hit_lights    = 0;
   payload.selected_light_id = LIGHT_ID_INVALID;
 
-  const vec3 trace_origin = apply_safe_offset(task.origin, trace.face_normal, direct_light_task.ray);
+  const bool requires_ray_offset = task_requires_ray_offset(trace.handle.instance_id);
+
+  const vec3 trace_origin = (requires_ray_offset) ? apply_safe_offset(task.origin, trace.face_normal, direct_light_task.ray) : task.origin;
 
   optixKernelFunctionLightBSDFTrace(
     device.optix_bvh_light, trace_origin, direct_light_task.ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF),

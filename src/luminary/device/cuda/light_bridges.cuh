@@ -313,6 +313,9 @@ LUMINARY_FUNCTION LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   float initial_pdf;
   const vec3 initial_vertex = bridges_sample_initial_vertex(ctx, point_on_light, path_id, output_id, initial_attenuation, initial_pdf);
 
+  target_and_weight.x = 0.0f;
+  target_and_weight.y = 1.0f;
+
   LightSampleResult<MATERIAL_VOLUME> result;
   result.light_id = LIGHT_ID_INVALID;
 
@@ -322,9 +325,6 @@ LUMINARY_FUNCTION LightSampleResult<MATERIAL_VOLUME> bridges_sample(
   vec3 light_dir;
   float area, light_dist;
   light_triangle_sample_finalize_bridges(light, light_uv_packed, initial_vertex, point_on_light, light_dir, light_dist, area);
-
-  target_and_weight.x = 0.0f;
-  target_and_weight.y = 1.0f;
 
   if (light_dist == FLT_MAX || area < eps)
     return result;

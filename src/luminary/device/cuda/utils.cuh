@@ -230,6 +230,10 @@ LUMINARY_FUNCTION ShadingTaskIndex shading_task_index_from_instance_id(const uin
   }
 }
 
+LUMINARY_FUNCTION bool task_requires_ray_offset(const uint32_t instance_id) {
+  return (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT || instance_id == HIT_TYPE_OCEAN);
+}
+
 //===========================================================================================
 // Debug utils
 //===========================================================================================
