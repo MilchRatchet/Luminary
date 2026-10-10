@@ -476,8 +476,9 @@ LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_i
   // Convert from spectral to RGB
   if constexpr (SPECTRAL_RENDERING) {
     result.weight = mul_color(result.weight, spectral_wavelength_to_rgb(wavelength));
-    result.weight = scale_color(result.weight, 1.0f / wavelength_pdf);
   }
+
+  result.weight = scale_color(result.weight, 1.0f / wavelength_pdf);
 
   // We center the result around the last vertex. This allows for a more stable perspective when scaling the camera.
   result.origin.z -= device.camera_aux.last_vertex;
