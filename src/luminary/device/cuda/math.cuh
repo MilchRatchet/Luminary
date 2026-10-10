@@ -1392,59 +1392,58 @@ LUMINARY_FUNCTION vec3 vector_direction_stable(vec3 a, vec3 b) {
   return normalize_vector(d);
 }
 
-/*
- * Samples the solid angle of a sphere.
- * @param p Center of the sphere.
- * @param r Radius of the sphere.
- * @param origin Point to sample from.
- * @result Normalized direction to the point on the sphere.
- */
-LUMINARY_FUNCTION vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& area) {
-  float r1 = random.x;
-  float r2 = random.y;
+LUMINARY_FUNCTION float sphere_subtended_solid_angle(const float radius, const float distance) {
+  if (radius <= 0.0f)
+    return 0.0f;
 
-  vec3 dir      = sub_vector(p, origin);
-  const float d = get_length(dir);
+  if (distance < radius)
+    return 4.0f * PI;
 
-  if (d < r) {
-    area = 4.0f * PI;
-    return normalize_vector(sample_ray_sphere(2.0f * r1 - 1.0f, r2));
-  }
+  const float sin_angle           = __saturatef(radius / distance);
+  const float cos_angle           = sqrtf(fmaxf(1.0f - sin_angle * sin_angle, 0.0f));
+  const float one_minus_cos_angle = (sin_angle * sin_angle) / (1.0f + cos_angle);
 
-  // Map random numbers uniformly into [0.0,0.999].
-  r1 = 0.999f * r1;
-  r2 = 0.999f * r2;
-
-  dir = scale_vector(dir, 1.0f / d);
-
-  const float angle = asinf(__saturatef(r / d));
-
-  area = 2.0f * PI * angle * angle;
-
-  const float u = sqrtf(r1) * angle;
-  const float v = 2.0f * PI * r2;
-
-  return normalize_vector(sample_hemisphere_basis(u, v, dir));
+  return 2.0f * PI * one_minus_cos_angle;
 }
 
 /*
- * Computes solid angle when sampling a sphere.
+ * Samples directions subtended by a sphere uniformly in solid angle.
+ * @param p Center of the sphere.
+ * @param r Radius of the sphere.
+ * @param origin Point to sample from.
+ * @param solid_angle_out Solid angle of the sampled domain, in steradians.
+ * @result Normalized direction to the point on the sphere.
+ */
+LUMINARY_FUNCTION vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& solid_angle_out) {
+  const vec3 dir  = sub_vector(p, origin);
+  const float d   = get_length(dir);
+  solid_angle_out = sphere_subtended_solid_angle(r, d);
+
+  if (d < r)
+    return normalize_vector(sample_ray_sphere(2.0f * random.x - 1.0f, random.y));
+
+  const vec3 basis                   = scale_vector(dir, 1.0f / d);
+  const float one_minus_cos_angle    = solid_angle_out * (1.0f / (2.0f * PI));
+  const float one_minus_cos_altitude = random.x * one_minus_cos_angle;
+  const float cos_altitude           = 1.0f - one_minus_cos_altitude;
+  const float sin_altitude           = sqrtf(one_minus_cos_altitude * (2.0f - one_minus_cos_altitude));
+  const float altitude               = atan2f(sin_altitude, cos_altitude);
+  const float azimuth                = 2.0f * PI * random.y;
+
+  return sample_hemisphere_basis(altitude, azimuth, basis);
+}
+
+/*
+ * Computes the solid angle subtended by a sphere.
  * @param p Center of sphere.
  * @param r Radius of sphere.
  * @param origin Point from which you sample.
- * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of sphere.
  */
 LUMINARY_FUNCTION float sample_sphere_solid_angle(const vec3 p, const float r, const vec3 origin) {
-  vec3 dir      = sub_vector(p, origin);
-  const float d = get_length(dir);
+  const float d = get_length(sub_vector(p, origin));
 
-  if (d < r)
-    return 2.0f * PI;
-
-  const float a = asinf(r / d);
-
-  return 2.0f * PI * a * a;
+  return sphere_subtended_solid_angle(r, d);
 }
 
 // Computes tangent space for use with normal mapping without precomputation

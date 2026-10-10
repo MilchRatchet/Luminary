@@ -363,7 +363,7 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
 ///////////////////////////////////////////////////
 
 LUMINARY_FUNCTION vec3 bsdf_diffuse_sample(const float2 random) {
-  return sample_ray_sphere(random.x, random.y);
+  return sample_ray_sphere(sqrtf(random.x), random.y);
 }
 
 LUMINARY_FUNCTION float bsdf_diffuse_pdf(const float NdotL) {
