@@ -165,9 +165,10 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
 template <MaterialType TYPE>
 LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_sample(const MaterialContext<TYPE> ctx, const PathID& path_id) {
   LightBSDFSampleResult result;
-  result.light_color          = splat_color(0.0f);
+  result.weight               = splat_color(0.0f);
   result.ray                  = get_vector(0.0f, 0.0f, 1.0f);
   result.sampling_probability = 0.0f;
+  result.is_refraction        = false;
 
   return result;
 }

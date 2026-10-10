@@ -305,6 +305,22 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_pdf(
   return D_G1 * (HdotV / NdotV) * (HdotL / denominator);
 }
 
+LUMINARY_FUNCTION float bsdf_microfacet_refraction_tir_reflection_pdf(const float roughness, const float NdotH, const float NdotV) {
+  if (NdotV <= eps)
+    return 0.0f;
+
+  const float roughness2 = roughness * roughness;
+  const float roughness4 = roughness2 * roughness2;
+
+  const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const Fraction G1 = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
+
+  const float D_G1 = fraction_evaluate(fraction_multiply(D, G1));
+
+  // For reflection, |H dot V| equals |H dot L|, cancelling in the visible-normal PDF Jacobian.
+  return D_G1 * (0.25f / NdotV);
+}
+
 LUMINARY_FUNCTION vec3
   bsdf_microfacet_refraction_sample(const vec3 V, const float roughness, const PathID& path_id, const uint32_t target) {
   const float2 random = random_2D(target, path_id);
