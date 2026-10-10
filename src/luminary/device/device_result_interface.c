@@ -125,7 +125,7 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
   uint32_t selected_result = 0xFFFFFFFF;
 
   for (uint32_t result_id = 0; result_id < currently_allocated_results; result_id++) {
-    if (interface->allocated_results[result_id]->queued == false) {
+    if (interface->allocated_results[device->index][result_id].queued == false) {
       selected_result = result_id;
       break;
     }
@@ -141,6 +141,8 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
   }
 
   DeviceResultEntry* entry = interface->allocated_results[device->index] + selected_result;
+
+  entry->queued = true;
 
   if (entry->consumer_event_id != RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID) {
     __DEBUG_ASSERT(interface->allocated_events[entry->consumer_event_id].assigned);
@@ -309,6 +311,13 @@ LuminaryResult device_result_interface_destroy(DeviceResultInterface** interface
 
   for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
     __FAILURE_HANDLE(array_destroy(&(*interface)->allocated_results[device_id]));
+  }
+
+  uint32_t num_allocated_events;
+  __FAILURE_HANDLE(array_get_num_elements((*interface)->allocated_events, &num_allocated_events));
+
+  for (uint32_t event_id = 0; event_id < num_allocated_events; event_id++) {
+    CUDA_FAILURE_HANDLE(cuEventDestroy((*interface)->allocated_events[event_id].event));
   }
 
   __FAILURE_HANDLE(array_destroy(&(*interface)->allocated_events));

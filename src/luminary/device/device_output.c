@@ -205,8 +205,6 @@ static LuminaryResult _device_output_generate_output(
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, callback_event, CU_EVENT_WAIT_DEFAULT));
   CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, output->registered_callback_func, (void*) callback_data));
 
-  output->callback_index = (output->callback_index + 1) % DEVICE_OUTPUT_CALLBACK_COUNT;
-
   return LUMINARY_SUCCESS;
 }
 

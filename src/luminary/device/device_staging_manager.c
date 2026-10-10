@@ -57,10 +57,13 @@ LuminaryResult device_staging_manager_register_direct_access(
     buffer_offset = 0;
   }
 
+  const uint32_t next_entries_write_offset = (staging_manager->entries_write_offset + 1) & STAGING_ENTRIES_OFFSET_MASK;
+
   bool emergency_staging_required = false;
 
   emergency_staging_required |= (staging_manager->buffer_size_in_use + used_memory > STAGING_BUFFER_SIZE);
   emergency_staging_required |= (staging_manager->entries_count_in_use == STAGING_ENTRIES_COUNT);
+  emergency_staging_required |= (next_entries_write_offset == staging_manager->entries_read_offset);
 
   if (emergency_staging_required) {
     log_message("Staging buffer ran out of memory, performing emergency staging.");
@@ -82,7 +85,7 @@ LuminaryResult device_staging_manager_register_direct_access(
 
   staging_manager->buffer_write_offset = buffer_offset + size;
   staging_manager->buffer_size_in_use += used_memory;
-  staging_manager->entries_write_offset = (staging_manager->entries_write_offset + 1) & STAGING_ENTRIES_OFFSET_MASK;
+  staging_manager->entries_write_offset = next_entries_write_offset;
   staging_manager->entries_count_in_use++;
 
   // We need to wait for any uploads to have finished before we return control to the caller, else we risk corruption.
