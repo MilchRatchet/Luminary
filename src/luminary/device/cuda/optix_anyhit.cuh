@@ -21,6 +21,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(geometry_trace)() {
 
   if (alpha_result == OPTIX_ALPHA_RESULT_TRANSPARENT) {
     optixIgnoreIntersection();
+    return;
   }
 }
 
@@ -33,6 +34,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
 
   if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
     optixIgnoreIntersection();
+    return;
   }
 }
 
@@ -48,6 +50,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   if (triangle_handle_equal(handle, target_light)) {
     optixIgnoreIntersection();
+    return;
   }
 
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
@@ -57,6 +60,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   if ((triangle_flags & DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE) == 0) {
     optixTerminateRay();
+    return;
   }
 
   // Currently, materials are just two loads so it makes no sense to only load parts of it.
@@ -66,12 +70,14 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_trace)() {
 
   if (albedo.a == 1.0f) {
     optixTerminateRay();
+    return;
   }
 
   const bool is_colored_transparency = material.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY;
 
-  if (albedo.a == 0.0f && !is_colored_transparency) {
+  if (albedo.a == 0.0f && is_colored_transparency == false) {
     optixIgnoreIntersection();
+    return;
   }
 
   const float transparency = 1.0f - albedo.a;
@@ -102,6 +108,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_sun_trace)() {
 
   if ((triangle_flags & DEVICE_TRIANGLE_TEXTURE_FLAG_NON_OPAQUE) == 0) {
     optixTerminateRay();
+    return;
   }
 
   // Currently, materials are just two loads so it makes no sense to only load parts of it.
@@ -111,12 +118,14 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(shadow_sun_trace)() {
 
   if (albedo.a == 1.0f) {
     optixTerminateRay();
+    return;
   }
 
   const bool is_colored_transparency = material.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY;
 
-  if (albedo.a == 0.0f && !is_colored_transparency) {
+  if (albedo.a == 0.0f && is_colored_transparency == false) {
     optixIgnoreIntersection();
+    return;
   }
 
   const float transparency = 1.0f - albedo.a;
@@ -156,8 +165,9 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
   // TODO: Check if alpha affect emission
   // TODO: Check if has emission
   // TODO: If we are already evaluating emission here, might aswell write it out as payload
-  if (albedo.a == 0.0f && !is_colored_transparency) {
+  if (albedo.a == 0.0f && is_colored_transparency == false) {
     optixIgnoreIntersection();
+    return;
   }
 
   uint32_t num_hits = optixGetPayloadGeneric(OPTIX_KERNEL_FUNCTION_LIGHT_BSDF_TRACE_PAYLOAD_VALUE_NUM_HIT_LIGHTS);
@@ -189,6 +199,7 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(light_bsdf_trace)() {
   // Cull lights that are further away if this light is opaque
   if (albedo.a != 1.0f) {
     optixIgnoreIntersection();
+    return;
   }
 }
 
