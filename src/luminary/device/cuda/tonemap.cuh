@@ -182,6 +182,9 @@ LUMINARY_FUNCTION RGBF tonemap_apply_transform(const RGBF pixel) {
     case LUMINARY_TONEMAP_AGX_PUNCHY:
       result = tonemap_agx_punchy(pixel);
       break;
+    default:
+      LUMINARY_UNREACHABLE;
+      break;
   }
 
   return result;

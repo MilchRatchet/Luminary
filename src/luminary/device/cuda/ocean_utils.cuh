@@ -188,9 +188,10 @@ LUMINARY_FUNCTION RGBF ocean_jerlov_scattering_coefficient(const JerlovWaterType
       return get_color(1.772f, 2.394f, 3.376f);
     case LUMINARY_JERLOV_WATER_TYPE_9C:
       return get_color(2.347f, 3.18f, 4.496f);
+    default:
+      LUMINARY_UNREACHABLE;
+      return get_color(0.0f, 0.0f, 0.0f);
   }
-
-  return get_color(0.0f, 0.0f, 0.0f);
 }
 
 LUMINARY_FUNCTION RGBF ocean_jerlov_absorption_coefficient(const JerlovWaterType type) {
@@ -215,9 +216,10 @@ LUMINARY_FUNCTION RGBF ocean_jerlov_absorption_coefficient(const JerlovWaterType
       return get_color(0.351f, 0.188f, 0.574f);
     case LUMINARY_JERLOV_WATER_TYPE_9C:
       return get_color(0.398f, 0.349f, 0.995f);
+    default:
+      LUMINARY_UNREACHABLE;
+      return get_color(0.0f, 0.0f, 0.0f);
   }
-
-  return get_color(0.0f, 0.0f, 0.0f);
 }
 
 LUMINARY_FUNCTION float ocean_molecular_weight(const JerlovWaterType type) {
@@ -242,9 +244,10 @@ LUMINARY_FUNCTION float ocean_molecular_weight(const JerlovWaterType type) {
       return 0.0f;
     case LUMINARY_JERLOV_WATER_TYPE_9C:
       return 0.0f;
+    default:
+      LUMINARY_UNREACHABLE;
+      return 0.0f;
   }
-
-  return 0.0f;
 }
 
 // Henyey Greenstein importance sampling for g = 0

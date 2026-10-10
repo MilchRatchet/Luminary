@@ -365,6 +365,9 @@ LUMINARY_FUNCTION void bsdf_sample_for_light_probabilities(const MaterialFlags f
       microfacet_reflection_weight = 1.0f;
       microfacet_refraction_weight = 1.0f;
       break;
+    default:
+      LUMINARY_UNREACHABLE;
+      break;
   }
 
   const float sum_weights = microfacet_reflection_weight + microfacet_refraction_weight;

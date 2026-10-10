@@ -18,7 +18,6 @@ LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const PathID& path_id) {
   const float aperture_size = device.camera.thin_lens_aperture_size;
 
   switch (device.camera.aperture_shape) {
-    default:
     case LUMINARY_APERTURE_ROUND: {
       const float alpha = random.x * 2.0f * PI;
       const float beta  = sqrtf(random.y) * aperture_size;
@@ -44,6 +43,9 @@ LUMINARY_FUNCTION vec3 camera_thin_lens_sample_aperture(const PathID& path_id) {
       sample.x *= aperture_size;
       sample.y *= aperture_size;
     } break;
+    default:
+      LUMINARY_UNREACHABLE;
+      break;
   }
 
   return get_vector(sample.x, sample.y, 0.0f);

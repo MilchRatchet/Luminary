@@ -25,6 +25,7 @@ LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, con
       max_dist              = 6.0f * (device.cloud.top.height_max - device.cloud.top.height_min);
     } break;
     default:
+      LUMINARY_UNREACHABLE;
       return false;
   }
 

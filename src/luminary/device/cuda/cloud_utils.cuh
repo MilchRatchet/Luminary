@@ -67,6 +67,7 @@ LUMINARY_FUNCTION float cloud_height(const vec3 pos) {
     case CLOUD_LAYER_TOP:
       return (sky_height(pos) - device.cloud.top.height_min) / (device.cloud.top.height_max - device.cloud.top.height_min);
     default:
+      LUMINARY_UNREACHABLE;
       return FLT_MAX;
   }
 }

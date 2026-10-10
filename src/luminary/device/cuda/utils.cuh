@@ -182,6 +182,11 @@ LUMINARY_FUNCTION uint32_t path_id_get_sample_id(const PathID& path_id) {
 #define LUMINARY_ASSUME(__internal_macro_expression) __assume(__internal_macro_expression)
 #endif /* !__builtin_assume */
 
+#define LUMINARY_UNREACHABLE \
+  {                          \
+    __builtin_unreachable(); \
+  }
+
 LUMINARY_FUNCTION bool is_center_pixel(const PathID& path_id) {
   const ushort2 pixel = path_id_get_pixel(path_id);
 

@@ -109,6 +109,9 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
       ray           = refract_vector(V_local, microfacet, ior, total_reflection);
       is_refraction = total_reflection == false;
     } break;
+    default:
+      LUMINARY_UNREACHABLE;
+      break;
   }
 
   // TODO: We build two contexts in a row here. Consolidate that.

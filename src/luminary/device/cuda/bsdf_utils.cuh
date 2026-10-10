@@ -435,6 +435,9 @@ LUMINARY_FUNCTION RGBF bsdf_conductor(
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
                 / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
+    default:
+      LUMINARY_UNREACHABLE;
+      break;
   };
 
   const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(params);
@@ -486,6 +489,9 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
                 / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
       break;
+    default:
+      LUMINARY_UNREACHABLE;
+      break;
   };
 
   float diff_term;
@@ -502,6 +508,9 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       diff_term = bsdf_diffuse_evaluate(ctx.NdotL)
                   / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+      break;
+    default:
+      LUMINARY_UNREACHABLE;
       break;
   };
 
@@ -555,6 +564,9 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
       case BSDF_SAMPLING_DIFFUSE:
         term = 0.0f;
         break;
+      default:
+        LUMINARY_UNREACHABLE;
+        break;
     };
 
     term *= (1.0f - ctx.fresnel_dielectric);
@@ -573,6 +585,9 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
                / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+        break;
+      default:
+        LUMINARY_UNREACHABLE;
         break;
     };
 
