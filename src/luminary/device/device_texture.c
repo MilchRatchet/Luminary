@@ -450,6 +450,8 @@ LuminaryResult device_texture_copy_from_mem(DeviceTexture* device_texture, const
     memcpy_info.dstMemoryType = CU_MEMORYTYPE_ARRAY;
     memcpy_info.srcDevice     = DEVICE_CUPTR(mem);
     memcpy_info.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+    memcpy_info.srcPitch      = device_texture->width * device_texture->pixel_size;
+    memcpy_info.srcHeight     = device_texture->height;
     memcpy_info.WidthInBytes  = device_texture->width * device_texture->pixel_size;
     memcpy_info.Height        = device_texture->height;
     memcpy_info.Depth         = device_texture->depth;

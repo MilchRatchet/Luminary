@@ -123,7 +123,7 @@ static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* r
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
-    if (depth + 1 != args->max_depth) {
+    if (depth + 1 <= args->max_depth) {
       action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
       action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = depth + 1};
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));

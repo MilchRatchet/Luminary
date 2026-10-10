@@ -557,8 +557,8 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
   uint32_t id = THREAD_ID;
 
   const uint32_t amount = args.width * args.height;
-  const float scale_x   = 1.0f / (args.width - 1);
-  const float scale_y   = 1.0f / (args.height - 1);
+  const float scale_x   = (args.width > 1) ? 1.0f / (args.width - 1) : 1.0f;
+  const float scale_y   = (args.height > 1) ? 1.0f / (args.height - 1) : 1.0f;
 
   const uint32_t undersampling_stage = (args.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
 

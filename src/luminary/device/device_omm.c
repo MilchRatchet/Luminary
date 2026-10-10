@@ -274,7 +274,7 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
   buffers.temp              = DEVICE_CUPTR(temp_buffer);
   buffers.tempSizeInBytes   = buffer_sizes.tempSizeInBytes;
 
-  OPTIX_FAILURE_HANDLE(optixOpacityMicromapArrayBuild(device->optix_ctx, 0, &array_build_input, &buffers));
+  OPTIX_FAILURE_HANDLE(optixOpacityMicromapArrayBuild(device->optix_ctx, device->stream_main, &array_build_input, &buffers));
 
   __FAILURE_HANDLE(device_free(&desc_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));

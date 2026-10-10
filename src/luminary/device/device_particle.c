@@ -99,23 +99,27 @@ LuminaryResult device_particles_handle_update(
       __FAILURE_HANDLE(device_malloc(&particles_handle->quad_buffer, sizeof(Quad) * count));
 
       particles_handle->allocated_count = count;
-
-      KernelArgsParticleGenerate args;
-      args.count          = count;
-      args.seed           = shared_particles->seed;
-      args.size           = shared_particles->size * 0.001f;
-      args.size_variation = shared_particles->size_variation;
-      args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
-      args.quads          = DEVICE_PTR(particles_handle->quad_buffer);
-
-      __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
-
-      __FAILURE_HANDLE(optix_bvh_particles_gas_build(particles_handle->geometry_bvh, device, particles_handle));
-
-      __FAILURE_HANDLE(_device_particles_instances_create(particles_handle, device, particles_handle->geometry_bvh->traversable));
-
-      __FAILURE_HANDLE(optix_bvh_particles_ias_build(particles_handle->instance_bvh, device, particles_handle));
     }
+
+    *buffers_have_changed = true;
+  }
+
+  if (shared_particles->active && particles_handle->allocated_count > 0) {
+    KernelArgsParticleGenerate args;
+    args.count          = particles_handle->allocated_count;
+    args.seed           = shared_particles->seed;
+    args.size           = shared_particles->size * 0.001f;
+    args.size_variation = shared_particles->size_variation;
+    args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
+    args.quads          = DEVICE_PTR(particles_handle->quad_buffer);
+
+    __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
+
+    __FAILURE_HANDLE(optix_bvh_particles_gas_build(particles_handle->geometry_bvh, device, particles_handle));
+
+    __FAILURE_HANDLE(_device_particles_instances_create(particles_handle, device, particles_handle->geometry_bvh->traversable));
+
+    __FAILURE_HANDLE(optix_bvh_particles_ias_build(particles_handle->instance_bvh, device, particles_handle));
 
     *buffers_have_changed = true;
   }

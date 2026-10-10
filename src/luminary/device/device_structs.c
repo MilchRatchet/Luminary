@@ -229,7 +229,7 @@ LuminaryResult device_struct_particles_convert(const Particles* particles, Devic
   __CHECK_NULL_ARGUMENT(particles);
   __CHECK_NULL_ARGUMENT(device_particles);
 
-  device_particles->active = particles->active;
+  device_particles->active = particles->active && (particles->count > 0);
   device_particles->count  = particles->count;
 
   device_particles->albedo             = particles->albedo;
