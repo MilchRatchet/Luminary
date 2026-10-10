@@ -69,10 +69,10 @@ LUMINARY_FUNCTION float post_sample_buffer_border(
 }
 
 LUMINARY_KERNEL void post_image_downsample(const KernelArgsPostImageDownsample args) {
-  const float scale_x = 1.0f / (args.tw - 1);
-  const float scale_y = 1.0f / (args.th - 1);
-  const float step_x  = 1.0f / (args.sw - 1);
-  const float step_y  = 1.0f / (args.sh - 1);
+  const float scale_x = (args.tw > 1) ? 1.0f / (args.tw - 1) : 1.0f;
+  const float scale_y = (args.th > 1) ? 1.0f / (args.th - 1) : 1.0f;
+  const float step_x  = (args.sw > 1) ? 1.0f / (args.sw - 1) : 1.0f;
+  const float step_y  = (args.sh > 1) ? 1.0f / (args.sh - 1) : 1.0f;
 
   const uint32_t amount = args.tw * args.th;
 
@@ -109,10 +109,10 @@ LUMINARY_KERNEL void post_image_downsample(const KernelArgsPostImageDownsample a
 }
 
 LUMINARY_KERNEL void post_image_upsample(const KernelArgsPostImageUpsample args) {
-  const float scale_x = 1.0f / (args.tw - 1);
-  const float scale_y = 1.0f / (args.th - 1);
-  const float step_x  = 1.0f / (args.sw - 1);
-  const float step_y  = 1.0f / (args.sh - 1);
+  const float scale_x = (args.tw > 1) ? 1.0f / (args.tw - 1) : 1.0f;
+  const float scale_y = (args.th > 1) ? 1.0f / (args.th - 1) : 1.0f;
+  const float step_x  = (args.sw > 1) ? 1.0f / (args.sw - 1) : 1.0f;
+  const float step_y  = (args.sh > 1) ? 1.0f / (args.sh - 1) : 1.0f;
 
   const uint32_t amount = args.tw * args.th;
 

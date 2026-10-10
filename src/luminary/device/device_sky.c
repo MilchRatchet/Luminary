@@ -266,9 +266,9 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
 
     hdri->origin = camera->pos;
 
-    // A dimension of 0 can cause issues in the allocation, so we don't allow it (and why would we)
-    const uint32_t width  = max(sky->hdri_dim, 1);
-    const uint32_t height = max(sky->hdri_dim, 1);
+    // A dimension of 0 or 1 can cause issues, so we don't allow it (and why would we)
+    const uint32_t width  = max(sky->hdri_dim, 2);
+    const uint32_t height = max(sky->hdri_dim, 2);
 
     if (hdri->color_tex == ((Texture*) 0) || hdri->width != width || hdri->height != height) {
       hdri->output_is_dirty = true;

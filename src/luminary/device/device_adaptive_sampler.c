@@ -21,7 +21,7 @@ LuminaryResult adaptive_sampler_get_buffer_sizes(AdaptiveSampler* sampler, Devic
 
   sizes->stage_sample_counts_size     = sizeof(uint32_t) * sampler->width * sampler->height;
   sizes->stage_total_task_counts_size = sizeof(uint32_t) * ADAPTIVE_SAMPLER_NUM_STAGES;
-  sizes->variance_buffer_size         = sizeof(float) * sampler->width * sampler->height << (2 * ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG);
+  sizes->variance_buffer_size         = sizeof(float) * sampler->render_width * sampler->render_height;
 
   return LUMINARY_SUCCESS;
 }
