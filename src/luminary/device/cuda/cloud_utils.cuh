@@ -92,6 +92,7 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height) {
 
       weather.coverage = __saturatef(remap(tex.x * device.cloud.low.coverage, 0.0f, 1.0f, device.cloud.low.coverage_min, 1.0f));
       weather.type     = __saturatef(remap(tex.y * device.cloud.low.type, 0.0f, 1.0f, device.cloud.low.type_min, 1.0f));
+      break;
     }
     case CLOUD_LAYER_MID: {
       vec3 weather_pos = pos;
@@ -103,6 +104,7 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height) {
 
       weather.coverage = __saturatef(remap(tex.z * device.cloud.mid.coverage, 0.0f, 1.0f, device.cloud.mid.coverage_min, 1.0f));
       weather.type     = __saturatef(remap(tex.w * device.cloud.mid.type, 0.0f, 1.0f, device.cloud.mid.type_min, 1.0f));
+      break;
     }
     case CLOUD_LAYER_TOP: {
       vec3 weather_pos = pos;
@@ -115,6 +117,7 @@ LUMINARY_FUNCTION CloudWeather cloud_weather(vec3 pos, const float height) {
       weather.coverage  = __saturatef(remap(tex.x * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
       weather.coverage1 = __saturatef(remap(tex.y * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
       weather.coverage2 = __saturatef(remap(tex.z * device.cloud.top.coverage, 0.0f, 1.0f, device.cloud.top.coverage_min, 1.0f));
+      break;
     }
   }
 

@@ -38,6 +38,7 @@ LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, con
 
     for (int i = 0; i < step_count; i++) {
       const vec3 pos = add_vector(origin, scale_vector(ray, reach));
+      reach += step_size;
 
       const float height = cloud_height<LAYER_TYPE>(pos);
 
@@ -52,8 +53,6 @@ LUMINARY_FUNCTION bool cloud_shadow_layer(const vec3 origin, const vec3 ray, con
           return true;
         }
       }
-
-      reach += step_size;
     }
   }
 
