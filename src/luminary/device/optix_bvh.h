@@ -12,6 +12,7 @@ struct MeshInstanceProcessedUpdate typedef MeshInstanceProcessedUpdate;
 struct OptixBVHInstanceCache {
   uint32_t num_instances_allocated;
   uint32_t num_instances;
+  ARRAY MeshInstance* scene_instances;
   DEVICE OptixInstance* instances;
 } typedef OptixBVHInstanceCache;
 

@@ -69,6 +69,9 @@ LuminaryResult optix_bvh_instance_cache_create(OptixBVHInstanceCache** cache) {
   __CHECK_NULL_ARGUMENT(cache);
 
   __FAILURE_HANDLE(host_malloc(cache, sizeof(OptixBVHInstanceCache)));
+  memset(*cache, 0, sizeof(OptixBVHInstanceCache));
+
+  __FAILURE_HANDLE(array_create(&(*cache)->scene_instances, sizeof(MeshInstance), 16));
 
   __FAILURE_HANDLE(device_malloc(&(*cache)->instances, 16 * sizeof(OptixInstance)));
 
@@ -89,54 +92,98 @@ LuminaryResult optix_bvh_instance_cache_update(
   uint32_t num_updates;
   __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_updates));
 
-  uint32_t num_instances_after = cache->num_instances;
+  uint32_t current_scene_instances;
+  __FAILURE_HANDLE(array_get_num_elements(cache->scene_instances, &current_scene_instances));
 
-  // Compute the number of instances we will have afterwards
+  uint32_t num_scene_instances = current_scene_instances;
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
     const MeshInstanceProcessedUpdate* update = instance_updates + update_id;
 
-    if (update->instance.active == false)
-      continue;
+    if (update->instance_id == 0xFFFFFFFF) {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Mesh instance ID exceeds the supported range.");
+    }
 
-    if (update->instance_id >= num_instances_after)
-      num_instances_after = update->instance_id + 1;
+    num_scene_instances = max(num_scene_instances, update->instance_id + 1);
   }
 
-  // Reallocate the instances buffer if it is not large enough.
-  if (num_instances_after > cache->num_instances_allocated) {
-    cache->num_instances_allocated = num_instances_after * 2;
+  if (num_scene_instances > current_scene_instances) {
+    __FAILURE_HANDLE(array_set_num_elements(&cache->scene_instances, num_scene_instances));
+  }
+
+  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
+    const MeshInstanceProcessedUpdate* update   = instance_updates + update_id;
+    cache->scene_instances[update->instance_id] = update->instance;
+  }
+
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(meshes, &num_meshes));
+
+  uint32_t num_active_instances = 0;
+  for (uint32_t instance_id = 0; instance_id < num_scene_instances; instance_id++) {
+    const MeshInstance* instance = cache->scene_instances + instance_id;
+
+    if (instance->active == false)
+      continue;
+
+    __DEBUG_ASSERT(instance->mesh_id < num_meshes);
+    __DEBUG_ASSERT(meshes[instance->mesh_id] != (DeviceMesh*) 0);
+    __DEBUG_ASSERT(meshes[instance->mesh_id]->bvh != (OptixBVH*) 0);
+
+    num_active_instances++;
+  }
+
+  if (num_active_instances > cache->num_instances_allocated) {
+    cache->num_instances_allocated = num_active_instances * 2;
 
     DEVICE OptixInstance* new_instances;
     __FAILURE_HANDLE(device_malloc(&new_instances, sizeof(OptixInstance) * cache->num_instances_allocated));
 
-    OptixInstance* direct_access_buffer;
-    __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-      device->staging_manager, new_instances, 0, sizeof(OptixInstance) * cache->num_instances, (void**) &direct_access_buffer));
+    if (cache->num_instances > 0) {
+      OptixInstance* direct_access_buffer;
+      __FAILURE_HANDLE(device_staging_manager_register_direct_access(
+        device->staging_manager, new_instances, 0, sizeof(OptixInstance) * cache->num_instances, (void**) &direct_access_buffer));
 
-    __FAILURE_HANDLE(
-      device_download(direct_access_buffer, cache->instances, 0, sizeof(OptixInstance) * cache->num_instances, device->stream_main));
+      __FAILURE_HANDLE(
+        device_download(direct_access_buffer, cache->instances, 0, sizeof(OptixInstance) * cache->num_instances, device->stream_main));
+    }
 
     __FAILURE_HANDLE(device_free(&cache->instances));
 
     cache->instances = new_instances;
   }
 
-  cache->num_instances = num_instances_after;
+  if (num_active_instances > 0) {
+    const uint32_t max_instances_per_upload = (uint32_t) ((1ull << 30) / sizeof(OptixInstance));
+    uint32_t packed_instance_id             = 0;
+    uint32_t scene_instance_id              = 0;
 
-  // Stage the new optix instances
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const MeshInstanceProcessedUpdate* update = instance_updates + update_id;
+    while (packed_instance_id < num_active_instances) {
+      const uint32_t upload_instance_count = min(max_instances_per_upload, num_active_instances - packed_instance_id);
 
-    if (update->instance.active == false)
-      continue;
+      OptixInstance* direct_access_buffer;
+      __FAILURE_HANDLE(device_staging_manager_register_direct_access(
+        device->staging_manager, cache->instances, sizeof(OptixInstance) * packed_instance_id,
+        sizeof(OptixInstance) * upload_instance_count, (void**) &direct_access_buffer));
 
-    OptixInstance* direct_access_buffer;
-    __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-      device->staging_manager, cache->instances, sizeof(OptixInstance) * update->instance_id, sizeof(OptixInstance),
-      (void**) &direct_access_buffer));
+      uint32_t uploaded_instance_count = 0;
+      while (uploaded_instance_count < upload_instance_count) {
+        const uint32_t upload_id     = scene_instance_id++;
+        const MeshInstance* instance = cache->scene_instances + upload_id;
 
-    __FAILURE_HANDLE(_optix_bvh_get_optix_instance(device, &update->instance, update->instance_id, meshes, direct_access_buffer));
+        if (instance->active == false)
+          continue;
+
+        __FAILURE_HANDLE(
+          _optix_bvh_get_optix_instance(device, instance, upload_id, meshes, direct_access_buffer + uploaded_instance_count));
+
+        uploaded_instance_count++;
+      }
+
+      packed_instance_id += upload_instance_count;
+    }
   }
+
+  cache->num_instances = num_active_instances;
 
   return LUMINARY_SUCCESS;
 }
@@ -145,6 +192,7 @@ LuminaryResult optix_bvh_instance_cache_destroy(OptixBVHInstanceCache** cache) {
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(*cache);
 
+  __FAILURE_HANDLE(array_destroy(&(*cache)->scene_instances));
   __FAILURE_HANDLE(device_free(&(*cache)->instances));
 
   __FAILURE_HANDLE(host_free(cache));
@@ -172,6 +220,9 @@ static LuminaryResult _optix_bvh_free(OptixBVH* bvh) {
     __FAILURE_HANDLE(device_free(&bvh->bvh_data));
     bvh->allocated_mask = false;
   }
+
+  bvh->traversable = 0;
+  bvh->fast_trace  = false;
 
   return LUMINARY_SUCCESS;
 }
@@ -283,6 +334,7 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device, const OptixBVH
   __CHECK_NULL_ARGUMENT(bvh);
   __CHECK_NULL_ARGUMENT(device);
   __FAILURE_HANDLE(_optix_bvh_free(bvh));
+  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
   if (cache->num_instances == 0)
     return LUMINARY_SUCCESS;
@@ -297,8 +349,6 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device, const OptixBVH
   build_options.motionOptions.flags   = OPTIX_MOTION_FLAG_NONE;
   build_options.motionOptions.numKeys = 1;
   build_options.buildFlags            = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
-
-  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
   OptixBuildInput build_input;
   memset(&build_input, 0, sizeof(OptixBuildInput));
