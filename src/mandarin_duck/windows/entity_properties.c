@@ -479,7 +479,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
     if (aperture_shape == (uint32_t) LUMINARY_APERTURE_BLADED) {
       update_data |= _window_entity_properties_add_slider(
-        data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+        data, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 3.0f, 15.0f, 1.0f);
     }
 
     update_data |= _window_entity_properties_add_checkbox(data, "Auto Focus", &camera.lens.use_auto_focus);

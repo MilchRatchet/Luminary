@@ -45,7 +45,7 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   __CHECK_NULL_ARGUMENT(device_camera);
 
   device_camera->aperture_shape                   = camera->aperture_shape;
-  device_camera->aperture_blade_count             = camera->aperture_blade_count;
+  device_camera->aperture_blade_count             = min(camera->aperture_blade_count, 15);
   device_camera->tonemap                          = camera->tonemap;
   device_camera->dithering                        = camera->dithering;
   device_camera->purkinje                         = camera->purkinje;

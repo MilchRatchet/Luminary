@@ -39,7 +39,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceCameraInterface, 0x0Cu);
 
 struct DeviceCamera {
   uint32_t aperture_shape : 1;
-  uint32_t aperture_blade_count : 3;
+  uint32_t aperture_blade_count : 4;
   uint32_t tonemap : 3;
   uint32_t dithering : 1;
   uint32_t purkinje : 1;
@@ -49,7 +49,7 @@ struct DeviceCamera {
   uint32_t use_local_error_minimization : 1;
   uint32_t use_aspect_ratio_from_resolution : 1;
   uint32_t enable_diffraction : 1;
-  // 17 bits spare
+  // 16 bits spare
 
   vec3 pos;
   Quaternion rotation;

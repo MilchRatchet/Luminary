@@ -158,7 +158,8 @@ LUMINARY_FUNCTION float camera_simulation_interface_intersection(
   if (radius == FLT_MAX) {
     dist = (state.ray.z != 0.0f) ? (center.z - state.origin.z) / state.ray.z : FLT_MAX;
 
-    dist = (state.is_forward) ? dist : -dist;
+    if (dist < 0.0f)
+      return FLT_MAX;
   }
   else {
     const vec3 diff = sub_vector(state.origin, center);
@@ -223,14 +224,15 @@ LUMINARY_FUNCTION vec3 camera_aperture_diffraction_sample(
   const float lambda_mm  = wavelength * 1e-6f;
   const float base_angle = lambda_mm / (2.0f * PI * edge_dist);
 
-  // Sample a positive half-Cauchy distribution for the polar angular deviation
-  // This maps [0, 1) uniformly to [0, inf)
-  const float sample_u        = fmaxf(random.x, 1e-6f);
-  const float angle_deviation = base_angle * tanf((PI * 0.5f) * sample_u);
+  // Sample a positive half-Cauchy polar angle truncated to [0, pi / 2].
+  const float angle_max        = PI * 0.5f;
+  const float truncation_angle = atanf(angle_max / base_angle);
+  const float sample_u         = fmaxf(random.x, 1e-6f);
+  const float angle_deviation  = base_angle * tanf(truncation_angle * sample_u);
 
-  // PDF of the sampled theta (Cauchy distribution PDF)
+  // PDF of the normalized truncated half-Cauchy distribution.
   const float theta_normalized = angle_deviation / base_angle;
-  const float pdf_theta        = 2.0f / (PI * base_angle * (1.0f + theta_normalized * theta_normalized));
+  const float pdf_theta        = 1.0f / (base_angle * truncation_angle * (1.0f + theta_normalized * theta_normalized));
 
   // Construct a tangent basis aligned with the aperture edge normal
   vec3 edge_normal_3d  = get_vector(edge_normal.x, edge_normal.y, 0.0f);
@@ -447,7 +449,14 @@ LUMINARY_FUNCTION CameraSimulationResult
 template <bool ALLOW_REFLECTIONS, bool SPECTRAL_RENDERING>
 LUMINARY_FUNCTION CameraSampleResult camera_physical_sample(const PathID& path_id) {
   float wavelength_pdf;
-  const float wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, path_id), wavelength_pdf);
+  float wavelength;
+  if constexpr (SPECTRAL_RENDERING) {
+    wavelength = spectral_sample_wavelength(random_1D(RANDOM_TARGET_LENS_WAVELENGTH, path_id), wavelength_pdf);
+  }
+  else {
+    wavelength     = CAMERA_DESIGN_WAVELENGTH;
+    wavelength_pdf = 1.0f;
+  }
 
   const vec3 sensor_point = camera_sample_sensor<false>(path_id);
 
