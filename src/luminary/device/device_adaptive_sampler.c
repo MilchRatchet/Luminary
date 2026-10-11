@@ -119,7 +119,11 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
       DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
 
     sampler->allocated_stage_sample_counts_size = buffer_sizes.stage_sample_counts_size;
+  }
 
+  if (sampler->render_width > 0 && sampler->render_height > 0
+      && (sampler->optix_denoiser == NULL || sampler->denoiser_setup_width != sampler->render_width
+          || sampler->denoiser_setup_height != sampler->render_height)) {
     if (sampler->optix_denoiser) {
       optixDenoiserDestroy(sampler->optix_denoiser);
       sampler->optix_denoiser = NULL;
@@ -165,6 +169,9 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
       OPTIX_FAILURE_HANDLE(optixDenoiserSetup(
         sampler->optix_denoiser, device->stream_main, sampler->render_width, sampler->render_height, DEVICE_CUPTR(sampler->denoiser_state),
         sampler->allocated_denoiser_state_size, DEVICE_CUPTR(sampler->denoiser_scratch), sampler->allocated_denoiser_scratch_size));
+
+      sampler->denoiser_setup_width  = sampler->render_width;
+      sampler->denoiser_setup_height = sampler->render_height;
     }
   }
 
@@ -367,6 +374,8 @@ LuminaryResult adaptive_sampler_unload(AdaptiveSampler* sampler) {
   sampler->allocated_optix_denoiser_io_buffer_size = 0;
   sampler->allocated_denoiser_state_size           = 0;
   sampler->allocated_denoiser_scratch_size         = 0;
+  sampler->denoiser_setup_width                    = 0;
+  sampler->denoiser_setup_height                   = 0;
   sampler->width                                   = 0;
   sampler->height                                  = 0;
   sampler->render_width                            = 0;

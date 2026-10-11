@@ -46,6 +46,8 @@ struct AdaptiveSampler {
   size_t allocated_denoiser_state_size;
   size_t allocated_denoiser_scratch_size;
   size_t allocated_optix_denoiser_io_buffer_size;
+  uint32_t denoiser_setup_width;
+  uint32_t denoiser_setup_height;
 
   uint32_t max_sampling_rate;
   uint32_t avg_sampling_rate;
