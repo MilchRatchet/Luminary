@@ -228,8 +228,8 @@ LUMINARY_KERNEL void accumulation_generate_result_undersampling() {
   // During undersampling we always copy the whole screen because
   // we dynamically change the memory layout based on undersampling stage.
   // We ignore render regions because they are not of interest here.
-  const uint32_t width  = device.settings.width >> undersampling_stage;
-  const uint32_t height = device.settings.height >> undersampling_stage;
+  const uint32_t width  = (device.settings.width + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t height = (device.settings.height + (1 << undersampling_stage) - 1) >> undersampling_stage;
 
   const uint32_t amount = width * height;
 

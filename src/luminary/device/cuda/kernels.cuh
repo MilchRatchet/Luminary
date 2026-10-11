@@ -498,11 +498,11 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 
   const uint32_t output_scale = 1u << (undersampling_output - undersampling_input);
 
-  const uint32_t output_width  = device.settings.width >> undersampling_output;
-  const uint32_t output_height = device.settings.height >> undersampling_output;
+  const uint32_t output_width  = (device.settings.width + (1 << undersampling_output) - 1) >> undersampling_output;
+  const uint32_t output_height = (device.settings.height + (1 << undersampling_output) - 1) >> undersampling_output;
 
-  const uint32_t input_width  = device.settings.width >> undersampling_input;
-  const uint32_t input_height = device.settings.height >> undersampling_input;
+  const uint32_t input_width  = (device.settings.width + (1 << undersampling_input) - 1) >> undersampling_input;
+  const uint32_t input_height = (device.settings.height + (1 << undersampling_input) - 1) >> undersampling_input;
 
   const float aspect_ratio    = (device.camera.use_aspect_ratio_from_resolution) ? ((float) device.settings.width / device.settings.height)
                                                                                  : device.camera.sensor.aspect_ratio;
@@ -567,12 +567,11 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
   const uint32_t dst_width  = device.settings.width >> device.settings.supersampling;
   const uint32_t dst_height = device.settings.height >> device.settings.supersampling;
 
-  const uint32_t src_width = device.settings.width >> undersampling_output;
-
   const uint32_t undersampling_mem = undersampling_output - device.settings.supersampling;
-
-  const float mem_scale    = 1.0f / (1 << undersampling_mem);
-  const bool scaled_output = (args.width != dst_width) || (args.height != dst_height);
+  const uint32_t source_scale      = 1u << undersampling_mem;
+  const uint32_t src_width         = (dst_width + source_scale - 1) / source_scale;
+  const uint32_t src_height        = (dst_height + source_scale - 1) / source_scale;
+  const bool scaled_output         = (args.width != dst_width) || (args.height != dst_height);
 
   while (id < amount) {
     const uint32_t y = id / args.width;
@@ -583,15 +582,15 @@ LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 ar
       const float sx = x * scale_x;
       const float sy = y * scale_y;
 
-      const float red   = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_RED], sx, sy, dst_width, dst_height, mem_scale);
-      const float green = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_GREEN], sx, sy, dst_width, dst_height, mem_scale);
-      const float blue  = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_BLUE], sx, sy, dst_width, dst_height, mem_scale);
+      const float red   = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_RED], sx, sy, src_width, src_height);
+      const float green = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_GREEN], sx, sy, src_width, src_height);
+      const float blue  = post_sample_buffer_clamp(device.ptrs.frame_output[FRAME_CHANNEL_BLUE], sx, sy, src_width, src_height);
 
       pixel = get_color(red, green, blue);
     }
     else {
-      const uint32_t src_x = x >> undersampling_mem;
-      const uint32_t src_y = y >> undersampling_mem;
+      const uint32_t src_x = min(x >> undersampling_mem, src_width - 1);
+      const uint32_t src_y = min(y >> undersampling_mem, src_height - 1);
 
       const uint32_t src_index = src_x + src_y * src_width;
 

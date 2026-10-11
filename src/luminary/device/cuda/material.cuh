@@ -238,7 +238,7 @@ template <MaterialGeometryParam PARAM>
 LUMINARY_FUNCTION vec3 material_get_normal(const MaterialParams& param) {
   static_assert(MATERIAL_GEOMETRY_PARAM_GET_TYPE(PARAM) == MATERIAL_PARAM_TYPE_PACKED_NORMAL, "PARAM must be packed normal type.");
 
-  const uint32_t data = material_param_get_data<PARAM>(ctx);
+  const uint32_t data = material_param_get_data<PARAM>(param);
 
   return normal_unpack(data);
 }

@@ -305,8 +305,6 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Pointer is not device memory.");
   }
 
-  header->magic = DEVICE_MEMORY_HEADER_FREED_MAGIC;
-
   CUdevice device;
   CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
@@ -327,6 +325,8 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
   if (header->ptr) {
     CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
   }
+
+  header->magic = DEVICE_MEMORY_HEADER_FREED_MAGIC;
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 

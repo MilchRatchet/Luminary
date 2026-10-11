@@ -66,7 +66,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const float4 tri = __ldg((float4*) (tri_ptr + trace.handle.tri_id));
 
   vec3 position  = transform_apply_inv(trans, task.origin);
-  const vec3 ray = transform_apply_rotation_inv(trans, task.ray);
+  const vec3 ray = normalize_vector(transform_apply_relative_inv(trans, task.ray));
 
   const vec3 vertex  = v0.pos;
   const vec3 vertex1 = v1.pos;
@@ -202,8 +202,8 @@ LUMINARY_FUNCTION MaterialContextGeometry
   MaterialContextGeometry ctx;
   ctx.instance_id = trace.handle.instance_id;
   ctx.tri_id      = trace.handle.tri_id;
-  ctx.normal      = transform_apply_rotation(trans, normal);
-  ctx.face_normal = normal_pack(face_normal);
+  ctx.normal      = transform_apply_normal(trans, normal);
+  ctx.face_normal = normal_pack(transform_apply_normal(trans, face_normal));
   ctx.position    = position;
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;

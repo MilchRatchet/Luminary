@@ -535,6 +535,10 @@ LUMINARY_FUNCTION vec3 transform_apply_relative_inv(const DeviceTransform trans,
   return transform_apply_rotation_inv(trans, mul_vector(v, inv_vector(trans.scale)));
 }
 
+LUMINARY_FUNCTION vec3 transform_apply_normal(const DeviceTransform trans, const vec3 normal) {
+  return normalize_vector(mul_vector(transform_apply_rotation(trans, normal), inv_vector(trans.scale)));
+}
+
 LUMINARY_FUNCTION vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
   return transform_apply_absolute(trans, transform_apply_relative(trans, v));
 }

@@ -5,20 +5,19 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION float post_sample_buffer(
-  const float* buffer, const float x, const float y, const uint32_t width, const uint32_t height, const float mem_scale = 1.0f) {
-  const float source_x = fmaxf(0.0f, x * (width - 1)) * mem_scale;
-  const float source_y = fmaxf(0.0f, y * (height - 1)) * mem_scale;
+LUMINARY_FUNCTION float post_sample_buffer(const float* buffer, const float x, const float y, const uint32_t width, const uint32_t height) {
+  const float source_x = fmaxf(0.0f, x * (width - 1));
+  const float source_y = fmaxf(0.0f, y * (height - 1));
 
   const uint32_t index_x0 = (uint32_t) source_x;
   const uint32_t index_y0 = (uint32_t) source_y;
-  const uint32_t index_x1 = min((uint32_t) (source_x + mem_scale), width - 1);
-  const uint32_t index_y1 = min((uint32_t) (source_y + mem_scale), height - 1);
+  const uint32_t index_x1 = min(index_x0 + 1, width - 1);
+  const uint32_t index_y1 = min(index_y0 + 1, height - 1);
 
-  const uint32_t index_00 = index_x0 + index_y0 * width * mem_scale;
-  const uint32_t index_01 = index_x0 + index_y1 * width * mem_scale;
-  const uint32_t index_10 = index_x1 + index_y0 * width * mem_scale;
-  const uint32_t index_11 = index_x1 + index_y1 * width * mem_scale;
+  const uint32_t index_00 = index_x0 + index_y0 * width;
+  const uint32_t index_01 = index_x0 + index_y1 * width;
+  const uint32_t index_10 = index_x1 + index_y0 * width;
+  const uint32_t index_11 = index_x1 + index_y1 * width;
 
   const float pixel_00 = __ldca(buffer + index_00);
   const float pixel_01 = __ldca(buffer + index_01);
@@ -43,8 +42,7 @@ LUMINARY_FUNCTION float post_sample_buffer(
   return result;
 }
 
-LUMINARY_FUNCTION float post_sample_buffer_clamp(
-  const float* image, float x, float y, const int width, const int height, const float mem_scale = 1.0f) {
+LUMINARY_FUNCTION float post_sample_buffer_clamp(const float* image, float x, float y, const int width, const int height) {
   x = fmaxf(x, 0.0f);
   y = fmaxf(y, 0.0f);
 
@@ -52,7 +50,7 @@ LUMINARY_FUNCTION float post_sample_buffer_clamp(
   x = fminf(x, __uint_as_float(0b00111111011111111111111111111111));
   y = fminf(y, __uint_as_float(0b00111111011111111111111111111111));
 
-  return post_sample_buffer(image, x, y, width, height, mem_scale);
+  return post_sample_buffer(image, x, y, width, height);
 }
 
 LUMINARY_FUNCTION float post_sample_buffer_border(
