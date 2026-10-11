@@ -66,19 +66,19 @@ LUMINARY_FUNCTION float cloud_shadow(const vec3 origin, const vec3 ray) {
   }
 
   if (device.cloud.low_active) {
-    if (cloud_shadow_layer<CLOUD_LAYER_LOW>(origin, ray, device.cloud.steps / 3)) {
+    if (cloud_shadow_layer<CLOUD_LAYER_LOW>(origin, ray, (device.cloud.steps + 2) / 3)) {
       return 0.0f;
     }
   }
 
   if (device.cloud.mid_active) {
-    if (cloud_shadow_layer<CLOUD_LAYER_MID>(origin, ray, device.cloud.steps / 16)) {
+    if (cloud_shadow_layer<CLOUD_LAYER_MID>(origin, ray, (device.cloud.steps + 15) / 16)) {
       return 0.1f;
     }
   }
 
   if (device.cloud.top_active) {
-    if (cloud_shadow_layer<CLOUD_LAYER_TOP>(origin, ray, device.cloud.steps / 32)) {
+    if (cloud_shadow_layer<CLOUD_LAYER_TOP>(origin, ray, (device.cloud.steps + 31) / 32)) {
       return 0.5f;
     }
   }

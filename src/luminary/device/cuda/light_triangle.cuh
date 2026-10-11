@@ -163,7 +163,9 @@ LUMINARY_FUNCTION bool light_triangle_sample_finalize(
 
   success &= light_triangle_sample_solid_angle(
     origin, triangle.vertex, triangle.edge1, triangle.edge2, random, triangle.bidirectional, ray, solid_angle);
-  success &= light_triangle_sample_finalize_dist_and_uvs(triangle, packed_light_data, origin, ray, dist);
+
+  if (success)
+    success &= light_triangle_sample_finalize_dist_and_uvs(triangle, packed_light_data, origin, ray, dist);
 
   return success;
 }

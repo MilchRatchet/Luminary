@@ -533,7 +533,7 @@ LuminaryResult device_adaptive_sampler_ensure_stage(
 
   const uint32_t subtile_count = tile_count * WARP_SIZE;
 
-  if (subtile_count >= sampler->num_allocated_subtiles) {
+  if (subtile_count > sampler->num_allocated_subtiles) {
     if (sampler->subtile_last_blocks != (uint32_t*) 0) {
       __FAILURE_HANDLE(device_free(&sampler->subtile_last_blocks));
     }

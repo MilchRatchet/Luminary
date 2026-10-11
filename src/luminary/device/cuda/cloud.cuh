@@ -46,7 +46,9 @@
 
 template <CloudLayerType LAYER_TYPE>
 LUMINARY_FUNCTION float cloud_extinction(const vec3 origin, const vec3 ray) {
-  const float iter_step = 1.0f / device.cloud.shadow_steps;
+  // Maximum shadow tracing distance.
+  const float segment_length = 4.0f;
+  const float iter_step      = 1.0f / device.cloud.shadow_steps;
 
   float optical_depth = 0.0f;
 
@@ -56,8 +58,10 @@ LUMINARY_FUNCTION float cloud_extinction(const vec3 origin, const vec3 ray) {
     t0       = t0 * t0;
     t1       = t1 * t1;
 
-    const float step_size = t1 - t0;
-    const float reach     = t0 + step_size * 0.5f;
+    const float normalized_step_size = t1 - t0;
+
+    const float step_size = normalized_step_size * segment_length;
+    const float reach     = (t0 + normalized_step_size * 0.5f) * segment_length;
 
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
@@ -74,6 +78,12 @@ LUMINARY_FUNCTION float cloud_extinction(const vec3 origin, const vec3 ray) {
   }
 
   optical_depth *= CLOUD_EXTINCTION_DENSITY;
+
+  // If the transmittance becomes 0 due to limited precision, then we lose all
+  // octaves aswell, so we clamp it.
+  constexpr float MIN_OPTICAL_DEPTH = -64.0f;
+
+  optical_depth = fmaxf(optical_depth, MIN_OPTICAL_DEPTH);
 
   return expf(optical_depth);
 }
@@ -101,12 +111,12 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
   else if constexpr (LAYER_TYPE == CLOUD_LAYER_MID) {
     const float span = device.cloud.mid.height_max - device.cloud.mid.height_min;
     dist             = fminf(8.0f * span, dist);
-    step_count       = device.cloud.steps / 4;
+    step_count       = (device.cloud.steps + 3) / 4;
   }
   else if constexpr (LAYER_TYPE == CLOUD_LAYER_TOP) {
     const float span = device.cloud.top.height_max - device.cloud.top.height_min;
     dist             = fminf(8.0f * span, dist);
-    step_count       = device.cloud.steps / 8;
+    step_count       = (device.cloud.steps + 7) / 8;
   }
 
   start = fmaxf(0.0f, start);
@@ -202,7 +212,7 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
 
     transmittance *= step_trans_base;
 
-    if (transmittance < 0.001f) {
+    if (transmittance < 4.0f * eps) {
       transmittance = 0.0f;
       break;
     }
@@ -210,12 +220,15 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
     reach += step_size;
   }
 
-  const Spectrum sun_radiance     = (sun_visible) ? sky_get_sun_color_spectral(color_sampling_pos, sun_ray, false) : spectrum_set1(0.0f);
-  const Spectrum ambient_radiance = sky_get_color_spectral<false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps, path_id);
+  Spectrum radiance = spectrum_set1(0.0f);
+  if (scattered_sun_light > 0.0f) {
+    const Spectrum sun_radiance     = (sun_visible) ? sky_get_sun_color_spectral(color_sampling_pos, sun_ray, false) : spectrum_set1(0.0f);
+    const Spectrum ambient_radiance = sky_get_color_spectral<false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps, path_id);
+    radiance = spectrum_add(spectrum_scale(sun_radiance, scattered_sun_light), spectrum_scale(ambient_radiance, scattered_ambient_light));
+  }
 
   CloudRenderResult result;
-  result.radiance =
-    spectrum_add(spectrum_scale(sun_radiance, scattered_sun_light), spectrum_scale(ambient_radiance, scattered_ambient_light));
+  result.radiance      = radiance;
   result.transmittance = transmittance;
   result.hit_dist      = hit_dist;
 

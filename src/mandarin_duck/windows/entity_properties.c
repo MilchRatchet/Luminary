@@ -905,6 +905,10 @@ static void _window_entity_properties_cloud_action(Window* window, Display* disp
 
   if (cloud.active) {
     update_data |=
+      _window_entity_properties_add_slider(data, "Iterations", &cloud.steps, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 512.0f, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Shadow Iterations", &cloud.shadow_steps, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 512.0f, 1.0f);
+    update_data |=
       _window_entity_properties_add_slider(data, "Offset X", &cloud.offset_x, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
     update_data |=
       _window_entity_properties_add_slider(data, "Offset Z", &cloud.offset_z, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
