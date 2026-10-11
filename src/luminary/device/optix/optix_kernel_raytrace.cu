@@ -31,15 +31,6 @@ LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, Optix
   const uint16_t y  = pixel.y >> shift;
   const uint32_t ld = device.settings.width >> shift;
 
-  if (device.ocean.active) {
-    const float short_distance = ocean_intersection_distance(task.origin, task.ray);
-
-    if (short_distance < result.depth) {
-      result.handle.instance_id = HIT_TYPE_REJECT;
-      result.depth              = short_distance;
-    }
-  }
-
   uint16_t material_id = MATERIAL_ID_INVALID;
   uint32_t instance_id = HIT_TYPE_INVALID;
 
