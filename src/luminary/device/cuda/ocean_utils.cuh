@@ -142,9 +142,9 @@ LUMINARY_FUNCTION vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterat
   const float h_3 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
 
   vec3 normal;
-  normal.x = (h_1 - h_2) * (1.0f / 4.0f);
+  normal.x = (h_1 - h_2) * (1.0f / 2.0f);
   normal.y = d;
-  normal.z = (h_3 - h_0) * (1.0f / 4.0f);
+  normal.z = (h_3 - h_0) * (1.0f / 2.0f);
 
   return normalize_vector(normal);
 }

@@ -85,7 +85,10 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
 
   if (randomRR >= russian_roulette_probability) {
     LightBSDFSampleResult result;
+    result.ray                  = get_vector(0.0f, 0.0f, 1.0f);
+    result.weight               = splat_color(0.0f);
     result.sampling_probability = 0.0f;
+    result.is_refraction        = false;
 
     return result;
   }

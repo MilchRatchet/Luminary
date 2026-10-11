@@ -206,7 +206,8 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
 
   const vec3 rel_base = sub_vector(base, ctx.position);
 
-  uint32_t selected[LIGHT_TREE_NUM_OUTPUTS];
+  uint32_t selected[LIGHT_TREE_NUM_OUTPUTS] = {};
+
   float sum = 0.0f;
 
   LUMINARY_ASSUME(header.num_sections <= LIGHT_TREE_ROOT_MAX_NUM_SECTIONS);
