@@ -11,8 +11,10 @@ LUMINARY_FUNCTION bool accumulation_reduce_sample(
   const uint32_t index_mask  = __match_any_sync(__activemask(), index);
   const bool is_first_thread = (__ffs(index_mask) - 1) == THREAD_ID_IN_WARP;
 
+  const float luminance = color_luminance(value);
+
   first_moment           = value;
-  second_moment_lumiance = color_luminance(mul_color(value, value));
+  second_moment_lumiance = luminance * luminance;
 
   if (index_mask == 0xFFFFFFFF) {
     first_moment.r = warp_reduce_sum(first_moment.r);
@@ -31,8 +33,10 @@ LUMINARY_FUNCTION bool accumulation_reduce_sample(
 
       const RGBF color = get_color(red, green, blue);
 
+      const float luminance = color_luminance(color);
+
       first_moment = add_color(first_moment, color);
-      second_moment_lumiance += color_luminance(mul_color(color, color));
+      second_moment_lumiance += luminance * luminance;
     }
   }
 
@@ -78,8 +82,10 @@ LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
 
     const DeviceTaskResult result = task_result_load(task_result_base_address);
 
+    const float luminance = color_luminance(result.color);
+
     const RGBF first_moment             = result.color;
-    const float second_moment_luminance = color_luminance(mul_color(result.color, result.color));
+    const float second_moment_luminance = luminance * luminance;
 
     __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);
     __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);

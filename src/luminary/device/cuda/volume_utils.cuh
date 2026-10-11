@@ -54,16 +54,6 @@ LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset(const VolumeType
   }
 }
 
-struct VolumePath {
-  union {
-    float2 data;
-    struct {
-      float start;
-      float length;
-    };
-  };
-} typedef VolumePath;
-
 LUMINARY_FUNCTION VolumePath make_volume_path(const float start, const float length) {
   VolumePath path;
 
@@ -211,19 +201,19 @@ LUMINARY_FUNCTION float volume_sample_intersection_miss_probability(const Volume
   return expf(-volume.max_scattering * depth);
 }
 
-LUMINARY_FUNCTION float volume_sample_intersection_bounded(const VolumeDescriptor volume, const float max_length, const float random) {
-  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
+LUMINARY_FUNCTION float volume_sample_intersection_bounded(const VolumeDescriptor volume, const VolumePath path, const float random) {
+  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * path.length);
 
   // [FonWKH17] Equation 15
   const float t = -logf(1.0f - random * prob_hit_at_max) / volume.max_scattering;
 
-  return t;
+  return path.start + t;
 }
 
-LUMINARY_FUNCTION float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const float max_length, const float t) {
-  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * max_length);
+LUMINARY_FUNCTION float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const VolumePath path, const float t) {
+  const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * path.length);
 
-  return volume.max_scattering * expf(-volume.max_scattering * t) / prob_hit_at_max;
+  return volume.max_scattering * expf(-volume.max_scattering * (t - path.start)) / prob_hit_at_max;
 }
 
 template <MaterialType TYPE>
@@ -326,7 +316,7 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
   ctx.V           = scale_vector(task.ray, -1.0f);
   ctx.state       = task.state;
   ctx.volume_type = volume.type;
-  ctx.max_dist    = max_dist;
+  ctx.path        = volume_compute_path(volume, task.origin, task.ray, max_dist);
 
   return ctx;
 }
@@ -334,7 +324,7 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
 LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const PathID& path_id) {
   const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, path_id);
 
-  const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.max_dist, random);
+  const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.path, random);
 
   ctx.position = add_vector(ctx.position, scale_vector(ctx.V, -dist));
 
@@ -344,12 +334,14 @@ LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContext
 LUMINARY_FUNCTION RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContextVolume& ctx, const float dist) {
   const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
 
-  RGBF weight;
-  weight.r = expf(-dist * volume_transmittance.r) * ctx.descriptor.scattering.r;
-  weight.g = expf(-dist * volume_transmittance.g) * ctx.descriptor.scattering.g;
-  weight.b = expf(-dist * volume_transmittance.b) * ctx.descriptor.scattering.b;
+  const float weight_dist = dist - ctx.path.start;
 
-  weight = scale_color(weight, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.max_dist, dist));
+  RGBF weight;
+  weight.r = expf(-weight_dist * volume_transmittance.r) * ctx.descriptor.scattering.r;
+  weight.g = expf(-weight_dist * volume_transmittance.g) * ctx.descriptor.scattering.g;
+  weight.b = expf(-weight_dist * volume_transmittance.b) * ctx.descriptor.scattering.b;
+
+  weight = scale_color(weight, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.path, dist));
 
   return weight;
 }

@@ -97,7 +97,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float dist_along_ray = -dot_product(PO, ctx.V);
 
   // Clamp the distance if the ray is shortened by geometry.
-  const float clamped_dist_along_ray = clampf(dist_along_ray, 0.0f, ctx.max_dist);
+  const float clamped_dist_along_ray = clampf(dist_along_ray, ctx.path.start, ctx.path.start + ctx.path.length);
 
   // This is only perpendicular if we didn't actually clamp
   const vec3 perpendicular_vector   = sub_vector(PO, scale_vector(ctx.V, clamped_dist_along_ray));
@@ -108,14 +108,16 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
 
   const float variance = std_dev * std_dev;
 
+  const float volume_dist = clamped_dist_along_ray - ctx.path.start;
+
   // Don't use direct path to save on computations by using distances that we already computed.
-  const float transmittance_depth = fmaxf(perpendicular_dist_sq + clamped_dist_along_ray * clamped_dist_along_ray - variance, 0.0f);
+  const float transmittance_depth = fmaxf(perpendicular_dist_sq + volume_dist * volume_dist - variance, 0.0f);
 
   // Account for energy loss due to absorption
   const float transmittance = expf(-ctx.descriptor.max_absorption * transmittance_depth);
 
   // Account for limited amount of energy that is scattered along the ray before passing the mean
-  const float scattering = 1.0f - expf(-ctx.descriptor.max_scattering * (variance + clamped_dist_along_ray));
+  const float scattering = 1.0f - expf(-ctx.descriptor.max_scattering * (variance + volume_dist));
 
   return power * falloff * transmittance * scattering;
 }

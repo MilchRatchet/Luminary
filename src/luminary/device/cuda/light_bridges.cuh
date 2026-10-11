@@ -266,38 +266,39 @@ LUMINARY_FUNCTION vec3 bridges_sample_initial_vertex(
   const float dist_to_light = fmaxf(-dot_product(PO, ctx.V), 0.0f);
 
   // We sample points in front of the light with a very high probability, the rest is only for unbiasedness.
-  const float forward_prob = (dist_to_light < ctx.max_dist) ? BRIDGES_INITIAL_VERTEX_FORWARD_PROB : 1.0f;
+  float forward_prob = (dist_to_light < ctx.path.start + ctx.path.length) ? BRIDGES_INITIAL_VERTEX_FORWARD_PROB : 1.0f;
+  forward_prob       = (dist_to_light <= ctx.path.start) ? 0.0f : forward_prob;
 
-  float max_dist;
-  float t_offset;
-
+  VolumePath new_path;
   if (random_intersection < forward_prob) {
     random_intersection = random_intersection / forward_prob;
 
-    max_dist = clampf(dist_to_light, 0.0f, ctx.max_dist);
-    t_offset = 0.0f;
+    new_path.start  = ctx.path.start;
+    new_path.length = clampf(dist_to_light, ctx.path.start, ctx.path.start + ctx.path.length) - new_path.start;
 
     pdf = forward_prob;
   }
   else {
     random_intersection = (random_intersection - forward_prob) / (1.0f - forward_prob);
 
-    // This path is only ever hit if ctx.max_dist > dist_to_light;
-    max_dist = ctx.max_dist - dist_to_light;
-    t_offset = dist_to_light;
+    // This path is only ever hit if  ctx.path.start + ctx.path.length > dist_to_light;
+    new_path.start  = fmaxf(ctx.path.start, dist_to_light);
+    new_path.length = ctx.path.start + ctx.path.length - new_path.start;
 
     pdf = 1.0f - forward_prob;
   }
 
-  const float t = t_offset + volume_sample_intersection_bounded(ctx.descriptor, max_dist, random_intersection);
+  const float t = volume_sample_intersection_bounded(ctx.descriptor, new_path, random_intersection);
+
+  pdf *= volume_sample_intersection_bounded_pdf(ctx.descriptor, new_path, t);
 
   const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
 
-  attenuation.r = expf(-t * volume_transmittance.r) * ctx.descriptor.scattering.r;
-  attenuation.g = expf(-t * volume_transmittance.g) * ctx.descriptor.scattering.g;
-  attenuation.b = expf(-t * volume_transmittance.b) * ctx.descriptor.scattering.b;
+  const float attenuation_distance = t - ctx.path.start;
 
-  pdf *= volume_sample_intersection_bounded_pdf(ctx.descriptor, max_dist, t - t_offset);
+  attenuation.r = expf(-attenuation_distance * volume_transmittance.r) * ctx.descriptor.scattering.r;
+  attenuation.g = expf(-attenuation_distance * volume_transmittance.g) * ctx.descriptor.scattering.g;
+  attenuation.b = expf(-attenuation_distance * volume_transmittance.b) * ctx.descriptor.scattering.b;
 
   return add_vector(ctx.position, scale_vector(ctx.V, -t));
 }

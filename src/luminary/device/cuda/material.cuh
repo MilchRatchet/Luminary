@@ -4,6 +4,16 @@
 #include "math.cuh"
 #include "utils.cuh"
 
+struct VolumePath {
+  union {
+    float2 data;
+    struct {
+      float start;
+      float length;
+    };
+  };
+} typedef VolumePath;
+
 enum MaterialType { MATERIAL_GEOMETRY, MATERIAL_VOLUME, MATERIAL_PARTICLE } typedef MaterialType;
 
 enum MaterialParamType {
@@ -89,7 +99,7 @@ struct MaterialContext<MATERIAL_VOLUME> {
   vec3 V;
   uint16_t state;
   VolumeType volume_type;
-  float max_dist;
+  VolumePath path;
 };
 
 template <>
