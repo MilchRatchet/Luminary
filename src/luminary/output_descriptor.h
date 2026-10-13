@@ -6,6 +6,8 @@
 
 struct OutputDescriptor {
   bool is_recurring_output;
+  uint32_t device_index;
+  uint64_t output_request_id;
   struct {
     uint32_t width;
     uint32_t height;

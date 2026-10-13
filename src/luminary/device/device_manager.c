@@ -601,6 +601,33 @@ struct DeviceManagerAddOutputRequestArgs {
   OutputRequestProperties props;
 } typedef DeviceManagerAddOutputRequestArgs;
 
+struct DeviceManagerCompleteOutputRequestArgs {
+  uint32_t device_index;
+  uint64_t request_id;
+} typedef DeviceManagerCompleteOutputRequestArgs;
+
+static LuminaryResult _device_manager_complete_output_request_clear_work(
+  DeviceManager* device_manager, DeviceManagerCompleteOutputRequestArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerCompleteOutputRequestArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_complete_output_request_queue_work(
+  DeviceManager* device_manager, DeviceManagerCompleteOutputRequestArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  Device* device = device_manager->devices[args->device_index];
+
+  __FAILURE_HANDLE(device_retire_output_request(device, args->request_id));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_add_output_request_clear_work(
   DeviceManager* device_manager, DeviceManagerAddOutputRequestArgs* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
@@ -1050,6 +1077,28 @@ LuminaryResult device_manager_add_output_request(DeviceManager* device_manager, 
   entry.name       = "Add output request";
   entry.function   = (QueueEntryFunction) _device_manager_add_output_request_queue_work;
   entry.clear_func = (QueueEntryFunction) _device_manager_add_output_request_clear_work;
+  entry.args       = args;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_complete_output_request(DeviceManager* device_manager, uint32_t device_index, uint64_t request_id) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerCompleteOutputRequestArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerCompleteOutputRequestArgs), (void**) &args));
+
+  args->device_index = device_index;
+  args->request_id   = request_id;
+
+  QueueEntry entry;
+  memset(&entry, 0, sizeof(QueueEntry));
+
+  entry.name       = "Complete Output Request";
+  entry.function   = (QueueEntryFunction) _device_manager_complete_output_request_queue_work;
+  entry.clear_func = (QueueEntryFunction) _device_manager_complete_output_request_clear_work;
   entry.args       = args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));

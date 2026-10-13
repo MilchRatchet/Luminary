@@ -140,6 +140,7 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
 
   DeviceOutputRequest output_request;
 
+  output_request.id     = output->next_output_request_id++;
   output_request.queued = false;
   __FAILURE_HANDLE(
     device_malloc_staging(&output_request.buffer, sizeof(ARGB8) * props.width * props.height, DEVICE_MEMORY_STAGING_FLAG_NONE));
@@ -159,6 +160,35 @@ LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProp
   __FAILURE_HANDLE(array_push(&output->output_requests, &output_request));
 
   __FAILURE_HANDLE(_device_output_allocate_device_buffer(output, props.width, props.height));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_output_retire_request(DeviceOutput* output, uint64_t request_id) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  uint32_t num_output_requests;
+  __FAILURE_HANDLE(array_get_num_elements(output->output_requests, &num_output_requests));
+
+  uint32_t request_index = num_output_requests;
+  for (uint32_t index = 0; index < num_output_requests; index++) {
+    if (output->output_requests[index].id == request_id) {
+      request_index = index;
+      break;
+    }
+  }
+
+  if (request_index == num_output_requests)
+    return LUMINARY_SUCCESS;
+
+  DeviceOutputRequest* request = output->output_requests + request_index;
+  __FAILURE_HANDLE(vault_object_destroy(&request->buffer_object));
+  __FAILURE_HANDLE(device_free_staging(&request->buffer));
+
+  for (uint32_t index = request_index; index + 1 < num_output_requests; index++)
+    output->output_requests[index] = output->output_requests[index + 1];
+
+  __FAILURE_HANDLE(array_set_num_elements(&output->output_requests, num_output_requests - 1));
 
   return LUMINARY_SUCCESS;
 }
@@ -283,6 +313,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     data->render_event_id                      = render_event_id;
     data->descriptor.is_recurring_output       = true;
+    data->descriptor.device_index              = data->common.device_index;
+    data->descriptor.output_request_id         = 0;
     data->descriptor.meta_data.width           = output->width;
     data->descriptor.meta_data.height          = output->height;
     data->descriptor.meta_data.sample_count    = aggregate_sample_count;
@@ -304,8 +336,6 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   for (uint32_t output_request_id = 0; output_request_id < num_output_requests; output_request_id++) {
     DeviceOutputRequest* output_request = output->output_requests + output_request_id;
 
-    // TODO: If the output request has already been processed, mark it for deletion, else we leak precious staging memory.
-
     if (_device_output_request_needs_queueing(output_request, aggregate_sample_count) == false)
       continue;
 
@@ -313,6 +343,8 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     data->render_event_id                      = render_event_id;
     data->descriptor.is_recurring_output       = false;
+    data->descriptor.device_index              = data->common.device_index;
+    data->descriptor.output_request_id         = output_request->id;
     data->descriptor.meta_data.width           = output_request->props.width;
     data->descriptor.meta_data.height          = output_request->props.height;
     data->descriptor.meta_data.sample_count    = aggregate_sample_count;

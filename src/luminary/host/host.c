@@ -114,7 +114,7 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputDescriptor*
   __FAILURE_HANDLE(vault_handle_lock(args->data_handle));
 
   STAGING void* data;
-  __FAILURE_HANDLE(vault_handle_get(args->data_handle, &data));
+  __FAILURE_HANDLE_CRITICAL(vault_handle_get(args->data_handle, &data));
 
   // If the data pointer is NULL, then it was freed and we need to drop this output.
   if (data != (STAGING void*) 0) {
@@ -146,8 +146,16 @@ static LuminaryResult _host_copy_output_clear_work(Host* host, OutputDescriptor*
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(args);
 
+  const bool is_non_recurring = args->is_recurring_output == false;
+  const uint32_t device_index = args->device_index;
+  const uint64_t request_id   = args->output_request_id;
+
   __FAILURE_HANDLE(vault_handle_destroy(&args->data_handle));
   __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(OutputDescriptor)));
+
+  if (is_non_recurring) {
+    __FAILURE_HANDLE(device_manager_complete_output_request(host->device_manager, device_index, request_id));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -1270,7 +1278,11 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputDescriptor d
   entry.clear_func = (QueueEntryFunction) _host_copy_output_clear_work;
   entry.args       = (void*) args;
 
-  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+  LuminaryResult result = queue_push(host->work_queue, &entry);
+  if (result != LUMINARY_SUCCESS) {
+    LuminaryResult release_result = ringbuffer_release_entry(host->ringbuffer, sizeof(OutputDescriptor));
+    return (release_result != LUMINARY_SUCCESS) ? release_result : result;
+  }
 
   return LUMINARY_SUCCESS;
 }

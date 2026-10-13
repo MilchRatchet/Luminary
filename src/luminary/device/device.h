@@ -176,6 +176,7 @@ LuminaryResult device_set_output_dirty(Device* device);
 LuminaryResult device_update_output_properties(Device* device, LuminaryOutputProperties properties);
 LuminaryResult device_update_output_camera_params(Device* device, const Camera* camera);
 LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties);
+LuminaryResult device_retire_output_request(Device* device, uint64_t request_id);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
 LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid);
 LuminaryResult device_finish_render_iteration(Device* device, AdaptiveSampler* sampler, DeviceRenderCallbackData* callback_data);

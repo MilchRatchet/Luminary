@@ -13,6 +13,7 @@ struct DeviceRenderer typedef DeviceRenderer;
 #define DEVICE_OUTPUT_CALLBACK_COUNT 128
 
 struct DeviceOutputRequest {
+  uint64_t id;
   bool queued;
   STAGING void* buffer;
   VaultObject* buffer_object;
@@ -34,6 +35,7 @@ struct DeviceOutput {
   DeviceOutputCallbackData callback_data[DEVICE_OUTPUT_CALLBACK_COUNT];
   CUevent event_output_callback[DEVICE_OUTPUT_CALLBACK_COUNT];
   uint32_t callback_index;
+  uint64_t next_output_request_id;
   ARRAY DeviceOutputRequest* output_requests;
   LuminaryTonemapParams tonemap_params;
   bool recurring_output_is_dirty;
@@ -45,6 +47,7 @@ LuminaryResult device_output_set_output_dirty(DeviceOutput* output);
 DEVICE_CTX_FUNC LuminaryResult device_output_set_properties(DeviceOutput* output, LuminaryOutputProperties properties);
 DEVICE_CTX_FUNC LuminaryResult device_output_set_camera_params(DeviceOutput* output, const Camera* camera);
 DEVICE_CTX_FUNC LuminaryResult device_output_add_request(DeviceOutput* output, OutputRequestProperties props);
+DEVICE_CTX_FUNC LuminaryResult device_output_retire_request(DeviceOutput* output, uint64_t request_id);
 DEVICE_CTX_FUNC LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data);
 LuminaryResult device_output_will_output(DeviceOutput* output, DeviceRenderer* renderer, bool* does_output);
 DEVICE_CTX_FUNC LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device, uint32_t render_event_id);
