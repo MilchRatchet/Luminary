@@ -390,6 +390,8 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device, const OptixBVH
   size_t compact_size;
   __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
 
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
 
@@ -492,6 +494,8 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const Device
   size_t compact_size;
   __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
 
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
 
@@ -590,6 +594,8 @@ LuminaryResult optix_bvh_particles_gas_build(OptixBVH* bvh, Device* device, cons
   size_t compact_size;
   __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
 
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
 
@@ -674,6 +680,8 @@ LuminaryResult optix_bvh_particles_ias_build(OptixBVH* bvh, Device* device, cons
 
   size_t compact_size;
   __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
+
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));

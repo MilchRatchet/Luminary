@@ -112,6 +112,8 @@ LuminaryResult omm_build(OpacityMicromap* omm, Device* device, const DeviceMesh*
     uint32_t num_triangles_queued_for_refinement;
     __FAILURE_HANDLE(device_download(&num_triangles_queued_for_refinement, tri_work_counter, 0, sizeof(uint32_t), device->stream_main));
 
+    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
     uint32_t triangles_at_level = remaining_triangles - num_triangles_queued_for_refinement;
     remaining_triangles         = num_triangles_queued_for_refinement;
 
