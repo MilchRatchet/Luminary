@@ -1652,6 +1652,7 @@ LuminaryResult device_query_gbuffer_meta(Device* device) {
 
 LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, GBufferMetaData* data) {
   __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(data);
 
   DEVICE_ASSERT_AVAILABLE
 

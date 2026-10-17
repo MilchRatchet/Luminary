@@ -536,7 +536,7 @@ static LuminaryResult _device_manager_enable_device_queue_work(DeviceManager* de
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Tried to enable an unavailable device.");
   }
 
-  const bool integration_dirty = ((device->state == DEVICE_STATE_ENABLED) == args->enable);
+  const bool integration_dirty = ((device->state == DEVICE_STATE_ENABLED) != args->enable);
 
   bool select_new_main_device = false;
 
@@ -839,8 +839,8 @@ static LuminaryResult _device_manager_init(DeviceManager* device_manager, Device
   // Setup
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
   __FAILURE_HANDLE(_device_manager_compile_kernels(device_manager));
+  __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
   __FAILURE_HANDLE(_device_manager_initialize_devices(device_manager));
 
   __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerCreateInfo)));

@@ -95,28 +95,23 @@ static LuminaryResult _device_texture_get_num_mip_levels(const Texture* tex, uin
     return LUMINARY_SUCCESS;
   }
 
-  uint16_t min_dim;
+  uint32_t max_dim;
   switch (tex->dim) {
     case TEXTURE_DIMENSION_TYPE_2D:
-      min_dim = min(tex->width, tex->height);
+      max_dim = max(tex->width, tex->height);
       break;
     case TEXTURE_DIMENSION_TYPE_3D:
-      min_dim = min(min(tex->width, tex->height), tex->depth);
+      max_dim = max(max(tex->width, tex->height), tex->depth);
       break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension type is invalid.");
   }
 
-  if (min_dim <= 1) {
-    *num_mip_levels = 1;
-    return LUMINARY_SUCCESS;
-  }
+  uint32_t level = 1;
 
-  uint32_t level = 0;
-
-  while (min_dim > 1) {
+  while (max_dim > 1) {
     level++;
-    min_dim = min_dim >> 1;
+    max_dim = max_dim >> 1;
   }
 
   *num_mip_levels = level;
@@ -136,8 +131,8 @@ static LuminaryResult _device_texture_generate_mipmaps(
     CUarray dst_level;
     CUDA_FAILURE_HANDLE(cuMipmappedArrayGetLevel(&dst_level, device_texture->cuda_mipmapped_array, mip_level + 1));
 
-    const uint16_t width  = device_texture->width >> (mip_level + 1);
-    const uint16_t height = device_texture->height >> (mip_level + 1);
+    const uint16_t width  = max(device_texture->width >> (mip_level + 1), 1);
+    const uint16_t height = max(device_texture->height >> (mip_level + 1), 1);
     const uint16_t depth  = device_texture->depth >> (mip_level + 1);
 
     // Create SRC texture
