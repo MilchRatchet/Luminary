@@ -410,16 +410,16 @@ LuminaryResult luminary_image_save(const LuminaryImageSaveArgs* args) {
 
   int stbi_result = 0;
   switch (args->format) {
-    case LUMINARY_IMAGE_SAVE_FORMAT_PNG:
+    case LUMINARY_IMAGE_FILE_FORMAT_PNG:
       stbi_result = stbi_write_png(file_path_string, width, height, 4, buffer, width * 4);
       break;
-    case LUMINARY_IMAGE_SAVE_FORMAT_JPG:
+    case LUMINARY_IMAGE_FILE_FORMAT_JPG:
       stbi_result = stbi_write_jpg(file_path_string, width, height, 4, buffer, args->jpeg_quality);
       break;
-    case LUMINARY_IMAGE_SAVE_FORMAT_BMP:
+    case LUMINARY_IMAGE_FILE_FORMAT_BMP:
       stbi_result = stbi_write_bmp(file_path_string, width, height, 4, buffer);
       break;
-    case LUMINARY_IMAGE_SAVE_FORMAT_TGA:
+    case LUMINARY_IMAGE_FILE_FORMAT_TGA:
       stbi_result = stbi_write_tga(file_path_string, width, height, 4, buffer);
       break;
     default:

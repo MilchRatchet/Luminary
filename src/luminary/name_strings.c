@@ -59,6 +59,12 @@ const char* const luminary_strings_sensor_response_model[LUMINARY_SENSOR_RESPONS
   [LUMINARY_SENSOR_RESPONSE_DIGITAL] = "Digital (Microlens)",
 };
 
+const char* const luminary_strings_image_file_format[LUMINARY_IMAGE_FILE_FORMAT_COUNT] = {
+  [LUMINARY_IMAGE_FILE_FORMAT_PNG] = "png",
+  [LUMINARY_IMAGE_FILE_FORMAT_JPG] = "jpg",
+  [LUMINARY_IMAGE_FILE_FORMAT_BMP] = "bmp",
+  [LUMINARY_IMAGE_FILE_FORMAT_TGA] = "tga"};
+
 const char* const luminary_strings_error_kind[LUMINARY_ERROR_KIND_COUNT] = {
   [LUMINARY_ERROR_NONE]                 = "LUMINARY_ERROR_NONE",
   [LUMINARY_ERROR_UNKNOWN]              = "LUMINARY_ERROR_UNKNOWN",

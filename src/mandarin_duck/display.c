@@ -269,6 +269,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   display_set_mouse_visible(display, display->show_ui);
 
   display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
+  display->image_file_format     = LUMINARY_IMAGE_FILE_FORMAT_JPG;
 
   uint8_t* splash_screen_data;
   int64_t splash_screen_size;
@@ -523,7 +524,8 @@ static WindowVisibilityMask _display_get_window_visibility_mask(Display* display
   return WINDOW_VISIBILITY_NONE;
 }
 
-static void _display_generate_screenshot_name(const char* output_directory, char* string, LuminaryImage image) {
+static void _display_generate_screenshot_name(
+  const char* output_directory, char* string, LuminaryImage image, LuminaryImageFileFormat format) {
   time_t rawtime;
   struct tm timeinfo;
 
@@ -535,7 +537,9 @@ static void _display_generate_screenshot_name(const char* output_directory, char
 
   const char* dir = (output_directory != (const char*) 0) ? output_directory : ".";
 
-  sprintf(string, "%s/Snap-%s-%05u-%07.1fs.png", dir, time_string, image.meta_data.sample_count, image.meta_data.time);
+  sprintf(
+    string, "%s/Snap-%s-%05u-%07.1fs.%s", dir, time_string, image.meta_data.sample_count, image.meta_data.time,
+    luminary_strings_image_file_format[format]);
 }
 
 static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
@@ -550,7 +554,9 @@ static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
   properties.width        = settings.width;
   properties.height       = settings.height;
 
-  display->screenshot_status_message_id = display_add_status_message(display, "Display", "Save PNG");
+  char status_message[32];
+  sprintf(status_message, "Save %s", luminary_strings_image_file_format[display->image_file_format]);
+  display->screenshot_status_message_id = display_add_status_message(display, "Display", status_message);
 
   LUM_FAILURE_HANDLE(luminary_host_request_output(host, properties, &display->output_promise_handle));
 }
@@ -820,7 +826,7 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
     LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
 
     char string[4096];
-    _display_generate_screenshot_name(output_directory, string, output_image);
+    _display_generate_screenshot_name(output_directory, string, output_image, display->image_file_format);
 
     LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
 
@@ -829,7 +835,7 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
 
     task_args->save_args.image        = output_image;
     task_args->save_args.file_path    = image_path;
-    task_args->save_args.format       = LUMINARY_IMAGE_SAVE_FORMAT_PNG;
+    task_args->save_args.format       = display->image_file_format;
     task_args->save_args.jpeg_quality = 100;
     task_args->host                   = host;
     task_args->output_handle          = output_handle;

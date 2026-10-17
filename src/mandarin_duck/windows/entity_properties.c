@@ -258,7 +258,7 @@ static bool _window_entity_properties_add_file_dialog(
   return update_data;
 }
 
-static void _window_entity_properties_scene_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+static void _window_entity_properties_global_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -268,9 +268,22 @@ static void _window_entity_properties_scene_action(Window* window, Display* disp
     .display        = display,
     .mouse_state    = mouse_state,
     .keyboard_state = display->keyboard_state,
+    .write_access   = true,
   };
 
-  element_separator(window, mouse_state, (ElementSeparatorArgs) {.text = "Scene", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+  element_separator(
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Global", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  uint32_t image_file_format = (uint32_t) display->image_file_format;
+
+  bool update_data = false;
+
+  update_data |= _window_entity_properties_add_dropdown(
+    data, "Image Save Format", LUMINARY_IMAGE_FILE_FORMAT_COUNT, (char**) luminary_strings_image_file_format, &image_file_format);
+
+  if (update_data) {
+    display->image_file_format = (LuminaryImageFileFormat) image_file_format;
+  }
 }
 
 static void _window_entity_properties_renderer_settings_action(
@@ -1207,7 +1220,7 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
 
 static void (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) = {
-  [WINDOW_ENTITY_PROPERTIES_TYPE_SCENE]     = _window_entity_properties_scene_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_GLOBAL]    = _window_entity_properties_global_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]  = _window_entity_properties_renderer_settings_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA]    = _window_entity_properties_camera_action,
   [WINDOW_ENTITY_PROPERTIES_TYPE_OCEAN]     = _window_entity_properties_ocean_action,

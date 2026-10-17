@@ -81,6 +81,7 @@ struct Display {
   uint32_t reference_y;
   RenderMetaData current_render_meta_data;
   LuminaryOutputPromiseHandle output_promise_handle;
+  LuminaryImageFileFormat image_file_format;
   RenderRegion* region;
   const uint32_t* splash_screen;
   DisplayZoomHandler* zoom_handler;

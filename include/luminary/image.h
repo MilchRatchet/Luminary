@@ -21,17 +21,18 @@
 #include <luminary/path.h>
 #include <luminary/structs.h>
 
-LUMINARY_API enum LuminaryImageSaveFormat {
-  LUMINARY_IMAGE_SAVE_FORMAT_PNG,
-  LUMINARY_IMAGE_SAVE_FORMAT_JPG,
-  LUMINARY_IMAGE_SAVE_FORMAT_BMP,
-  LUMINARY_IMAGE_SAVE_FORMAT_TGA
-} typedef LuminaryImageSaveFormat;
+LUMINARY_API enum LuminaryImageFileFormat {
+  LUMINARY_IMAGE_FILE_FORMAT_PNG,
+  LUMINARY_IMAGE_FILE_FORMAT_JPG,
+  LUMINARY_IMAGE_FILE_FORMAT_BMP,
+  LUMINARY_IMAGE_FILE_FORMAT_TGA,
+  LUMINARY_IMAGE_FILE_FORMAT_COUNT
+} typedef LuminaryImageFileFormat;
 
 LUMINARY_API struct LuminaryImageSaveArgs {
   LuminaryImage image;
   LuminaryPath* file_path;
-  LuminaryImageSaveFormat format;
+  LuminaryImageFileFormat format;
   uint32_t jpeg_quality; /* Quality from 1 to 100 for JPG */
 } typedef LuminaryImageSaveArgs;
 

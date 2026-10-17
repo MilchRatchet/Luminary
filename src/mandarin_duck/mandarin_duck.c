@@ -284,7 +284,7 @@ void _mandarin_duck_run_mode_benchmark(MandarinDuck* duck) {
 
       task_args->save_args.image        = output_image;
       task_args->save_args.file_path    = image_path;
-      task_args->save_args.format       = LUMINARY_IMAGE_SAVE_FORMAT_PNG;
+      task_args->save_args.format       = LUMINARY_IMAGE_FILE_FORMAT_PNG;
       task_args->save_args.jpeg_quality = 100;
       task_args->host                   = duck->host;
       task_args->output_handle          = output_handle;
