@@ -55,6 +55,9 @@ where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Arg
 -b, --benchmark [Log2 of Sample Count, Name of Benchmark Run]
         render the given scene and output an image at each power of two sample count up to the given target sample count
 
+--height [Height]
+  Set the initial window height in pixels
+
 -h, --help
         print all available arguments
 
@@ -63,6 +66,9 @@ where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Arg
 
 -v, --version
         print build information and exit
+
+--width [Width]
+  Set the initial window width in pixels
 
 --device [Device ID]
         enable a device for rendering

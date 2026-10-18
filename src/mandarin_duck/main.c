@@ -27,8 +27,10 @@ int main(int argc, char* argv[]) {
 
     mandarin_duck_create_info.mode =
       (argument_parser->results.num_benchmark_outputs == 0) ? MANDARIN_DUCK_MODE_DEFAULT : MANDARIN_DUCK_MODE_BENCHMARK;
-    mandarin_duck_create_info.host             = host;
-    mandarin_duck_create_info.output_directory = argument_parser->results.output_directory;
+    mandarin_duck_create_info.host                  = host;
+    mandarin_duck_create_info.initial_window_width  = argument_parser->results.initial_window_width;
+    mandarin_duck_create_info.initial_window_height = argument_parser->results.initial_window_height;
+    mandarin_duck_create_info.output_directory      = argument_parser->results.output_directory;
 
     if (mandarin_duck_create_info.mode == MANDARIN_DUCK_MODE_BENCHMARK) {
       mandarin_duck_create_info.num_benchmark_outputs = argument_parser->results.num_benchmark_outputs;

@@ -9,6 +9,8 @@ enum MandarinDuckMode { MANDARIN_DUCK_MODE_DEFAULT, MANDARIN_DUCK_MODE_BENCHMARK
 struct MandarinDuckCreateInfo {
   LuminaryHost* host;
   const char* output_directory;
+  uint32_t initial_window_width;
+  uint32_t initial_window_height;
   MandarinDuckMode mode;
   uint32_t num_benchmark_outputs;
   const char* benchmark_name;

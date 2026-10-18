@@ -1,6 +1,9 @@
 #include "argument_parser.h"
 
+#include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
@@ -64,6 +67,36 @@ static void _argument_parser_arg_func_output(ArgumentParser* parser, LuminaryHos
   }
 }
 
+static uint32_t _argument_parser_parse_dimension(const char* name, const char* value) {
+  char* end;
+  const char* character = value;
+
+  for (; *character != '\0'; character++) {
+    if (*character < '0' || *character > '9') {
+      crash_message("Invalid window %s: %s. Expected a positive 32-bit integer.", name, value);
+      return 0;
+    }
+  }
+
+  errno                              = 0;
+  const unsigned long long dimension = strtoull(value, &end, 10);
+
+  if (errno == ERANGE || end == value || *end != '\0' || dimension == 0 || dimension > UINT32_MAX) {
+    crash_message("Invalid window %s: %s. Expected a positive 32-bit integer.", name, value);
+    return 0;
+  }
+
+  return (uint32_t) dimension;
+}
+
+static void _argument_parser_arg_func_height(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(host);
+
+  if (num_arguments > 0) {
+    parser->results.initial_window_height = _argument_parser_parse_dimension("height", arguments[0]);
+  }
+}
+
 static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
   UNUSED_ARG(parser);
   UNUSED_ARG(host);
@@ -74,6 +107,14 @@ static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHo
   info_message("Build: %s (%s) - %s", MANDARIN_DUCK_BRANCH_NAME, MANDARIN_DUCK_VERSION_HASH, MANDARIN_DUCK_VERSION_DATE);
 
   parser->results.dry_run_requested = true;
+}
+
+static void _argument_parser_arg_func_width(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(host);
+
+  if (num_arguments > 0) {
+    parser->results.initial_window_width = _argument_parser_parse_dimension("width", arguments[0]);
+  }
 }
 
 static void _argument_parser_arg_func_device(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
@@ -186,6 +227,16 @@ void argument_parser_create(ArgumentParser** parser) {
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
+  descriptor.long_name         = "height";
+  descriptor.short_name        = (char*) 0;
+  descriptor.description       = "Set initial window height in pixels";
+  descriptor.subargument_count = 1;
+  descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_height;
+  descriptor.pre_execute       = false;
+
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "output";
   descriptor.short_name        = "o";
   descriptor.description       = "Set output directory";
@@ -202,6 +253,16 @@ void argument_parser_create(ArgumentParser** parser) {
   descriptor.subargument_count = 0;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_version;
   descriptor.pre_execute       = true;
+
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
+  descriptor.long_name         = "width";
+  descriptor.short_name        = (char*) 0;
+  descriptor.description       = "Set initial window width in pixels";
+  descriptor.subargument_count = 1;
+  descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_width;
+  descriptor.pre_execute       = false;
 
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 

@@ -17,9 +17,9 @@ void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restric
 
 static uint32_t __num_displays = 0;
 
-static void _display_get_initial_window_size(uint32_t* width, uint32_t* height) {
-  *width  = 1920;
-  *height = 1080;
+static void _display_get_initial_window_size(uint32_t requested_width, uint32_t requested_height, uint32_t* width, uint32_t* height) {
+  *width  = (requested_width > 0) ? requested_width : 1920;
+  *height = (requested_height > 0) ? requested_height : 1080;
 
   const SDL_DisplayID primary_display = SDL_GetPrimaryDisplay();
   SDL_Rect usable_bounds;
@@ -224,7 +224,7 @@ static void _display_set_hittest(Display* display, bool enable) {
   SDL_SetWindowHitTest(display->sdl_window, (SDL_HitTest) enable ? _display_sdl_hittestcallback : 0, (void*) display);
 }
 
-void display_create(Display** _display) {
+void display_create(Display** _display, uint32_t requested_window_width, uint32_t requested_window_height) {
   MD_CHECK_NULL_ARGUMENT(_display);
 
   if (__num_displays == 0) {
@@ -242,7 +242,7 @@ void display_create(Display** _display) {
 
   uint32_t initial_window_width;
   uint32_t initial_window_height;
-  _display_get_initial_window_size(&initial_window_width, &initial_window_height);
+  _display_get_initial_window_size(requested_window_width, requested_window_height, &initial_window_width, &initial_window_height);
 
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetStringProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "MandarinDuck - Using Luminary");

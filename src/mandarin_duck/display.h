@@ -93,7 +93,7 @@ struct Display {
   MDTaskNode* active_promises;
 } typedef Display;
 
-void display_create(Display** _display);
+void display_create(Display** _display, uint32_t initial_window_width, uint32_t initial_window_height);
 void display_set_mouse_visible(Display* display, bool enable);
 void display_set_cursor(Display* display, SDL_SystemCursor cursor);
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode);

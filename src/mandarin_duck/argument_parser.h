@@ -34,6 +34,8 @@ struct ArgumentParserResults {
   uint32_t num_benchmark_outputs;
   const char* benchmark_name;
   uint32_t device_mask;
+  uint32_t initial_window_width;
+  uint32_t initial_window_height;
 } typedef ArgumentParserResults;
 
 struct ArgumentParser {

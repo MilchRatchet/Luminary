@@ -119,7 +119,7 @@ void mandarin_duck_create(MandarinDuck** _duck, MandarinDuckCreateInfo info) {
 
   switch (duck->mode) {
     case MANDARIN_DUCK_MODE_DEFAULT: {
-      display_create(&duck->display);
+      display_create(&duck->display, info.initial_window_width, info.initial_window_height);
       _mandarin_duck_update_host_output_props(duck->host);
     } break;
     case MANDARIN_DUCK_MODE_BENCHMARK: {
