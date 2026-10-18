@@ -56,7 +56,7 @@ static void _window_caption_controls_action(Window* window, Display* display, Lu
         .tooltip_text = (const char*) 0,
         .inactive     = display->mouse_mode == DISPLAY_MOUSE_MODE_LOCK,
       })) {
-    display_handle_maximize(display, host, true);
+    display_handle_maximize(display, true);
   }
 }
 

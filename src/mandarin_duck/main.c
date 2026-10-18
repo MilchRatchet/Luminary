@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
 
   LuminaryHost* host;
   MandarinDuckCreateInfo mandarin_duck_create_info;
+  memset(&mandarin_duck_create_info, 0, sizeof(MandarinDuckCreateInfo));
 
   if (execute) {
     argument_parser_execute(argument_parser, (LuminaryHost*) 0, ARGUMENT_CATEGORY_LUMINARY);
@@ -29,15 +30,9 @@ int main(int argc, char* argv[]) {
     mandarin_duck_create_info.host             = host;
     mandarin_duck_create_info.output_directory = argument_parser->results.output_directory;
 
-    switch (mandarin_duck_create_info.mode) {
-      default:
-      case MANDARIN_DUCK_MODE_DEFAULT:
-        mandarin_duck_create_info.sync_render_resolution = true;
-        break;
-      case MANDARIN_DUCK_MODE_BENCHMARK:
-        mandarin_duck_create_info.num_benchmark_outputs = argument_parser->results.num_benchmark_outputs;
-        mandarin_duck_create_info.benchmark_name        = argument_parser->results.benchmark_name;
-        break;
+    if (mandarin_duck_create_info.mode == MANDARIN_DUCK_MODE_BENCHMARK) {
+      mandarin_duck_create_info.num_benchmark_outputs = argument_parser->results.num_benchmark_outputs;
+      mandarin_duck_create_info.benchmark_name        = argument_parser->results.benchmark_name;
     }
   }
 

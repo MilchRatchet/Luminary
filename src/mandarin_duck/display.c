@@ -17,6 +17,30 @@ void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restric
 
 static uint32_t __num_displays = 0;
 
+static void _display_get_initial_window_size(uint32_t* width, uint32_t* height) {
+  *width  = 1920;
+  *height = 1080;
+
+  const SDL_DisplayID primary_display = SDL_GetPrimaryDisplay();
+  SDL_Rect usable_bounds;
+
+  if (primary_display == 0 || !SDL_GetDisplayUsableBounds(primary_display, &usable_bounds))
+    return;
+
+  const int32_t available_width  = (usable_bounds.w > 2 * DISPLAY_SCREEN_MARGIN) ? usable_bounds.w - 2 * DISPLAY_SCREEN_MARGIN : 1;
+  const int32_t available_height = (usable_bounds.h > 2 * DISPLAY_SCREEN_MARGIN) ? usable_bounds.h - 2 * DISPLAY_SCREEN_MARGIN : 1;
+
+  const float scale_factor = fminf(1.0f, fminf((float) available_width / *width, (float) available_height / *height));
+
+  *width  = (uint32_t) (*width * scale_factor);
+  *height = (uint32_t) (*height * scale_factor);
+
+  if (*width == 0)
+    *width = 1;
+  if (*height == 0)
+    *height = 1;
+}
+
 static void _display_handle_resize(Display* display) {
   MD_CHECK_NULL_ARGUMENT(display);
 
@@ -42,7 +66,6 @@ static void _display_handle_resize(Display* display) {
   display->buffer      = display->sdl_surface->pixels;
   display->pitch       = (uint32_t) display->sdl_surface->pitch;
 
-  render_region_handler_set_display_size(display->region, display->width, display->height);
   display_zoom_handler_set_display_size(display->zoom_handler, display->width, display->height);
 }
 
@@ -81,10 +104,16 @@ static void _display_handle_display_change(Display* display) {
   display->screen_width  = (uint32_t) rect.w;
   display->screen_height = (uint32_t) rect.h;
 
+  if (display->width == 0 || display->height == 0)
+    return;
+
   uint32_t width  = min(display->width, display->screen_width);
   uint32_t height = min(display->height, display->screen_height);
 
-  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
+  if (width != display->width || height != display->height) {
+    SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
+    _display_handle_resize(display);
+  }
 }
 
 static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
@@ -195,7 +224,7 @@ static void _display_set_hittest(Display* display, bool enable) {
   SDL_SetWindowHitTest(display->sdl_window, (SDL_HitTest) enable ? _display_sdl_hittestcallback : 0, (void*) display);
 }
 
-void display_create(Display** _display, uint32_t width, uint32_t height, bool sync_render_resolution) {
+void display_create(Display** _display) {
   MD_CHECK_NULL_ARGUMENT(_display);
 
   if (__num_displays == 0) {
@@ -209,16 +238,11 @@ void display_create(Display** _display, uint32_t width, uint32_t height, bool sy
   LUM_FAILURE_HANDLE(host_malloc(&display, sizeof(Display)));
   memset(display, 0, sizeof(Display));
 
-  display->show_ui                = true;
-  display->sync_render_resolution = sync_render_resolution;
+  display->show_ui = true;
 
-  uint32_t initial_window_width  = (int) width;
-  uint32_t initial_window_height = (int) height;
-
-  // Make sure that the aspect ratio is maintained.
-  const float aspect_ratio = ((float) width) / ((float) height);
-
-  initial_window_width = initial_window_height * aspect_ratio;
+  uint32_t initial_window_width;
+  uint32_t initial_window_height;
+  _display_get_initial_window_size(&initial_window_width, &initial_window_height);
 
   SDL_PropertiesID sdl_properties = SDL_CreateProperties();
   SDL_SetStringProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "MandarinDuck - Using Luminary");
@@ -338,7 +362,7 @@ static void _display_handle_drop_event(DisplayFileDrop** file_drop_array, SDL_Dr
   }
 }
 
-void display_query_events(Display* display, DisplayFileDrop** file_drop_array, bool* exit_requested, bool* dirty) {
+void display_query_events(Display* display, DisplayFileDrop** file_drop_array, bool* exit_requested) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(exit_requested);
 
@@ -365,9 +389,9 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
         break;
       case SDL_EVENT_WINDOW_RESIZED:
         _display_handle_resize(display);
-        *dirty = true;
         break;
       case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        _display_handle_resize(display);
         break;
       case SDL_EVENT_WINDOW_MINIMIZED:
       case SDL_EVENT_WINDOW_MAXIMIZED:
@@ -475,14 +499,31 @@ static void _display_query_pixel_info(Display* display, LuminaryHost* host, floa
   uint32_t image_x, image_y;
   display_zoom_handler_screen_to_image(display->zoom_handler, screen_x, screen_y, &image_x, &image_y);
 
-  const float rel_x = image_x / ((float) display->width);
-  const float rel_y = image_y / ((float) display->height);
-
   LuminaryRendererSettings settings;
   LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
-  const uint16_t x = rel_x * settings.width;
-  const uint16_t y = rel_y * settings.height;
+  if (image_x >= settings.width || image_y >= settings.height) {
+    display->awaiting_pixel_query_result = false;
+
+    switch (display->mouse_mode) {
+      case DISPLAY_MOUSE_MODE_DEFAULT:
+        display->move_pixel_data.pixel_query_is_valid = false;
+        break;
+      case DISPLAY_MOUSE_MODE_SELECT:
+        display->select_pixel_data.pixel_query_is_valid = false;
+        break;
+      case DISPLAY_MOUSE_MODE_FOCUS:
+        display->focus_pixel_data.pixel_query_is_valid = false;
+        break;
+      default:
+        break;
+    }
+
+    return;
+  }
+
+  const uint16_t x = (uint16_t) image_x;
+  const uint16_t y = (uint16_t) image_y;
 
   LuminaryPixelQueryResult result;
 
@@ -622,18 +663,34 @@ static void _display_query_scene_path(Display* display, LuminaryHost* host) {
   file_dialog_handler_open_dialog(display->scene_file_path, &open_args);
 }
 
+static void _display_sync_resolution(Display* display, LuminaryHost* host) {
+  LuminaryRendererSettings settings;
+  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
+
+  if (display->zoom_handler->image_width != settings.width || display->zoom_handler->image_height != settings.height) {
+    display_zoom_handler_set_image_size(display->zoom_handler, settings.width, settings.height);
+  }
+
+  if (display->region->image_width != settings.width || display->region->image_height != settings.height) {
+    render_region_handler_set_image_size(display->region, settings.width, settings.height);
+  }
+
+  LuminaryOutputProperties output_properties;
+  LUM_FAILURE_HANDLE(luminary_host_get_output_properties(host, &output_properties));
+
+  if (output_properties.width != settings.width || output_properties.height != settings.height) {
+    output_properties.width  = settings.width;
+    output_properties.height = settings.height;
+
+    LUM_FAILURE_HANDLE(luminary_host_set_output_properties(host, output_properties));
+  }
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  if ((display->frame_id & 0x1F) == 0) {
-    LuminaryRendererSettings settings;
-    LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-    display_update_resolution(display, host, &settings);
-    display_zoom_handler_set_image_size(display->zoom_handler, settings.width, settings.height);
-    render_region_handler_set_image_size(display->region, settings.width, settings.height);
-  }
+  _display_sync_resolution(display, host);
 
   display->frametime = time_step;
 
@@ -769,7 +826,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
   }
   else if (ui_status.received_keyboard_action == false) {
-    display_zoom_handler_update(display->zoom_handler, display->mouse_state);
+    const bool ctrl_down = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down || display->keyboard_state->keys[SDL_SCANCODE_RCTRL].down;
+    display_zoom_handler_update(display->zoom_handler, display->mouse_state, ctrl_down);
     render_region_handle_inputs(display->region, display, host, display->mouse_state, display->keyboard_state);
   }
 }
@@ -855,7 +913,7 @@ void display_handle_outputs(Display* display, LuminaryHost* host, const char* ou
   }
 }
 
-void display_handle_maximize(Display* display, LuminaryHost* host, bool reinstate_position) {
+void display_handle_maximize(Display* display, bool reinstate_position) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   uint32_t width;
@@ -890,17 +948,6 @@ void display_handle_maximize(Display* display, LuminaryHost* host, bool reinstat
 
   if (reinstate_position)
     SDL_SetWindowPosition(display->sdl_window, (int) x, (int) y);
-
-  if (display->sync_render_resolution) {
-    LuminaryRendererSettings settings;
-    LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-    if (settings.width != width || settings.height != height) {
-      settings.width  = width;
-      settings.height = height;
-      LUM_FAILURE_HANDLE(luminary_host_set_settings(host, &settings));
-    }
-  }
 }
 
 static void _display_render_output(Display* display, LuminaryHost* host) {
@@ -936,6 +983,8 @@ static void _display_render_output(Display* display, LuminaryHost* host) {
 
   LuminaryImage output_image;
   LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
+
+  display_zoom_handler_set_image_size(display->zoom_handler, output_image.width, output_image.height);
 
   display->current_render_meta_data.elapsed_time = output_image.meta_data.time;
   display->current_render_meta_data.sample_count = output_image.meta_data.sample_count;
@@ -981,22 +1030,6 @@ void display_resize(Display* display, uint32_t width, uint32_t height) {
 
   // Display width and height will be updated through a resize event
   SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
-}
-
-void display_update_resolution(Display* display, LuminaryHost* host, const LuminaryRendererSettings* settings) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(settings);
-
-  if (display->sync_render_resolution == false)
-    return;
-
-  if (settings->width != display->width || settings->height != display->height) {
-    // If the display is maximized, we unmaximize it here
-    if (display->is_maximized)
-      display_handle_maximize(display, host, false);
-
-    display_resize(display, settings->width, settings->height);
-  }
 }
 
 void display_destroy(Display** display) {

@@ -69,6 +69,7 @@ LUMINARY_API LuminaryResult luminary_host_get_queue_worker_string(const Luminary
  */
 LUMINARY_API LuminaryResult luminary_host_get_queue_worker_time(const LuminaryHost* host, uint32_t queue_worker_id, double* time);
 
+LUMINARY_API LuminaryResult luminary_host_get_output_properties(LuminaryHost* host, LuminaryOutputProperties* properties);
 LUMINARY_API LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties);
 
 LUMINARY_API LuminaryResult

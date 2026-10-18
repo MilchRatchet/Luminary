@@ -21,6 +21,15 @@ LuminaryResult output_handler_create(OutputHandler** output) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult output_handler_get_properties(OutputHandler* output, OutputProperties* properties) {
+  __CHECK_NULL_ARGUMENT(output);
+  __CHECK_NULL_ARGUMENT(properties);
+
+  *properties = output->properties;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult output_handler_set_properties(OutputHandler* output, OutputProperties properties) {
   __CHECK_NULL_ARGUMENT(output);
 
@@ -229,7 +238,7 @@ static LuminaryResult _output_handler_get_handle_for_write(OutputHandler* output
   __FAILURE_HANDLE(array_get_num_elements(output->objects, &num_outputs));
 
   *selected_handle              = OUTPUT_HANDLE_INVALID;
-  uint64_t earliest_time_stamp  = UINT64_MAX;
+  uint64_t earliest_time_stamp  = (uint64_t) -1;
   bool selected_handle_is_valid = true;
 
   uint32_t num_valid_outputs = 0;
@@ -469,12 +478,13 @@ LuminaryResult output_handler_get_image(OutputHandler* output, uint32_t handle, 
 
   OutputObject* object = output->objects + handle;
 
-  *image = (Image) {.buffer                 = object->data,
-                    .width                  = object->descriptor.meta_data.width,
-                    .height                 = object->descriptor.meta_data.height,
-                    .ld                     = object->descriptor.meta_data.width,
-                    .meta_data.time         = object->descriptor.meta_data.time,
-                    .meta_data.sample_count = object->descriptor.meta_data.sample_count};
+  *image = (Image) {
+    .buffer                 = object->data,
+    .width                  = object->descriptor.meta_data.width,
+    .height                 = object->descriptor.meta_data.height,
+    .ld                     = object->descriptor.meta_data.width,
+    .meta_data.time         = object->descriptor.meta_data.time,
+    .meta_data.sample_count = object->descriptor.meta_data.sample_count};
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

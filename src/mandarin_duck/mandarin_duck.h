@@ -10,17 +10,8 @@ struct MandarinDuckCreateInfo {
   LuminaryHost* host;
   const char* output_directory;
   MandarinDuckMode mode;
-  union {
-    // Only in MANDARIN_DUCK_MODE_DEFAULT
-    struct {
-      bool sync_render_resolution;
-    };
-    // Only in MANDARIN_DUCK_MODE_BENCHMARK
-    struct {
-      uint32_t num_benchmark_outputs;
-      const char* benchmark_name;
-    };
-  };
+  uint32_t num_benchmark_outputs;
+  const char* benchmark_name;
 } typedef MandarinDuckCreateInfo;
 
 struct MandarinDuck {

@@ -1145,6 +1145,17 @@ LuminaryResult luminary_host_get_num_instances(Host* host, uint32_t* num_instanc
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_output_properties(LuminaryHost* host, LuminaryOutputProperties* properties) {
+  LUMINARY_HOST_API_ENTRY
+
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(properties);
+
+  __FAILURE_HANDLE(output_handler_get_properties(host->output_handler, properties));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_set_output_properties(Host* host, LuminaryOutputProperties properties) {
   LUMINARY_HOST_API_ENTRY
 

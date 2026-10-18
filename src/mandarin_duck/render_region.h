@@ -9,8 +9,6 @@ struct Display typedef Display;
 struct UIRenderer typedef UIRenderer;
 
 struct RenderRegion {
-  uint32_t display_width;
-  uint32_t display_height;
   uint32_t image_width;
   uint32_t image_height;
   bool is_selecting;
@@ -26,7 +24,6 @@ struct RenderRegion {
 } typedef RenderRegion;
 
 void render_region_create(RenderRegion** region);
-void render_region_handler_set_display_size(RenderRegion* region, uint32_t width, uint32_t height);
 void render_region_handler_set_image_size(RenderRegion* region, uint32_t width, uint32_t height);
 void render_region_handle_inputs(
   RenderRegion* region, Display* display, LuminaryHost* host, MouseState* mouse_state, KeyboardState* keyboard_state);

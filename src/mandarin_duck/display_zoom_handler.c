@@ -29,6 +29,50 @@ static void _display_zoom_handler_recalculate_scale_bounds(DisplayZoomHandler* z
   }
 }
 
+static float _display_zoom_handler_clamp_axis_offset(float offset, uint32_t display_size, uint32_t image_size, int32_t scale) {
+  if (display_size == 0 || image_size == 0)
+    return 0.0f;
+
+  const uint32_t last_sample = _map_screen_to_image(display_size - 1, scale);
+  const float max_offset     = (float) (image_size - 1);
+  const float min_offset     = -(float) last_sample;
+
+  if (scale >= 0 || (1u << -scale) <= image_size)
+    return fmaxf(min_offset, fminf(offset, max_offset));
+
+  const float sample_stride    = (float) (1u << -scale);
+  const float requested_offset = (float) (int32_t) offset;
+  float sample_index           = roundf(((max_offset * 0.5f) - requested_offset) / sample_stride);
+  sample_index                 = fmaxf(0.0f, fminf(sample_index, (float) (display_size - 1)));
+
+  const float interval_min = -sample_index * sample_stride;
+  const float interval_max = interval_min + max_offset;
+
+  return fmaxf(interval_min, fminf(offset, interval_max));
+}
+
+static void _display_zoom_handler_update_offset(DisplayZoomHandler* zoom) {
+  MD_CHECK_NULL_ARGUMENT(zoom);
+
+  zoom->offset_x_internal =
+    _display_zoom_handler_clamp_axis_offset(zoom->offset_x_internal, zoom->display_width, zoom->image_width, zoom->scale);
+  zoom->offset_y_internal =
+    _display_zoom_handler_clamp_axis_offset(zoom->offset_y_internal, zoom->display_height, zoom->image_height, zoom->scale);
+
+  zoom->offset_x = (int32_t) zoom->offset_x_internal;
+  zoom->offset_y = (int32_t) zoom->offset_y_internal;
+}
+
+static void _display_zoom_handler_center(DisplayZoomHandler* zoom) {
+  MD_CHECK_NULL_ARGUMENT(zoom);
+
+  if (zoom->display_width == 0 || zoom->display_height == 0 || zoom->image_width == 0 || zoom->image_height == 0)
+    return;
+
+  zoom->offset_x_internal = ((float) (zoom->image_width - 1) - (float) _map_screen_to_image(zoom->display_width - 1, zoom->scale)) * 0.5f;
+  zoom->offset_y_internal = ((float) (zoom->image_height - 1) - (float) _map_screen_to_image(zoom->display_height - 1, zoom->scale)) * 0.5f;
+}
+
 void display_zoom_handler_create(DisplayZoomHandler** zoom) {
   MD_CHECK_NULL_ARGUMENT(zoom);
 
@@ -47,9 +91,19 @@ void display_zoom_handler_set_display_size(DisplayZoomHandler* zoom, uint32_t wi
 void display_zoom_handler_set_image_size(DisplayZoomHandler* zoom, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(zoom);
 
+  const bool image_size_changed = (zoom->image_width != width) || (zoom->image_height != height);
+
   zoom->image_width  = width;
   zoom->image_height = height;
   _display_zoom_handler_recalculate_scale_bounds(zoom);
+
+  if (image_size_changed) {
+    zoom->scale                  = zoom->min_scale;
+    zoom->mouse_wheel_accumulate = (float) zoom->scale;
+    _display_zoom_handler_center(zoom);
+  }
+
+  _display_zoom_handler_update_offset(zoom);
 }
 
 static void _display_zoom_handler_handle_scroll(DisplayZoomHandler* zoom, MouseState* mouse) {
@@ -96,30 +150,17 @@ static void _display_zoom_handler_handle_swipe(DisplayZoomHandler* zoom, MouseSt
   zoom->offset_y_internal -= mouse->y_motion * scale_factor;
 }
 
-static void _display_zoom_handler_update_offset(DisplayZoomHandler* zoom) {
-  MD_CHECK_NULL_ARGUMENT(zoom);
-
-  const uint32_t effective_display_width  = _map_screen_to_image(zoom->display_width, zoom->scale);
-  const uint32_t effective_display_height = _map_screen_to_image(zoom->display_height, zoom->scale);
-
-  float min_x = fminf(0.0f, (float) zoom->image_width - (float) effective_display_width);
-  float max_x = fmaxf(0.0f, (float) zoom->image_width - (float) effective_display_width);
-
-  float min_y = fminf(0.0f, (float) zoom->image_height - (float) effective_display_height);
-  float max_y = fmaxf(0.0f, (float) zoom->image_height - (float) effective_display_height);
-
-  zoom->offset_x_internal = fmaxf(min_x, fminf(zoom->offset_x_internal, max_x));
-  zoom->offset_y_internal = fmaxf(min_y, fminf(zoom->offset_y_internal, max_y));
-
-  zoom->offset_x = (int32_t) zoom->offset_x_internal;
-  zoom->offset_y = (int32_t) zoom->offset_y_internal;
-}
-
-void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse) {
+void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse, bool ctrl_down) {
   MD_CHECK_NULL_ARGUMENT(zoom);
   MD_CHECK_NULL_ARGUMENT(mouse);
 
-  _display_zoom_handler_handle_swipe(zoom, mouse);
+  if (mouse->right_phase == MOUSE_PHASE_PRESSED && ctrl_down) {
+    _display_zoom_handler_center(zoom);
+  }
+  else if (ctrl_down == false) {
+    _display_zoom_handler_handle_swipe(zoom, mouse);
+  }
+
   _display_zoom_handler_handle_scroll(zoom, mouse);
   _display_zoom_handler_update_offset(zoom);
 }

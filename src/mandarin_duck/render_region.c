@@ -12,13 +12,6 @@ void render_region_create(RenderRegion** region) {
   memset(*region, 0, sizeof(RenderRegion));
 }
 
-void render_region_handler_set_display_size(RenderRegion* region, uint32_t width, uint32_t height) {
-  MD_CHECK_NULL_ARGUMENT(region);
-
-  region->display_width  = width;
-  region->display_height = height;
-}
-
 void render_region_handler_set_image_size(RenderRegion* region, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(region);
 
@@ -29,8 +22,8 @@ void render_region_handler_set_image_size(RenderRegion* region, uint32_t width, 
 static void _render_region_compute_size(RenderRegion* region) {
   MD_CHECK_NULL_ARGUMENT(region);
 
-  uint32_t bounds_width  = max(region->display_width, region->image_width);
-  uint32_t bounds_height = max(region->display_height, region->image_height);
+  const uint32_t bounds_width  = region->image_width;
+  const uint32_t bounds_height = region->image_height;
 
   region->x      = fminf(region->x_internal, region->x_internal + region->width_internal);
   region->y      = fminf(region->y_internal, region->y_internal + region->height_internal);
@@ -59,8 +52,8 @@ static void _render_region_commit(RenderRegion* region, LuminaryHost* host) {
     LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
 
     if (region->is_active) {
-      uint32_t bounds_width  = max(region->display_width, region->image_width);
-      uint32_t bounds_height = max(region->display_height, region->image_height);
+      const uint32_t bounds_width  = region->image_width;
+      const uint32_t bounds_height = region->image_height;
 
       settings.region_x      = region->x / bounds_width;
       settings.region_y      = region->y / bounds_height;

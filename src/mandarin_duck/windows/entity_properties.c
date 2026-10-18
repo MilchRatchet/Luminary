@@ -404,9 +404,9 @@ static void _window_entity_properties_renderer_settings_action(
 
   bool update_data = false;
 
-  update_data |= _window_entity_properties_add_slider(data, "Width", &settings.width, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 16535.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(data, "Width", &settings.width, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 16535.0f, 1.0f);
   update_data |=
-    _window_entity_properties_add_slider(data, "Height", &settings.height, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 16535.0f, 1.0f);
+    _window_entity_properties_add_slider(data, "Height", &settings.height, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 16535.0f, 1.0f);
 
   update_data |=
     _window_entity_properties_add_slider(data, "Max Depth", &settings.max_ray_depth, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
@@ -443,8 +443,6 @@ static void _window_entity_properties_renderer_settings_action(
 
   update_data |= _window_entity_properties_add_dropdown(
     data, "Shading Mode", LUMINARY_SHADING_MODE_COUNT, (char**) luminary_strings_shading_mode, &shading_mode);
-
-  display_update_resolution(display, host, &settings);
 
   if (update_data) {
     settings.adaptive_sampling_settings.output_mode = (LuminaryAdaptiveSamplingOutputMode) adaptive_sampling_output_mode;
