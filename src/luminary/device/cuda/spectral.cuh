@@ -47,7 +47,7 @@ LUMINARY_FUNCTION RGBF spectral_xyz_to_rgb(const float3 XYZ) {
 }
 
 LUMINARY_FUNCTION float3 spectral_wavelength_to_xyz(const float wavelength) {
-  const float sample = remap01(wavelength, SPECTRAL_MIN_WAVELENGTH, SPECTRAL_MAX_WAVELENGTH);
+  const float sample = (wavelength - SPECTRAL_MIN_WAVELENGTH + 0.5f) / (SPECTRAL_MAX_WAVELENGTH - SPECTRAL_MIN_WAVELENGTH + 1.0f);
 
   const float2 XY = tex2D<float2>(device.spectral_xy_lut_tex.handle, sample, 0.0f);
   const float Z   = tex2D<float>(device.spectral_z_lut_tex.handle, sample, 0.0f);
