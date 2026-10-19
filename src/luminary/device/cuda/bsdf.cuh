@@ -443,18 +443,22 @@ LUMINARY_FUNCTION float bsdf_sample_for_sun_pdf<MATERIAL_GEOMETRY>(const Materia
   float reflection_probability, refraction_probability;
   bsdf_sample_for_light_probabilities(mat_ctx.params.flags, reflection_probability, refraction_probability);
 
-  const BSDFRayContext ctx = bsdf_evaluate_analyze(mat_ctx.params, mat_ctx.normal, mat_ctx.V, L);
+  const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(mat_ctx.normal);
+  const vec3 V_local             = normalize_vector(quaternion_apply(rotation_to_z, mat_ctx.V));
+  const vec3 L_local             = normalize_vector(quaternion_apply(rotation_to_z, L));
+
+  const BSDFRayContext ctx = bsdf_evaluate_analyze(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, L_local);
   const float roughness    = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
   if (ctx.is_refraction) {
     const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx.params);
     const float microfacet_refraction_pdf =
-      bsdf_microfacet_refraction_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+      bsdf_microfacet_refraction_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
 
     return refraction_probability * microfacet_refraction_pdf;
   }
   else {
-    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(mat_ctx.V, roughness, ctx.NdotH, ctx.NdotV);
+    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(V_local, roughness, ctx.NdotH, ctx.NdotV);
 
     return reflection_probability * microfacet_reflection_pdf;
   }

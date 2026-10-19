@@ -416,7 +416,7 @@ LUMINARY_FUNCTION RGBF bsdf_conductor(
 
   float ior = 1.0f;
   if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
-    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
 
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
@@ -470,7 +470,7 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
 
   float ior = 1.0f;
   if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
-    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
+    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
 
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
