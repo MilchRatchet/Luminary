@@ -221,10 +221,14 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
   }
 
   Spectrum radiance = spectrum_set1(0.0f);
-  if (scattered_sun_light > 0.0f) {
-    const Spectrum sun_radiance     = (sun_visible) ? sky_get_sun_color_spectral(color_sampling_pos, sun_ray, false) : spectrum_set1(0.0f);
+  if (scattered_sun_light > 0.0f && sun_visible) {
+    const Spectrum sun_radiance = sky_get_sun_color_spectral(color_sampling_pos, sun_ray, false);
+    radiance                    = spectrum_add(spectrum_scale(sun_radiance, scattered_sun_light), radiance);
+  }
+
+  if (scattered_ambient_light > 0.0f) {
     const Spectrum ambient_radiance = sky_get_color_spectral<false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps, path_id);
-    radiance = spectrum_add(spectrum_scale(sun_radiance, scattered_sun_light), spectrum_scale(ambient_radiance, scattered_ambient_light));
+    radiance                        = spectrum_add(spectrum_scale(ambient_radiance, scattered_ambient_light), radiance);
   }
 
   CloudRenderResult result;

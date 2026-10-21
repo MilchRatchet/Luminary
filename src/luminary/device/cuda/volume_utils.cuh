@@ -318,10 +318,16 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
   ctx.volume_type = volume.type;
   ctx.path        = volume_compute_path(volume, task.origin, task.ray, max_dist);
 
+  if (ctx.path.length == 0.0f || ctx.path.start < 0.0f)
+    ctx.volume_type = VOLUME_TYPE_NONE;
+
   return ctx;
 }
 
 LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContextVolume& ctx, const PathID& path_id) {
+  if (ctx.volume_type == VOLUME_TYPE_NONE)
+    return 0.0f;
+
   const float random = random_1D(RANDOM_TARGET_LIGHT_SUN_INITIAL_VERTEX, path_id);
 
   const float dist = volume_sample_intersection_bounded(ctx.descriptor, ctx.path, random);
@@ -332,6 +338,9 @@ LUMINARY_FUNCTION float volume_sample_sky_dl_initial_vertex_dist(MaterialContext
 }
 
 LUMINARY_FUNCTION RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContextVolume& ctx, const float dist) {
+  if (ctx.volume_type == VOLUME_TYPE_NONE)
+    return splat_color(0.0f);
+
   const RGBF volume_transmittance = volume_get_transmittance(ctx.descriptor);
 
   const float weight_dist = dist - ctx.path.start;

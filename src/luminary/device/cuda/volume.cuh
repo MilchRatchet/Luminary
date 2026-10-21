@@ -83,7 +83,7 @@ LUMINARY_KERNEL void volume_process_inscattering() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_DL_AMBIENT>(ctx, task.path_id);
+    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_DL_AMBIENT>(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Ambient
