@@ -17,9 +17,9 @@ struct ShadowTraceTask {
   TriangleHandle target_light;
 } typedef DirectLightingShadowTask;
 
-LUMINARY_FUNCTION RGBF shadow_evaluate(const ShadowTraceTask& task, const TriangleHandle self_handle) {
+LUMINARY_FUNCTION RGBF shadow_evaluate(const ShadowTraceTask& task) {
 #ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_geometry_shadowing(self_handle, task.origin, task.ray, task.limit, task.target_light, task.trace_status);
+  RGBF visibility = optix_geometry_shadowing(task.origin, task.ray, task.limit, task.target_light, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);
@@ -33,9 +33,9 @@ LUMINARY_FUNCTION RGBF shadow_evaluate(const ShadowTraceTask& task, const Triang
 #endif /* DIRECT_LIGHTING_NO_SHADOW */
 }
 
-LUMINARY_FUNCTION RGBF shadow_evaluate_sun(const ShadowTraceTask& task, const TriangleHandle self_handle) {
+LUMINARY_FUNCTION RGBF shadow_evaluate_sun(const ShadowTraceTask& task) {
 #ifndef DIRECT_LIGHTING_NO_SHADOW
-  RGBF visibility = optix_sun_shadowing(self_handle, task.origin, task.ray, task.limit, task.trace_status);
+  RGBF visibility = optix_sun_shadowing(task.origin, task.ray, task.limit, task.trace_status);
 
   if (task.trace_status == OPTIX_TRACE_STATUS_ABORT)
     return splat_color(0.0f);

@@ -34,7 +34,7 @@ LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, Optix
   uint16_t material_id = MATERIAL_ID_INVALID;
   uint32_t instance_id = HIT_TYPE_INVALID;
 
-  if (result.handle.instance_id < HIT_TYPE_TRIANGLE_ID_LIMIT) {
+  if (result.handle.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
     const uint32_t mesh_id = mesh_id_load(result.handle.instance_id);
 
     uint16_t triangle_flags;

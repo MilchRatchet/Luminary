@@ -79,8 +79,7 @@ LUMINARY_FUNCTION bool particle_opacity_cutout(const float2 coord) {
 }
 
 LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
-  const TriangleHandle handle, const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light,
-  const OptixTraceStatus status) {
+  const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const OptixTraceStatus status) {
   OptixKernelFunctionShadowTracePayload payload;
   payload.handle     = target_light;
   payload.throughput = splat_color(1.0f);
@@ -96,8 +95,7 @@ LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
   return payload.throughput;
 }
 
-LUMINARY_FUNCTION RGBF
-  optix_sun_shadowing(const TriangleHandle handle, const vec3 position, const vec3 dir, const float dist, const OptixTraceStatus status) {
+LUMINARY_FUNCTION RGBF optix_sun_shadowing(const vec3 position, const vec3 dir, const float dist, const OptixTraceStatus status) {
   OptixKernelFunctionShadowSunTracePayload payload;
   payload.throughput = splat_color(1.0f);
 

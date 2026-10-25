@@ -463,9 +463,8 @@ LUMINARY_FUNCTION RGBF bridges_sample_apply_shadowing(
   float dist;
   dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, path_id)) * scale;
 
-  const RGBF shadow_vertex0 =
-    optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status);
-  shadow_term = mul_color(shadow_term, shadow_vertex0);
+  const RGBF shadow_vertex0 = optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, trace_status);
+  shadow_term               = mul_color(shadow_term, shadow_vertex0);
 
   for (uint32_t vertex_id = 1; vertex_id < BRIDGES_MAX_VERTEX_COUNT; vertex_id++) {
     const bool vertex_is_valid = (vertex_id < vertex_count);
@@ -485,9 +484,8 @@ LUMINARY_FUNCTION RGBF bridges_sample_apply_shadowing(
     // We always execute all shadow rays as Nvidia hardware prefers that over conditional branching.
     const OptixTraceStatus trace_status_vertex = (vertex_is_valid) ? trace_status : OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
 
-    const RGBF shadow_vertex =
-      optix_geometry_shadowing(TRIANGLE_HANDLE_INVALID, current_vertex, current_direction, dist, light_handle, trace_status_vertex);
-    shadow_term = mul_color(shadow_term, shadow_vertex);
+    const RGBF shadow_vertex = optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, trace_status_vertex);
+    shadow_term              = mul_color(shadow_term, shadow_vertex);
   }
 
   return (bridge_is_valid) ? mul_color(direct_light_task.light_color, shadow_term) : splat_color(0.0f);

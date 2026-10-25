@@ -407,7 +407,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_geometry_evaluate_task(
   if (sample_is_valid)
     shadow_task.target_light = device.ptrs.light_tree_tri_handle_map[direct_light_task.light_id];
 
-  const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
+  const RGBF visibility = shadow_evaluate(shadow_task);
 
   return mul_color(direct_light_task.light_color, visibility);
 }
@@ -439,7 +439,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
 
-  RGBF visibility = shadow_evaluate_sun(shadow_task, trace.handle);
+  RGBF visibility = shadow_evaluate_sun(shadow_task);
 
   RGBF light_color = record_unpack(direct_light_task.light_color);
   light_color      = mul_color(light_color, visibility);
@@ -478,7 +478,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
     shadow_task.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
   }
 
-  light_color = mul_color(light_color, shadow_evaluate_sun(shadow_task, TRIANGLE_HANDLE_INVALID));
+  light_color = mul_color(light_color, shadow_evaluate_sun(shadow_task));
 
   return light_color;
 }
@@ -515,7 +515,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
   shadow_task.limit        = limit;
   shadow_task.target_light = TRIANGLE_HANDLE_INVALID;
 
-  RGBF visibility = shadow_evaluate_sun(shadow_task, trace.handle);
+  RGBF visibility = shadow_evaluate_sun(shadow_task);
 
   RGBF light_color = record_unpack(direct_light_task.light_color);
   light_color      = mul_color(light_color, visibility);
@@ -551,7 +551,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
     shadow_task.trace_status = OPTIX_TRACE_STATUS_OPTIONAL_UNUSED;
   }
 
-  light_color = mul_color(light_color, shadow_evaluate_sun(shadow_task, TRIANGLE_HANDLE_INVALID));
+  light_color = mul_color(light_color, shadow_evaluate_sun(shadow_task));
 
   return light_color;
 }
@@ -618,7 +618,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_bsdf_evaluate_task(
   shadow_task.limit        = dist;
   shadow_task.target_light = light_handle;
 
-  const RGBF visibility = shadow_evaluate(shadow_task, trace.handle);
+  const RGBF visibility = shadow_evaluate(shadow_task);
 
   const uint16_t volume_id = medium_stack_volume_peek(medium, false);
 
