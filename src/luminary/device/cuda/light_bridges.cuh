@@ -32,9 +32,13 @@ LUMINARY_FUNCTION Quaternion bridges_compute_rotation(const vec3 initial_vertex,
     return rotation;
   }
   else if (dot < -0.999f) {
-    rotation.x = 1.0f;
-    rotation.y = 0.0f;
-    rotation.z = 0.0f;
+    const float sign = copysignf(1.0f, actual_dir.z);
+    const float a    = -1.0f / (sign + actual_dir.z);
+    const float b    = actual_dir.x * actual_dir.y * a;
+
+    rotation.x = 1.0f + sign * actual_dir.x * actual_dir.x * a;
+    rotation.y = sign * b;
+    rotation.z = -sign * actual_dir.x;
     rotation.w = 0.0f;
 
     return rotation;
@@ -111,7 +115,7 @@ LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t verte
   const float center_dist = meta.y;
   const float max_dist    = meta.z;
 
-  if (effective_dist > max_dist)
+  if (effective_dist >= max_dist)
     return 0.0f;
 
   if (effective_dist < min_dist) {

@@ -30,7 +30,7 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 
   RGBF light_bsdf         = get_color(0.0f, 0.0f, 0.0f);
   bool is_refraction_bsdf = false;
-  if (sphere_ray_hit_outside(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
+  if (bsdf_sample_is_valid && sphere_ray_hit_outside(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
     light_bsdf = sky_get_sun_color(sky_pos, dir_bsdf);
 
     const RGBF value_bsdf = bsdf_evaluate(ctx, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
@@ -462,7 +462,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
     bool total_reflection;
     const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
 
-    const float fresnel = ocean_reflection_coefficient(ocean_normal, ray, refraction, 1.0f / device.ocean.refractive_index);
+    const float fresnel = ocean_reflection_coefficient(ocean_normal, ray, refraction, device.ocean.refractive_index);
     light_color         = scale_color(light_color, 1.0f - fresnel);
 
     if (total_reflection) {

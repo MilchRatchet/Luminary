@@ -1772,7 +1772,7 @@ LUMINARY_FUNCTION PackedNormal normal_pack(const vec3 normal) {
 // BSDF transparent fast path relies on this precision.
 // If the precision is improved in the future we will run into INFs with surfaces with refractive index close to 1.
 LUMINARY_FUNCTION uint32_t ior_compress(const float ior) {
-  return (__float_as_uint((0.5f * (ior - 1.0f)) + 1.0f) >> 15) & 0xFF;
+  return (__float_as_uint(clampf((0.5f * (ior - 1.0f)) + 1.0f, 1.0f, 2.0f * (1.0f - eps))) >> 15) & 0xFF;
 }
 
 LUMINARY_FUNCTION float ior_decompress(const uint32_t compressed_ior) {

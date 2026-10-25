@@ -150,7 +150,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_throughput_store(dst_task_base_address, bounce_throughput);
 
       // Apply medium transition.
-      if (bounce_info.is_transparent_pass) {
+      if (bounce_info.is_transparent_pass && is_pass_through == false) {
         const bool refraction_is_inside = ctx.params.flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE;
 
         float new_ior = 1.0f;

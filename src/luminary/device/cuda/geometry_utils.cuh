@@ -133,8 +133,9 @@ LUMINARY_FUNCTION MaterialContextGeometry
       const float4 luminance_f = texture_load(tex, tex_coords);
 
       emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
-      emission = scale_color(emission, albedo.a * mat.emission_scale);
     }
+
+    emission = scale_color(emission, albedo.a * mat.emission_scale);
   }
 
   float roughness = mat.roughness;

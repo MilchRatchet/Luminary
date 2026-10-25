@@ -80,23 +80,24 @@ LUMINARY_FUNCTION CausticsSamplingDomain caustics_get_domain_full(const Material
 
   const vec3 center_dir = normalize_vector(sub_vector(center, ctx.position));
 
-  float azimuth, altitude;
-  direction_to_angles(center_dir, azimuth, altitude);
-
   const float angle        = 0.3f * device.ocean.caustics_domain_scale;
+  const float spread       = tanf(angle);
   const float plane_height = center.y;
+  const float delta_y      = plane_height - ctx.position.y;
 
-  const vec3 v0_dir = angles_to_direction(altitude - angle, azimuth - angle);
-  const vec3 v1_dir = angles_to_direction(altitude - angle, azimuth + angle);
-  const vec3 v2_dir = angles_to_direction(altitude + angle, azimuth - angle);
+  const Mat3x3 basis = create_basis(center_dir);
 
-  const float v0_dist = fabsf(ctx.position.y - plane_height) / fmaxf(0.01f, fabsf(v0_dir.y));
-  const float v1_dist = fabsf(ctx.position.y - plane_height) / fmaxf(0.01f, fabsf(v1_dir.y));
-  const float v2_dist = fabsf(ctx.position.y - plane_height) / fmaxf(0.01f, fabsf(v2_dir.y));
+  const vec3 v0_dir = normalize_vector(transform_vec3(basis, get_vector(-spread, -spread, 1.0f)));
+  const vec3 v1_dir = normalize_vector(transform_vec3(basis, get_vector(spread, -spread, 1.0f)));
+  const vec3 v2_dir = normalize_vector(transform_vec3(basis, get_vector(-spread, spread, 1.0f)));
 
-  const vec3 v0 = add_vector(ctx.position, scale_vector(v0_dir, v0_dist));
-  const vec3 v1 = add_vector(ctx.position, scale_vector(v1_dir, v1_dist));
-  const vec3 v2 = add_vector(ctx.position, scale_vector(v2_dir, v2_dist));
+  const float v0_dist = fabsf(delta_y) / fmaxf(0.01f, fabsf(v0_dir.y));
+  const float v1_dist = fabsf(delta_y) / fmaxf(0.01f, fabsf(v1_dir.y));
+  const float v2_dist = fabsf(delta_y) / fmaxf(0.01f, fabsf(v2_dir.y));
+
+  const vec3 v0 = get_vector(ctx.position.x + v0_dir.x * v0_dist, plane_height, ctx.position.z + v0_dir.z * v0_dist);
+  const vec3 v1 = get_vector(ctx.position.x + v1_dir.x * v1_dist, plane_height, ctx.position.z + v1_dir.z * v1_dist);
+  const vec3 v2 = get_vector(ctx.position.x + v2_dir.x * v2_dist, plane_height, ctx.position.z + v2_dir.z * v2_dist);
 
   CausticsSamplingDomain domain;
 
