@@ -5,8 +5,9 @@
 #include "utils.cuh"
 
 LUMINARY_FUNCTION float spectral_sample_wavelength(const float random, float& pdf) {
-  uint32_t range = SPECTRAL_MAX_WAVELENGTH - SPECTRAL_MIN_WAVELENGTH + 1;
-  uint32_t first = 0;
+  constexpr uint32_t max_index = SPECTRAL_MAX_WAVELENGTH - SPECTRAL_MIN_WAVELENGTH;
+  uint32_t range               = max_index + 1;
+  uint32_t first               = 0;
 
   while (range > 0) {
     const uint32_t step   = range >> 1;
@@ -25,13 +26,18 @@ LUMINARY_FUNCTION float spectral_sample_wavelength(const float random, float& pd
   const uint32_t index_lower  = first - 1;
   const uint32_t index_higher = first;
 
-  const float cdf_lower  = __ldg(device.ptrs.spectral_cdf + index_lower);
-  const float cdf_higher = __ldg(device.ptrs.spectral_cdf + index_higher);
+  const float cdf_lower  = (index_lower != max_index) ? __ldg(device.ptrs.spectral_cdf + index_lower) : 1.0f;
+  const float cdf_higher = (index_higher != max_index) ? __ldg(device.ptrs.spectral_cdf + index_higher) : 1.0f;
 
   pdf = cdf_higher - cdf_lower;
 
   const float wavelength_lower  = SPECTRAL_MIN_WAVELENGTH + index_lower;
   const float wavelength_higher = SPECTRAL_MIN_WAVELENGTH + index_higher;
+
+  if (pdf <= 0.0f) {
+    pdf = 1.0f;
+    return wavelength_lower;
+  }
 
   return remap(random, cdf_lower, cdf_higher, wavelength_lower, wavelength_higher);
 }

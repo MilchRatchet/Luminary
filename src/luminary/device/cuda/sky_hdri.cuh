@@ -32,14 +32,14 @@ LUMINARY_FUNCTION float sky_hdri_warp_apply_median_of_means(float buckets[], con
 
   for (uint32_t bucket_id = bucket_offset; bucket_id < bucket_offset + num_buckets; bucket_id++) {
     const float value = buckets[bucket_id];
-    num += (bucket_id - bucket_offset) * value;
+    num += (bucket_id - bucket_offset + 1) * value;
     denom += value;
   }
 
   num *= 2.0f;
   denom *= num_buckets;
 
-  const float G = __saturatef((num / denom) - (num_buckets + 1.0f) / num_buckets);
+  const float G = (denom > 0.0f) ? __saturatef((num / denom) - (num_buckets + 1.0f) / num_buckets) : 0.0f;
 
   const uint32_t k = num_buckets >> 1;
   const uint32_t c = k - (1.0f - G) * k;

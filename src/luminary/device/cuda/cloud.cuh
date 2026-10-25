@@ -138,7 +138,7 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
   const vec3 ambient_ray        = sample_ray_sphere(2.0f * ambient_r.x - 1.0f, ambient_r.y);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
-  const float color_sampling_dist = random_1D(RANDOM_TARGET_CLOUD_COLOR_STEP + LAYER_TYPE, path_id);
+  const float color_sampling_dist = start + random_1D(RANDOM_TARGET_CLOUD_COLOR_STEP + LAYER_TYPE, path_id) * dist;
   const vec3 color_sampling_pos   = add_vector(origin, scale_vector(ray, color_sampling_dist));
 
   const vec3 sun_ray        = normalize_vector(sub_vector(device.sky.sun_pos, color_sampling_pos));
@@ -257,9 +257,9 @@ LUMINARY_FUNCTION float clouds_render(
   intersections[2] = cloud_get_toplayer_intersection(origin, ray, limit);
   results[2]       = clouds_compute<CLOUD_LAYER_TOP>(origin, ray, intersections[2].x, intersections[2].y, path_id);
 
-  const bool less01 = intersections[0].x <= intersections[1].x;
-  const bool less02 = intersections[0].x <= intersections[2].x;
-  const bool less12 = intersections[1].x <= intersections[2].x;
+  const bool less01 = results[0].hit_dist <= results[1].hit_dist;
+  const bool less02 = results[0].hit_dist <= results[2].hit_dist;
+  const bool less12 = results[1].hit_dist <= results[2].hit_dist;
 
   int order[3];
   if (less01) {
