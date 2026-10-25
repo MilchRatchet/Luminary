@@ -414,10 +414,6 @@ LUMINARY_FUNCTION RGBF bsdf_conductor(
   if ((params.flags & MATERIAL_FLAG_METALLIC) == 0)
     return splat_color(0.0f);
 
-  float ior = 1.0f;
-  if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
-    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
-
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
   float ss_term;
@@ -433,7 +429,7 @@ LUMINARY_FUNCTION RGBF bsdf_conductor(
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+                / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
       break;
     default:
       LUMINARY_UNREACHABLE;
@@ -468,10 +464,6 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
   if ((params.flags & MATERIAL_FLAG_METALLIC) != 0)
     return splat_color(0.0f);
 
-  float ior = 1.0f;
-  if (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION)
-    ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
-
   const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params);
 
   float ss_term;
@@ -487,7 +479,7 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+                / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
       break;
     default:
       LUMINARY_UNREACHABLE;
@@ -506,8 +498,7 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
       diff_term = bsdf_diffuse_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotH, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      diff_term = bsdf_diffuse_evaluate(ctx.NdotL)
-                  / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+      diff_term = bsdf_diffuse_evaluate(ctx.NdotL) / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
       break;
     default:
       LUMINARY_UNREACHABLE;
@@ -584,7 +575,7 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
         break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-               / bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+               / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
         break;
       default:
         LUMINARY_UNREACHABLE;
