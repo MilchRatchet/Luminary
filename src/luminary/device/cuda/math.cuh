@@ -97,7 +97,8 @@ LUMINARY_FUNCTION float lerp(const float a, const float b, const float t) {
  * @result Remapped value.
  */
 LUMINARY_FUNCTION float remap(const float value, const float src_low, const float src_high, const float dst_low, const float dst_high) {
-  return (value - src_low) / (src_high - src_low) * (dst_high - dst_low) + dst_low;
+  const float remap_value = (src_low != src_high) ? ((value - src_low) / (src_high - src_low) * (dst_high - dst_low)) : 0.0f;
+  return remap_value + dst_low;
 }
 
 LUMINARY_FUNCTION float remap01(const float value, const float src_low, const float src_high) {
@@ -128,6 +129,10 @@ LUMINARY_FUNCTION float expm1_over_x(const float x) {
   const float z = (fabsf(x) < 1.0f) ? logf(u) : x;
 
   return y / z;
+}
+
+LUMINARY_FUNCTION float clampf(const float x, const float a, const float b) {
+  return fminf(b, fmaxf(a, x));
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -869,7 +874,7 @@ LUMINARY_FUNCTION vec3 angles_to_direction(const float altitude, const float azi
 }
 
 LUMINARY_FUNCTION void direction_to_angles(const vec3 dir, float& azimuth, float& altitude) {
-  altitude = asinf(__saturatef(dir.y));
+  altitude = asinf(clampf(dir.y, -1.0f, 1.0f));
   azimuth  = atan2f(dir.z, dir.x);
 
   if (azimuth < 0.0f)
@@ -1227,7 +1232,7 @@ LUMINARY_FUNCTION JendersieEonParams jendersie_eon_phase_parameters(const float 
     params.alpha = 250.0f;
     params.w_d   = 0.146209f * cosf(3.38707f * logf(d) + 2.11193f) + 0.316072f + 0.0778917f * logf(d);
   }
-  else if (d < 0.1f) {
+  else /* if (d < 0.1f) */ {
     params.g_hg  = 13.8f * d * d;
     params.g_d   = 1.1456f * d * sinf(9.29044f * d);
     params.alpha = 250.0f;
@@ -1370,32 +1375,6 @@ LUMINARY_FUNCTION float bvh_triangle_intersection(
   return __fslctf(t, FLT_MAX, t);
 }
 
-LUMINARY_FUNCTION float clampf(const float x, const float a, const float b) {
-  return fminf(b, fmaxf(a, x));
-}
-
-/*
- * A more numerically stable version of normalize(b-a).
- * Whether this is actually is any better, I don't know, I just pretend.
- */
-LUMINARY_FUNCTION vec3 vector_direction_stable(vec3 a, vec3 b) {
-  const float len_a = get_length(a);
-  const float len_b = get_length(b);
-
-  if (len_a == 0.0f && len_b == 0.0f) {
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
-
-  const float max_len = fminf(len_a, len_b);
-
-  a = scale_vector(a, 1.0f / max_len);
-  b = scale_vector(b, 1.0f / max_len);
-
-  vec3 d = sub_vector(a, b);
-
-  return normalize_vector(d);
-}
-
 LUMINARY_FUNCTION float sphere_subtended_solid_angle(const float radius, const float distance) {
   if (radius <= 0.0f)
     return 0.0f;
@@ -1494,6 +1473,11 @@ LUMINARY_FUNCTION Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, U
 
 LUMINARY_FUNCTION RGBF rgb_to_hsv(const RGBF rgb) {
   const float max_value = fmaxf(rgb.r, fmaxf(rgb.g, rgb.b));
+
+  if (max_value == 0.0f) {
+    return splat_color(0.0f);
+  }
+
   const float min_value = fminf(rgb.r, fminf(rgb.g, rgb.b));
 
   const float v = max_value;

@@ -190,8 +190,8 @@ LUMINARY_FUNCTION uint32_t path_id_get_sample_id(const PathID& path_id) {
 LUMINARY_FUNCTION bool is_center_pixel(const PathID& path_id) {
   const ushort2 pixel = path_id_get_pixel(path_id);
 
-  const uint32_t width  = device.settings.width >> device.settings.supersampling;
-  const uint32_t height = device.settings.height >> device.settings.supersampling;
+  const uint32_t width  = device.settings.width >> 1;
+  const uint32_t height = device.settings.height >> 1;
 
   return ((pixel.x == width) && (pixel.y == height));
 }
