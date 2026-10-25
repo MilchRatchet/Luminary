@@ -317,6 +317,7 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
   ctx.state       = task.state;
   ctx.volume_type = volume.type;
   ctx.path        = volume_compute_path(volume, task.origin, task.ray, max_dist);
+  ctx.path_end    = ctx.path.start + ctx.path.length;
 
   if (ctx.path.length == 0.0f || ctx.path.start < 0.0f)
     ctx.volume_type = VOLUME_TYPE_NONE;

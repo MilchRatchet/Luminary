@@ -100,6 +100,7 @@ struct MaterialContext<MATERIAL_VOLUME> {
   uint16_t state;
   VolumeType volume_type;
   VolumePath path;
+  float path_end;
 };
 
 template <>

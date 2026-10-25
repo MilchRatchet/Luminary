@@ -97,29 +97,23 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float dist_along_ray = -dot_product(PO, ctx.V);
 
   // Clamp the distance if the ray is shortened by geometry.
-  const float clamped_dist_along_ray = clampf(dist_along_ray, ctx.path.start, ctx.path.start + ctx.path.length);
+  const float clamped_dist_along_ray = clampf(dist_along_ray, ctx.path.start, ctx.path_end);
 
-  // This is only perpendicular if we didn't actually clamp
-  const vec3 perpendicular_vector   = sub_vector(PO, scale_vector(ctx.V, clamped_dist_along_ray));
-  const float perpendicular_dist_sq = dot_product(perpendicular_vector, perpendicular_vector);
+  // Squared distance to the closest point on the ray segment via Pythagorean identity:
+  // ||PO + clamped * V||^2 = (||PO||^2 - dist_along_ray^2) + (dist_along_ray - clamped)^2
+  const float clamp_diff      = dist_along_ray - clamped_dist_along_ray;
+  const float closest_dist_sq = clamp_diff * clamp_diff - dist_along_ray * dist_along_ray + dot_product(PO, PO);
 
-  // Account for quadratic falloff
-  const float falloff = 1.0f / (perpendicular_dist_sq + std_dev);
+  // Effective squared distance accounting for cluster spatial variance
+  const float eff_dist_sq = std_dev * std_dev + closest_dist_sq;
 
-  const float variance = std_dev * std_dev;
+  // Effective active scattering segment length
+  const float scatter_dist = (clamped_dist_along_ray - ctx.path.start) + std_dev;
 
-  const float volume_dist = clamped_dist_along_ray - ctx.path.start;
+  // Rational approximation of inscattering buildup and extinction attenuation along the ray
+  const float atten = ctx.descriptor.max_scattering * scatter_dist + 1.0f;
 
-  // Don't use direct path to save on computations by using distances that we already computed.
-  const float transmittance_depth = fmaxf(perpendicular_dist_sq + volume_dist * volume_dist - variance, 0.0f);
-
-  // Account for energy loss due to absorption
-  const float transmittance = expf(-ctx.descriptor.max_absorption * transmittance_depth);
-
-  // Account for limited amount of energy that is scattered along the ray before passing the mean
-  const float scattering = 1.0f - expf(-ctx.descriptor.max_scattering * (variance + volume_dist));
-
-  return power * falloff * transmittance * scattering;
+  return (power * scatter_dist) / (eff_dist_sq * atten * atten);
 }
 
 template <>
@@ -211,6 +205,7 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   uint32_t selected[LIGHT_TREE_NUM_OUTPUTS] = {};
 
   float sum = 0.0f;
+  LUM_UNUSED(sum);  // Only used for MATERIAL_GEOMETRY
 
   LUMINARY_ASSUME(header.num_sections <= LIGHT_TREE_ROOT_MAX_NUM_SECTIONS);
 
@@ -249,7 +244,10 @@ LUMINARY_FUNCTION LightTreeWork light_tree_traverse_prepass(const MaterialContex
   }
 
   LightTreeWork work;
-  work.root_sum = sum * (bfloat_unpack(header.power_normalization) / 0xFFFF);
+  if constexpr (TYPE == MATERIAL_GEOMETRY)
+    work.root_sum = sum * (bfloat_unpack(header.power_normalization) / 0xFFFF);
+  else
+    work.root_sum = 0.0f;
 
 #pragma unroll
   for (uint32_t lane_id = 0; lane_id < LIGHT_TREE_NUM_OUTPUTS; lane_id++) {
