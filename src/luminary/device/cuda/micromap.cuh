@@ -120,11 +120,9 @@ LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, con
   const float inv_width  = 1.0f / tri.tex.width;
   const float inv_height = 1.0f / tri.tex.height;
 
-  float step_v = 0.5f * inv_height;
+  float step_v = fmaxf(0.5f * inv_height, 2.0f * eps);
 
   for (float v = min_v; v <= max_v;) {
-    v = fminf(v, max_v);
-
     const float e0    = fmaxf(fminf(a0 + v * m0, max_e_0), min_e_0);
     const float e1    = fmaxf(fminf(a1 + v * m1, max_e_1), min_e_1);
     const float e2    = fmaxf(fminf(a2 + v * m2, max_e_2), min_e_2);
@@ -152,11 +150,9 @@ LUMINARY_FUNCTION uint8_t micromap_get_opacity(const OMMTextureTriangle tri, con
     TextureLoadArgs tex_load_args = texture_get_default_args();
     tex_load_args.mip_level       = mip_level;
 
-    const float step_u = 0.5f * exp2f(mip_level) * inv_width;
+    const float step_u = fmaxf(0.5f * exp2f(mip_level) * inv_width, 2.0f * eps);
 
     for (float u = min_u; u <= max_u; u += step_u) {
-      u = fminf(u, max_u);
-
       const float alpha = texture_load(tri.tex, get_uv(u, v), tex_load_args).w;
 
       if (alpha > 0.0f)
