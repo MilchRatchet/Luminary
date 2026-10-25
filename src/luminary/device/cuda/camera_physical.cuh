@@ -45,6 +45,7 @@ struct CameraSimulationState {
   float probability_density;
   float wavelength;
   bool is_forward;
+  bool has_diffracted;
   bool has_retro_reflected;  // Biased optimization: Only allow one pair of reflections
   bool has_forward_reflected;
 } typedef CameraSimulationState;
@@ -126,11 +127,11 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_medium_cylinder(
   const vec3 cylindrical_origin = get_vector(origin.x, origin.y, 0.0f);
 
   // TODO: Optimize, this only needs 2D math but I am lazy so I use existing 3D implementations
-  float cylindrical_dist = sphere_ray_intersection(cylindrical_ray, cylindrical_origin, get_vector(0.0f, 0.0f, 0.0f), cylindrical_radius);
+  float cylindrical_dist = sphere_ray_intersect_back(cylindrical_ray, cylindrical_origin, get_vector(0.0f, 0.0f, 0.0f), cylindrical_radius);
 
   cylindrical_dist *= 1.0f / cylindrical_length;
 
-  if (cylindrical_dist > 0.0f && cylindrical_dist < dist) {
+  if (cylindrical_dist > eps && cylindrical_dist < dist) {
     origin = add_vector(origin, scale_vector(ray, cylindrical_dist));
 
     const vec3 cylindrical_normal = normalize_vector(get_vector(-origin.x, -origin.y, 0.0f));
@@ -279,8 +280,9 @@ LUMINARY_FUNCTION bool camera_aperture_interaction(
   if (camera_simulation_intersect_aperture(state.origin, state.ray, dist, edge_dist, aperture_hit_point, edge_normal))
     return true;
 
-  if (device.camera.enable_diffraction && edge_dist != FLT_MAX && state.has_retro_reflected == false) {
+  if (device.camera.enable_diffraction && edge_dist != FLT_MAX && state.has_retro_reflected == false && state.has_diffracted == false) {
     state.origin                    = aperture_hit_point;
+    state.has_diffracted            = true;
     const float2 random_diffraction = random_2D(RANDOM_TARGET_LENS_DIFFRACTION, path_id);
 
     float pdf = 1.0f;
@@ -393,14 +395,22 @@ LUMINARY_FUNCTION int32_t
     }
   }
 
+  const bool is_forward = state.is_forward;
+
   state.throughput *= throughput;
   state.probability_density *= probality;
 
-  state.ray                 = sampled_refraction ? refraction : reflection;
-  state.ior                 = sampled_refraction ? medium_ior : state.ior;
-  state.cylindrical_radius  = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
-  state.is_forward          = state.ray.z >= 0.0f;
-  state.has_retro_reflected = sampled_refraction ? state.has_retro_reflected : true;
+  state.ray                   = sampled_refraction ? refraction : reflection;
+  state.ior                   = sampled_refraction ? medium_ior : state.ior;
+  state.cylindrical_radius    = sampled_refraction ? medium.cylindrical_radius : state.cylindrical_radius;
+  state.is_forward            = sampled_refraction ? is_forward : !is_forward;
+  state.has_retro_reflected   = (!sampled_refraction && is_forward) ? true : state.has_retro_reflected;
+  state.has_forward_reflected = (!sampled_refraction && !is_forward) ? true : state.has_forward_reflected;
+
+  if ((state.is_forward ? state.ray.z : -state.ray.z) <= 0.0f) {
+    state.throughput = 0.0f;
+    return 0;
+  }
 
   return state.is_forward ? 1 : -1;
 }
@@ -416,6 +426,8 @@ LUMINARY_FUNCTION CameraSimulationResult
   state.throughput            = 1.0f;
   state.probability_density   = 1.0f;
   state.wavelength            = wavelength;
+  state.is_forward            = true;
+  state.has_diffracted        = false;
   state.is_forward            = true;
   state.has_retro_reflected   = false;
   state.has_forward_reflected = false;
