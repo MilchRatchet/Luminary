@@ -98,7 +98,8 @@ LUMINARY_FUNCTION void light_evaluate_candidate<MATERIAL_VOLUME>(
 
 template <MaterialType TYPE>
 LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
-  const MaterialContext<TYPE> ctx, const LightTreeWork& light_tree_work, const PathID& path_id, const TriangleHandle blocked_handle) {
+  const MaterialContext<TYPE> ctx, const LightTreeContext<TYPE> tree_ctx, const LightTreeWork& light_tree_work, const PathID& path_id,
+  const TriangleHandle blocked_handle) {
   LightSampleResult<TYPE> result;
   result.light_id = LIGHT_ID_INVALID;
 
@@ -106,7 +107,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
 
 #pragma nounroll
   for (uint32_t output_id = 0; output_id < LIGHT_TREE_NUM_OUTPUTS; output_id++) {
-    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(ctx, path_id, output_id, light_tree_work);
+    const LightTreeResult output = light_tree_traverse_postpass<TYPE>(tree_ctx, path_id, output_id, light_tree_work);
 
     const uint32_t light_id = output.light_id;
 
@@ -142,7 +143,8 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
   // Sample light tree
   ////////////////////////////////////////////////////////////////////
 
-  const LightTreeWork light_tree_work = light_tree_traverse_prepass(ctx, path_id);
+  const LightTreeContext<TYPE> tree_ctx = light_tree_context_init<TYPE>(ctx);
+  const LightTreeWork light_tree_work   = light_tree_traverse_prepass<TYPE>(tree_ctx, path_id);
 
   ////////////////////////////////////////////////////////////////////
   // Sample from set of list of candidates
@@ -151,7 +153,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_sample(const MaterialContext<TYP
   // Don't allow triangles to sample themselves.
   const TriangleHandle blocked_handle = light_get_blocked_handle(ctx);
 
-  LightSampleResult<TYPE> result = light_list_resample(ctx, light_tree_work, path_id, blocked_handle);
+  LightSampleResult<TYPE> result = light_list_resample<TYPE>(ctx, tree_ctx, light_tree_work, path_id, blocked_handle);
 
   UTILS_CHECK_NANS(path_id, result.light_color);
 
@@ -263,7 +265,7 @@ LUMINARY_KERNEL void light_compute_intensity(const KernelArgsLightComputeIntensi
 
   const float microtriangle_max = fmaxf(microtriangle_max1, microtriangle_max2);
 
-  const float max_intensity = warp_reduce_max(microtriangle_max);
+  const float max_intensity = warp_reduce_max(microtriangle_max) * material.emission_scale;
 
   if (microtriangle_id == 0) {
     args.dst_intensities[light_id] = max_intensity;

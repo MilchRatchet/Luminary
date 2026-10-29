@@ -126,4 +126,18 @@ __device__ __forceinline__ float __fmax_fmax(const float a, const float b, const
   return __int_as_float(__max_max(__float_as_int(a), __float_as_int(b), __float_as_int(c)));
 }
 
+/*
+ * Explicit rsqrt intrinsic that prevents cicc from rewriting rsqrt(x) * rsqrt(x)
+ * into rcp(x) + sqrt(rcp(x)) across branches.
+ */
+__device__ __forceinline__ float __rsqrtf(const float a) {
+  float result;
+#ifndef OPTIX_KERNEL
+  asm("rsqrt.approx.ftz.f32 %0, %1;" : "=f"(result) : "f"(a));
+#else
+  result = rsqrtf(a);
+#endif
+  return result;
+}
+
 #endif /* CU_INTRINSICS_H */

@@ -481,8 +481,6 @@ LUMINARY_FUNCTION DeviceMaterial load_material(const DeviceMaterialCompressed* d
   mat.roughness_tex    = __float_as_uint(v1.w) & 0xFFFF;
   mat.normal_tex       = __float_as_uint(v1.w) >> 16;
 
-  mat.emission = scale_color(mat.emission, mat.emission_scale);
-
   return mat;
 }
 
