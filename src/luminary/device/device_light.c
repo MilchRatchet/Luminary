@@ -1817,7 +1817,7 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
       intensity = material->emission_scale;
     }
     else {
-      intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+      intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b)) * material->emission_scale;
     }
   }
 

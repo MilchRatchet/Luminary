@@ -23,11 +23,13 @@ LUMINARY_FUNCTION float spectral_sample_wavelength(const float random, float& pd
     }
   }
 
+  first = min(max(first, 1u), max_index);
+
   const uint32_t index_lower  = first - 1;
   const uint32_t index_higher = first;
 
-  const float cdf_lower  = (index_lower != max_index) ? __ldg(device.ptrs.spectral_cdf + index_lower) : 1.0f;
-  const float cdf_higher = (index_higher != max_index) ? __ldg(device.ptrs.spectral_cdf + index_higher) : 1.0f;
+  const float cdf_lower  = __ldg(device.ptrs.spectral_cdf + index_lower);
+  const float cdf_higher = (index_higher < max_index) ? __ldg(device.ptrs.spectral_cdf + index_higher) : 1.0f;
 
   pdf = cdf_higher - cdf_lower;
 

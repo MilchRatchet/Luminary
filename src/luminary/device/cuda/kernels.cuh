@@ -628,7 +628,7 @@ LUMINARY_KERNEL void buffer_add(const KernelArgsBufferAdd args) {
   if (offset >= args.num_elements)
     return;
 
-  if (offset + 4 >= args.num_elements) {
+  if (offset + 4 > args.num_elements) {
     for (; offset < args.num_elements; offset++) {
       const float src_data = __ldcs(args.src + offset);
       float dst_data       = __ldcs(args.dst + offset);

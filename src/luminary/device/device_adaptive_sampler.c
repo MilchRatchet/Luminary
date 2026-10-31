@@ -118,6 +118,8 @@ LuminaryResult adaptive_sampler_compute_next_stage(AdaptiveSampler* sampler, Dev
       &sampler->stage_sample_counts, buffer_sizes.stage_sample_counts_size,
       DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY | DEVICE_MEMORY_STAGING_FLAG_SHARED));
 
+    memset(sampler->stage_sample_counts, 0, buffer_sizes.stage_sample_counts_size);
+
     sampler->allocated_stage_sample_counts_size = buffer_sizes.stage_sample_counts_size;
   }
 
@@ -472,14 +474,14 @@ LuminaryResult device_adaptive_sampler_update(
   sampler->render_width  = shared_sampler->render_width;
   sampler->render_height = shared_sampler->render_height;
 
+  DeviceAdaptiveSamplerBufferSizes buffer_sizes;
+  __FAILURE_HANDLE(adaptive_sampler_get_buffer_sizes(shared_sampler, &buffer_sizes));
+
   if (sampler->width != shared_sampler->width || sampler->height != shared_sampler->height) {
     __FAILURE_HANDLE(_device_adaptive_sampler_free(sampler));
 
     sampler->width  = shared_sampler->width;
     sampler->height = shared_sampler->height;
-
-    DeviceAdaptiveSamplerBufferSizes buffer_sizes;
-    __FAILURE_HANDLE(adaptive_sampler_get_buffer_sizes(shared_sampler, &buffer_sizes));
 
     __FAILURE_HANDLE(device_malloc(&sampler->stage_sample_counts, buffer_sizes.stage_sample_counts_size));
 
@@ -500,6 +502,10 @@ LuminaryResult device_adaptive_sampler_update(
 
     sampler->num_allocated_subtiles = subtile_count;
     *buffers_have_changed           = true;
+  }
+
+  if (sampler->stage_sample_counts && buffer_sizes.stage_sample_counts_size > 0) {
+    __FAILURE_HANDLE(device_memset(sampler->stage_sample_counts, 0, 0, buffer_sizes.stage_sample_counts_size, device->stream_main));
   }
 
   return LUMINARY_SUCCESS;

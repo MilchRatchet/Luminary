@@ -425,7 +425,7 @@ LUMINARY_FUNCTION vec3
                              ? jendersie_eon_phase_sample(I, device.fog.droplet_diameter, random_dir, random_method)
                              : ocean_phase_sampling(I, random_dir, random_method);
 
-  is_refraction = true;
+  is_refraction = false;
   is_valid      = true;
 
   return scatter_ray;
@@ -437,7 +437,7 @@ LUMINARY_FUNCTION vec3 bsdf_sample_for_sun<MATERIAL_PARTICLE>(
   const float2 random_dir   = random_2D(MaterialContextParticle::RANDOM_DL_SUN::BSDF, path_id);
   const float random_method = random_1D(MaterialContextParticle::RANDOM_DL_SUN::BSDF_METHOD, path_id);
 
-  is_refraction = true;
+  is_refraction = false;
   is_valid      = true;
 
   return jendersie_eon_phase_sample(scale_vector(mat_ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_method);

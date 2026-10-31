@@ -135,6 +135,10 @@ LUMINARY_FUNCTION float clampf(const float x, const float a, const float b) {
   return fminf(b, fmaxf(a, x));
 }
 
+LUMINARY_FUNCTION float safe_asinf(const float x) {
+  return asinf(clampf(x, -1.0f, 1.0f));
+}
+
 ////////////////////////////////////////////////////////////////////
 // Vector API
 ////////////////////////////////////////////////////////////////////
@@ -875,7 +879,7 @@ LUMINARY_FUNCTION vec3 angles_to_direction(const float altitude, const float azi
 }
 
 LUMINARY_FUNCTION void direction_to_angles(const vec3 dir, float& azimuth, float& altitude) {
-  altitude = asinf(clampf(dir.y, -1.0f, 1.0f));
+  altitude = safe_asinf(dir.y);
   azimuth  = atan2f(dir.z, dir.x);
 
   if (azimuth < 0.0f)

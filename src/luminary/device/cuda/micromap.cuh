@@ -14,7 +14,6 @@ struct OMMTextureTriangle {
   UV vertex2;
   DeviceTextureObject tex;
   uint16_t tex_id;
-  bool is_invisible;
 } typedef OMMTextureTriangle;
 
 LUMINARY_FUNCTION OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t mesh_id, const uint32_t tri_id) {
@@ -28,12 +27,8 @@ LUMINARY_FUNCTION OMMTextureTriangle micromap_get_ommtexturetriangle(const uint3
 
   omm_triangle.tex_id = __ldg(&device.ptrs.materials[tri.material_id].albedo_tex);
 
-  if (omm_triangle.tex_id == TEXTURE_NONE) {
-    omm_triangle.is_invisible = __ldg(&device.ptrs.materials[tri.material_id].opacity) == 0;
-  }
-  else {
-    omm_triangle.is_invisible = false;
-    omm_triangle.tex          = device.ptrs.textures[omm_triangle.tex_id];
+  if (omm_triangle.tex_id != TEXTURE_NONE) {
+    omm_triangle.tex = device.ptrs.textures[omm_triangle.tex_id];
   }
 
   return omm_triangle;

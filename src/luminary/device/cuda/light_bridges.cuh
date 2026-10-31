@@ -121,14 +121,14 @@ LUMINARY_FUNCTION float bridges_get_vertex_count_importance(const uint32_t verte
   if (effective_dist < min_dist) {
     const float linear_falloff = meta.w;
 
-    return linear_falloff * effective_dist / min_dist;
+    return (min_dist > 0.0f) ? linear_falloff * effective_dist / min_dist : 0.0f;
   }
 
   const float low_dist  = (effective_dist < center_dist) ? min_dist : center_dist;
   const float high_dist = (effective_dist < center_dist) ? center_dist : max_dist;
 
   const float step       = (high_dist - low_dist) * 0.25f;
-  const uint32_t step_id = (uint32_t) ((effective_dist - low_dist) / step);
+  const uint32_t step_id = min((uint32_t) ((effective_dist - low_dist) / step), 3u);
   const float floor_dist = low_dist + step_id * step;
   const uint32_t index   = (effective_dist < center_dist) ? step_id : (step_id + 4);
 

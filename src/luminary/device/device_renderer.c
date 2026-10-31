@@ -404,9 +404,24 @@ static LuminaryResult _device_renderer_handle_queue_action(
       CUDA_FAILURE_HANDLE(
         cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, work->shared_callback_data));
       break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE:
+    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE: {
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], device->stream_main));
-      break;
+
+      bool is_first_sample = true;
+      for (uint32_t stage_id = 0; stage_id <= ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
+        is_first_sample &= renderer->executed_aggregate_sample_counts[stage_id] == 0;
+      }
+
+      if (is_first_sample && renderer->sample_allocation.stage_id > 0) {
+        const size_t moment_buffer_size = sizeof(float) * device->work_buffers->allocated_internal_pixel_count;
+        for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+          __FAILURE_HANDLE(
+            device_memset(device->work_buffers->frame_first_moment[channel_id], 0, 0, moment_buffer_size, device->stream_main));
+        }
+
+        __FAILURE_HANDLE(device_memset(device->work_buffers->frame_second_moment_luminance, 0, 0, moment_buffer_size, device->stream_main));
+      }
+    } break;
     case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
       CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[work->event_id], device->stream_main));
       CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[work->event_id], CU_EVENT_WAIT_DEFAULT));
@@ -438,10 +453,7 @@ static LuminaryResult _device_renderer_handle_queue_action(
         is_first_sample &= renderer->executed_aggregate_sample_counts[stage_id] == 0;
       }
 
-      if (is_first_sample) {
-        // We assume that the main device will always execute the base adaptive sampling stage first.
-        __DEBUG_ASSERT(device->is_main_device == false || renderer->executed_aggregate_sample_counts[1] == 0);
-
+      if (is_first_sample && renderer->sample_allocation.stage_id == 0) {
         __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(
           renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE, &work->launch_id));
       }
@@ -537,12 +549,6 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   work.allow_gbuffer_meta_query = allow_gbuffer_meta_query;
   work.shared_callback_data     = shared_callback_data;
 
-  __FAILURE_HANDLE(_device_renderer_queue_adaptive_sampling_update(renderer, device, &work));
-
-  ////////////////////////////////////////////////////////////////////
-  // Execute
-  ////////////////////////////////////////////////////////////////////
-
   if (renderer->tile_id == 0) {
     __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->prepass_queue));
   }
@@ -551,6 +557,7 @@ LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device
   renderer->tile_id++;
 
   if (renderer->tile_id == tile_count) {
+    __FAILURE_HANDLE(_device_renderer_queue_adaptive_sampling_update(renderer, device, &work));
     __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->postpass_queue));
 
     renderer->status_flags &= ~DEVICE_RENDERER_STATUS_FLAG_IN_PROGRESS;

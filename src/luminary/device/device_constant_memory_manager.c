@@ -26,6 +26,7 @@ static const size_t _device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEM
   offsetof(DeviceConstantMemory, cloud),                         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   offsetof(DeviceConstantMemory, fog),                           // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   offsetof(DeviceConstantMemory, particles),                     // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  offsetof(DeviceConstantMemory, camera_aux),                    // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA_AUX
   offsetof(DeviceConstantMemory, optix_bvh),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   offsetof(DeviceConstantMemory, sky_lut_transmission_low_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
@@ -47,7 +48,8 @@ static const size_t _device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBE
   sizeof(DeviceCloud),                   // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   sizeof(DeviceFog),                     // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   sizeof(DeviceParticles),               // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  sizeof(OptixTraversableHandle) * 4,    // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  sizeof(DeviceCameraAux),               // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA_AUX
+  sizeof(OptixTraversableHandle) * 3,    // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   sizeof(DeviceTextureObject) * 4,       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX

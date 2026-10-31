@@ -727,6 +727,15 @@ LuminaryResult device_update_dynamic_const_mem(
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  // Keep host shadow copy of state synchronized so subsequent constant memory syncs never overwrite dynamic state with stale data.
+  device->constant_memory->data.state.depth             = 0;
+  device->constant_memory->data.state.undersampling     = (uint8_t) device->undersampling_state;
+  device->constant_memory->data.state.sample_allocation = sample_allocation;
+  memcpy(
+    device->constant_memory->data.state.adaptive_sampling_accumulated_stages, num_stage_executions,
+    sizeof(uint32_t) * (ADAPTIVE_SAMPLER_NUM_STAGES + 1));
+  device->constant_memory->staging_buffers[device->constant_memory->current_staging_buffer_id]->state = device->constant_memory->data.state;
+
   // These have to be done through a memset. If a memcpy would be used, the abort flag memcpy would stall until these here
   // have completed. If the abort flag would use a memset, then that one would stall until all kernels have completed. Hence
   // it is mandatory that the renderer NEVER queues any host to device memcpys.
@@ -773,6 +782,9 @@ LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id)
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  device->constant_memory->data.state.tile_id                                                                 = tile_id;
+  device->constant_memory->staging_buffers[device->constant_memory->current_staging_buffer_id]->state.tile_id = tile_id;
+
   CUDA_FAILURE_HANDLE(
     cuMemsetD32Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.tile_id), tile_id, 1, device->stream_main));
 
@@ -787,6 +799,9 @@ LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth) {
   DEVICE_ASSERT_AVAILABLE
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  device->constant_memory->data.state.depth                                                                 = depth;
+  device->constant_memory->staging_buffers[device->constant_memory->current_staging_buffer_id]->state.depth = depth;
 
   CUDA_FAILURE_HANDLE(
     cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), depth, 1, device->stream_main));
@@ -1454,6 +1469,16 @@ LuminaryResult device_finish_render_iteration(Device* device, AdaptiveSampler* s
     return LUMINARY_SUCCESS;
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  if (device->is_main_device) {
+    const uint8_t target_stage_id = (callback_data->adaptive_sampling_build_stage_id != ADAPTIVE_SAMPLING_STAGE_INVALID)
+                                      ? callback_data->adaptive_sampling_build_stage_id
+                                      : sampler->queued_stage_build;
+
+    if (target_stage_id != ADAPTIVE_SAMPLING_STAGE_INVALID) {
+      __FAILURE_HANDLE(adaptive_sampler_compute_next_stage(sampler, device, target_stage_id));
+    }
+  }
 
   uint32_t new_undersampling_state;
   __FAILURE_HANDLE(_device_update_get_next_undersampling_state(device, &new_undersampling_state));

@@ -48,7 +48,7 @@ LUMINARY_FUNCTION bool sky_ray_hits_sun(const vec3 origin_sky, const vec3 ray) {
 
 LUMINARY_FUNCTION RGBF sky_hdri_sample(const vec3 ray) {
   const float theta = atan2f(ray.z, ray.x);
-  const float phi   = asinf(ray.y);
+  const float phi   = safe_asinf(ray.y);
 
   const float u = (theta + PI) / (2.0f * PI);
   const float v = 1.0f - ((phi + 0.5f * PI) / PI);
@@ -64,7 +64,7 @@ LUMINARY_FUNCTION RGBF sky_hdri_sample(const vec3 ray) {
 
 LUMINARY_FUNCTION float sky_hdri_sample_alpha(const vec3 ray) {
   const float theta = atan2f(ray.z, ray.x);
-  const float phi   = asinf(ray.y);
+  const float phi   = safe_asinf(ray.y);
 
   const float u = (theta + PI) / (2.0f * PI);
   const float v = 1.0f - ((phi + 0.5f * PI) / PI);

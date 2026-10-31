@@ -63,7 +63,7 @@ DEVICE_CTX_FUNC LuminaryResult device_mesh_process(DeviceMesh* device_mesh, Devi
 
   *data_has_changed = false;
 
-  if (device_mesh->omm == (OpacityMicromap*) 0) {
+  if (device->optix_properties.rtcore_version > 0 && device_mesh->omm == (OpacityMicromap*) 0) {
     __FAILURE_HANDLE(omm_create(&device_mesh->omm));
     __FAILURE_HANDLE(omm_build(device_mesh->omm, device, device_mesh));
 

@@ -79,12 +79,20 @@ LuminaryResult device_result_interface_set_pixel_count(
 
   const uint32_t new_pixel_count = width * height;
 
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(interface->mutex));
+
   if (new_pixel_count != interface->pixel_count) {
-    __FAILURE_HANDLE(array_clear(interface->queued_results));
+    __FAILURE_HANDLE_CRITICAL(array_clear(interface->queued_results));
 
     interface->pixel_count = new_pixel_count;
     *entries_must_be_freed = true;
   }
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(interface->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -92,14 +100,22 @@ LuminaryResult device_result_interface_set_pixel_count(
 LuminaryResult device_result_interface_free_entries(DeviceResultInterface* interface, uint32_t device_id) {
   __CHECK_NULL_ARGUMENT(interface);
 
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(interface->mutex));
+
   uint32_t num_allocated_results;
-  __FAILURE_HANDLE(array_get_num_elements(interface->allocated_results[device_id], &num_allocated_results));
+  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(interface->allocated_results[device_id], &num_allocated_results));
 
   for (uint32_t result_id = 0; result_id < num_allocated_results; result_id++) {
-    __FAILURE_HANDLE(_device_result_interface_entry_free(interface, interface->allocated_results[device_id] + result_id));
+    __FAILURE_HANDLE_CRITICAL(_device_result_interface_entry_free(interface, interface->allocated_results[device_id] + result_id));
   }
 
-  __FAILURE_HANDLE(array_clear(interface->allocated_results[device_id]));
+  __FAILURE_HANDLE_CRITICAL(array_clear(interface->allocated_results[device_id]));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(interface->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -119,8 +135,11 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
   if (aggregate_sample_count < recommended_sample_count)
     return LUMINARY_SUCCESS;
 
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(interface->mutex));
+
   uint32_t currently_allocated_results;
-  __FAILURE_HANDLE(array_get_num_elements(interface->allocated_results[device->index], &currently_allocated_results));
+  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(interface->allocated_results[device->index], &currently_allocated_results));
 
   uint32_t selected_result = 0xFFFFFFFF;
 
@@ -133,9 +152,9 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
 
   if (selected_result == 0xFFFFFFFF) {
     DeviceResultEntry entry;
-    __FAILURE_HANDLE(_device_result_interface_entry_allocate(interface, &entry));
+    __FAILURE_HANDLE_CRITICAL(_device_result_interface_entry_allocate(interface, &entry));
 
-    __FAILURE_HANDLE(array_push(&interface->allocated_results[device->index], &entry));
+    __FAILURE_HANDLE_CRITICAL(array_push(&interface->allocated_results[device->index], &entry));
 
     selected_result = currently_allocated_results;
   }
@@ -154,24 +173,29 @@ LuminaryResult device_result_interface_queue_result(DeviceResultInterface* inter
   const uint32_t pixel_count = interface->pixel_count;
 
   for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
-    __FAILURE_HANDLE(device_download(
+    __FAILURE_HANDLE_CRITICAL(device_download(
       entry->frame_first_moment[channel_id], device->work_buffers->frame_first_moment[channel_id], 0, pixel_count * sizeof(float),
       device->stream_main));
   }
 
-  __FAILURE_HANDLE(device_download(
+  __FAILURE_HANDLE_CRITICAL(device_download(
     entry->frame_second_moment_luminance, device->work_buffers->frame_second_moment_luminance, 0, pixel_count * sizeof(float),
     device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuEventRecord(entry->available_event, device->stream_main));
 
-  __FAILURE_HANDLE(device_renderer_externalize_samples(device->renderer, entry->num_stage_executions));
+  __FAILURE_HANDLE_CRITICAL(device_renderer_externalize_samples(device->renderer, entry->num_stage_executions));
 
   DeviceResultMap map;
   map.allocation_id = selected_result;
   map.device_id     = device->index;
 
-  __FAILURE_HANDLE(array_push(&interface->queued_results, &map));
+  __FAILURE_HANDLE_CRITICAL(array_push(&interface->queued_results, &map));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(interface->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -244,7 +268,7 @@ static LuminaryResult _device_result_interface_get_consumer_event(DeviceResultIn
     selected_id = num_allocated_events;
   }
 
-  interface->allocated_events[selected_id].assigned = RESULT_INTERFACE_CONSUMER_EVENT_ID_INVALID;
+  interface->allocated_events[selected_id].assigned = true;
 
   *consumer_event_id = selected_id;
 

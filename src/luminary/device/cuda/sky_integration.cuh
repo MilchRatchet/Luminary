@@ -195,7 +195,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
         vec3 normal = normalize_vector(sub_vector(moon_pos, device.sky.moon_pos));
 
         const float tex_u = 0.5f + device.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
-        const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
+        const float tex_v = 0.5f + safe_asinf(normal.y) * (1.0f / PI);
 
         const UV uv = get_uv(tex_u, tex_v);
 
@@ -224,11 +224,11 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
     }
 
     if ((device.ptrs.stars != (Star*) 0) && sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
-      const float ray_altitude = asinf(ray.y);
+      const float ray_altitude = safe_asinf(ray.y);
       const float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
 
-      const uint32_t x = (uint32_t) (ray_azimuth * 10.0f);
-      const uint32_t y = (uint32_t) ((ray_altitude + PI * 0.5f) * 10.0f);
+      const uint32_t x = min((uint32_t) fmaxf(ray_azimuth * 10.0f, 0.0f), (uint32_t) (STARS_GRID_LD - 1));
+      const uint32_t y = min((uint32_t) fmaxf((ray_altitude + PI * 0.5f) * 10.0f, 0.0f), 31u);
 
       const uint32_t grid = x + y * STARS_GRID_LD;
 
