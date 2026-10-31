@@ -32,9 +32,10 @@ LUMINARY_FUNCTION void light_bsdf_get_technique_probabilities(
 }
 
 LUMINARY_FUNCTION float light_bsdf_get_directional_pdf(
-  const MaterialParams& params, const vec3 V, const vec3 L, const float roughness, const float reflection_probability,
+  const MaterialParams& params, const BSDFRayContext& ctx, const float roughness, const float reflection_probability,
   const float refraction_probability) {
-  const BSDFRayContext ctx = bsdf_evaluate_analyze(params, get_vector(0.0f, 0.0f, 1.0f), V, L);
+  if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
+    return 0.0f;
 
   if (ctx.is_refraction) {
     if (refraction_probability == 0.0f)
@@ -42,19 +43,16 @@ LUMINARY_FUNCTION float light_bsdf_get_directional_pdf(
 
     const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
     return refraction_probability
-           * bsdf_microfacet_refraction_pdf(V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
+           * bsdf_microfacet_refraction_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ior);
   }
 
-  float pdf = reflection_probability * bsdf_microfacet_pdf(V, roughness, ctx.NdotH, ctx.NdotV);
+  float pdf = reflection_probability * bsdf_microfacet_pdf(ctx.V, roughness, ctx.NdotH, ctx.NdotV);
 
   if (refraction_probability > 0.0f) {
-    const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
-    const vec3 H    = bsdf_normal_from_pair(L, V, 1.0f);
+    const float ior   = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(params);
+    const bool is_tir = (1.0f - ior * ior * (1.0f - ctx.HdotV * ctx.HdotV)) < 0.0f;
 
-    bool total_reflection;
-    (void) refract_vector(V, H, ior, total_reflection);
-
-    if (total_reflection) {
+    if (is_tir) {
       pdf += refraction_probability * bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
     }
   }
@@ -117,10 +115,8 @@ LUMINARY_FUNCTION LightBSDFSampleResult light_bsdf_get_sample(const MaterialCont
       break;
   }
 
-  // TODO: We build two contexts in a row here. Consolidate that.
   const BSDFRayContext ctx = bsdf_sample_context(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, microfacet, ray, is_refraction);
-  const float pdf =
-    light_bsdf_get_directional_pdf(mat_ctx.params, V_local, ray, sampling_roughness, reflection_probability, refraction_probability);
+  const float pdf = light_bsdf_get_directional_pdf(mat_ctx.params, ctx, sampling_roughness, reflection_probability, refraction_probability);
   const RGBF eval =
     (pdf > 0.0f) ? bsdf_evaluate_core(mat_ctx.params, ctx, BSDF_SAMPLING_GENERAL, ray, face_normal_local, 1.0f / pdf) : splat_color(0.0f);
 
@@ -146,10 +142,11 @@ LUMINARY_FUNCTION float light_bsdf_get_probability(const MaterialContextGeometry
   float reflection_probability, refraction_probability;
   light_bsdf_get_technique_probabilities(mat_ctx.params, reflection_probability, refraction_probability);
 
+  const BSDFRayContext ctx       = bsdf_evaluate_analyze(mat_ctx.params, get_vector(0.0f, 0.0f, 1.0f), V_local, L_local);
   const float roughness          = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
   const float sampling_roughness = light_bsdf_get_sampling_roughness(roughness);
   float sampling_probability =
-    light_bsdf_get_directional_pdf(mat_ctx.params, V_local, L_local, sampling_roughness, reflection_probability, refraction_probability);
+    light_bsdf_get_directional_pdf(mat_ctx.params, ctx, sampling_roughness, reflection_probability, refraction_probability);
 
   const float russian_roulette_probability = light_bsdf_get_russian_roulette_probability(roughness);
   sampling_probability *= russian_roulette_probability;
