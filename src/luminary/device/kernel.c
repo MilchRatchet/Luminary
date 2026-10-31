@@ -155,7 +155,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream) {
   launch_config.gridDimX       = kernel->default_block_count;
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
-  launch_config.sharedMemBytes = kernel->shared_memory_size;
+  launch_config.sharedMemBytes = 0;
   launch_config.hStream        = stream;
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
@@ -170,13 +170,13 @@ LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CU
 
   CUlaunchConfig launch_config;
 
-  launch_config.blockDimX      = MAX_THREADS_PER_BLOCK;
+  launch_config.blockDimX      = kernel->optimal_block_size;
   launch_config.blockDimY      = 1;
   launch_config.blockDimZ      = 1;
   launch_config.gridDimX       = kernel->default_block_count;
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
-  launch_config.sharedMemBytes = kernel->shared_memory_size;
+  launch_config.sharedMemBytes = 0;
   launch_config.hStream        = stream;
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
@@ -199,7 +199,7 @@ LuminaryResult kernel_execute_custom(
   launch_config.gridDimX       = grid_dim_x;
   launch_config.gridDimY       = grid_dim_y;
   launch_config.gridDimZ       = grid_dim_z;
-  launch_config.sharedMemBytes = kernel->shared_memory_size;
+  launch_config.sharedMemBytes = 0;
   launch_config.hStream        = stream;
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
