@@ -18,9 +18,10 @@ LUMINARY_FUNCTION float mis_compute_gi_pdf(const MaterialContextGeometry ctx, co
 
 LUMINARY_FUNCTION float mis_compute_weight_base(
   const float gi_pdf, const float solid_angle, const float power, const float dist_sq, const float light_tree_root_sum) {
-  const float dl_pdf = LIGHT_GEO_MAX_SAMPLES * (1.0f / solid_angle) * (power / dist_sq) * (1.0f / light_tree_root_sum);
+  const float num = gi_pdf * (solid_angle * dist_sq * light_tree_root_sum);
+  const float den = num + LIGHT_GEO_MAX_SAMPLES * power;
 
-  return (dl_pdf > 0.0f) ? gi_pdf / (gi_pdf + dl_pdf) : 1.0f;
+  return (den > 0.0f) ? num / den : 1.0f;
 }
 
 LUMINARY_FUNCTION float mis_compute_weight_gi(

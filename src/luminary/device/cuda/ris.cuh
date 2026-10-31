@@ -50,14 +50,14 @@ LUMINARY_FUNCTION RISReservoir ris_reservoir_init(const float random) {
 LUMINARY_FUNCTION bool ris_reservoir_add_sample(RISReservoir& reservoir, const float target, const float sampling_weight) {
   const float weight = target * sampling_weight;
 
-  reservoir.sum_weight += weight;
-
 #ifdef RIS_COLLECT_SAMPLE_COUNT
   reservoir.num_samples++;
 #endif  // RIS_COLLECT_SAMPLE_COUNT
 
-  if (weight == 0.0f)
+  if (weight <= 0.0f)
     return false;
+
+  reservoir.sum_weight += weight;
 
   const float resampling_probability = weight / reservoir.sum_weight;
 
@@ -115,7 +115,7 @@ LUMINARY_FUNCTION RISAggregator ris_aggregator_init(void) {
 LUMINARY_FUNCTION RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggregator, const float target, const float sampling_weight) {
   const float weight = target * sampling_weight;
 
-  aggregator.sum_weight += weight;
+  aggregator.sum_weight += (weight > 0.0f) ? weight : 0.0f;
 
   RISSampleHandle handle;
   handle.resampling_probability = (weight > 0.0f) ? weight / aggregator.sum_weight : 0.0f;
@@ -126,7 +126,7 @@ LUMINARY_FUNCTION RISSampleHandle ris_aggregator_add_sample(RISAggregator& aggre
 
 LUMINARY_FUNCTION void ris_sample_handle_finalize(RISSampleHandle& handle) {
   handle.rcp_resampling_probability     = 1.0f / handle.resampling_probability;
-  handle.rcp_neg_resampling_probability = 1.0f / (1.0f - handle.resampling_probability);
+  handle.rcp_neg_resampling_probability = 1.0f / fmaxf(1.0f - handle.resampling_probability, eps);
 }
 
 LUMINARY_FUNCTION void ris_lane_reset(RISLane& lane) {
@@ -239,7 +239,7 @@ LUMINARY_FUNCTION bool ris_stratified_reservoir_add_sample(
   RISStratifiedReservoir& reservoir, const float target, const float sampling_weight) {
   const float weight = target * sampling_weight;
 
-  if (weight == 0.0f)
+  if (weight <= 0.0f)
     return false;
 
   const bool compute_front = (reservoir.sum_weight_front <= reservoir.random * (reservoir.sum_weight_front + reservoir.sum_weight_back));

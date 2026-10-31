@@ -208,7 +208,7 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
 
   {
     const float random_dist = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, path_id);
-    const float dist        = -logf(random_dist);
+    const float dist        = -logf(fmaxf(random_dist, eps));
     current_vertex          = add_vector(current_vertex, scale_vector(current_direction, dist));
 
     sum_dist += dist;
@@ -222,7 +222,7 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
     current_direction = bridges_phase_sample(current_direction, random_phase);
 
     const float random_dist = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + i, path_id);
-    const float dist        = -logf(random_dist);
+    const float dist        = -logf(fmaxf(random_dist, eps));
     current_vertex          = add_vector(current_vertex, scale_vector(current_direction, dist));
 
     sum_dist += dist;
@@ -234,7 +234,7 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
 
   const float actual_scale = get_length(sub_vector(current_vertex, initial_vertex));
 
-  if (actual_scale == 0.0f) {
+  if (actual_scale <= 0.0f || sum_dist <= 0.0f) {
     path_pdf = 0.0f;
 
     return get_color(0.0f, 0.0f, 0.0f);
@@ -251,9 +251,9 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
 
   // TODO: Scattering is a material constant, so logf(scattering) should be precomputed.
   RGBF path_weight = get_color(
-    expf(vertex_count * logf(scattering.r) - sum_dist * (scattering.r + absorption.r)),
-    expf(vertex_count * logf(scattering.g) - sum_dist * (scattering.g + absorption.g)),
-    expf(vertex_count * logf(scattering.b) - sum_dist * (scattering.b + absorption.b)));
+    expf(vertex_count * logf(fmaxf(scattering.r, eps)) - sum_dist * (scattering.r + absorption.r)),
+    expf(vertex_count * logf(fmaxf(scattering.g, eps)) - sum_dist * (scattering.g + absorption.g)),
+    expf(vertex_count * logf(fmaxf(scattering.b, eps)) - sum_dist * (scattering.b + absorption.b)));
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
@@ -270,8 +270,8 @@ LUMINARY_FUNCTION vec3 bridges_sample_initial_vertex(
   const float dist_to_light = fmaxf(-dot_product(PO, ctx.V), 0.0f);
 
   // We sample points in front of the light with a very high probability, the rest is only for unbiasedness.
-  float forward_prob = (dist_to_light < ctx.path_end) ? BRIDGES_INITIAL_VERTEX_FORWARD_PROB : 1.0f;
-  forward_prob       = (dist_to_light <= ctx.path.start) ? 0.0f : forward_prob;
+  float forward_prob = (dist_to_light < ctx.path_end - eps) ? BRIDGES_INITIAL_VERTEX_FORWARD_PROB : 1.0f;
+  forward_prob       = (dist_to_light <= ctx.path.start + eps) ? 0.0f : forward_prob;
 
   VolumePath new_path;
   if (random_intersection < forward_prob) {
@@ -460,8 +460,8 @@ LUMINARY_FUNCTION RGBF bridges_sample_apply_shadowing(
   // We don't need to trace visibility to the initial vertex as it was sampled with an interval that we know has no intersections
   RGBF shadow_term = splat_color(1.0f);
 
-  float dist;
-  dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, path_id)) * scale;
+  float initial_dist_random = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + 0, path_id);
+  float dist                = -logf(fmaxf(initial_dist_random, eps)) * scale;
 
   const RGBF shadow_vertex0 = optix_geometry_shadowing(current_vertex, current_direction, dist, light_handle, trace_status);
   shadow_term               = mul_color(shadow_term, shadow_vertex0);
@@ -478,7 +478,9 @@ LUMINARY_FUNCTION RGBF bridges_sample_apply_shadowing(
 
       current_direction = quaternion16_apply(rotation, current_direction_sampled);
 
-      dist = -logf(random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + vertex_id, path_id)) * scale;
+      float dist_random = random_1D(RANDOM_TARGET_LIGHT_GEO_BRIDGE_DISTANCE + seed * LIGHT_GEO_MAX_BRIDGE_LENGTH + vertex_id, path_id);
+
+      dist = -logf(fmaxf(dist_random, eps)) * scale;
     }
 
     // We always execute all shadow rays as Nvidia hardware prefers that over conditional branching.

@@ -86,8 +86,14 @@ LUMINARY_FUNCTION float bsdf_fresnel(const vec3 normal, const vec3 V, const vec3
   const float p_pol_term1 = ior * NdotT;
   const float p_pol_term2 = 1.0f * NdotV;
 
-  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
-  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
+  const float s_denom = s_pol_term1 + s_pol_term2;
+  const float p_denom = p_pol_term1 + p_pol_term2;
+
+  if (s_denom <= 0.0f || p_denom <= 0.0f)
+    return 1.0f;
+
+  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / s_denom;
+  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / p_denom;
 
   reflection_s_pol *= reflection_s_pol;
   reflection_p_pol *= reflection_p_pol;
@@ -290,19 +296,22 @@ LUMINARY_FUNCTION vec3 bsdf_microfacet_refraction_sample_normal(const vec3 V, co
 LUMINARY_FUNCTION float bsdf_microfacet_refraction_pdf(
   const vec3 V, const float roughness, const float NdotH, const float NdotV, const float NdotL, const float HdotV, const float HdotL,
   const float refraction_index) {
+  float denominator = refraction_index * HdotV + HdotL;
+  denominator       = denominator * denominator * NdotV;
+
+  if (denominator <= eps)
+    return 0.0f;
+
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
   const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const Fraction G1 = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
 
-  const float D_G1 = fraction_evaluate(fraction_multiply(D, G1));
-
-  float denominator = refraction_index * HdotV + HdotL;
-  denominator       = denominator * denominator;
+  const Fraction D_G1 = fraction_multiply(D, G1);
 
   // See Heitz14.
-  return D_G1 * (HdotV / NdotV) * (HdotL / denominator);
+  return (D_G1.numerator * HdotV * HdotL) / (D_G1.denominator * denominator);
 }
 
 LUMINARY_FUNCTION float bsdf_microfacet_refraction_tir_reflection_pdf(const float roughness, const float NdotH, const float NdotV) {
@@ -315,10 +324,10 @@ LUMINARY_FUNCTION float bsdf_microfacet_refraction_tir_reflection_pdf(const floa
   const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const Fraction G1 = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
 
-  const float D_G1 = fraction_evaluate(fraction_multiply(D, G1));
+  const Fraction D_G1 = fraction_multiply(D, G1);
 
   // For reflection, |H dot V| equals |H dot L|, cancelling in the visible-normal PDF Jacobian.
-  return D_G1 * (0.25f / NdotV);
+  return (0.25f * D_G1.numerator) / (D_G1.denominator * NdotV);
 }
 
 LUMINARY_FUNCTION vec3
@@ -330,20 +339,23 @@ LUMINARY_FUNCTION vec3
 LUMINARY_FUNCTION float bsdf_microfacet_refraction_evaluate(
   const float roughness, const float HdotL, const float HdotV, const float NdotH, const float NdotL, const float NdotV,
   const float refraction_index) {
+  float denominator = refraction_index * HdotV + HdotL;
+  denominator       = denominator * denominator;
+
+  if (denominator <= eps)
+    return 0.0f;
+
   const float roughness2 = roughness * roughness;
   const float roughness4 = roughness2 * roughness2;
 
   const Fraction D  = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const Fraction G2 = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  const float D_G2 = fraction_evaluate(fraction_multiply(D, G2));
-
-  float denominator = refraction_index * HdotV + HdotL;
-  denominator       = denominator * denominator;
+  const Fraction D_G2 = fraction_multiply(D, G2);
 
   // See Walter07.
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return 4.0f * NdotL * HdotV * HdotL * D_G2 / denominator;
+  return (4.0f * NdotL * HdotV * HdotL * D_G2.numerator) / (D_G2.denominator * denominator);
 }
 
 LUMINARY_FUNCTION float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -428,8 +440,8 @@ LUMINARY_FUNCTION RGBF bsdf_conductor(
       ss_term = bsdf_microfacet_evaluate_sampled_diffuse(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
+      ss_term =
+        bsdf_microfacet_refraction_evaluate_sampled_microfacet(roughness, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, 1.0f);
       break;
     default:
       LUMINARY_UNREACHABLE;
@@ -478,8 +490,8 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
       ss_term = bsdf_microfacet_evaluate_sampled_diffuse(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-                / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
+      ss_term =
+        bsdf_microfacet_refraction_evaluate_sampled_microfacet(roughness, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, 1.0f);
       break;
     default:
       LUMINARY_UNREACHABLE;
@@ -497,9 +509,11 @@ LUMINARY_FUNCTION RGBF bsdf_glossy(
     case BSDF_SAMPLING_MICROFACET:
       diff_term = bsdf_diffuse_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotH, ctx.NdotV);
       break;
-    case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      diff_term = bsdf_diffuse_evaluate(ctx.NdotL) / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
+    case BSDF_SAMPLING_MICROFACET_REFRACTION: {
+      const float tir_pdf = bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
+      diff_term           = (tir_pdf > 0.0f) ? bsdf_diffuse_evaluate(ctx.NdotL) / tir_pdf : 0.0f;
       break;
+    }
     default:
       LUMINARY_UNREACHABLE;
       break;
@@ -571,11 +585,11 @@ LUMINARY_FUNCTION RGBF bsdf_dielectric(
         term = bsdf_microfacet_evaluate_sampled_microfacet(ctx.V, roughness, ctx.NdotL, ctx.NdotV);
         break;
       case BSDF_SAMPLING_DIFFUSE:
-        term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(ctx.NdotL);
+        term = bsdf_microfacet_evaluate_sampled_diffuse(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV);
         break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
-        term = bsdf_microfacet_evaluate(roughness, ctx.NdotH, ctx.NdotL, ctx.NdotV)
-               / bsdf_microfacet_refraction_tir_reflection_pdf(roughness, ctx.NdotH, ctx.NdotV);
+        term =
+          bsdf_microfacet_refraction_evaluate_sampled_microfacet(roughness, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ior);
         break;
       default:
         LUMINARY_UNREACHABLE;

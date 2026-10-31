@@ -232,17 +232,19 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
     sum_weights += weight;
 
-    const float resampling_probability = weight / sum_weights;
-    if (resampling_random < resampling_probability) {
-      ray_local                = ray;
-      selected_eval            = eval;
-      info.is_transparent_pass = false;
-      info.is_microfacet_based = false;
+    if (weight > 0.0f) {
+      const float resampling_probability = weight / sum_weights;
+      if (resampling_random < resampling_probability) {
+        ray_local                = ray;
+        selected_eval            = eval;
+        info.is_transparent_pass = false;
+        info.is_microfacet_based = false;
 
-      resampling_random = random_saturate(resampling_random / resampling_probability);
-    }
-    else {
-      resampling_random = random_saturate((resampling_random - resampling_probability) / (1.0f - resampling_probability));
+        resampling_random = random_saturate(resampling_random / resampling_probability);
+      }
+      else {
+        resampling_random = random_saturate((resampling_random - resampling_probability) / fmaxf(1.0f - resampling_probability, eps));
+      }
     }
   }
 
@@ -276,25 +278,27 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
     sum_weights += weight;
 
-    const float resampling_probability = weight / sum_weights;
-    if (resampling_random < resampling_probability) {
-      ray_local                = ray;
-      selected_eval            = eval;
-      info.is_transparent_pass = !total_reflection;
-      info.is_microfacet_based = true;
+    if (weight > 0.0f) {
+      const float resampling_probability = weight / sum_weights;
+      if (resampling_random < resampling_probability) {
+        ray_local                = ray;
+        selected_eval            = eval;
+        info.is_transparent_pass = !total_reflection;
+        info.is_microfacet_based = true;
 
-      resampling_random = random_saturate(resampling_random / resampling_probability);
-    }
-    else {
-      resampling_random = random_saturate((resampling_random - resampling_probability) / (1.0f - resampling_probability));
+        resampling_random = random_saturate(resampling_random / resampling_probability);
+      }
+      else {
+        resampling_random = random_saturate((resampling_random - resampling_probability) / fmaxf(1.0f - resampling_probability, eps));
+      }
     }
   }
 
   // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
   // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
   // and thus we evaluate f / |f| = (f / p) / |f / p|.
-  info.weight =
-    (sum_weights > 0.0f) ? scale_color(selected_eval, sum_weights / color_importance(selected_eval)) : get_color(0.0f, 0.0f, 0.0f);
+  const float selected_importance = color_importance(selected_eval);
+  info.weight = (selected_importance > 0.0f) ? scale_color(selected_eval, sum_weights / selected_importance) : get_color(0.0f, 0.0f, 0.0f);
 
   UTILS_CHECK_NANS(pixel, info.weight);
 

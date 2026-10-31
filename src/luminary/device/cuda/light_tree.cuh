@@ -121,7 +121,7 @@ LUMINARY_FUNCTION LightTreeContext<MATERIAL_GEOMETRY> light_tree_context_init(co
   // Microfacet cone cosine threshold c0 depends only on roughness; pre-bake sqrt(spec_weight) and diff_weight into lobes
   const float c0         = 0.85f * k;
   const float spec_scale = sqrtf(spec_weight) / (1.0f - c0);
-  const float r_scale    = __rsqrtf(dot_product(R_raw, R_raw)) * spec_scale;
+  const float r_scale    = __rsqrtf(fmaxf(dot_product(R_raw, R_raw), eps)) * spec_scale;
 
   tree_ctx.normal          = scale_vector(ctx.normal, diff_weight);
   tree_ctx.spec_dir_scaled = scale_vector(R_raw, r_scale);
@@ -140,7 +140,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_GEOMETRY>(
   const float variance = std_dev * std_dev;
 
   // Single MUFU.RSQ instruction; __rsqrtf prevents cicc from splitting rsqrt^2 into RCP + SQRT
-  const float rsqrt_dist        = __rsqrtf(dist_sq + variance);
+  const float rsqrt_dist        = __rsqrtf(fmaxf(dist_sq + variance, eps));
   const float inv_dist_sq       = rsqrt_dist * rsqrt_dist;
   const float power_inv_dist_sq = power * inv_dist_sq;
 
@@ -170,7 +170,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
   const float closest_dist_sq = clamp_diff * clamp_diff - dist_along_ray * dist_along_ray + dot_product(PO, PO);
 
   // Effective squared distance accounting for cluster spatial variance
-  const float eff_dist_sq = std_dev * std_dev + closest_dist_sq;
+  const float eff_dist_sq = fmaxf(std_dev * std_dev + closest_dist_sq, eps);
 
   // Effective active scattering segment length
   const float scatter_dist = (clamped_dist_along_ray - ctx.path.start) + std_dev;
@@ -184,7 +184,7 @@ LUMINARY_FUNCTION float light_tree_importance<MATERIAL_VOLUME>(
 template <>
 LUMINARY_FUNCTION float light_tree_importance<MATERIAL_PARTICLE>(
   const LightTreeContext<MATERIAL_PARTICLE> tree_ctx, const float power, const vec3 PO, const float std_dev) {
-  const float dist_sq = dot_product(PO, PO) + std_dev * std_dev;
+  const float dist_sq = fmaxf(dot_product(PO, PO) + std_dev * std_dev, eps);
 
   return power / dist_sq;
 }

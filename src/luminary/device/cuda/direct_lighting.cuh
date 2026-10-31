@@ -59,15 +59,22 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
   const float target_pdf_solid_angle = color_importance(light_solid_angle);
 
   // MIS weight multiplied with PDF
-  const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_sun_pdf(ctx, dir_bsdf) * solid_angle + 1.0f);
-  const float mis_weight_solid_angle = solid_angle / (bsdf_sample_for_sun_pdf(ctx, dir_solid_angle) * solid_angle + 1.0f);
+  float mis_weight_bsdf = 0.0f;
+  if (target_pdf_bsdf > 0.0f) {
+    mis_weight_bsdf = solid_angle / (bsdf_sample_for_sun_pdf(ctx, dir_bsdf) * solid_angle + 1.0f);
+  }
+
+  float mis_weight_solid_angle = 0.0f;
+  if (target_pdf_solid_angle > 0.0f) {
+    mis_weight_solid_angle = solid_angle / (bsdf_sample_for_sun_pdf(ctx, dir_solid_angle) * solid_angle + 1.0f);
+  }
 
   const float weight_bsdf        = target_pdf_bsdf * mis_weight_bsdf;
   const float weight_solid_angle = target_pdf_solid_angle * mis_weight_solid_angle;
 
   const float sum_weights = weight_bsdf + weight_solid_angle;
 
-  if (sum_weights == 0.0f) {
+  if (sum_weights <= 0.0f) {
     DeviceTaskDirectLightSun task;
     task.light_color = PACKED_RECORD_BLACK;
     return task;
@@ -87,13 +94,13 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
     light_color = light_solid_angle;
   }
 
-  light_color = scale_color(light_color, sum_weights / target_pdf);
-
-  if (target_pdf == 0.0f) {
+  if (target_pdf <= 0.0f) {
     DeviceTaskDirectLightSun task;
     task.light_color = PACKED_RECORD_BLACK;
     return task;
   }
+
+  light_color = scale_color(light_color, sum_weights / target_pdf);
 
   if (color_importance(light_color) == 0.0f) {
     DeviceTaskDirectLightSun task;

@@ -6,12 +6,15 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-LUMINARY_FUNCTION bool accumulation_reduce_sample(
-  const RGBF value, const uint32_t index, RGBF& first_moment, float& second_moment_lumiance) {
+LUMINARY_FUNCTION bool accumulation_reduce_sample(RGBF value, const uint32_t index, RGBF& first_moment, float& second_moment_lumiance) {
   const uint32_t index_mask  = __match_any_sync(__activemask(), index);
   const bool is_first_thread = (__ffs(index_mask) - 1) == THREAD_ID_IN_WARP;
 
-  const float luminance = color_luminance(value);
+  float luminance = color_luminance(value);
+  if (is_non_finite(luminance)) {
+    value     = UTILS_DEBUG_NAN_COLOR;
+    luminance = 0.0f;
+  }
 
   first_moment           = value;
   second_moment_lumiance = luminance * luminance;
@@ -82,9 +85,13 @@ LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
 
     const DeviceTaskResult result = task_result_load(task_result_base_address);
 
-    const float luminance = color_luminance(result.color);
+    float luminance   = color_luminance(result.color);
+    RGBF first_moment = result.color;
+    if (is_non_finite(luminance)) {
+      first_moment = UTILS_DEBUG_NAN_COLOR;
+      luminance    = 0.0f;
+    }
 
-    const RGBF first_moment             = result.color;
     const float second_moment_luminance = luminance * luminance;
 
     __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);

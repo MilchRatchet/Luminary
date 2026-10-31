@@ -327,9 +327,12 @@ LUMINARY_FUNCTION void material_set_color(MaterialParams& param, const RGBF valu
       higher_relative = value.g;
     }
 
-    max_value       = __saturatef(max_value * (1.0f / 1023.0f)) * 2.0f;  // Map to [0,2]
-    lower_relative  = __saturatef(lower_relative * (2.0f / 1023.0f) * (1.0f / max_value));
-    higher_relative = __saturatef(higher_relative * (2.0f / 1023.0f) * (1.0f / max_value));
+    max_value = __saturatef(max_value * (1.0f / 1023.0f)) * 2.0f;  // Map to [0,2]
+
+    const float inv_max = (max_value > 0.0f) ? (2.0f / 1023.0f) / max_value : 0.0f;
+
+    lower_relative  = __saturatef(lower_relative * inv_max);
+    higher_relative = __saturatef(higher_relative * inv_max);
 
     uint32_t data_max_value       = (__float_as_uint(max_value) >= 0x30000000) ? (__float_as_uint(max_value) >> 14) & 0x3FFF : 0;
     uint32_t data_lower_relative  = (uint32_t) (lower_relative * 0xFF + 0.5f);

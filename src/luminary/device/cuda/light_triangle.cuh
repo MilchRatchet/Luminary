@@ -137,11 +137,16 @@ LUMINARY_FUNCTION bool light_triangle_sample_solid_angle(
     scale_vector(v0, G0 * cosf(0.5f * sampled_solid_angle) - G1 * sinf(0.5f * sampled_solid_angle)),
     scale_vector(v2, G2 * sinf(0.5f * sampled_solid_angle)));
 
-  const vec3 v2_t = sub_vector(scale_vector(r, 2.0f * dot_product(v0, r) / dot_product(r, r)), v0);
+  const float r_len_sq = dot_product(r, r);
+  if (r_len_sq <= 0.0f)
+    return false;
 
-  const float s2 = dot_product(v1, v2_t);
-  const float s  = (1.0f - random.y) + random.y * s2;
-  const float t  = sqrtf(fmaxf((1.0f - s * s) / (1.0f - s2 * s2), 0.0f));
+  const vec3 v2_t = sub_vector(scale_vector(r, 2.0f * dot_product(v0, r) / r_len_sq), v0);
+
+  const float s2    = dot_product(v1, v2_t);
+  const float s     = (1.0f - random.y) + random.y * s2;
+  const float denom = 1.0f - s2 * s2;
+  const float t     = (denom > eps) ? sqrtf(fmaxf((1.0f - s * s) / denom, 0.0f)) : 0.0f;
 
   ray = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
 

@@ -267,7 +267,8 @@ LUMINARY_FUNCTION float2 get_coordinates_in_triangle(const vec3 vertex, const ve
   const float d11   = dot_product(edge2, edge2);
   const float d20   = dot_product(diff, edge1);
   const float d21   = dot_product(diff, edge2);
-  const float denom = 1.0f / (d00 * d11 - d01 * d01);
+  const float det   = d00 * d11 - d01 * d01;
+  const float denom = (det > 0.0f) ? 1.0f / det : 0.0f;
 
   return make_float2((d11 * d20 - d01 * d21) * denom, (d00 * d21 - d01 * d20) * denom);
 }
@@ -282,7 +283,7 @@ LUMINARY_FUNCTION vec3
 
   const float length = get_length(result);
 
-  return (length < eps) ? face_normal : scale_vector(result, 1.0f / length);
+  return (length >= eps) ? scale_vector(result, 1.0f / length) : face_normal;
 }
 
 LUMINARY_FUNCTION UV get_uv(const float u, const float v) {
@@ -1186,10 +1187,10 @@ LUMINARY_FUNCTION RGBAF saturate_albedo(RGBAF color, float change) {
 
 LUMINARY_FUNCTION float henyey_greenstein_phase_function(const float cos_angle, const float g) {
   const float g2         = g * g;
-  const float denom_term = 1.0f + g2 - 2.0f * g * cos_angle;
+  const float denom_term = fmaxf(1.0f + g2 - 2.0f * g * cos_angle, eps);
   const float pow15      = denom_term * sqrtf(denom_term);
 
-  return (1.0f - g * g) / (4.0f * PI * pow15);
+  return (1.0f - g2) / (4.0f * PI * pow15);
 }
 
 LUMINARY_FUNCTION float draine_phase_function(const float cos_angle, const float g, const float alpha) {
@@ -1309,11 +1310,11 @@ LUMINARY_FUNCTION float draine_phase_sample(const float g, const float alpha, co
   const float t4 = 3.0f * g2 * (1.0f + t3) + alpha * (2.0f + g2 * (1.0f + (1.0f + 2.0f * g2) * t3));
   const float t5 = t0 * (t1 * t2 + t4 * t4) + t1 * t1 * t1;
   const float t6 = t0 * 4.0f * (g4 - g2);
-  const float t7 = cbrtf(t5 + sqrtf(t5 * t5 - t6 * t6 * t6));
+  const float t7 = fmaxf(cbrtf(t5 + sqrtf(fmaxf(t5 * t5 - t6 * t6 * t6, 0.0f))), eps);
   const float t8 = 2.0f * ((t1 + (t6 / t7) + t7) / t0);
-  const float t9 = sqrtf(6.0f * (1.0f + g2) + t8);
+  const float t9 = fmaxf(sqrtf(fmaxf(6.0f * (1.0f + g2) + t8, 0.0f)), eps);
 
-  const float h = sqrtf(6.0f * (1.0f + g2) - t8 + 8.0f * t4 / (t0 * t9)) - t9;
+  const float h = sqrtf(fmaxf(6.0f * (1.0f + g2) - t8 + 8.0f * t4 / (t0 * t9), 0.0f)) - t9;
 
   return 0.5f * g + ((1.0f / (2.0f * g)) - (1.0f / (8.0f * g)) * (h * h));
 }

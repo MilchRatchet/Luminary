@@ -184,6 +184,9 @@ LUMINARY_FUNCTION VolumePath volume_compute_path(
  */
 LUMINARY_FUNCTION float volume_sample_intersection(
   const VolumeDescriptor volume, const float start, const float max_length, const float random) {
+  if (volume.max_scattering <= 0.0f || random == 0.0f)
+    return FLT_MAX;
+
   // [FonWKH17] Equation 15
   const float t = (-logf(random)) / volume.max_scattering;
 
@@ -202,16 +205,22 @@ LUMINARY_FUNCTION float volume_sample_intersection_miss_probability(const Volume
 }
 
 LUMINARY_FUNCTION float volume_sample_intersection_bounded(const VolumeDescriptor volume, const VolumePath path, const float random) {
+  if (volume.max_scattering <= 0.0f || path.length <= 0.0f)
+    return path.start;
+
   const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * path.length);
 
   // [FonWKH17] Equation 15
   const float t = -logf(1.0f - random * prob_hit_at_max) / volume.max_scattering;
 
-  return path.start + t;
+  return path.start + fminf(t, path.length);
 }
 
 LUMINARY_FUNCTION float volume_sample_intersection_bounded_pdf(const VolumeDescriptor volume, const VolumePath path, const float t) {
   const float prob_hit_at_max = 1.0f - expf(-volume.max_scattering * path.length);
+
+  if (prob_hit_at_max <= 0.0f)
+    return 0.0f;
 
   return volume.max_scattering * expf(-volume.max_scattering * (t - path.start)) / prob_hit_at_max;
 }
@@ -351,7 +360,8 @@ LUMINARY_FUNCTION RGBF volume_sample_sky_dl_initial_vertex_weight(MaterialContex
   weight.g = expf(-weight_dist * volume_transmittance.g) * ctx.descriptor.scattering.g;
   weight.b = expf(-weight_dist * volume_transmittance.b) * ctx.descriptor.scattering.b;
 
-  weight = scale_color(weight, 1.0f / volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.path, dist));
+  const float pdf = volume_sample_intersection_bounded_pdf(ctx.descriptor, ctx.path, dist);
+  weight          = (pdf > 0.0f) ? scale_color(weight, 1.0f / pdf) : splat_color(0.0f);
 
   return weight;
 }

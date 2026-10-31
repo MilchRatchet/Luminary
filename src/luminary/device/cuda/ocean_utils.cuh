@@ -333,8 +333,14 @@ LUMINARY_FUNCTION float ocean_reflection_coefficient(
   const float p_pol_term1 = index_in_over_out * NdotT;
   const float p_pol_term2 = 1.0f * NdotV;
 
-  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
-  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
+  const float s_denom = s_pol_term1 + s_pol_term2;
+  const float p_denom = p_pol_term1 + p_pol_term2;
+
+  if (s_denom <= 0.0f || p_denom <= 0.0f)
+    return 1.0f;
+
+  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / s_denom;
+  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / p_denom;
 
   reflection_s_pol *= reflection_s_pol;
   reflection_p_pol *= reflection_p_pol;

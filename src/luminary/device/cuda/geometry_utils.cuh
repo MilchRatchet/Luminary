@@ -41,7 +41,8 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
       map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
     }
 
-    map_normal = normalize_vector(map_normal);
+    const float map_normal_len_sq = dot_product(map_normal, map_normal);
+    map_normal = (map_normal_len_sq >= eps) ? scale_vector(map_normal, rsqrtf(map_normal_len_sq)) : get_vector(0.0f, 0.0f, 1.0f);
 
     const Quaternion q = quaternion_rotation_to_z_canonical(normal);
 

@@ -193,7 +193,7 @@ LUMINARY_KERNEL void volume_process_events() {
       }
 
       record = mul_color(record, volume_integrate_transmittance_precomputed(volume, path.length));
-      record = scale_color(record, 1.0f / pdf);
+      record = (pdf > 0.0f) ? scale_color(record, 1.0f / pdf) : splat_color(0.0f);
 
       task_trace_handle_store(task_base_address, handle);
       task_trace_depth_store(task_base_address, depth);

@@ -197,14 +197,7 @@ LUMINARY_FUNCTION bool is_center_pixel(const PathID& path_id) {
 }
 
 LUMINARY_FUNCTION bool is_non_finite(const float a) {
-#ifndef __INTELLISENSE__
-  return isnan(a) || isinf(a);
-#else
-  const bool is_nan = a != a;
-  const bool is_inf = a < -FLT_MAX || a > FLT_MAX;
-
-  return is_nan || is_inf;
-#endif
+  return (__float_as_uint(a) & 0x7F800000u) == 0x7F800000u;
 }
 
 #define LIGHTS_ARE_PRESENT (device.ptrs.light_tree_root != nullptr)
