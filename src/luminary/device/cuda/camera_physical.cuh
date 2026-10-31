@@ -214,9 +214,8 @@ LUMINARY_FUNCTION float camera_simulation_interface_intersection(
 }
 
 LUMINARY_FUNCTION vec3 camera_aperture_diffraction_sample(
-  const vec3 ray, const float edge_dist, const float2 edge_normal, const float wavelength, const float2 random, float& pdf) {
+  const vec3 ray, const float edge_dist, const float2 edge_normal, const float wavelength, const float2 random) {
   if (edge_dist <= 0.0f) {
-    pdf = 1.0f;
     return ray;
   }
 
@@ -230,10 +229,6 @@ LUMINARY_FUNCTION vec3 camera_aperture_diffraction_sample(
   const float truncation_angle = atanf(angle_max / base_angle);
   const float sample_u         = fmaxf(random.x, 1e-6f);
   const float angle_deviation  = base_angle * tanf(truncation_angle * sample_u);
-
-  // PDF of the normalized truncated half-Cauchy distribution.
-  const float theta_normalized = angle_deviation / base_angle;
-  const float pdf_theta        = 1.0f / (base_angle * truncation_angle * (1.0f + theta_normalized * theta_normalized));
 
   // Construct a tangent basis aligned with the aperture edge normal
   vec3 edge_normal_3d  = get_vector(edge_normal.x, edge_normal.y, 0.0f);
@@ -261,11 +256,6 @@ LUMINARY_FUNCTION vec3 camera_aperture_diffraction_sample(
   const float cos_theta = cosf(angle_deviation);
   const float sin_theta = sinf(angle_deviation);
 
-  // Convert theta and phi to a solid angle PDF
-  // p(omega) = p(theta) * p(phi) / sin(theta)
-  const float pdf_phi = 1.0f / (4.0f * v_spread_angle);
-  pdf                 = pdf_theta * pdf_phi / fmaxf(sin_theta, eps);
-
   const vec3 diffracted =
     add_vector(scale_vector(ray, cos_theta), add_vector(scale_vector(U, sin_theta * cos_phi), scale_vector(V, sin_theta * sin_phi)));
 
@@ -285,10 +275,7 @@ LUMINARY_FUNCTION bool camera_aperture_interaction(
     state.has_diffracted            = true;
     const float2 random_diffraction = random_2D(RANDOM_TARGET_LENS_DIFFRACTION, path_id);
 
-    float pdf = 1.0f;
-    state.ray = camera_aperture_diffraction_sample(state.ray, edge_dist, edge_normal, state.wavelength, random_diffraction, pdf);
-    state.throughput *= pdf;
-    state.probability_density *= pdf;
+    state.ray = camera_aperture_diffraction_sample(state.ray, edge_dist, edge_normal, state.wavelength, random_diffraction);
 
     dist = camera_simulation_interface_intersection(state, semi_circle_center, interface.radius, interface.cylindrical_radius);
   }
@@ -428,25 +415,29 @@ LUMINARY_FUNCTION CameraSimulationResult
   state.wavelength            = wavelength;
   state.is_forward            = true;
   state.has_diffracted        = false;
-  state.is_forward            = true;
   state.has_retro_reflected   = false;
   state.has_forward_reflected = false;
 
   // There are num_interfaces + 1 media.
-  const uint32_t num_interfaces = device.camera_aux.num_interfaces;
+  const int32_t num_interfaces = (int32_t) device.camera_aux.num_interfaces;
 
-  uint32_t iteration        = 0;
-  int32_t current_interface = 0;
-
-  for (; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
-    current_interface += camera_simulation_step<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(state, iteration, current_interface, path_id);
-
-    if (current_interface >= num_interfaces || current_interface < 0 || state.throughput == 0.0f)
-      break;
-  }
-
-  if (current_interface < 0 || (iteration == RANDOM_LENS_MAX_INTERSECTIONS && current_interface <= num_interfaces))
+  if (num_interfaces <= 0) {
     state.throughput = 0.0f;
+  }
+  else {
+    uint32_t iteration        = 0;
+    int32_t current_interface = 0;
+
+    for (; iteration < RANDOM_LENS_MAX_INTERSECTIONS; iteration++) {
+      current_interface += camera_simulation_step<ALLOW_REFLECTIONS, SPECTRAL_RENDERING>(state, iteration, current_interface, path_id);
+
+      if (current_interface >= num_interfaces || current_interface < 0 || state.throughput == 0.0f)
+        break;
+    }
+
+    if (current_interface < 0 || current_interface < num_interfaces)
+      state.throughput = 0.0f;
+  }
 
   CameraSimulationResult result;
   result.origin              = state.origin;

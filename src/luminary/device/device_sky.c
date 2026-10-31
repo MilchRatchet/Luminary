@@ -260,7 +260,7 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
   dirty_flags |= (camera->pos.y != hdri->origin.y) ? SCENE_DIRTY_FLAG_PASSIVE : 0;
   dirty_flags |= (camera->pos.z != hdri->origin.z) ? SCENE_DIRTY_FLAG_PASSIVE : 0;
 
-  if ((dirty_flags & (SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_PASSIVE)) != 0) {
+  if (hdri->sky_is_dirty || (dirty_flags & (SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_PASSIVE)) != 0) {
     memcpy(&hdri->sky, sky, sizeof(Sky));
     hdri->sky_is_dirty = true;
 
@@ -276,7 +276,7 @@ LuminaryResult sky_hdri_update(SkyHDRI* hdri, const Sky* sky, const Camera* came
       hdri->height          = height;
     }
 
-    hdri->sample_count = max(sky->hdri_samples, 1);
+    hdri->sample_count = max(sky->hdri_samples, 32);
     hdri->sample_count = ((hdri->sample_count + 31) / 32) * 32;  // Round up to next multiple of 32.
   }
 

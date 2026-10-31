@@ -1171,7 +1171,7 @@ LUMINARY_FUNCTION float color_luminance(const RGBF v) {
 }
 
 LUMINARY_FUNCTION float color_importance(const RGBF color) {
-  return __fmax_fmax(color.r, color.g, color.b);
+  return fmaxf(color.r, fmaxf(color.g, color.b));
 }
 
 LUMINARY_FUNCTION RGBAF saturate_albedo(RGBAF color, float change) {

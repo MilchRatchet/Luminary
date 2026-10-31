@@ -175,28 +175,28 @@ LUMINARY_KERNEL void adaptive_sampling_block_reduce_variance(const KernelArgsAda
   // Two blocks per warp
   const uint32_t adaptive_sampling_block = THREAD_ID >> (WARP_SIZE_LOG - 1);
 
-  if (adaptive_sampling_block >= args.num_adaptive_sampling_blocks)
-    return;
+  float coeff_variation = 0.0f;
+  if (adaptive_sampling_block < args.num_adaptive_sampling_blocks) {
+    const uint32_t sample_count = adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
+    const float denominator     = 1.0f / sample_count;
 
-  const uint32_t sample_count = adaptive_sampling_get_sample_count_from_block_index(adaptive_sampling_block);
-  const float denominator     = 1.0f / sample_count;
+    const uint32_t adaptive_sampling_y = adaptive_sampling_block / args.width;
+    const uint32_t adaptive_sampling_x = adaptive_sampling_block - adaptive_sampling_y * args.width;
 
-  const uint32_t adaptive_sampling_y = adaptive_sampling_block / args.width;
-  const uint32_t adaptive_sampling_x = adaptive_sampling_block - adaptive_sampling_y * args.width;
+    const uint32_t local_x = THREAD_ID & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
+    const uint32_t local_y = (THREAD_ID >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
 
-  const uint32_t local_x = THREAD_ID & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
-  const uint32_t local_y = (THREAD_ID >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) & ADAPTIVE_SAMPLING_BLOCK_SIZE_MASK;
+    const uint32_t x = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x + device.settings.window_x;
+    const uint32_t y = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y + device.settings.window_y;
 
-  const uint32_t x = (adaptive_sampling_x << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_x + device.settings.window_x;
-  const uint32_t y = (adaptive_sampling_y << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) + local_y + device.settings.window_y;
-
-  float luminance;
-  const float variance        = adaptive_sampling_get_pixel_variance(x, y, denominator, luminance);
-  const float coeff_variation = adaptive_sampling_compute_coefficient_of_variation(variance, luminance);
+    float luminance;
+    const float variance = adaptive_sampling_get_pixel_variance(x, y, denominator, luminance);
+    coeff_variation      = adaptive_sampling_compute_coefficient_of_variation(variance, luminance);
+  }
 
   const float block_variance = fabsf(warp_reduce_max<16>(coeff_variation));
 
-  if ((THREAD_ID & (WARP_SIZE_MASK >> 1)) == 0) {
+  if (adaptive_sampling_block < args.num_adaptive_sampling_blocks && (THREAD_ID & (WARP_SIZE_MASK >> 1)) == 0) {
     args.dst_block_variance[adaptive_sampling_block] = block_variance;
   }
 }

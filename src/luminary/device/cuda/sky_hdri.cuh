@@ -11,6 +11,9 @@
 // Sampling Sun => (pos - hdri_pos) and then precompute the sun pos based on hdri values instead.
 
 LUMINARY_FUNCTION float sky_hdri_warp_apply_median_of_means(float buckets[], const uint32_t num_buckets) {
+  if (num_buckets == 0)
+    return 0.0f;
+
   const uint32_t bucket_offset = (THREAD_ID_IN_BLOCK >> WARP_SIZE_LOG) * WARP_SIZE;
 
   // Sort
@@ -50,7 +53,7 @@ LUMINARY_FUNCTION float sky_hdri_warp_apply_median_of_means(float buckets[], con
     output += buckets[bucket_id];
   }
 
-  output /= num_buckets - 2 * c;
+  output /= max(num_buckets - 2 * c, 1u);
 
   return output;
 }

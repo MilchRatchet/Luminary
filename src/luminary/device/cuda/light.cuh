@@ -100,8 +100,9 @@ template <MaterialType TYPE>
 LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
   const MaterialContext<TYPE> ctx, const LightTreeContext<TYPE> tree_ctx, const LightTreeWork& light_tree_work, const PathID& path_id,
   const TriangleHandle blocked_handle) {
-  LightSampleResult<TYPE> result;
-  result.light_id = LIGHT_ID_INVALID;
+  LightSampleResult<TYPE> result = {};
+  result.light_id                = LIGHT_ID_INVALID;
+  result.light_color             = splat_color(0.0f);
 
   RISReservoir reservoir = ris_reservoir_init(random_1D(MaterialContext<TYPE>::RANDOM_DL_GEO::RESAMPLING, path_id));
 
@@ -129,7 +130,8 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
 
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
-  result.light_color = scale_color(result.light_color, sampling_weight);
+  if (result.light_id != LIGHT_ID_INVALID)
+    result.light_color = scale_color(result.light_color, sampling_weight);
 
   if constexpr (TYPE == MATERIAL_GEOMETRY)
     result.light_tree_root_sum = light_tree_work.root_sum;

@@ -276,8 +276,10 @@ LUMINARY_FUNCTION DeviceTaskDirectLightGeo
   ////////////////////////////////////////////////////////////////////
 
   if constexpr (TYPE != MATERIAL_VOLUME) {
-    const RGBF transmittance = volume_integrate_transmittance(ctx.volume_type, ctx.position, sample.ray, sample.dist);
-    sample.light_color       = mul_color(sample.light_color, transmittance);
+    if (sample.light_id != LIGHT_ID_INVALID) {
+      const RGBF transmittance = volume_integrate_transmittance(ctx.volume_type, ctx.position, sample.ray, sample.dist);
+      sample.light_color       = mul_color(sample.light_color, transmittance);
+    }
   }
 
   ////////////////////////////////////////////////////////////////////
