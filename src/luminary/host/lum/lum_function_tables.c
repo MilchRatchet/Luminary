@@ -446,7 +446,7 @@ static LuminaryResult _lum_function_load_instance(LumVirtualMachine* vm, const L
 
   bool found;
   uint32_t id;
-  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->material_name_dict, name, &id, &found));
+  __FAILURE_HANDLE(dictionary_find_by_name(vm->host->mesh_instance_name_dict, name, &id, &found));
 
   if (found) {
     *dst = vm->host->mesh_instances[id];

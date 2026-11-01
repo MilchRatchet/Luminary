@@ -1,5 +1,6 @@
 #include "lum.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,27 +30,61 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
 
   char line[LINE_SIZE];
 
-  fgets(line, LINE_SIZE, file);
-
-  uint32_t magic_error = 0;
-
-  magic_error += line[0] ^ 'L';
-  magic_error += line[1] ^ 'u';
-  magic_error += line[2] ^ 'm';
-  magic_error += line[3] ^ 'i';
-  magic_error += line[4] ^ 'n';
-  magic_error += line[5] ^ 'a';
-  magic_error += line[6] ^ 'r';
-  magic_error += line[7] ^ 'y';
-
-  if (magic_error != 0) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File is not a Luminary file.")
+  if (fgets(line, LINE_SIZE, file) == (char*) 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has no header.");
   }
 
-  fgets(line, LINE_SIZE, file);
+  const size_t magic_line_length = strlen(line);
+  if (
+    magic_line_length < 8 || memcmp(line, "Luminary", 8) != 0
+    || !((magic_line_length == 9 && line[8] == '\n') || (magic_line_length == 10 && line[8] == '\r' && line[9] == '\n'))) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File is not a Luminary file.");
+  }
+
+  if (fgets(line, LINE_SIZE, file) == (char*) 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has no version information.");
+  }
 
   if (line[0] == 'v' || line[0] == 'V') {
-    sscanf(line, "%*s %u\n", version);
+    char* version_value = line;
+    while (*version_value != '\0' && *version_value != ' ' && *version_value != '\t') {
+      version_value++;
+    }
+
+    while (*version_value == ' ' || *version_value == '\t') {
+      version_value++;
+    }
+
+    if (*version_value < '0' || *version_value > '9') {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has invalid version information.");
+    }
+
+    errno = 0;
+    char* end;
+    const unsigned long parsed_version = strtoul(version_value, &end, 10);
+    if (version_value == end || errno == ERANGE || parsed_version > 0xFFFFFFFFUL) {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has invalid version information.");
+    }
+
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') {
+      end++;
+    }
+
+    if (*end != '\0') {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has invalid version information.");
+    }
+
+    *version = (uint32_t) parsed_version;
+
+    if (*version < MIN_SUPPORTED_VERSION) {
+      __RETURN_ERROR(
+        LUMINARY_ERROR_API_EXCEPTION, "Luminary file is version %u but minimum supported version is %u.", *version, MIN_SUPPORTED_VERSION);
+    }
+
+    if (*version > CURRENT_VERSION) {
+      __RETURN_ERROR(
+        LUMINARY_ERROR_API_EXCEPTION, "Luminary file version %u is newer than the current version %u.", *version, CURRENT_VERSION);
+    }
   }
   else {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has no version information.");

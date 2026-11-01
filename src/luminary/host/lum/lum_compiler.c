@@ -1174,6 +1174,17 @@ LuminaryResult lum_compiler_compile(LumCompiler* compiler, const LumCompilerComp
     __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, &token, "unexpected end of file"));
   }
 
+  if (state->error_occurred == false) {
+    uint32_t num_main_instructions;
+    uint32_t num_cleanup_instructions;
+    __FAILURE_HANDLE(array_get_num_elements(state->instructions_main, &num_main_instructions));
+    __FAILURE_HANDLE(array_get_num_elements(state->instructions_cleanup, &num_cleanup_instructions));
+
+    if (state->returned_stack_object_id != ALLOCATOR_OBJECT_ID_INVALID || num_main_instructions > 0 || num_cleanup_instructions > 0) {
+      __FAILURE_HANDLE(_lum_compiler_state_add_error_message(state, &token, "expected ';' before end of file"));
+    }
+  }
+
   uint32_t message_count;
   __FAILURE_HANDLE(array_get_num_elements(state->messages, &message_count));
 

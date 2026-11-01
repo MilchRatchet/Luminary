@@ -124,7 +124,7 @@ struct LumTokenizer {
   uint32_t line;
   uint32_t col;
   char* string_mem;
-  uint32_t allocated_string_mem;
+  size_t allocated_string_mem;
 } typedef LumTokenizer;
 
 LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer);

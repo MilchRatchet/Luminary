@@ -10,24 +10,54 @@ LuminaryResult lum_file_parse_v5(FILE* file, LumBinary* binary) {
   __CHECK_NULL_ARGUMENT(file);
   __CHECK_NULL_ARGUMENT(binary);
 
-  size_t read_chars = 0;
-  size_t file_size  = 4096;
+  // Keep the payload below UINT32_MAX so the tokenizer can represent the final NUL offset.
+  const size_t max_code_size = (size_t) 0x7FFFFFFF * 2;
+  size_t read_chars          = 0;
+  size_t code_capacity       = 4096;
   char* code;
-  __FAILURE_HANDLE(host_malloc(&code, file_size));
+  __FAILURE_HANDLE(host_malloc(&code, code_capacity + 1));
 
-  // 4GB limit
-  while (file_size < UINT32_MAX) {
-    read_chars += fread(code + read_chars, 1, file_size - read_chars, file);
+  while (true) {
+    if (read_chars == code_capacity) {
+      if (code_capacity == max_code_size) {
+        if (fgetc(file) != EOF) {
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary V5 source exceeds the maximum supported size.");
+        }
 
-    if (read_chars != file_size) {
+        if (ferror(file)) {
+          __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to read Luminary V5 source.");
+        }
+
+        break;
+      }
+
+      const size_t new_capacity = (code_capacity > max_code_size / 2) ? max_code_size : code_capacity * 2;
+
+      __FAILURE_HANDLE(host_realloc(&code, new_capacity + 1));
+      code_capacity = new_capacity;
+    }
+
+    const size_t bytes_read = fread(code + read_chars, 1, code_capacity - read_chars, file);
+    read_chars += bytes_read;
+
+    if (ferror(file)) {
+      __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Failed to read Luminary V5 source.");
+    }
+
+    if (feof(file)) {
       break;
     }
 
-    file_size *= 2;
-    __FAILURE_HANDLE(host_realloc(&code, file_size));
+    if (bytes_read == 0) {
+      __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Luminary V5 source read made no progress.");
+    }
   }
 
-  memset(code + read_chars, 0, file_size - read_chars);
+  if (memchr(code, '\0', read_chars) != (void*) 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary V5 source contains an embedded NUL byte.");
+  }
+
+  code[read_chars] = '\0';
 
   LumParser* parser;
   __FAILURE_HANDLE(lum_parser_create(&parser));

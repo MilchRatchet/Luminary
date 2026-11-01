@@ -1,5 +1,7 @@
 #include "lum_tokenizer.h"
 
+#include <errno.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,131 +31,140 @@ LuminaryResult lum_tokenizer_create(LumTokenizer** tokenizer) {
   return LUMINARY_SUCCESS;
 }
 
+static bool _lum_tokenizer_starts_number(const char* code) {
+  return (code[0] >= '0' && code[0] <= '9') || (code[0] == '-' && code[1] >= '0' && code[1] <= '9');
+}
+
 static uint32_t _lum_identifier_get_num_chars(const char* code, const bool for_literal) {
-  const char* next_space            = strchr(code, ' ');
-  const char* next_newline          = strchr(code, '\n');
-  const char* next_charriage_return = strchr(code, '\r');
+  const bool starts_number    = for_literal && _lum_tokenizer_starts_number(code);
+  const bool is_hex           = starts_number && code[0] == '0' && (code[1] == 'x' || code[1] == 'X');
+  bool decimal_separator_seen = false;
+  bool exponent_seen          = false;
+  uint32_t num_chars          = 0;
 
-  uint32_t num_chars = UINT32_MAX;
+  while (code[num_chars] != '\0') {
+    const char current_char = code[num_chars];
 
-  num_chars = (next_space) ? min(next_space - code, num_chars) : num_chars;
-  num_chars = (next_newline) ? min(next_newline - code, num_chars) : num_chars;
-  num_chars = (next_charriage_return) ? min(next_charriage_return - code, num_chars) : num_chars;
+    if (current_char == ' ' || current_char == '\t' || current_char == '\n' || current_char == '\r' || current_char == '=') {
+      break;
+    }
 
-  for (uint32_t separator_id = 0; separator_id < LUM_SEPARATOR_COUNT; separator_id++) {
-    // Member separator is special as it is allowed to be part of a literal
-    if (for_literal && separator_id == LUM_SEPARATOR_TYPE_MEMBER)
+    if (current_char == '.' && starts_number && !decimal_separator_seen && !exponent_seen) {
+      decimal_separator_seen = true;
+      num_chars++;
       continue;
+    }
 
-    const char* next_separator = strchr(code, _lum_separator_chars[separator_id]);
+    if (is_hex == false && (current_char == 'e' || current_char == 'E')) {
+      exponent_seen = true;
+    }
 
-    num_chars = (next_separator) ? min(next_separator - code, num_chars) : num_chars;
-  }
+    bool is_separator = false;
+    for (uint32_t separator_id = 0; separator_id < LUM_SEPARATOR_COUNT; separator_id++) {
+      if (current_char == _lum_separator_chars[separator_id]) {
+        is_separator = true;
+        break;
+      }
+    }
 
-  if (num_chars == UINT32_MAX) {
-    num_chars = (uint32_t) strlen(code);
+    if (is_separator) {
+      break;
+    }
+
+    num_chars++;
   }
 
   return num_chars;
 }
 
-static uint32_t _lum_literal_parse_string(LumTokenizer* tokenizer, LumToken* token) {
-  const char* code = tokenizer->code + tokenizer->read_offset;
+static LuminaryResult _lum_tokenizer_string_append(LumTokenizer* tokenizer, size_t* write_offset, char value) {
+  __CHECK_NULL_ARGUMENT(tokenizer);
+  __CHECK_NULL_ARGUMENT(write_offset);
 
-  // Verify begin of string
-  if (code[0] != '\"')
-    return 0;
-
-  uint32_t read_chars   = 1;
-  uint32_t write_offset = 0;
-
-  while (code[read_chars] != '\0') {
-    // Carriage return
-    if (code[read_chars] == '\r') {
-      read_chars++;
-      continue;
+  if (*write_offset >= tokenizer->allocated_string_mem) {
+    if (tokenizer->allocated_string_mem > (size_t) -1 / 2) {
+      __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Luminary string literal is too large.");
     }
 
-    // Newline
-    if (code[read_chars] == '\n') {
-      read_chars++;
-      continue;
-    }
-
-    // String End
-    if (code[read_chars] == '\"') {
-      read_chars++;
-      break;
-    }
-
-    // TODO: Figure out if LumV5 should support escape sequences in strings. My feeling is that they are useless
-    // for our purpose. The issue is that they cause issues with Windows file paths.
-#if 0
-    // Escape Sequence
-    if (code[read_chars] == '\\') {
-      read_chars++;
-
-      if (write_offset == tokenizer->allocated_string_mem) {
-        tokenizer->allocated_string_mem *= 2;
-        __FAILURE_HANDLE(host_realloc(&tokenizer->string_mem, tokenizer->allocated_string_mem));
-      }
-
-      switch (code[read_chars]) {
-        case '0':
-          tokenizer->string_mem[write_offset++] = '\0';
-          break;
-        case 'n':
-          tokenizer->string_mem[write_offset++] = '\n';
-          break;
-        case 't':
-          tokenizer->string_mem[write_offset++] = '\t';
-          break;
-        case 'r':
-          tokenizer->string_mem[write_offset++] = '\r';
-          break;
-        default:
-          break;
-      }
-
-      read_chars++;
-      continue;
-    }
-#endif
-
-    if (write_offset == tokenizer->allocated_string_mem) {
-      tokenizer->allocated_string_mem *= 2;
-      __FAILURE_HANDLE(host_realloc(&tokenizer->string_mem, tokenizer->allocated_string_mem));
-    }
-
-    tokenizer->string_mem[write_offset++] = code[read_chars];
-
-    read_chars++;
-  }
-
-  if (write_offset == tokenizer->allocated_string_mem) {
     tokenizer->allocated_string_mem *= 2;
     __FAILURE_HANDLE(host_realloc(&tokenizer->string_mem, tokenizer->allocated_string_mem));
   }
 
-  tokenizer->string_mem[write_offset++] = '\0';
+  tokenizer->string_mem[(*write_offset)++] = value;
 
-  token->literal.val_string = (LumTokenLiteralString) {.data = tokenizer->string_mem, .length = write_offset - 1};
+  return LUMINARY_SUCCESS;
+}
 
-  return read_chars;
+static LuminaryResult _lum_literal_parse_string(LumTokenizer* tokenizer, LumToken* token, uint32_t* consumed_chars) {
+  __CHECK_NULL_ARGUMENT(tokenizer);
+  __CHECK_NULL_ARGUMENT(token);
+  __CHECK_NULL_ARGUMENT(consumed_chars);
+
+  const char* code    = tokenizer->code + tokenizer->read_offset;
+  uint32_t read_chars = 1;
+  size_t write_offset = 0;
+  bool closed         = false;
+
+  while (code[read_chars] != '\0') {
+    char value = code[read_chars++];
+
+    if (value == '"') {
+      closed = true;
+      break;
+    }
+
+    if (value == '\r' || value == '\n') {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Newlines in Luminary string literals must be escaped.");
+    }
+
+    if (value == '\\') {
+      value = code[read_chars++];
+
+      switch (value) {
+        case '\\':
+        case '"':
+          break;
+        case 'n':
+          value = '\n';
+          break;
+        case 'r':
+          value = '\r';
+          break;
+        case 't':
+          value = '\t';
+          break;
+        case '\0':
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Unterminated escape sequence in Luminary string literal.");
+        default:
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid escape sequence in Luminary string literal.");
+      }
+    }
+
+    __FAILURE_HANDLE(_lum_tokenizer_string_append(tokenizer, &write_offset, value));
+  }
+
+  if (closed == false) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Unterminated Luminary string literal.");
+  }
+
+  const size_t string_length = write_offset;
+  __FAILURE_HANDLE(_lum_tokenizer_string_append(tokenizer, &write_offset, '\0'));
+
+  token->literal.val_string = (LumTokenLiteralString) {.data = tokenizer->string_mem, .length = (uint32_t) string_length};
+  *consumed_chars           = read_chars;
+
+  return LUMINARY_SUCCESS;
 }
 
 static bool _lum_tokenizer_is_identifier(LumTokenizer* tokenizer, LumToken* token, uint32_t* consumed_chars) {
-  const char* code = tokenizer->code + tokenizer->read_offset;
-
+  const char* code         = tokenizer->code + tokenizer->read_offset;
   const uint32_t num_chars = _lum_identifier_get_num_chars(code, false);
 
-  if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH - 1)
+  if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH)
     return false;
 
   *consumed_chars = num_chars;
-
-  token->type = LUM_TOKEN_TYPE_IDENTIFIER;
-
+  token->type     = LUM_TOKEN_TYPE_IDENTIFIER;
   memcpy(token->identifier.name, code, num_chars);
   token->identifier.name[num_chars] = '\0';
 
@@ -185,58 +196,23 @@ static bool _lum_tokenizer_is_keyword(LumTokenizer* tokenizer, LumToken* token, 
 }
 
 static bool _lum_tokenizer_is_literal(LumTokenizer* tokenizer, LumToken* token, uint32_t* consumed_chars) {
-  if (tokenizer->code[tokenizer->read_offset] == '\"') {
-    token->type         = LUM_TOKEN_TYPE_LITERAL;
-    token->literal.type = LUM_LITERAL_TYPE_STRING;
-    *consumed_chars     = _lum_literal_parse_string(tokenizer, token);
-    return true;
-  }
+  __CHECK_NULL_ARGUMENT(tokenizer);
+  __CHECK_NULL_ARGUMENT(token);
+  __CHECK_NULL_ARGUMENT(consumed_chars);
 
   const char* code = tokenizer->code + tokenizer->read_offset;
+  if (code[0] == '"') {
+    token->type         = LUM_TOKEN_TYPE_LITERAL;
+    token->literal.type = LUM_LITERAL_TYPE_STRING;
+
+    return _lum_literal_parse_string(tokenizer, token, consumed_chars) == LUMINARY_SUCCESS;
+  }
 
   const uint32_t num_chars = _lum_identifier_get_num_chars(code, true);
+  if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH)
+    return LUMINARY_SUCCESS;
 
-  if (num_chars >= LUM_IDENTIFIER_MAX_LENGTH - 1)
-    return false;
-
-  bool is_number = code[0] >= '0' && code[0] <= '9';
-
-  if (is_number == false && num_chars > 1) {
-    is_number = code[0] == '-' && code[1] >= '0' && code[1] <= '9';
-  }
-
-  if (is_number) {
-    char literal_string[LUM_IDENTIFIER_MAX_LENGTH];
-    memcpy(literal_string, code, num_chars);
-    literal_string[num_chars] = '\0';
-
-    bool has_decimal_seperator = false;
-    for (uint32_t index = 0; index < num_chars; index++) {
-      if (literal_string[index] == '.') {
-        has_decimal_seperator = true;
-        break;
-      }
-    }
-
-    if (has_decimal_seperator) {
-      token->type              = LUM_TOKEN_TYPE_LITERAL;
-      token->literal.type      = LUM_LITERAL_TYPE_FLOAT;
-      token->literal.val_float = strtof(literal_string, (char**) 0);
-      *consumed_chars          = num_chars;
-      return true;
-    }
-    else {
-      token->type             = LUM_TOKEN_TYPE_LITERAL;
-      token->literal.type     = LUM_LITERAL_TYPE_UINT;
-      token->literal.val_uint = strtoul(literal_string, (char**) 0, 0);
-      *consumed_chars         = num_chars;
-      return true;
-    }
-
-    return false;
-  }
-
-  if (num_chars == 4 && code[0] == 't' && code[1] == 'r' && code[2] == 'u' && code[3] == 'e') {
+  if (num_chars == 4 && memcmp(code, "true", 4) == 0) {
     token->type             = LUM_TOKEN_TYPE_LITERAL;
     token->literal.type     = LUM_LITERAL_TYPE_BOOL;
     token->literal.val_bool = true;
@@ -244,7 +220,7 @@ static bool _lum_tokenizer_is_literal(LumTokenizer* tokenizer, LumToken* token, 
     return true;
   }
 
-  if (num_chars == 5 && code[0] == 'f' && code[1] == 'a' && code[2] == 'l' && code[3] == 's' && code[4] == 'e') {
+  if (num_chars == 5 && memcmp(code, "false", 5) == 0) {
     token->type             = LUM_TOKEN_TYPE_LITERAL;
     token->literal.type     = LUM_LITERAL_TYPE_BOOL;
     token->literal.val_bool = false;
@@ -254,13 +230,9 @@ static bool _lum_tokenizer_is_literal(LumTokenizer* tokenizer, LumToken* token, 
 
   for (uint32_t enum_type = 0; enum_type < LUM_BUILTIN_ENUM_COUNT; enum_type++) {
     const LumBuiltinEnumValuePair* pair = lum_builtin_enums + enum_type;
+    const size_t string_length          = strlen(pair->string);
 
-    const size_t string_length = strlen(pair->string);
-
-    if (string_length != num_chars)
-      continue;
-
-    if (memcmp(pair->string, code, num_chars) == 0) {
+    if (string_length == num_chars && memcmp(pair->string, code, num_chars) == 0) {
       token->type             = LUM_TOKEN_TYPE_LITERAL;
       token->literal.type     = LUM_LITERAL_TYPE_ENUM;
       token->literal.val_enum = pair->value;
@@ -269,7 +241,49 @@ static bool _lum_tokenizer_is_literal(LumTokenizer* tokenizer, LumToken* token, 
     }
   }
 
-  return false;
+  if (_lum_tokenizer_starts_number(code) == false)
+    return false;
+
+  char literal_string[LUM_IDENTIFIER_MAX_LENGTH];
+  memcpy(literal_string, code, num_chars);
+  literal_string[num_chars] = '\0';
+
+  const bool is_hex = literal_string[0] == '0' && (literal_string[1] == 'x' || literal_string[1] == 'X');
+  bool is_float     = literal_string[0] == '-';
+  for (uint32_t index = 0; index < num_chars; index++) {
+    if (literal_string[index] == '.' || (!is_hex && (literal_string[index] == 'e' || literal_string[index] == 'E'))) {
+      is_float = true;
+      break;
+    }
+  }
+
+  if (is_float) {
+    errno = 0;
+    char* end;
+    const float parsed_value = strtof(literal_string, &end);
+
+    if (end == literal_string || *end != '\0' || !isfinite(parsed_value) || (errno == ERANGE && parsed_value == 0.0f))
+      return false;
+
+    token->type              = LUM_TOKEN_TYPE_LITERAL;
+    token->literal.type      = LUM_LITERAL_TYPE_FLOAT;
+    token->literal.val_float = parsed_value;
+  }
+  else {
+    errno = 0;
+    char* end;
+    const unsigned long parsed_value = strtoul(literal_string, &end, 0);
+
+    if (end == literal_string || *end != '\0' || errno == ERANGE || parsed_value > 0xFFFFFFFFUL)
+      return false;
+
+    token->type             = LUM_TOKEN_TYPE_LITERAL;
+    token->literal.type     = LUM_LITERAL_TYPE_UINT;
+    token->literal.val_uint = (uint32_t) parsed_value;
+  }
+
+  *consumed_chars = num_chars;
+  return true;
 }
 
 static bool _lum_tokenizer_is_operator(LumTokenizer* tokenizer, LumToken* token, uint32_t* consumed_chars) {
@@ -305,6 +319,7 @@ static bool _lum_tokenizer_is_separator(LumTokenizer* tokenizer, LumToken* token
 
 LuminaryResult lum_tokenizer_set_code(LumTokenizer* tokenizer, const char* code) {
   __CHECK_NULL_ARGUMENT(tokenizer);
+  __CHECK_NULL_ARGUMENT(code);
 
   tokenizer->code        = code;
   tokenizer->read_offset = 0;
@@ -317,6 +332,7 @@ LuminaryResult lum_tokenizer_set_code(LumTokenizer* tokenizer, const char* code)
 LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken* token) {
   __CHECK_NULL_ARGUMENT(tokenizer);
   __CHECK_NULL_ARGUMENT(token);
+  __CHECK_NULL_ARGUMENT(tokenizer->code);
 
   // Skip special characters.
   while (true) {
@@ -329,14 +345,7 @@ LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken*
     }
 
     // Whitespace
-    if (current_char == ' ') {
-      tokenizer->col++;
-      tokenizer->read_offset++;
-      continue;
-    }
-
-    // Tab
-    if (current_char == '\t') {
+    if (current_char == ' ' || current_char == '\t') {
       tokenizer->col++;
       tokenizer->read_offset++;
       continue;
@@ -358,13 +367,16 @@ LuminaryResult lum_tokenizer_parse_next_token(LumTokenizer* tokenizer, LumToken*
 
     // Comments
     if (current_char == '#') {
-      char comment_char;
-      do {
-        comment_char = tokenizer->code[tokenizer->read_offset++];
-      } while (comment_char != '\0' && comment_char != '\n');
+      while (tokenizer->code[tokenizer->read_offset] != '\0' && tokenizer->code[tokenizer->read_offset] != '\n') {
+        tokenizer->read_offset++;
+        tokenizer->col++;
+      }
 
-      tokenizer->line++;
-      tokenizer->col = 0;
+      if (tokenizer->code[tokenizer->read_offset] == '\n') {
+        tokenizer->read_offset++;
+        tokenizer->line++;
+        tokenizer->col = 0;
+      }
 
       continue;
     }
@@ -499,7 +511,6 @@ LuminaryResult lum_tokenizer_destroy(LumTokenizer** tokenizer) {
   __CHECK_NULL_ARGUMENT(*tokenizer);
 
   __FAILURE_HANDLE(host_free(&(*tokenizer)->string_mem));
-
   __FAILURE_HANDLE(host_free(tokenizer));
 
   return LUMINARY_SUCCESS;

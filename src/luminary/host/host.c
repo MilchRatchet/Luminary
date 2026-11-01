@@ -1351,7 +1351,7 @@ LuminaryResult luminary_host_save_as_lumV5(Host* host, Path* path) {
 
   LumSerializer* serializer;
   __FAILURE_HANDLE(lum_serializer_create(&serializer));
-  __FAILURE_HANDLE(lum_serializer_serialize(serializer, host));
+  __FAILURE_HANDLE(lum_serializer_serialize(serializer, host, path));
   __FAILURE_HANDLE(lum_serializer_store(serializer, path));
   __FAILURE_HANDLE(lum_serializer_destroy(&serializer));
 

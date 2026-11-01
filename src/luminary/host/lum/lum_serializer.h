@@ -11,7 +11,7 @@ struct LumSerializer {
 } typedef LumSerializer;
 
 LuminaryResult lum_serializer_create(LumSerializer** serializer);
-LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host);
+LuminaryResult lum_serializer_serialize(LumSerializer* serializer, Host* host, Path* destination_path);
 LuminaryResult lum_serializer_store(LumSerializer* serializer, Path* path);
 LuminaryResult lum_serializer_destroy(LumSerializer** serializer);
 
