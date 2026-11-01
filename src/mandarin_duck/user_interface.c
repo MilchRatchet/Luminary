@@ -4,6 +4,7 @@
 #include "window.h"
 #include "windows/about.h"
 #include "windows/caption_controls.h"
+#include "windows/debug_window.h"
 #include "windows/entity_properties.h"
 #include "windows/frametime.h"
 #include "windows/renderer_status.h"
@@ -24,6 +25,14 @@ static void _user_interface_setup(UserInterface* ui) {
 
     LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &entity_property_window_ids[entity_property_type]));
     LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_entity_properties));
+  }
+
+  for (uint32_t debug_window_type = 0; debug_window_type < WINDOW_DEBUG_TYPE_COUNT; debug_window_type++) {
+    Window* window_debug;
+    window_debug_create(&window_debug, (WindowDebugType) debug_window_type);
+
+    LUM_FAILURE_HANDLE(array_get_num_elements(ui->windows, &ui->debug_window_ids[debug_window_type]));
+    LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_debug));
   }
 
   Window* window_caption_controls;

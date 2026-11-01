@@ -15,7 +15,11 @@ add_executable(LuminaryMD)
 # Sources
 #=============================================================
 
-file(GLOB mandarin_duck_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/elements/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/windows/*.c")
+file(
+  GLOB mandarin_duck_source_files CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/elements/*.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/windows/*.c")
 
 target_sources(LuminaryMD PRIVATE ${mandarin_duck_source_files})
 

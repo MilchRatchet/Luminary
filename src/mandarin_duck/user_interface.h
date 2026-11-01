@@ -2,6 +2,7 @@
 #define MANDARIN_DUCK_USER_INTERFACE_H
 
 #include "utils.h"
+#include "windows/debug_window_types.h"
 
 struct Display typedef Display;
 struct Window typedef Window;
@@ -21,6 +22,7 @@ UserInterfaceStatus user_interface_status_merge(UserInterfaceStatus a, UserInter
 struct UserInterface {
   Window** windows;
   uint32_t* window_ids_sorted;
+  uint32_t debug_window_ids[WINDOW_DEBUG_TYPE_COUNT];
   uint32_t about_window_id;
   MouseState* mouse_state;
 } typedef UserInterface;

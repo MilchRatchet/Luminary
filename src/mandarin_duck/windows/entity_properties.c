@@ -12,6 +12,8 @@
 #include "elements/separator.h"
 #include "elements/slider.h"
 #include "elements/text.h"
+#include "user_interface.h"
+#include "windows/debug_window.h"
 
 struct WindowEntityPropertiesPassingData {
   Window* window;
@@ -1306,18 +1308,48 @@ static void _window_entity_properties_instance_action(Window* window, Display* d
   return;
 }
 
+static void _window_entity_properties_debug_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  WindowEntityPropertiesPassingData data = {
+    .window         = window,
+    .display        = display,
+    .mouse_state    = mouse_state,
+    .keyboard_state = display->keyboard_state,
+    .write_access   = true,
+  };
+
+  element_separator(
+    window, mouse_state, (ElementSeparatorArgs) {.text = "Debug Windows", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
+
+  for (uint32_t debug_window_type = 0; debug_window_type < WINDOW_DEBUG_TYPE_COUNT; debug_window_type++) {
+    const uint32_t window_id = display->ui->debug_window_ids[debug_window_type];
+    bool is_visible;
+    user_interface_get_window_visible(display->ui, window_id, &is_visible);
+
+    if (_window_entity_properties_add_checkbox(data, window_debug_type_get_name((WindowDebugType) debug_window_type), &is_visible)) {
+      user_interface_set_window_visible(display->ui, window_id, is_visible);
+    }
+  }
+
+  return;
+}
+
 static void (*const action_funcs[WINDOW_ENTITY_PROPERTIES_TYPE_COUNT])(
   Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) = {
-  [WINDOW_ENTITY_PROPERTIES_TYPE_GLOBAL]    = _window_entity_properties_global_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]  = _window_entity_properties_renderer_settings_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA]    = _window_entity_properties_camera_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_OCEAN]     = _window_entity_properties_ocean_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_SKY]       = _window_entity_properties_sky_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_CLOUD]     = _window_entity_properties_cloud_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_FOG]       = _window_entity_properties_fog_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES] = _window_entity_properties_particles_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]  = _window_entity_properties_material_action,
-  [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]  = _window_entity_properties_instance_action};
+  [WINDOW_ENTITY_PROPERTIES_TYPE_GLOBAL]        = _window_entity_properties_global_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_SETTINGS]      = _window_entity_properties_renderer_settings_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_CAMERA]        = _window_entity_properties_camera_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_OCEAN]         = _window_entity_properties_ocean_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_SKY]           = _window_entity_properties_sky_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_CLOUD]         = _window_entity_properties_cloud_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_FOG]           = _window_entity_properties_fog_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_PARTICLES]     = _window_entity_properties_particles_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_MATERIAL]      = _window_entity_properties_material_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_INSTANCE]      = _window_entity_properties_instance_action,
+  [WINDOW_ENTITY_PROPERTIES_TYPE_DEBUG_WINDOWS] = _window_entity_properties_debug_action};
 
 void window_entity_properties_create(Window** window, WindowEntityPropertiesType type) {
   MD_CHECK_NULL_ARGUMENT(window);
