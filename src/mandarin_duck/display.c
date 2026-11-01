@@ -827,7 +827,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   }
   else if (ui_status.received_keyboard_action == false) {
     const bool ctrl_down = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down || display->keyboard_state->keys[SDL_SCANCODE_RCTRL].down;
-    display_zoom_handler_update(display->zoom_handler, display->mouse_state, ctrl_down);
+    display_zoom_handler_update(display->zoom_handler, display->mouse_state, ctrl_down, ui_status.received_scroll);
     render_region_handle_inputs(display->region, display, host, display->mouse_state, display->keyboard_state);
   }
 }

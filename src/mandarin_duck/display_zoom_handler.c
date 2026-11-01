@@ -150,7 +150,7 @@ static void _display_zoom_handler_handle_swipe(DisplayZoomHandler* zoom, MouseSt
   zoom->offset_y_internal -= mouse->y_motion * scale_factor;
 }
 
-void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse, bool ctrl_down) {
+void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse, bool ctrl_down, bool wheel_consumed) {
   MD_CHECK_NULL_ARGUMENT(zoom);
   MD_CHECK_NULL_ARGUMENT(mouse);
 
@@ -161,7 +161,8 @@ void display_zoom_handler_update(DisplayZoomHandler* zoom, MouseState* mouse, bo
     _display_zoom_handler_handle_swipe(zoom, mouse);
   }
 
-  _display_zoom_handler_handle_scroll(zoom, mouse);
+  if (wheel_consumed == false)
+    _display_zoom_handler_handle_scroll(zoom, mouse);
   _display_zoom_handler_update_offset(zoom);
 }
 

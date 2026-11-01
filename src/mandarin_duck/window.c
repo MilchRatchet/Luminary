@@ -137,6 +137,11 @@ UserInterfaceStatus window_handle_input(Window* window, Display* display, Lumina
         display_set_mouse_visible(display, true);
       }
       break;
+    case WINDOW_INTERACTION_STATE_TABLE_SCROLL:
+      if (mouse_state->down == false) {
+        _window_reset_state(window);
+      }
+      break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED: {
       UserInterfaceStatus external_status = window_handle_input(window->external_subwindow, display, host, mouse_state);
       window->external_subwindow->propagate_parent_func(window->external_subwindow, window);
@@ -156,13 +161,15 @@ UserInterfaceStatus window_handle_input(Window* window, Display* display, Lumina
   window->context_stack_ptr = 0;
   memset(window->separator_context_string, 0, WINDOW_SEPARATOR_CONTEXT_IDENTIFIER_SIZE);
 
-  window->context_stack[0] = (WindowContext) {.fill          = 0,
-                                              .x             = window->x,
-                                              .y             = window->y,
-                                              .width         = window->width,
-                                              .height        = window->height,
-                                              .padding       = window->padding,
-                                              .is_horizontal = window->is_horizontal};
+  window->context_stack[0] = (WindowContext) {
+    .fill          = 0,
+    .x             = window->x,
+    .y             = window->y,
+    .width         = window->width,
+    .height        = window->height,
+    .padding       = window->padding,
+    .is_horizontal = window->is_horizontal,
+  };
 
   window->action_func(window, display, host, mouse_state);
 
@@ -174,6 +181,11 @@ UserInterfaceStatus window_handle_input(Window* window, Display* display, Lumina
     default:
       break;
     case WINDOW_INTERACTION_STATE_SLIDER:
+      if (mouse_state->down == true) {
+        mouse_state_invalidate(mouse_state);
+      }
+      break;
+    case WINDOW_INTERACTION_STATE_TABLE_SCROLL:
       if (mouse_state->down == true) {
         mouse_state_invalidate(mouse_state);
       }

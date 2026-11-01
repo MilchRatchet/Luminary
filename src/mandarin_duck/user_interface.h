@@ -12,6 +12,7 @@ typedef uint32_t WindowVisibilityMask;
 
 struct UserInterfaceStatus {
   bool received_hover;
+  bool received_scroll;
   bool received_mouse_action;
   bool received_keyboard_action;
 } typedef UserInterfaceStatus;

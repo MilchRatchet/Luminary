@@ -108,7 +108,12 @@ static void _user_interface_sort_windows_by_depth(UserInterface* ui) {
 ////////////////////////////////////////////////////////////////////
 
 UserInterfaceStatus user_interface_status_default() {
-  UserInterfaceStatus status = {.received_hover = false, .received_keyboard_action = false, .received_mouse_action = false};
+  UserInterfaceStatus status = {
+    .received_hover           = false,
+    .received_scroll          = false,
+    .received_keyboard_action = false,
+    .received_mouse_action    = false,
+  };
 
   return status;
 }
@@ -116,8 +121,10 @@ UserInterfaceStatus user_interface_status_default() {
 UserInterfaceStatus user_interface_status_merge(UserInterfaceStatus a, UserInterfaceStatus b) {
   UserInterfaceStatus status = {
     .received_hover           = a.received_hover || b.received_hover,
+    .received_scroll          = a.received_scroll || b.received_scroll,
     .received_keyboard_action = a.received_keyboard_action || b.received_keyboard_action,
-    .received_mouse_action    = a.received_mouse_action || b.received_mouse_action};
+    .received_mouse_action    = a.received_mouse_action || b.received_mouse_action,
+  };
 
   return status;
 }
