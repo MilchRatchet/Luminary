@@ -256,6 +256,10 @@ if(LUMINARY_MEMORY_DEBUG)
   target_compile_definitions(Luminary PRIVATE "LUMINARY_MEMORY_DEBUG")
 endif()
 
+if(LUMINARY_ENABLE_DEBUG_API)
+  target_compile_definitions(Luminary PUBLIC "LUMINARY_ENABLE_DEBUG_API")
+endif()
+
 #=============================================================
 # Configure
 #=============================================================

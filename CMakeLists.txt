@@ -13,6 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Common options
 option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
+option(LUMINARY_ENABLE_DEBUG_API "Enable debug API" OFF)
 option(LUMINARY_KERNEL_ARCHS "Architecture to build" "")
 option(LUMINARY_FAST_KERNEL_COMPILE "Use fast Kernel compilation" OFF)
 option(LUMINARY_SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)

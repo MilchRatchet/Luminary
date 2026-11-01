@@ -19,6 +19,7 @@
 #define LUMINARY_H
 
 #include <luminary/api_utils.h>
+#include <luminary/debug.h>
 #include <luminary/error.h>
 #include <luminary/host.h>
 #include <luminary/image.h>
