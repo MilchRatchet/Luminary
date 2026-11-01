@@ -322,6 +322,11 @@ LUMINARY_KERNEL void adaptive_sampling_compute_tile_block_ranges(const KernelArg
   if (tile_id >= args.tile_count)
     return;
 
+  if (args.block_count == 0) {
+    args.dst[THREAD_ID] = 0;
+    return;
+  }
+
   const uint32_t subtile_id = THREAD_ID_IN_WARP;
 
   const uint32_t tasks_per_subtile = (args.tasks_per_tile + WARP_SIZE - 1) >> WARP_SIZE_LOG;

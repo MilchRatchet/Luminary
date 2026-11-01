@@ -84,6 +84,9 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
   __CHECK_NULL_ARGUMENT(ocean);
   __CHECK_NULL_ARGUMENT(device_ocean);
 
+  if (ocean->caustics_ris_sample_count > 128)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Ocean caustics RIS sample count exceeds the device limit of 128.");
+
   device_ocean->active                      = ocean->active;
   device_ocean->water_type                  = ocean->water_type;
   device_ocean->caustics_active             = ocean->caustics_active;
@@ -103,6 +106,9 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
 LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) {
   __CHECK_NULL_ARGUMENT(sky);
   __CHECK_NULL_ARGUMENT(device_sky);
+
+  if (sky->steps == 0 || sky->steps > 1023)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Sky step count must be between 1 and 1023.");
 
   device_sky->ozone_absorption   = sky->ozone_absorption;
   device_sky->steps              = sky->steps;
@@ -186,6 +192,9 @@ static LuminaryResult _device_struct_cloud_layer_convert(const CloudLayer* cloud
 LuminaryResult device_struct_cloud_convert(const Cloud* cloud, DeviceCloud* device_cloud) {
   __CHECK_NULL_ARGUMENT(cloud);
   __CHECK_NULL_ARGUMENT(device_cloud);
+
+  if (cloud->steps == 0 || cloud->steps > 1023 || cloud->shadow_steps == 0 || cloud->shadow_steps > 1023)
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Cloud step counts must be between 1 and 1023.");
 
   device_cloud->active       = cloud->active;
   device_cloud->steps        = cloud->steps;

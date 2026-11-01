@@ -175,14 +175,15 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 LUMINARY_KERNEL void geometry_process_tasks_debug() {
   HANDLE_DEVICE_ABORT();
 
-  const int task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
 
   LUMINARY_ASSUME(task_count <= MAXIMUM_TASKS_PER_THREAD);
 
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address      = task_get_base_address(i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
     DeviceTask task                       = task_load(task_base_address);
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);

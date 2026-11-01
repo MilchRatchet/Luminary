@@ -552,6 +552,11 @@ LuminaryResult device_adaptive_sampler_ensure_stage(
 
   const uint32_t num_adaptive_sampling_blocks = sampler->render_width * sampler->render_height;
 
+  if (num_adaptive_sampling_blocks == 0 || tile_count == 0) {
+    sampler->allocated_stage_id = stage_id;
+    return LUMINARY_SUCCESS;
+  }
+
   if (device->is_main_device == false) {
     DeviceAdaptiveSamplerBufferSizes buffer_sizes;
     __FAILURE_HANDLE(adaptive_sampler_get_buffer_sizes(shared_sampler, &buffer_sizes));
