@@ -53,6 +53,6 @@ struct ElementTableArgs {
   float* first_visible_row;
 } typedef ElementTableArgs;
 
-void element_table(Window* window, Display* display, const MouseState* mouse_state, ElementTableArgs args);
+uint32_t element_table(Window* window, Display* display, const MouseState* mouse_state, ElementTableArgs args);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_TABLE_H */

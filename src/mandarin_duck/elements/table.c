@@ -14,6 +14,7 @@
 #define ELEMENT_TABLE_CELL_PADDING 8
 #define ELEMENT_TABLE_SCROLLBAR_WIDTH 14
 #define ELEMENT_TABLE_SCROLLBAR_MIN_THUMB_HEIGHT 16
+#define ELEMENT_TABLE_NO_SELECTION (~(uint32_t) 0)
 
 struct ElementTableRenderData {
   uint32_t header_height;
@@ -25,6 +26,7 @@ struct ElementTableRenderData {
   uint32_t track_height;
   uint32_t thumb_y;
   uint32_t thumb_height;
+  uint32_t hovered_row;
   bool has_scrollbar;
 } typedef ElementTableRenderData;
 static_assert(sizeof(ElementTableRenderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
@@ -38,6 +40,13 @@ static void _element_table_render_func(Element* table, Display* display) {
   ui_renderer_render_rounded_box(
     display->ui_renderer, display, table->width, data->header_height, table->x, table->y, 0, MD_COLOR_BORDER, MD_COLOR_ACCENT_2,
     UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
+
+  if (data->hovered_row != ELEMENT_TABLE_NO_SELECTION) {
+    const uint32_t row_y = table->y + data->header_height + data->hovered_row * data->row_height;
+    ui_renderer_render_rounded_box(
+      display->ui_renderer, display, table->width - data->track_width, data->row_height, table->x, row_y, 0, MD_COLOR_BORDER,
+      MD_COLOR_ACCENT_LIGHT_2, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
+  }
 
   for (uint32_t row = 0; row < data->visible_row_count; row++) {
     const uint32_t line_y = table->y + data->header_height + row * data->row_height;
@@ -336,7 +345,7 @@ static uint32_t _element_table_compute_thumb_height(uint32_t track_height, uint3
   return (uint32_t) thumb_height;
 }
 
-void element_table(Window* window, Display* display, const MouseState* mouse_state, ElementTableArgs args) {
+uint32_t element_table(Window* window, Display* display, const MouseState* mouse_state, ElementTableArgs args) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(mouse_state);
@@ -354,6 +363,10 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
   const size_t max_addressable_size = ~(size_t) 0;
   if (args.element_count > 0 && (args.element_size == 0 || args.element_count > max_addressable_size / args.element_size)) {
     crash_message("Table element count and stride exceed the addressable data size.");
+  }
+
+  if (args.element_count > ELEMENT_TABLE_NO_SELECTION) {
+    crash_message("Table element count exceeds the range supported by its uint32_t selection result.");
   }
 
   const uint64_t max_row_height = ~(uint32_t) 0;
@@ -454,6 +467,30 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
     thumb_y                  = track_y + (uint32_t) floorf(scroll_ratio * thumb_travel + 0.5f);
   }
 
+  const uint64_t first_row           = (uint64_t) floor(*args.first_visible_row);
+  uint32_t hovered_row               = ELEMENT_TABLE_NO_SELECTION;
+  uint32_t clicked_index             = ELEMENT_TABLE_NO_SELECTION;
+  const uint32_t data_y              = table_bounds.y + args.row_height;
+  const uint32_t mouse_x             = mouse_state->x;
+  const uint32_t mouse_y             = mouse_state->y;
+  const bool any_row_visible         = args.visible_row_count > 0;
+  const bool mouse_in_table_bounds_x = mouse_x >= table_bounds.x && mouse_x < table_bounds.x + content_width;
+  const bool mouse_in_table_bounds_y = mouse_y >= data_y && mouse_y < data_y + track_height;
+
+  if (any_row_visible && mouse_in_table_bounds_x && mouse_in_table_bounds_y) {
+    const uint32_t visible_row = (mouse_y - data_y) / args.row_height;
+    const uint64_t row_index   = first_row + visible_row;
+
+    if (row_index < args.element_count) {
+      hovered_row = visible_row;
+
+      if (mouse_state->phase == MOUSE_PHASE_RELEASED) {
+        clicked_index                        = (uint32_t) row_index;
+        window->status.received_mouse_action = true;
+      }
+    }
+  }
+
   Element table     = {0};
   table.type        = ELEMENT_TYPE_TABLE;
   table.render_func = _element_table_render_func;
@@ -473,6 +510,7 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
   render_data->track_height           = track_height;
   render_data->thumb_y                = thumb_y;
   render_data->thumb_height           = thumb_height;
+  render_data->hovered_row            = hovered_row;
   render_data->has_scrollbar          = scrollbar_width > 0;
   window_push_element(window, &table);
 
@@ -480,7 +518,6 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
     window, display, mouse_state, table_bounds.x, table_bounds.y, content_width, args.row_height, args.columns, args.column_count,
     total_column_width, (const unsigned char*) 0);
 
-  const uint64_t first_row = (uint64_t) floor(*args.first_visible_row);
   for (uint32_t visible_row = 0; visible_row < args.visible_row_count; visible_row++) {
     const uint64_t row_index = first_row + visible_row;
     if (row_index >= args.element_count)
@@ -493,4 +530,6 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
       window, display, mouse_state, table_bounds.x, row_y, content_width, args.row_height, args.columns, args.column_count,
       total_column_width, record);
   }
+
+  return clicked_index;
 }
