@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <luminary/debug.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -562,6 +563,29 @@ LuminaryResult luminary_host_get_device_info(LuminaryHost* host, uint32_t device
   info->memory_size = device->properties.memory_size;
 
   return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_device_memory_get_allocations(
+  LuminaryHost* host, uint32_t device_id, LuminaryDeviceMemoryAllocationList* list) {
+  LUMINARY_HOST_API_ENTRY
+
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(list);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(host->device_manager->devices, &num_devices));
+
+  if (device_id >= num_devices) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Device ID exceeds number of devices.");
+  }
+
+  Device* device = host->device_manager->devices[device_id];
+
+  return device_memory_get_allocations(device->cuda_device, list);
+}
+
+LuminaryResult luminary_host_device_memory_allocation_list_destroy(LuminaryDeviceMemoryAllocationList* list) {
+  return device_memory_allocation_list_destroy(list);
 }
 
 LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, uint32_t device_id, bool enable) {

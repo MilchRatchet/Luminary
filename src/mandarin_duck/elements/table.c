@@ -395,13 +395,13 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
   const uint32_t thumb_height =
     scrollbar_width > 0 ? _element_table_compute_thumb_height(track_height, args.visible_row_count, args.element_count) : 0;
   const uint32_t thumb_travel = track_height - thumb_height;
-  const double max_scroll     = is_scrollable ? (double) (args.element_count - args.visible_row_count) : 0.0;
+  const float max_scroll      = is_scrollable ? (float) (args.element_count - args.visible_row_count) : 0.0;
   const uint64_t table_hash   = element_compute_hash(window->separator_context_string, args.identifier);
 
-  *args.first_visible_row = fmin(max_scroll, fmax(0.0, *args.first_visible_row));
+  *args.first_visible_row = fminf(max_scroll, fmaxf(0.0f, *args.first_visible_row));
 
   uint32_t thumb_y = track_y;
-  if (thumb_travel > 0 && max_scroll > 0.0) {
+  if (thumb_travel > 0 && max_scroll > 0.0f) {
     const float scroll_ratio = (float) (*args.first_visible_row / max_scroll);
     thumb_y += (uint32_t) floorf(scroll_ratio * thumb_travel + 0.5f);
   }
@@ -447,7 +447,7 @@ void element_table(Window* window, Display* display, const MouseState* mouse_sta
     }
   }
 
-  *args.first_visible_row = fmin(max_scroll, fmax(0.0, *args.first_visible_row));
+  *args.first_visible_row = fminf(max_scroll, fmaxf(0.0f, *args.first_visible_row));
 
   if (scrollbar_width > 0 && thumb_travel > 0 && max_scroll > 0.0) {
     const float scroll_ratio = (float) (*args.first_visible_row / max_scroll);

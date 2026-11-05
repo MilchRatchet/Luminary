@@ -1,6 +1,8 @@
 #ifndef LUMINARY_DEVICE_MEMORY_H
 #define LUMINARY_DEVICE_MEMORY_H
 
+#include <luminary/debug.h>
+
 #include "device_utils.h"
 
 #define STAGING
@@ -35,6 +37,8 @@ LuminaryResult device_memory_get_size(DEVICE const void* ptr, size_t* size);
 LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size, CUstream stream);
 LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char* func, uint32_t line);
 LuminaryResult device_memory_get_total_allocation_size(CUdevice device, size_t* size);
+LuminaryResult device_memory_get_allocations(CUdevice device, LuminaryDeviceMemoryAllocationList* list);
+LuminaryResult device_memory_allocation_list_destroy(LuminaryDeviceMemoryAllocationList* list);
 
 enum DeviceMemoryStagingFlag {
   DEVICE_MEMORY_STAGING_FLAG_NONE = 0,

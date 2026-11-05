@@ -23,6 +23,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+struct LuminaryHost;
+
 typedef struct LuminaryHostMemoryAllocation {
   const void* ptr;
   size_t size;
@@ -34,6 +36,17 @@ typedef struct LuminaryHostMemoryAllocationList {
   uint64_t count;
 } LuminaryHostMemoryAllocationList;
 
+typedef struct LuminaryDeviceMemoryAllocation {
+  uint64_t device_address;
+  size_t size;
+  const char* name;
+} LuminaryDeviceMemoryAllocation;
+
+typedef struct LuminaryDeviceMemoryAllocationList {
+  LuminaryDeviceMemoryAllocation* allocations;
+  uint64_t count;
+} LuminaryDeviceMemoryAllocationList;
+
 /*
  * Returns a point-in-time copy of live host allocations. Allocation addresses
  * may become stale after this function returns; the copied entries and names
@@ -44,5 +57,17 @@ LUMINARY_API LuminaryResult luminary_host_memory_get_allocations(LuminaryHostMem
 
 /* Frees the copied entries and names, then clears the list. */
 LUMINARY_API LuminaryResult luminary_host_memory_allocation_list_destroy(LuminaryHostMemoryAllocationList* list);
+
+/*
+ * Returns a point-in-time copy of allocations made through Luminary's device memory wrappers for the host device-list index.
+ * Device addresses are CUDA virtual addresses, not host-dereferenceable pointers. Addresses may become stale after this function returns;
+ * copied entries and names remain valid until the list is destroyed.
+ */
+/* The destination must be zero-initialized and must not own an existing snapshot. */
+LUMINARY_API LuminaryResult
+  luminary_host_device_memory_get_allocations(struct LuminaryHost* host, uint32_t device_id, LuminaryDeviceMemoryAllocationList* list);
+
+/* Frees the copied entries and names, then clears the list. */
+LUMINARY_API LuminaryResult luminary_host_device_memory_allocation_list_destroy(LuminaryDeviceMemoryAllocationList* list);
 
 #endif /* LUMINARY_API_DEBUG_H */

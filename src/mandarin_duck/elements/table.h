@@ -50,7 +50,7 @@ struct ElementTableArgs {
   ElementSize size;
   uint32_t row_height;
   /* Mutable row offset; fractional values allow smooth wheel and thumb movement. */
-  double* first_visible_row;
+  float* first_visible_row;
 } typedef ElementTableArgs;
 
 void element_table(Window* window, Display* display, const MouseState* mouse_state, ElementTableArgs args);

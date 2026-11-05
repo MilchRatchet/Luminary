@@ -1,5 +1,10 @@
 #include "device_memory.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <threads.h>
+
 #include "device_utils.h"
 #include "internal_error.h"
 
@@ -9,6 +14,10 @@ struct DeviceMemoryHeader {
   size_t size;
   size_t pitch;
   CUdevice device;
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  char* name;
+  struct DeviceMemoryHeader* next;
+#endif
 };
 
 // LUMDEVIM
@@ -16,19 +25,108 @@ struct DeviceMemoryHeader {
 #define DEVICE_MEMORY_HEADER_FREED_MAGIC (69ull)
 
 static size_t total_memory_allocation[LUMINARY_MAX_NUM_DEVICES];
+static mtx_t _device_memory_mutex;
+#ifdef LUMINARY_ENABLE_DEBUG_API
+static struct DeviceMemoryHeader* _debug_device_memory_allocations;
+#endif
 
 static_assert(sizeof(CUdevice) == sizeof(int), "This code assumes that CUDevice is just an alias for int.");
 
+#ifdef LUMINARY_ENABLE_DEBUG_API
+static LuminaryResult _device_memory_set_allocation_name(
+  struct DeviceMemoryHeader* header, const char* buf_name, const char* func, uint32_t line) {
+  const int name_size = snprintf((char*) 0, 0, "[%s:%u]: %s", func, line, buf_name);
+
+  if (name_size < 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to format device allocation tracking name.");
+  }
+
+  header->name = (char*) malloc((size_t) name_size + 1);
+
+  if (header->name == (char*) 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to allocate device allocation tracking name.");
+  }
+
+  if (snprintf(header->name, (size_t) name_size + 1, "[%s:%u]: %s", func, line, buf_name) < 0) {
+    free(header->name);
+    header->name = (char*) 0;
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to create device allocation tracking name.");
+  }
+
+  return LUMINARY_SUCCESS;
+}
+#endif
+
+static void _device_memory_add_allocation(struct DeviceMemoryHeader* header) {
+  mtx_lock(&_device_memory_mutex);
+
+  total_memory_allocation[header->device] += header->size;
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  header->next                     = _debug_device_memory_allocations;
+  _debug_device_memory_allocations = header;
+#endif
+
+  mtx_unlock(&_device_memory_mutex);
+}
+
+static LuminaryResult _device_memory_remove_allocation(struct DeviceMemoryHeader* header) {
+  mtx_lock(&_device_memory_mutex);
+
+  const size_t total_size = total_memory_allocation[header->device];
+  if (header->size > total_size) {
+    mtx_unlock(&_device_memory_mutex);
+    __RETURN_ERROR(
+      LUMINARY_ERROR_MEMORY_LEAK, "Device memory allocation is %llu bytes large but only %llu bytes are allocated in total.", header->size,
+      total_size);
+  }
+
+  total_memory_allocation[header->device] -= header->size;
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  struct DeviceMemoryHeader** allocation = &_debug_device_memory_allocations;
+  while (*allocation && *allocation != header)
+    allocation = &(*allocation)->next;
+
+  if (*allocation == header)
+    *allocation = header->next;
+#endif
+
+  mtx_unlock(&_device_memory_mutex);
+
+  return LUMINARY_SUCCESS;
+}
+
 void _device_memory_init(void) {
   memset(total_memory_allocation, 0, sizeof(size_t) * LUMINARY_MAX_NUM_DEVICES);
+  mtx_init(&_device_memory_mutex, mtx_plain);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  _debug_device_memory_allocations = (struct DeviceMemoryHeader*) 0;
+#endif
 }
 
 void _device_memory_shutdown(void) {
+  mtx_lock(&_device_memory_mutex);
+
   for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
     if (total_memory_allocation[device_id]) {
       luminary_print_error("Device %u leaked %llu bytes.", device_id, total_memory_allocation[device_id]);
     }
   }
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  struct DeviceMemoryHeader* allocation = _debug_device_memory_allocations;
+  while (allocation) {
+    struct DeviceMemoryHeader* next = allocation->next;
+    free(allocation->name);
+    allocation->name = (char*) 0;
+    allocation       = next;
+  }
+  _debug_device_memory_allocations = (struct DeviceMemoryHeader*) 0;
+#endif
+
+  mtx_unlock(&_device_memory_mutex);
+  mtx_destroy(&_device_memory_mutex);
 }
 
 LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
@@ -36,6 +134,11 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
 
   struct DeviceMemoryHeader* header;
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  memset(header, 0, sizeof(struct DeviceMemoryHeader));
+  __FAILURE_HANDLE(_device_memory_set_allocation_name(header, buf_name, func, line));
+#endif
 
   if (size > 0) {
     CUDA_FAILURE_HANDLE(cuMemAlloc(&header->ptr, size));
@@ -52,7 +155,7 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
   header->pitch  = 0;
   header->device = device;
 
-  total_memory_allocation[device] += size;
+  _device_memory_add_allocation(header);
 
   *_ptr = (void**) header;
 
@@ -64,6 +167,11 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
 
   struct DeviceMemoryHeader* header;
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  memset(header, 0, sizeof(struct DeviceMemoryHeader));
+  __FAILURE_HANDLE(_device_memory_set_allocation_name(header, buf_name, func, line));
+#endif
 
   size_t pitch;
   if (width_in_bytes > 0 && height) {
@@ -84,7 +192,7 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
   header->pitch  = pitch;
   header->device = device;
 
-  total_memory_allocation[device] += size;
+  _device_memory_add_allocation(header);
 
   *_ptr = (void**) header;
 
@@ -314,19 +422,17 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
       header->device, device);
   }
 
-  if (header->size > total_memory_allocation[device]) {
-    __RETURN_ERROR(
-      LUMINARY_ERROR_MEMORY_LEAK, "Device memory allocation is %llu bytes large but only %llu bytes are allocated in total.", header->size,
-      total_memory_allocation[device]);
-  }
-
-  total_memory_allocation[device] -= header->size;
+  __FAILURE_HANDLE(_device_memory_remove_allocation(header));
 
   if (header->ptr) {
     CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
   }
 
   header->magic = DEVICE_MEMORY_HEADER_FREED_MAGIC;
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  free(header->name);
+#endif
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 
@@ -338,7 +444,92 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 LuminaryResult device_memory_get_total_allocation_size(CUdevice device, size_t* size) {
   __CHECK_NULL_ARGUMENT(size);
 
+  if (device < 0 || device >= LUMINARY_MAX_NUM_DEVICES) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Invalid CUDA device ordinal was passed.");
+  }
+
+  mtx_lock(&_device_memory_mutex);
   *size = total_memory_allocation[device];
+  mtx_unlock(&_device_memory_mutex);
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_memory_get_allocations(CUdevice device, LuminaryDeviceMemoryAllocationList* list) {
+  __CHECK_NULL_ARGUMENT(list);
+
+  if (device < 0 || device >= LUMINARY_MAX_NUM_DEVICES) {
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_DEVICE, "Invalid CUDA device ordinal was passed.");
+  }
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  mtx_lock(&_device_memory_mutex);
+
+  uint64_t allocation_count = 0;
+  for (struct DeviceMemoryHeader* allocation = _debug_device_memory_allocations; allocation; allocation = allocation->next) {
+    if (allocation->device == device)
+      allocation_count++;
+  }
+
+  if (allocation_count > SIZE_MAX / sizeof(LuminaryDeviceMemoryAllocation)) {
+    mtx_unlock(&_device_memory_mutex);
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Device allocation snapshot is too large.");
+  }
+
+  LuminaryDeviceMemoryAllocation* copied_allocations = (LuminaryDeviceMemoryAllocation*) 0;
+  if (allocation_count > 0) {
+    copied_allocations = (LuminaryDeviceMemoryAllocation*) calloc((size_t) allocation_count, sizeof(LuminaryDeviceMemoryAllocation));
+
+    if (copied_allocations == (LuminaryDeviceMemoryAllocation*) 0) {
+      mtx_unlock(&_device_memory_mutex);
+      __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to allocate device allocation snapshot.");
+    }
+  }
+
+  uint64_t copied_count = 0;
+  for (struct DeviceMemoryHeader* allocation = _debug_device_memory_allocations; allocation; allocation = allocation->next) {
+    if (allocation->device != device)
+      continue;
+
+    const size_t name_size = strlen(allocation->name) + 1;
+    char* copied_name      = (char*) malloc(name_size);
+
+    if (copied_name == (char*) 0) {
+      for (uint64_t cleanup = 0; cleanup < copied_count; cleanup++)
+        free((void*) copied_allocations[cleanup].name);
+
+      free(copied_allocations);
+      mtx_unlock(&_device_memory_mutex);
+      __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to copy device allocation snapshot name.");
+    }
+
+    memcpy(copied_name, allocation->name, name_size);
+    copied_allocations[copied_count].device_address = (uint64_t) allocation->ptr;
+    copied_allocations[copied_count].size           = allocation->size;
+    copied_allocations[copied_count].name           = copied_name;
+    copied_count++;
+  }
+
+  list->allocations = copied_allocations;
+  list->count       = allocation_count;
+
+  mtx_unlock(&_device_memory_mutex);
+#endif
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_memory_allocation_list_destroy(LuminaryDeviceMemoryAllocationList* list) {
+  __CHECK_NULL_ARGUMENT(list);
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  for (uint64_t allocation = 0; allocation < list->count; allocation++)
+    free((void*) list->allocations[allocation].name);
+
+  free(list->allocations);
+  list->allocations = (LuminaryDeviceMemoryAllocation*) 0;
+  list->count       = 0;
+#endif
 
   return LUMINARY_SUCCESS;
 }
