@@ -3,6 +3,7 @@
 #include "error_registry.h"
 #include "internal_host_memory.h"
 #include "internal_log.h"
+#include "internal_stack_trace.h"
 #include "utils.h"
 
 void luminary_init(void) {
@@ -14,11 +15,13 @@ void luminary_init(void) {
 
   _host_memory_init();
   _error_registry_init();
+  _stack_trace_init();
 
   info_message("Luminary finished initialization.");
 }
 
 void luminary_shutdown(void) {
+  _stack_trace_shutdown();
   _error_registry_uninit();
   _host_memory_shutdown();
   _log_shutdown();

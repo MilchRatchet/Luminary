@@ -16,10 +16,10 @@ set(OptiX_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/optix-dev/include")
 # Get source files
 #=============================================================
 
-file(GLOB luminary_cpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/host/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/host/lum/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/device/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/zlib/*.c")
-file(GLOB luminary_cpu_header_files "${CMAKE_SOURCE_DIR}/include/luminary/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/host/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/host/lum/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/device/*.h")
-file(GLOB luminary_gpu_header_files "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/*.cuh")
-file(GLOB luminary_api_header_files "${CMAKE_SOURCE_DIR}/include/luminary/*.h")
+file(GLOB luminary_cpu_source_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/host/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/host/lum/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/device/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/zlib/*.c")
+file(GLOB luminary_cpu_header_files CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/luminary/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/host/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/host/lum/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/device/*.h")
+file(GLOB luminary_gpu_header_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/*.cuh")
+file(GLOB luminary_api_header_files CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/luminary/*.h")
 
 #=============================================================
 # Targets
@@ -247,6 +247,12 @@ target_include_directories(Luminary PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/
 
 target_link_libraries(Luminary PRIVATE CUDA::cuda_driver)
 target_link_libraries(Luminary PUBLIC $<TARGET_NAME:Luminary::Headers>)
+
+if(WIN32)
+  target_link_libraries(Luminary PRIVATE dbghelp)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(Luminary PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 #=============================================================
 # Defines

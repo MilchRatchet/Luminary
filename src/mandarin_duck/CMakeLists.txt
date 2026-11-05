@@ -48,6 +48,10 @@ target_link_libraries(LuminaryMD PRIVATE SDL3::SDL3)
 target_link_libraries(LuminaryMD PRIVATE SDL3_ttf::SDL3_ttf)
 target_link_libraries(LuminaryMD PRIVATE Luminary::Library)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_options(LuminaryMD PRIVATE "-rdynamic")
+endif()
+
 #=============================================================
 # Configure
 #=============================================================

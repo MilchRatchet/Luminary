@@ -25,6 +25,7 @@
 #include <luminary/image.h>
 #include <luminary/name_strings.h>
 #include <luminary/path.h>
+#include <luminary/stack_trace.h>
 #include <luminary/structs.h>
 
 // Luminary provides multiple utility functions that can be used
