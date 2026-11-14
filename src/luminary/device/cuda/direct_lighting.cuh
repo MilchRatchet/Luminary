@@ -152,7 +152,14 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
   vec3 pos_to_ocean = sub_vector(connection_point, ctx.position);
 
   const float dist = get_length(pos_to_ocean);
-  const vec3 dir   = normalize_vector(pos_to_ocean);
+
+  if (dist == 0.0f) {
+    DeviceTaskDirectLightSun task;
+    task.light_color = PACKED_RECORD_BLACK;
+    return task;
+  }
+
+  const vec3 dir = scale_vector(pos_to_ocean, 1.0f / dist);
 
   RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
 
