@@ -54,15 +54,16 @@ LUMINARY_FUNCTION float post_sample_buffer_clamp(const float* image, float x, fl
 }
 
 LUMINARY_FUNCTION float post_sample_buffer_border(
-  const float* image, float x, float y, const int width, const int height, const float weight = 1.0f) {
-  if (x > __uint_as_float(0b00111111011111111111111111111111) || x < 0.0f) {
+  const float* image, float x, float y, const int width, const int height, float& weight_sum, const float weight = 1.0f) {
+  if (x > 1.0f || x < 0.0f) {
     return 0.0f;
   }
 
-  if (y > __uint_as_float(0b00111111011111111111111111111111) || y < 0.0f) {
+  if (y > 1.0f || y < 0.0f) {
     return 0.0f;
   }
 
+  weight_sum += weight;
   return post_sample_buffer(image, x, y, width, height) * weight;
 }
 
@@ -78,27 +79,28 @@ LUMINARY_KERNEL void post_image_downsample(const KernelArgsPostImageDownsample a
     const uint32_t y = index / args.tw;
     const uint32_t x = index - y * args.tw;
 
-    const float sx = scale_x * x;
-    const float sy = scale_y * y;
+    const float sx = (x > 0 && x == args.tw - 1) ? 1.0f : scale_x * x;
+    const float sy = (y > 0 && y == args.th - 1) ? 1.0f : scale_y * y;
 
-    float pixel = 0.0f;
+    float pixel      = 0.0f;
+    float weight_sum = 0.0f;
 
-    pixel += post_sample_buffer_border(args.src, sx - 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
-    pixel += post_sample_buffer_border(args.src, sx + 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh);
-    pixel += post_sample_buffer_border(args.src, sx - 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
-    pixel += post_sample_buffer_border(args.src, sx + 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh);
+    pixel += post_sample_buffer_border(args.src, sx - 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh, weight_sum);
+    pixel += post_sample_buffer_border(args.src, sx + 0.5f * step_x, sy - 0.5f * step_y, args.sw, args.sh, weight_sum);
+    pixel += post_sample_buffer_border(args.src, sx - 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh, weight_sum);
+    pixel += post_sample_buffer_border(args.src, sx + 0.5f * step_x, sy + 0.5f * step_y, args.sw, args.sh, weight_sum);
 
-    pixel += post_sample_buffer_border(args.src, sx, sy, args.sw, args.sh);
-    pixel += post_sample_buffer_border(args.src, sx, sy - step_y, args.sw, args.sh, 0.5f);
-    pixel += post_sample_buffer_border(args.src, sx - step_x, sy, args.sw, args.sh, 0.5f);
-    pixel += post_sample_buffer_border(args.src, sx + step_x, sy, args.sw, args.sh, 0.5f);
-    pixel += post_sample_buffer_border(args.src, sx, sy + step_y, args.sw, args.sh, 0.5f);
-    pixel += post_sample_buffer_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh, 0.25f);
-    pixel += post_sample_buffer_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh, 0.25f);
-    pixel += post_sample_buffer_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh, 0.25f);
-    pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh, 0.25f);
+    pixel += post_sample_buffer_border(args.src, sx, sy, args.sw, args.sh, weight_sum);
+    pixel += post_sample_buffer_border(args.src, sx, sy - step_y, args.sw, args.sh, weight_sum, 0.5f);
+    pixel += post_sample_buffer_border(args.src, sx - step_x, sy, args.sw, args.sh, weight_sum, 0.5f);
+    pixel += post_sample_buffer_border(args.src, sx + step_x, sy, args.sw, args.sh, weight_sum, 0.5f);
+    pixel += post_sample_buffer_border(args.src, sx, sy + step_y, args.sw, args.sh, weight_sum, 0.5f);
+    pixel += post_sample_buffer_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh, weight_sum, 0.25f);
+    pixel += post_sample_buffer_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh, weight_sum, 0.25f);
+    pixel += post_sample_buffer_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh, weight_sum, 0.25f);
+    pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh, weight_sum, 0.25f);
 
-    pixel *= 1.0f / 8.0f;
+    pixel = (weight_sum > 0.0f) ? pixel / weight_sum : 0.0f;
 
     pixel = fmaxf(pixel - args.threshold, 0.0f);
 
@@ -118,21 +120,22 @@ LUMINARY_KERNEL void post_image_upsample(const KernelArgsPostImageUpsample args)
     const uint32_t y = index / args.tw;
     const uint32_t x = index - y * args.tw;
 
-    const float sx = scale_x * x;
-    const float sy = scale_y * y;
+    const float sx = (x > 0 && x == args.tw - 1) ? 1.0f : scale_x * x;
+    const float sy = (y > 0 && y == args.th - 1) ? 1.0f : scale_y * y;
 
-    float pixel = post_sample_buffer_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh);
+    float weight_sum = 0.0f;
+    float pixel      = post_sample_buffer_border(args.src, sx - step_x, sy - step_y, args.sw, args.sh, weight_sum);
 
-    pixel += post_sample_buffer_border(args.src, sx, sy - step_y, args.sw, args.sh, 2.0f);
-    pixel += post_sample_buffer_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh);
-    pixel += post_sample_buffer_border(args.src, sx - step_x, sy, args.sw, args.sh, 2.0f);
-    pixel += post_sample_buffer_border(args.src, sx, sy, args.sw, args.sh, 4.0f);
-    pixel += post_sample_buffer_border(args.src, sx + step_x, sy, args.sw, args.sh, 2.0f);
-    pixel += post_sample_buffer_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh);
-    pixel += post_sample_buffer_border(args.src, sx, sy + step_y, args.sw, args.sh, 2.0f);
-    pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh);
+    pixel += post_sample_buffer_border(args.src, sx, sy - step_y, args.sw, args.sh, weight_sum, 2.0f);
+    pixel += post_sample_buffer_border(args.src, sx + step_x, sy - step_y, args.sw, args.sh, weight_sum);
+    pixel += post_sample_buffer_border(args.src, sx - step_x, sy, args.sw, args.sh, weight_sum, 2.0f);
+    pixel += post_sample_buffer_border(args.src, sx, sy, args.sw, args.sh, weight_sum, 4.0f);
+    pixel += post_sample_buffer_border(args.src, sx + step_x, sy, args.sw, args.sh, weight_sum, 2.0f);
+    pixel += post_sample_buffer_border(args.src, sx - step_x, sy + step_y, args.sw, args.sh, weight_sum);
+    pixel += post_sample_buffer_border(args.src, sx, sy + step_y, args.sw, args.sh, weight_sum, 2.0f);
+    pixel += post_sample_buffer_border(args.src, sx + step_x, sy + step_y, args.sw, args.sh, weight_sum);
 
-    pixel *= 1.0f / 16.0f;
+    pixel = (weight_sum > 0.0f) ? pixel / weight_sum : 0.0f;
     pixel *= args.sa;
 
     float base_pixel = __ldcs(args.base + x + y * args.tw);
