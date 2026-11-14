@@ -7,6 +7,7 @@
 
 // Include stdatomic later, otherwise I run into issues.
 #include <luminary/debug.h>
+#include <luminary/stack_trace.h>
 #include <stdatomic.h>
 
 #include "internal_error.h"
@@ -33,6 +34,9 @@ static mtx_t _memory_debug_mutex;
 
 struct MemoryDebugAllocation {
   char* name;
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  char* stack_trace;
+#endif
   const void* ptr;
   size_t size;
 } typedef MemoryDebugAllocation;
@@ -69,12 +73,37 @@ static char* _debug_memory_allocation_get_name(const char* buf_name, const char*
   return allocation_name;
 }
 
+#ifdef LUMINARY_ENABLE_DEBUG_API
+static LuminaryResult _debug_memory_allocation_get_stack_trace(char** stack_trace) {
+  __CHECK_NULL_ARGUMENT(stack_trace);
+
+  LuminaryNativeStackTrace native_stack_trace = {0};
+  __FAILURE_HANDLE(luminary_get_native_stack_trace(&native_stack_trace));
+
+  *stack_trace              = native_stack_trace.text;
+  native_stack_trace.text   = (char*) 0;
+  native_stack_trace.length = 0;
+
+  return LUMINARY_SUCCESS;
+}
+#endif
+
 static LuminaryResult _debug_memory_allocation_add(
   const void* ptr, const char* buf_name, const char* func, uint32_t line, const size_t size, uint64_t* prev_total) {
   char* allocation_name = _debug_memory_allocation_get_name(buf_name, func, line);
 
   if (allocation_name == (char*) 0)
     __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to create host allocation tracking name.");
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  char* allocation_stack_trace      = (char*) 0;
+  LuminaryResult stack_trace_result = _debug_memory_allocation_get_stack_trace(&allocation_stack_trace);
+
+  if (stack_trace_result != LUMINARY_SUCCESS) {
+    free(allocation_name);
+    return stack_trace_result;
+  }
+#endif
 
   mtx_lock(&_memory_debug_mutex);
 
@@ -83,6 +112,9 @@ static LuminaryResult _debug_memory_allocation_add(
   if (duplicate_allocation) {
     mtx_unlock(&_memory_debug_mutex);
     free(allocation_name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+    free(allocation_stack_trace);
+#endif
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Host allocation is already present in the tracking list.");
   }
 
@@ -92,6 +124,9 @@ static LuminaryResult _debug_memory_allocation_add(
     if (new_allocated < _debug_memory_allocations_allocated || new_allocated > SIZE_MAX / sizeof(MemoryDebugAllocation)) {
       mtx_unlock(&_memory_debug_mutex);
       free(allocation_name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+      free(allocation_stack_trace);
+#endif
       __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Host allocation tracking list is too large.");
     }
 
@@ -100,6 +135,9 @@ static LuminaryResult _debug_memory_allocation_add(
     if (new_allocations == (MemoryDebugAllocation*) 0) {
       mtx_unlock(&_memory_debug_mutex);
       free(allocation_name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+      free(allocation_stack_trace);
+#endif
       __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to grow host allocation tracking list.");
     }
 
@@ -109,8 +147,11 @@ static LuminaryResult _debug_memory_allocation_add(
 
   MemoryDebugAllocation* allocation = _debug_memory_allocations + _debug_memory_allocations_count++;
   allocation->name                  = allocation_name;
-  allocation->size                  = size;
-  allocation->ptr                   = ptr;
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  allocation->stack_trace = allocation_stack_trace;
+#endif
+  allocation->size = size;
+  allocation->ptr  = ptr;
 
   *prev_total = atomic_fetch_add(&_host_memory_total_allocation, size);
 
@@ -138,6 +179,9 @@ static LuminaryResult _debug_memory_allocation_remove(
   }
 
   free(allocation->name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  free(allocation->stack_trace);
+#endif
 
   const size_t allocation_index = (size_t) (allocation - _debug_memory_allocations);
   _debug_memory_allocations_count--;
@@ -167,6 +211,16 @@ static LuminaryResult _debug_memory_allocation_realloc(
   if (allocation_name == (char*) 0)
     __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to create host allocation tracking name.");
 
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  char* allocation_stack_trace      = (char*) 0;
+  LuminaryResult stack_trace_result = _debug_memory_allocation_get_stack_trace(&allocation_stack_trace);
+
+  if (stack_trace_result != LUMINARY_SUCCESS) {
+    free(allocation_name);
+    return stack_trace_result;
+  }
+#endif
+
   mtx_lock(&_memory_debug_mutex);
 
   struct HostMemoryHeader* header   = ((struct HostMemoryHeader*) (*ptr)) - 1;
@@ -175,12 +229,18 @@ static LuminaryResult _debug_memory_allocation_realloc(
   if (allocation == (MemoryDebugAllocation*) 0) {
     mtx_unlock(&_memory_debug_mutex);
     free(allocation_name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+    free(allocation_stack_trace);
+#endif
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Host allocation is not tracked.");
   }
 
   if (allocation->size != header->size) {
     mtx_unlock(&_memory_debug_mutex);
     free(allocation_name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+    free(allocation_stack_trace);
+#endif
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Host allocation tracking size does not match its header.");
   }
 
@@ -190,6 +250,9 @@ static LuminaryResult _debug_memory_allocation_realloc(
   if (new_header == (struct HostMemoryHeader*) 0) {
     mtx_unlock(&_memory_debug_mutex);
     free(allocation_name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+    free(allocation_stack_trace);
+#endif
     __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to realloc host memory.");
   }
 
@@ -199,6 +262,10 @@ static LuminaryResult _debug_memory_allocation_realloc(
   *prev_total = atomic_fetch_add(&_host_memory_total_allocation, size);
 
   free(allocation->name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  free(allocation->stack_trace);
+  allocation->stack_trace = allocation_stack_trace;
+#endif
   allocation->name = allocation_name;
   allocation->ptr  = (const void*) (new_header + 1);
   allocation->size = size;
@@ -231,6 +298,10 @@ void _host_memory_shutdown(void) {
 #ifdef HOST_MEMORY_TRACKING_ENABLED
   for (size_t allocation = 0; allocation < _debug_memory_allocations_count; allocation++)
     free(_debug_memory_allocations[allocation].name);
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  for (size_t allocation = 0; allocation < _debug_memory_allocations_count; allocation++)
+    free(_debug_memory_allocations[allocation].stack_trace);
+#endif
 
   free(_debug_memory_allocations);
   _debug_memory_allocations           = (MemoryDebugAllocation*) 0;
@@ -413,8 +484,10 @@ LuminaryResult luminary_host_memory_get_allocations(LuminaryHostMemoryAllocation
       char* copied_name      = malloc(name_size);
 
       if (copied_name == (char*) 0) {
-        for (size_t cleanup = 0; cleanup < allocation; cleanup++)
+        for (size_t cleanup = 0; cleanup < allocation; cleanup++) {
           free((void*) copied_allocations[cleanup].name);
+          free((void*) copied_allocations[cleanup].stack_trace);
+        }
 
         free(copied_allocations);
         mtx_unlock(&_memory_debug_mutex);
@@ -423,6 +496,25 @@ LuminaryResult luminary_host_memory_get_allocations(LuminaryHostMemoryAllocation
 
       memcpy(copied_name, _debug_memory_allocations[allocation].name, name_size);
       copied_allocations[allocation].name = copied_name;
+    }
+
+    if (_debug_memory_allocations[allocation].stack_trace != (char*) 0) {
+      const size_t stack_trace_size = strlen(_debug_memory_allocations[allocation].stack_trace) + 1;
+      char* copied_stack_trace      = (char*) malloc(stack_trace_size);
+
+      if (copied_stack_trace == (char*) 0) {
+        for (size_t cleanup = 0; cleanup <= allocation; cleanup++) {
+          free((void*) copied_allocations[cleanup].name);
+          free((void*) copied_allocations[cleanup].stack_trace);
+        }
+
+        free(copied_allocations);
+        mtx_unlock(&_memory_debug_mutex);
+        __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to copy host allocation snapshot stack trace.");
+      }
+
+      memcpy(copied_stack_trace, _debug_memory_allocations[allocation].stack_trace, stack_trace_size);
+      copied_allocations[allocation].stack_trace = copied_stack_trace;
     }
   }
 
@@ -441,8 +533,10 @@ LuminaryResult luminary_host_memory_allocation_list_destroy(LuminaryHostMemoryAl
 
 #ifdef LUMINARY_ENABLE_DEBUG_API
 
-  for (uint64_t allocation = 0; allocation < list->count; allocation++)
+  for (uint64_t allocation = 0; allocation < list->count; allocation++) {
     free((void*) list->allocations[allocation].name);
+    free((void*) list->allocations[allocation].stack_trace);
+  }
 
   free(list->allocations);
   list->allocations = (LuminaryHostMemoryAllocation*) 0;

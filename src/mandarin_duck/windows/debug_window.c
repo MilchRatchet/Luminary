@@ -10,6 +10,7 @@
 #include "elements/separator.h"
 #include "elements/table.h"
 #include "elements/text.h"
+#include "subwindow_tooltip.h"
 
 #define WINDOW_DEBUG_DEVICE_LABEL_CACHE_CAPACITY 4
 #define WINDOW_DEBUG_DEVICE_LABEL_SIZE 256
@@ -154,6 +155,33 @@ static void _window_debug_action(
     (ElementSeparatorArgs) {.text = window_debug_type_get_name(type), .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});
 }
 
+static void _window_debug_clear_stack_trace_popup(Window* window) {
+  if (window->external_subwindow == (Window*) 0 || window->external_subwindow->type != WINDOW_TYPE_SUBWINDOW_TOOLTIP)
+    return;
+
+  subwindow_tooltip_destroy(window->external_subwindow);
+  window->external_subwindow->is_visible = false;
+
+  if (window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER)
+    window->state_data.state = WINDOW_INTERACTION_STATE_NONE;
+}
+
+static void _window_debug_update_stack_trace_popup(
+  Window* window, Display* display, const MouseState* mouse_state, uint32_t hovered_index, const char* stack_trace) {
+  if (window->state_data.state == WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_CLICKED)
+    return;
+
+  if (hovered_index != ELEMENT_TABLE_NO_SELECTION) {
+    subwindow_tooltip_create_stack_trace(
+      window->external_subwindow, display, stack_trace, hovered_index, mouse_state->wheel_motion, mouse_state->x, mouse_state->y);
+    window->state_data = (WindowInteractionStateData) {.state = WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER};
+    window->status.received_scroll |= mouse_state->wheel_motion != 0.0f;
+  }
+  else {
+    _window_debug_clear_stack_trace_popup(window);
+  }
+}
+
 static void _window_debug_host_memory_action(Window* window, Display* display, LuminaryHost* host, const MouseState* mouse_state) {
   _window_debug_action(window, display, host, mouse_state, WINDOW_DEBUG_TYPE_HOST_MEMORY);
 
@@ -184,31 +212,39 @@ static void _window_debug_host_memory_action(Window* window, Display* display, L
   window_pop_section(window);
 
   if (allocation_list.count == 0) {
+    _window_debug_clear_stack_trace_popup(window);
     window_push_section(window, 24, 0);
     window_margin(window, 8);
     _window_debug_add_text(window, display, mouse_state, "No host allocations", 1.0f);
     window_pop_section(window);
   }
   else {
+    uint32_t hovered_index = ELEMENT_TABLE_NO_SELECTION;
     float first_visible_row;
     memcpy(&first_visible_row, window->data, sizeof(first_visible_row));
 
     element_table(
       window, display, mouse_state,
       (ElementTableArgs) {
-        .identifier        = "host_memory_allocations",
-        .data              = allocation_list.allocations,
-        .element_size      = sizeof(LuminaryHostMemoryAllocation),
-        .element_count     = allocation_list.count,
-        .visible_row_count = 10,
-        .columns           = _window_debug_host_memory_columns,
-        .column_count      = sizeof(_window_debug_host_memory_columns) / sizeof(_window_debug_host_memory_columns[0]),
-        .size              = (ElementSize) {.rel_width = 1.0f},
-        .row_height        = 24,
-        .first_visible_row = &first_visible_row,
+        .identifier            = "host_memory_allocations",
+        .data                  = allocation_list.allocations,
+        .element_size          = sizeof(LuminaryHostMemoryAllocation),
+        .element_count         = allocation_list.count,
+        .visible_row_count     = 10,
+        .columns               = _window_debug_host_memory_columns,
+        .column_count          = sizeof(_window_debug_host_memory_columns) / sizeof(_window_debug_host_memory_columns[0]),
+        .size                  = (ElementSize) {.rel_width = 1.0f},
+        .row_height            = 24,
+        .first_visible_row     = &first_visible_row,
+        .hovered_index         = &hovered_index,
+        .defer_wheel_over_rows = true,
       });
 
     memcpy(window->data, &first_visible_row, sizeof(first_visible_row));
+
+    const char* stack_trace =
+      hovered_index < allocation_list.count ? allocation_list.allocations[hovered_index].stack_trace : (const char*) 0;
+    _window_debug_update_stack_trace_popup(window, display, mouse_state, hovered_index, stack_trace);
   }
 
   LUM_FAILURE_HANDLE(luminary_host_memory_allocation_list_destroy(&allocation_list));
@@ -221,6 +257,7 @@ static void _window_debug_device_memory_action(Window* window, Display* display,
   LUM_FAILURE_HANDLE(luminary_host_get_device_count(host, &device_count));
 
   if (device_count == 0) {
+    _window_debug_clear_stack_trace_popup(window);
     window_push_section(window, 24, 0);
     window_margin(window, 8);
     _window_debug_add_text(window, display, mouse_state, "No devices available", 1.0f);
@@ -307,28 +344,36 @@ static void _window_debug_device_memory_action(Window* window, Display* display,
   window_pop_section(window);
 
   if (allocation_list.count == 0) {
+    _window_debug_clear_stack_trace_popup(window);
     window_push_section(window, 24, 0);
     window_margin(window, 8);
     _window_debug_add_text(window, display, mouse_state, "No device allocations", 1.0f);
     window_pop_section(window);
   }
   else {
+    uint32_t hovered_index = ELEMENT_TABLE_NO_SELECTION;
     element_table(
       window, display, mouse_state,
       (ElementTableArgs) {
-        .identifier        = "device_memory_allocations",
-        .data              = allocation_list.allocations,
-        .element_size      = sizeof(LuminaryDeviceMemoryAllocation),
-        .element_count     = allocation_list.count,
-        .visible_row_count = 10,
-        .columns           = _window_debug_device_memory_columns,
-        .column_count      = sizeof(_window_debug_device_memory_columns) / sizeof(_window_debug_device_memory_columns[0]),
-        .size              = (ElementSize) {.rel_width = 1.0f},
-        .row_height        = 24,
-        .first_visible_row = &state.first_visible_row,
+        .identifier            = "device_memory_allocations",
+        .data                  = allocation_list.allocations,
+        .element_size          = sizeof(LuminaryDeviceMemoryAllocation),
+        .element_count         = allocation_list.count,
+        .visible_row_count     = 10,
+        .columns               = _window_debug_device_memory_columns,
+        .column_count          = sizeof(_window_debug_device_memory_columns) / sizeof(_window_debug_device_memory_columns[0]),
+        .size                  = (ElementSize) {.rel_width = 1.0f},
+        .row_height            = 24,
+        .first_visible_row     = &state.first_visible_row,
+        .hovered_index         = &hovered_index,
+        .defer_wheel_over_rows = true,
       });
 
     memcpy(window->data, &state, sizeof(state));
+
+    const char* stack_trace =
+      hovered_index < allocation_list.count ? allocation_list.allocations[hovered_index].stack_trace : (const char*) 0;
+    _window_debug_update_stack_trace_popup(window, display, mouse_state, hovered_index, stack_trace);
   }
 
   LUM_FAILURE_HANDLE(luminary_host_device_memory_allocation_list_destroy(&allocation_list));

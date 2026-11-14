@@ -14,7 +14,6 @@
 #define ELEMENT_TABLE_CELL_PADDING 8
 #define ELEMENT_TABLE_SCROLLBAR_WIDTH 14
 #define ELEMENT_TABLE_SCROLLBAR_MIN_THUMB_HEIGHT 16
-#define ELEMENT_TABLE_NO_SELECTION (~(uint32_t) 0)
 
 struct ElementTableRenderData {
   uint32_t header_height;
@@ -349,6 +348,9 @@ uint32_t element_table(Window* window, Display* display, const MouseState* mouse
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(mouse_state);
+  if (args.hovered_index)
+    *args.hovered_index = ELEMENT_TABLE_NO_SELECTION;
+
   MD_CHECK_NULL_ARGUMENT(args.identifier);
   MD_CHECK_NULL_ARGUMENT(args.first_visible_row);
 
@@ -422,12 +424,22 @@ uint32_t element_table(Window* window, Display* display, const MouseState* mouse
   const bool is_table_captured =
     window->state_data.state == WINDOW_INTERACTION_STATE_TABLE_SCROLL && window->state_data.element_hash == table_hash;
 
+  const uint32_t data_y              = table_bounds.y + args.row_height;
+  const uint32_t mouse_x             = mouse_state->x;
+  const uint32_t mouse_y             = mouse_state->y;
+  const bool any_row_visible         = args.visible_row_count > 0;
+  const bool mouse_in_table_bounds_x = mouse_x >= table_bounds.x && mouse_x < table_bounds.x + content_width;
+  const bool mouse_in_table_bounds_y = mouse_y >= data_y && mouse_y < data_y + track_height;
+  const bool mouse_in_data_rows      = any_row_visible && mouse_in_table_bounds_x && mouse_in_table_bounds_y;
+
   if (table_mouse_result.is_hovered || is_table_captured) {
     window->element_has_hover     = true;
     window->status.received_hover = true;
   }
 
-  if (is_scrollable && table_mouse_result.is_hovered && mouse_state->wheel_motion != 0.0f) {
+  if (
+    is_scrollable && table_mouse_result.is_hovered && mouse_state->wheel_motion != 0.0f
+    && (args.defer_wheel_over_rows == false || mouse_in_data_rows == false)) {
     *args.first_visible_row -= mouse_state->wheel_motion;
     window->status.received_scroll = true;
   }
@@ -467,15 +479,9 @@ uint32_t element_table(Window* window, Display* display, const MouseState* mouse
     thumb_y                  = track_y + (uint32_t) floorf(scroll_ratio * thumb_travel + 0.5f);
   }
 
-  const uint64_t first_row           = (uint64_t) floor(*args.first_visible_row);
-  uint32_t hovered_row               = ELEMENT_TABLE_NO_SELECTION;
-  uint32_t clicked_index             = ELEMENT_TABLE_NO_SELECTION;
-  const uint32_t data_y              = table_bounds.y + args.row_height;
-  const uint32_t mouse_x             = mouse_state->x;
-  const uint32_t mouse_y             = mouse_state->y;
-  const bool any_row_visible         = args.visible_row_count > 0;
-  const bool mouse_in_table_bounds_x = mouse_x >= table_bounds.x && mouse_x < table_bounds.x + content_width;
-  const bool mouse_in_table_bounds_y = mouse_y >= data_y && mouse_y < data_y + track_height;
+  const uint64_t first_row = (uint64_t) floor(*args.first_visible_row);
+  uint32_t hovered_row     = ELEMENT_TABLE_NO_SELECTION;
+  uint32_t clicked_index   = ELEMENT_TABLE_NO_SELECTION;
 
   if (any_row_visible && mouse_in_table_bounds_x && mouse_in_table_bounds_y) {
     const uint32_t visible_row = (mouse_y - data_y) / args.row_height;
@@ -483,6 +489,8 @@ uint32_t element_table(Window* window, Display* display, const MouseState* mouse
 
     if (row_index < args.element_count) {
       hovered_row = visible_row;
+      if (args.hovered_index)
+        *args.hovered_index = (uint32_t) row_index;
 
       if (mouse_state->phase == MOUSE_PHASE_RELEASED) {
         clicked_index                        = (uint32_t) row_index;

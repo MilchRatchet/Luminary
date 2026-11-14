@@ -29,6 +29,7 @@ typedef struct LuminaryHostMemoryAllocation {
   const void* ptr;
   size_t size;
   const char* name;
+  const char* stack_trace;
 } LuminaryHostMemoryAllocation;
 
 typedef struct LuminaryHostMemoryAllocationList {
@@ -40,6 +41,7 @@ typedef struct LuminaryDeviceMemoryAllocation {
   uint64_t device_address;
   size_t size;
   const char* name;
+  const char* stack_trace;
 } LuminaryDeviceMemoryAllocation;
 
 typedef struct LuminaryDeviceMemoryAllocationList {
@@ -49,25 +51,28 @@ typedef struct LuminaryDeviceMemoryAllocationList {
 
 /*
  * Returns a point-in-time copy of live host allocations. Allocation addresses
- * may become stale after this function returns; the copied entries and names
- * remain valid until the list is destroyed.
+ * may become stale after this function returns; copied entries, names, and
+ * stack traces remain valid until the list is destroyed. Stack traces contain
+ * symbolized native frames, up to 64 frames.
  */
 /* The destination must be zero-initialized and must not own an existing snapshot. */
 LUMINARY_API LuminaryResult luminary_host_memory_get_allocations(LuminaryHostMemoryAllocationList* list);
 
-/* Frees the copied entries and names, then clears the list. */
+/* Frees the copied entries, names, and stack traces, then clears the list. */
 LUMINARY_API LuminaryResult luminary_host_memory_allocation_list_destroy(LuminaryHostMemoryAllocationList* list);
 
 /*
  * Returns a point-in-time copy of allocations made through Luminary's device memory wrappers for the host device-list index.
  * Device addresses are CUDA virtual addresses, not host-dereferenceable pointers. Addresses may become stale after this function returns;
- * copied entries and names remain valid until the list is destroyed.
+ * copied entries, names, and stack traces remain valid until the list is
+ * destroyed. Stack traces contain symbolized native frames, up to the native
+ * 64 frames.
  */
 /* The destination must be zero-initialized and must not own an existing snapshot. */
 LUMINARY_API LuminaryResult
   luminary_host_device_memory_get_allocations(struct LuminaryHost* host, uint32_t device_id, LuminaryDeviceMemoryAllocationList* list);
 
-/* Frees the copied entries and names, then clears the list. */
+/* Frees the copied entries, names, and stack traces, then clears the list. */
 LUMINARY_API LuminaryResult luminary_host_device_memory_allocation_list_destroy(LuminaryDeviceMemoryAllocationList* list);
 
 #endif /* LUMINARY_API_DEBUG_H */

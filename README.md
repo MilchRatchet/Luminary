@@ -93,6 +93,7 @@ Requirements:
 | -DNATIVE_CUDA_ARCH=ON/OFF      | Enable that the CUDA architecture is based on the installed GPU. Default: ON
 | -DSHOW_KERNEL_STATS=ON/OFF     | Enable that CUDA kernel stats are printed at compilation. Default: OFF
 | -DLUMINARY_MEMORY_DEBUG=ON/OFF | Enable tracking of all host side allocations. Default: OFF
+| -DLUMINARY_ENABLE_DEBUG_API=ON/OFF | Enable debug APIs, including per-allocation native stack traces. This adds allocation-tracking overhead. Default: OFF
 
 
 ## Windows

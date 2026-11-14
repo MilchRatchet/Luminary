@@ -7,6 +7,8 @@
 
 #include "elements_common.h"
 
+#define ELEMENT_TABLE_NO_SELECTION (~(uint32_t) 0)
+
 enum ElementTableDataType {
   ELEMENT_TABLE_DATA_TYPE_STRING,
   ELEMENT_TABLE_DATA_TYPE_SIZE,
@@ -51,6 +53,10 @@ struct ElementTableArgs {
   uint32_t row_height;
   /* Mutable row offset; fractional values allow smooth wheel and thumb movement. */
   float* first_visible_row;
+  /* Optional absolute index of the hovered row, or ELEMENT_TABLE_NO_SELECTION. */
+  uint32_t* hovered_index;
+  /* Let the caller handle wheel input over data rows instead of scrolling this table. */
+  bool defer_wheel_over_rows;
 } typedef ElementTableArgs;
 
 uint32_t element_table(Window* window, Display* display, const MouseState* mouse_state, ElementTableArgs args);

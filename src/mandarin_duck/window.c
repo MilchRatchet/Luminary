@@ -5,6 +5,7 @@
 #include "display.h"
 #include "ui_renderer_blur.h"
 #include "user_interface.h"
+#include "windows/subwindow_tooltip.h"
 
 static uint64_t __window_depth_counter = 1;
 
@@ -149,7 +150,15 @@ UserInterfaceStatus window_handle_input(Window* window, Display* display, Lumina
       window->status = user_interface_status_merge(window->status, external_status);
     } break;
     case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
-      _window_reset_state(window);
+      if (
+        window->external_subwindow == (Window*) 0
+        || (window_is_mouse_hover(window->external_subwindow, display, mouse_state) == false
+            && (window->type != WINDOW_TYPE_DEBUG
+                || ((int32_t) mouse_state->x < window->x || (int32_t) mouse_state->x >= window->x + (int32_t) window->width
+                    || (int32_t) mouse_state->y < window->y || (int32_t) mouse_state->y >= window->y + (int32_t) window->height))
+            && (window->external_subwindow->state_data.state != WINDOW_INTERACTION_STATE_TABLE_SCROLL || mouse_state->down == false))) {
+        _window_reset_state(window);
+      }
       break;
     case WINDOW_INTERACTION_STATE_STRING:
       if (mouse_state->phase == MOUSE_PHASE_PRESSED) {
@@ -200,9 +209,10 @@ UserInterfaceStatus window_handle_input(Window* window, Display* display, Lumina
         _window_reset_state(window);
       }
       break;
-    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER:
-      window_handle_input(window->external_subwindow, display, host, mouse_state);
-      break;
+    case WINDOW_INTERACTION_STATE_EXTERNAL_WINDOW_HOVER: {
+      UserInterfaceStatus external_status = window_handle_input(window->external_subwindow, display, host, mouse_state);
+      window->status                      = user_interface_status_merge(window->status, external_status);
+    } break;
   }
 
   if (
@@ -362,6 +372,9 @@ void window_destroy(Window** window) {
   if ((*window)->external_subwindow) {
     window_destroy(&(*window)->external_subwindow);
   }
+
+  if ((*window)->type == WINDOW_TYPE_SUBWINDOW_TOOLTIP)
+    subwindow_tooltip_destroy(*window);
 
   if ((*window)->background_blur_buffer) {
     LUM_FAILURE_HANDLE(host_free(&(*window)->background_blur_buffer));

@@ -14,9 +14,11 @@
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+// Windows must be included before these
 #include <dbghelp.h>
 #include <threads.h>
-#include <windows.h>
 #elif defined(__linux__)
 #include <dlfcn.h>
 #include <execinfo.h>

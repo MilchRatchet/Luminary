@@ -1,5 +1,6 @@
 #include "device_memory.h"
 
+#include <luminary/stack_trace.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@ struct DeviceMemoryHeader {
   CUdevice device;
 #ifdef LUMINARY_ENABLE_DEBUG_API
   char* name;
+  char* stack_trace;
   struct DeviceMemoryHeader* next;
 #endif
 };
@@ -52,6 +54,15 @@ static LuminaryResult _device_memory_set_allocation_name(
     header->name = (char*) 0;
     __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to create device allocation tracking name.");
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_memory_set_allocation_stack_trace(struct DeviceMemoryHeader* header) {
+  LuminaryNativeStackTrace stack_trace = {0};
+  __FAILURE_HANDLE(luminary_get_native_stack_trace(&stack_trace));
+
+  header->stack_trace = stack_trace.text;
 
   return LUMINARY_SUCCESS;
 }
@@ -119,8 +130,10 @@ void _device_memory_shutdown(void) {
   while (allocation) {
     struct DeviceMemoryHeader* next = allocation->next;
     free(allocation->name);
-    allocation->name = (char*) 0;
-    allocation       = next;
+    free(allocation->stack_trace);
+    allocation->name        = (char*) 0;
+    allocation->stack_trace = (char*) 0;
+    allocation              = next;
   }
   _debug_device_memory_allocations = (struct DeviceMemoryHeader*) 0;
 #endif
@@ -137,7 +150,13 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
 
 #ifdef LUMINARY_ENABLE_DEBUG_API
   memset(header, 0, sizeof(struct DeviceMemoryHeader));
-  __FAILURE_HANDLE(_device_memory_set_allocation_name(header, buf_name, func, line));
+  LuminaryResult name_result = _device_memory_set_allocation_name(header, buf_name, func, line);
+
+  if (name_result != LUMINARY_SUCCESS) {
+    LuminaryResult cleanup_result = _host_free((void**) &header, buf_name, func, line);
+    LUM_UNUSED(cleanup_result);
+    return name_result;
+  }
 #endif
 
   if (size > 0) {
@@ -155,6 +174,21 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
   header->pitch  = 0;
   header->device = device;
 
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  LuminaryResult stack_trace_result = _device_memory_set_allocation_stack_trace(header);
+
+  if (stack_trace_result != LUMINARY_SUCCESS) {
+    if (header->ptr)
+      cuMemFree(header->ptr);
+
+    free(header->name);
+    header->name                  = (char*) 0;
+    LuminaryResult cleanup_result = _host_free((void**) &header, buf_name, func, line);
+    LUM_UNUSED(cleanup_result);
+    return stack_trace_result;
+  }
+#endif
+
   _device_memory_add_allocation(header);
 
   *_ptr = (void**) header;
@@ -170,7 +204,13 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
 
 #ifdef LUMINARY_ENABLE_DEBUG_API
   memset(header, 0, sizeof(struct DeviceMemoryHeader));
-  __FAILURE_HANDLE(_device_memory_set_allocation_name(header, buf_name, func, line));
+  LuminaryResult name_result = _device_memory_set_allocation_name(header, buf_name, func, line);
+
+  if (name_result != LUMINARY_SUCCESS) {
+    LuminaryResult cleanup_result = _host_free((void**) &header, buf_name, func, line);
+    LUM_UNUSED(cleanup_result);
+    return name_result;
+  }
 #endif
 
   size_t pitch;
@@ -191,6 +231,21 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
   header->size   = size;
   header->pitch  = pitch;
   header->device = device;
+
+#ifdef LUMINARY_ENABLE_DEBUG_API
+  LuminaryResult stack_trace_result = _device_memory_set_allocation_stack_trace(header);
+
+  if (stack_trace_result != LUMINARY_SUCCESS) {
+    if (header->ptr)
+      cuMemFree(header->ptr);
+
+    free(header->name);
+    header->name                  = (char*) 0;
+    LuminaryResult cleanup_result = _host_free((void**) &header, buf_name, func, line);
+    LUM_UNUSED(cleanup_result);
+    return stack_trace_result;
+  }
+#endif
 
   _device_memory_add_allocation(header);
 
@@ -432,6 +487,7 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 
 #ifdef LUMINARY_ENABLE_DEBUG_API
   free(header->name);
+  free(header->stack_trace);
 #endif
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
@@ -495,8 +551,10 @@ LuminaryResult device_memory_get_allocations(CUdevice device, LuminaryDeviceMemo
     char* copied_name      = (char*) malloc(name_size);
 
     if (copied_name == (char*) 0) {
-      for (uint64_t cleanup = 0; cleanup < copied_count; cleanup++)
+      for (uint64_t cleanup = 0; cleanup < copied_count; cleanup++) {
         free((void*) copied_allocations[cleanup].name);
+        free((void*) copied_allocations[cleanup].stack_trace);
+      }
 
       free(copied_allocations);
       mtx_unlock(&_device_memory_mutex);
@@ -507,6 +565,23 @@ LuminaryResult device_memory_get_allocations(CUdevice device, LuminaryDeviceMemo
     copied_allocations[copied_count].device_address = (uint64_t) allocation->ptr;
     copied_allocations[copied_count].size           = allocation->size;
     copied_allocations[copied_count].name           = copied_name;
+
+    const size_t stack_trace_size = strlen(allocation->stack_trace) + 1;
+    char* copied_stack_trace      = (char*) malloc(stack_trace_size);
+
+    if (copied_stack_trace == (char*) 0) {
+      for (uint64_t cleanup = 0; cleanup <= copied_count; cleanup++) {
+        free((void*) copied_allocations[cleanup].name);
+        free((void*) copied_allocations[cleanup].stack_trace);
+      }
+
+      free(copied_allocations);
+      mtx_unlock(&_device_memory_mutex);
+      __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Failed to copy device allocation snapshot stack trace.");
+    }
+
+    memcpy(copied_stack_trace, allocation->stack_trace, stack_trace_size);
+    copied_allocations[copied_count].stack_trace = copied_stack_trace;
     copied_count++;
   }
 
@@ -523,8 +598,10 @@ LuminaryResult device_memory_allocation_list_destroy(LuminaryDeviceMemoryAllocat
   __CHECK_NULL_ARGUMENT(list);
 
 #ifdef LUMINARY_ENABLE_DEBUG_API
-  for (uint64_t allocation = 0; allocation < list->count; allocation++)
+  for (uint64_t allocation = 0; allocation < list->count; allocation++) {
     free((void*) list->allocations[allocation].name);
+    free((void*) list->allocations[allocation].stack_trace);
+  }
 
   free(list->allocations);
   list->allocations = (LuminaryDeviceMemoryAllocation*) 0;
