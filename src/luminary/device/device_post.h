@@ -9,10 +9,12 @@ struct DevicePost {
   uint32_t width;
   uint32_t height;
 
-  bool bloom;
-  float bloom_blend;
-  float* DEVICE* bloom_mips;
-  uint32_t bloom_mip_count;
+  bool glow_active;
+  LuminaryGlowMode glow_mode;
+  float glow_strength;
+  LuminaryRGBF glow_color;
+  float* DEVICE* glow_mips;
+  uint32_t glow_mip_count;
 } typedef DevicePost;
 
 DEVICE_CTX_FUNC LuminaryResult device_post_create(DevicePost** post);

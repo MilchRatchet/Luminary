@@ -53,9 +53,9 @@ extern const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT];
 // LumBuiltin Enums
 ////////////////////////////////////////////////////////////////////
 
-#define LUM_BUILTIN_ENUM_COUNT                                                                                       \
-  (LUMINARY_SHADING_MODE_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_APERTURE_COUNT + LUMINARY_JERLOV_WATER_TYPE_COUNT \
-   + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT + LUMINARY_LENS_TEMPLATE_COUNT)
+#define LUM_BUILTIN_ENUM_COUNT                                                                                   \
+  (LUMINARY_SHADING_MODE_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_GLOW_MODE_COUNT + LUMINARY_APERTURE_COUNT \
+   + LUMINARY_JERLOV_WATER_TYPE_COUNT + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT + LUMINARY_LENS_TEMPLATE_COUNT)
 
 struct LumBuiltinEnumValuePair {
   const char* string;
@@ -81,6 +81,10 @@ enum LumBuiltinEnum {
   LUM_BUILTIN_ENUM_TONEMAP_UNCHARTED2 = LUMINARY_TONEMAP_UNCHARTED2,
   LUM_BUILTIN_ENUM_TONEMAP_AGX        = LUMINARY_TONEMAP_AGX,
   LUM_BUILTIN_ENUM_TONEMAP_AGX_PUNCHY = LUMINARY_TONEMAP_AGX_PUNCHY,
+  // LuminaryGlowMode
+  LUM_BUILTIN_ENUM_GLOW_MODE_NONE          = LUMINARY_GLOW_MODE_NONE,
+  LUM_BUILTIN_ENUM_GLOW_MODE_MONOCHROMATIC = LUMINARY_GLOW_MODE_MONOCHROMATIC,
+  LUM_BUILTIN_ENUM_GLOW_MODE_TRICHROMATIC  = LUMINARY_GLOW_MODE_TRICHROMATIC,
   // LuminaryAperture
   LUM_BUILTIN_ENUM_APERTURE_ROUND  = LUMINARY_APERTURE_ROUND,
   LUM_BUILTIN_ENUM_APERTURE_BLADED = LUMINARY_APERTURE_BLADED,
@@ -209,7 +213,9 @@ struct LumBuiltinCamera {
   float agx_custom_power;
   float agx_custom_saturation;
   bool use_local_error_minimization;
-  float bloom_blend;
+  LuminaryGlowMode glow_mode;
+  float glow_strength;
+  LuminaryRGBF glow_color;
   bool dithering;
   bool purkinje;
   float purkinje_kappa1;

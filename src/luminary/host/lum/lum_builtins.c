@@ -167,6 +167,10 @@ const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   __BUILTIN_ENUM_PAIR(TONEMAP_UNCHARTED2, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(TONEMAP_AGX, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(TONEMAP_AGX_PUNCHY, 1, LUM_VERSION_CURRENT),
+  // LuminaryGlowMode
+  __BUILTIN_ENUM_PAIR(GLOW_MODE_NONE, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(GLOW_MODE_MONOCHROMATIC, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(GLOW_MODE_TRICHROMATIC, 1, LUM_VERSION_CURRENT),
   // LuminaryAperture
   __BUILTIN_ENUM_PAIR(APERTURE_ROUND, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(APERTURE_BLADED, 1, LUM_VERSION_CURRENT),
@@ -268,7 +272,9 @@ static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_power, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, agx_custom_saturation, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, use_local_error_minimization, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, bloom_blend, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, glow_mode, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, glow_strength, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinCamera, glow_color, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, dithering, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinCamera, purkinje_kappa1, 1, LUM_VERSION_CURRENT),
@@ -621,7 +627,9 @@ LuminaryResult lum_builtin_camera_init(LumBuiltinCamera* camera, uint32_t versio
   camera->aperture_shape               = LUMINARY_APERTURE_ROUND;
   camera->aperture_blade_count         = 7;
   camera->exposure                     = 0.0f;
-  camera->bloom_blend                  = 0.01f;
+  camera->glow_mode                    = LUMINARY_GLOW_MODE_MONOCHROMATIC;
+  camera->glow_strength                = 0.01f;
+  camera->glow_color                   = (LuminaryRGBF) {1.0f, 1.0f, 1.0f};
   camera->dithering                    = 1;
   camera->tonemap                      = LUMINARY_TONEMAP_AGX;
   camera->use_local_error_minimization = false;
@@ -968,7 +976,9 @@ LuminaryResult lum_builtin_camera_convert(const LumBuiltinCamera* camera, Lumina
   dst_camera->exposure                     = camera->exposure;
   dst_camera->tonemap                      = camera->tonemap;
   dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
-  dst_camera->bloom_blend                  = camera->bloom_blend;
+  dst_camera->glow_mode                    = camera->glow_mode;
+  dst_camera->glow_strength                = camera->glow_strength;
+  dst_camera->glow_color                   = camera->glow_color;
   dst_camera->dithering                    = camera->dithering;
   dst_camera->purkinje                     = camera->purkinje;
   dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;
@@ -1263,7 +1273,9 @@ LuminaryResult lum_builtin_camera_serialize(const LuminaryCamera* camera, LumBui
   dst_camera->exposure                     = camera->exposure;
   dst_camera->tonemap                      = camera->tonemap;
   dst_camera->use_local_error_minimization = camera->use_local_error_minimization;
-  dst_camera->bloom_blend                  = camera->bloom_blend;
+  dst_camera->glow_mode                    = camera->glow_mode;
+  dst_camera->glow_strength                = camera->glow_strength;
+  dst_camera->glow_color                   = camera->glow_color;
   dst_camera->dithering                    = camera->dithering;
   dst_camera->purkinje                     = camera->purkinje;
   dst_camera->purkinje_kappa1              = camera->purkinje_kappa1;

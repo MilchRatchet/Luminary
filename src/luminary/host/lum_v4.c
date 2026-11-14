@@ -191,7 +191,8 @@ static LuminaryResult parse_camera_settings(Camera* camera, LegacyLumFileSetting
       break;
     /* BLOOMBLE */
     case 4993438986657549378u:
-      sscanf(value, "%f\n", &camera->bloom_blend);
+      sscanf(value, "%f\n", &camera->glow_strength);
+      camera->glow_mode = (camera->glow_strength > 0.0f) ? LUMINARY_GLOW_MODE_MONOCHROMATIC : LUMINARY_GLOW_MODE_NONE;
       break;
     /* LENSFLAR */
     case 5927102449525343564u:
@@ -738,7 +739,8 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
     error_message("LumV4 FILE stream set error condition. Scene may have not been fully parsed.");
 
   if (legacy_settings.force_no_bloom) {
-    content->camera.bloom_blend = 0.0f;
+    content->camera.glow_mode     = LUMINARY_GLOW_MODE_NONE;
+    content->camera.glow_strength = 0.0f;
   }
 
   content->wavefront_args->legacy_smoothness            = legacy_settings.legacy_smoothness;

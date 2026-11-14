@@ -18,7 +18,9 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->aperture_blade_count         = 7;
   camera->exposure                     = 0.0f;
   camera->shutter_speed                = 200.0f;
-  camera->bloom_blend                  = 0.01f;
+  camera->glow_mode                    = LUMINARY_GLOW_MODE_MONOCHROMATIC;
+  camera->glow_strength                = 0.05f;
+  camera->glow_color                   = (LuminaryRGBF) {1.0f, 0.3f, 0.05f};
   camera->dithering                    = 1;
   camera->tonemap                      = LUMINARY_TONEMAP_AGX;
   camera->use_local_error_minimization = false;
@@ -142,7 +144,11 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
 
   __CAMERA_CHECK_DIRTY(use_local_error_minimization, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(exposure, SCENE_DIRTY_FLAG_OUTPUT);
-  __CAMERA_CHECK_DIRTY(bloom_blend, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(glow_mode, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(glow_strength, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(glow_color.r, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(glow_color.g, SCENE_DIRTY_FLAG_OUTPUT);
+  __CAMERA_CHECK_DIRTY(glow_color.b, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(dithering, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(tonemap, SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(purkinje, SCENE_DIRTY_FLAG_OUTPUT);

@@ -138,6 +138,13 @@ LUMINARY_API enum LuminaryToneMap {
   LUMINARY_TONEMAP_COUNT
 } typedef LuminaryToneMap;
 
+LUMINARY_API enum LuminaryGlowMode {
+  LUMINARY_GLOW_MODE_NONE,
+  LUMINARY_GLOW_MODE_MONOCHROMATIC,
+  LUMINARY_GLOW_MODE_TRICHROMATIC,
+  LUMINARY_GLOW_MODE_COUNT
+} typedef LuminaryGlowMode;
+
 LUMINARY_API enum LuminaryLensTemplate {
   LUMINARY_LENS_TEMPLATE_THIN_LENS,
   LUMINARY_LENS_TEMPLATE_PHYSICAL_A,  // Canon 50mm f/1.2
@@ -215,7 +222,9 @@ LUMINARY_API struct LuminaryCamera {
   float shutter_speed;  // [s/*]
   LuminaryToneMap tonemap;
   bool use_local_error_minimization;
-  float bloom_blend;
+  LuminaryGlowMode glow_mode;
+  float glow_strength;
+  LuminaryRGBF glow_color;
   bool dithering;
   bool purkinje;
   float purkinje_kappa1;

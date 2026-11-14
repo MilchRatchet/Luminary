@@ -523,6 +523,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   uint32_t lens_template  = (uint32_t) camera.lens_template;
   uint32_t tonemap        = (uint32_t) camera.tonemap;
+  uint32_t glow_mode      = (uint32_t) camera.glow_mode;
   uint32_t aperture_shape = (uint32_t) camera.aperture_shape;
 
   element_separator(
@@ -699,7 +700,18 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
 
   update_data |=
     _window_entity_properties_add_slider(data, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -16.0f, 16.0f, 1.0f);
-  update_data |= _window_entity_properties_add_slider(data, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+
+  update_data |=
+    _window_entity_properties_add_dropdown(data, "Glow", LUMINARY_GLOW_MODE_COUNT, (char**) luminary_strings_glow_mode, &glow_mode);
+
+  if (glow_mode != LUMINARY_GLOW_MODE_NONE) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "Glow Strength", &camera.glow_strength, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 1.0f);
+  }
+  if (glow_mode == LUMINARY_GLOW_MODE_TRICHROMATIC) {
+    update_data |=
+      _window_entity_properties_add_slider(data, "Glow Color", &camera.glow_color, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
+  }
 
   update_data |=
     _window_entity_properties_add_dropdown(data, "Tonemap", LUMINARY_TONEMAP_COUNT, (char**) luminary_strings_tonemap, &tonemap);
@@ -734,6 +746,7 @@ static void _window_entity_properties_camera_action(Window* window, Display* dis
   if (update_data) {
     camera.lens_template         = (LuminaryLensTemplate) lens_template;
     camera.tonemap               = (LuminaryToneMap) tonemap;
+    camera.glow_mode             = (LuminaryGlowMode) glow_mode;
     camera.aperture_shape        = (LuminaryApertureShape) aperture_shape;
     camera.sensor.response_model = (LuminarySensorResponseModel) response_model;
 

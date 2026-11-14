@@ -21,6 +21,12 @@ const char* const luminary_strings_tonemap[LUMINARY_TONEMAP_COUNT] = {
   [LUMINARY_TONEMAP_AGX] = "Agx",           [LUMINARY_TONEMAP_AGX_PUNCHY] = "Agx Punchy",
 };
 
+const char* const luminary_strings_glow_mode[LUMINARY_GLOW_MODE_COUNT] = {
+  [LUMINARY_GLOW_MODE_NONE]          = "None",
+  [LUMINARY_GLOW_MODE_MONOCHROMATIC] = "Monochromatic",
+  [LUMINARY_GLOW_MODE_TRICHROMATIC]  = "Trichromatic",
+};
+
 const char* const luminary_strings_aperture[LUMINARY_APERTURE_COUNT] = {
   [LUMINARY_APERTURE_ROUND]  = "Round",
   [LUMINARY_APERTURE_BLADED] = "Bladed",
