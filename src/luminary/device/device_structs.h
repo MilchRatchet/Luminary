@@ -178,9 +178,9 @@ LUM_STATIC_SIZE_ASSERT(DeviceFog, 0x14u);
 
 struct DeviceParticles {
   uint32_t active : 1;
-  uint32_t count : 31;
+  uint32_t type : 1;
+  uint32_t count : 30;
 
-  RGBF albedo;
   float speed;
   float direction_altitude;
   float direction_azimuth;
@@ -189,7 +189,7 @@ struct DeviceParticles {
   float size;
   float size_variation;
 } typedef DeviceParticles;
-LUM_STATIC_SIZE_ASSERT(DeviceParticles, 0x2Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceParticles, 0x20u);
 
 union DeviceSceneEntityCover {
   DeviceRendererSettings settings;

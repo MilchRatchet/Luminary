@@ -1128,10 +1128,13 @@ static void _window_entity_properties_particles_action(
   update_data |= _window_entity_properties_add_checkbox(data, "Active", &particles.active);
 
   if (particles.active) {
+    uint32_t particle_type = (uint32_t) particles.type;
+
+    update_data |= _window_entity_properties_add_dropdown(
+      data, "Type", LUMINARY_PARTICLE_TYPE_COUNT, (char**) luminary_strings_particle_type, &particle_type);
     update_data |=
       _window_entity_properties_add_slider(data, "Count", &particles.count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 32767.0f, 1.0f);
     update_data |= _window_entity_properties_add_slider(data, "Seed", &particles.seed, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(data, "Albedo", &particles.albedo, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
     update_data |=
       _window_entity_properties_add_slider(data, "Speed", &particles.speed, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_slider(
@@ -1145,6 +1148,10 @@ static void _window_entity_properties_particles_action(
     update_data |= _window_entity_properties_add_slider(data, "Size", &particles.size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_slider(
       data, "Size Variation", &particles.size_variation, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+    if (update_data) {
+      particles.type = (LuminaryParticleType) particle_type;
+    }
   }
 
   if (update_data) {

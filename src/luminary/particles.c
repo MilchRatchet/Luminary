@@ -8,9 +8,7 @@ LuminaryResult particles_get_default(Particles* particles) {
 
   particles->active             = false;
   particles->scale              = 10.0f;
-  particles->albedo.r           = 1.0f;
-  particles->albedo.g           = 1.0f;
-  particles->albedo.b           = 1.0f;
+  particles->type               = LUMINARY_PARTICLE_TYPE_RAIN;
   particles->direction_altitude = 1.234f;
   particles->direction_azimuth  = 0.0f;
   particles->speed              = 0.0f;
@@ -40,9 +38,7 @@ LuminaryResult particles_check_for_dirty(const Particles* input, const Particles
 
   if (input->active) {
     __PARTICLES_CHECK_DIRTY(scale);
-    __PARTICLES_CHECK_DIRTY(albedo.r);
-    __PARTICLES_CHECK_DIRTY(albedo.g);
-    __PARTICLES_CHECK_DIRTY(albedo.b);
+    __PARTICLES_CHECK_DIRTY(type);
     __PARTICLES_CHECK_DIRTY(direction_altitude);
     __PARTICLES_CHECK_DIRTY(direction_azimuth);
     __PARTICLES_CHECK_DIRTY(speed);

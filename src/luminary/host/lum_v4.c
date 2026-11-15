@@ -643,7 +643,6 @@ static LuminaryResult parse_particle_settings(Particles* particle, char* line) {
       break;
     /* ALBEDO__ */
     case 6872298711029009473u:
-      sscanf(value, "%f %f %f\n", &particle->albedo.r, &particle->albedo.g, &particle->albedo.b);
       break;
     /* DIRECTIO */
     case 5713190250198747460u:

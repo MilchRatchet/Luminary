@@ -96,7 +96,7 @@ LUMINARY_FUNCTION RGBF bsdf_evaluate(
   const MaterialContextParticle ctx, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
   const float one_over_sampling_pdf) {
   is_refraction = false;
-  return scale_color(device.particles.albedo, volume_phase_evaluate(ctx, L) * one_over_sampling_pdf);
+  return splat_color(volume_phase_evaluate(ctx, L) * one_over_sampling_pdf);
 }
 
 LUMINARY_FUNCTION BSDFRayContext
@@ -331,7 +331,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICL
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
   info.ray    = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);
-  info.weight = device.particles.albedo;
+  info.weight = splat_color(1.0f);
 
   return info;
 }

@@ -362,11 +362,17 @@ LUMINARY_API struct LuminaryFog {
 // Particles
 ////////////////////////////////////////////////////////////////////
 
+enum LuminaryParticleType {
+  LUMINARY_PARTICLE_TYPE_RAIN,
+  LUMINARY_PARTICLE_TYPE_SNOW,
+  LUMINARY_PARTICLE_TYPE_COUNT
+} typedef LuminaryParticleType;
+
 LUMINARY_API struct LuminaryParticles {
   bool active;
   uint32_t seed;
   uint32_t count;
-  LuminaryRGBF albedo;
+  LuminaryParticleType type;
   float speed;
   float direction_altitude;
   float direction_azimuth;

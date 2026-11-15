@@ -53,9 +53,10 @@ extern const bool lum_builtin_types_accessible[LUM_BUILTIN_TYPE_COUNT];
 // LumBuiltin Enums
 ////////////////////////////////////////////////////////////////////
 
-#define LUM_BUILTIN_ENUM_COUNT                                                                                   \
-  (LUMINARY_SHADING_MODE_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_GLOW_MODE_COUNT + LUMINARY_APERTURE_COUNT \
-   + LUMINARY_JERLOV_WATER_TYPE_COUNT + LUMINARY_SKY_MODE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT + LUMINARY_LENS_TEMPLATE_COUNT)
+#define LUM_BUILTIN_ENUM_COUNT                                                                                                          \
+  (LUMINARY_SHADING_MODE_COUNT + LUMINARY_TONEMAP_COUNT + LUMINARY_GLOW_MODE_COUNT + LUMINARY_APERTURE_COUNT                            \
+   + LUMINARY_JERLOV_WATER_TYPE_COUNT + LUMINARY_SKY_MODE_COUNT + LUMINARY_PARTICLE_TYPE_COUNT + LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT \
+   + LUMINARY_LENS_TEMPLATE_COUNT)
 
 struct LumBuiltinEnumValuePair {
   const char* string;
@@ -103,6 +104,9 @@ enum LumBuiltinEnum {
   LUM_BUILTIN_ENUM_SKY_MODE_DEFAULT        = LUMINARY_SKY_MODE_DEFAULT,
   LUM_BUILTIN_ENUM_SKY_MODE_HDRI           = LUMINARY_SKY_MODE_HDRI,
   LUM_BUILTIN_ENUM_SKY_MODE_CONSTANT_COLOR = LUMINARY_SKY_MODE_CONSTANT_COLOR,
+  // LuminaryParticleType
+  LUM_BUILTIN_ENUM_PARTICLE_TYPE_RAIN = LUMINARY_PARTICLE_TYPE_RAIN,
+  LUM_BUILTIN_ENUM_PARTICLE_TYPE_SNOW = LUMINARY_PARTICLE_TYPE_SNOW,
   // LuminaryMaterialBaseSubstrate
   LUM_BUILTIN_ENUM_MATERIAL_BASE_SUBSTRATE_OPAQUE      = LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE,
   LUM_BUILTIN_ENUM_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT = LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT,
@@ -321,7 +325,7 @@ struct LumBuiltinParticles {
   bool active;
   uint32_t seed;
   uint32_t count;
-  LuminaryRGBF albedo;
+  LuminaryParticleType type;
   float speed;
   float direction_altitude;
   float direction_azimuth;

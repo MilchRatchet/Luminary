@@ -45,6 +45,11 @@ const char* const luminary_strings_sky_mode[LUMINARY_SKY_MODE_COUNT] = {
   [LUMINARY_SKY_MODE_CONSTANT_COLOR] = "Constant Color",
 };
 
+const char* const luminary_strings_particle_type[LUMINARY_PARTICLE_TYPE_COUNT] = {
+  [LUMINARY_PARTICLE_TYPE_RAIN] = "Rain",
+  [LUMINARY_PARTICLE_TYPE_SNOW] = "Snow",
+};
+
 const char* const luminary_strings_material_base_substrate[LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT] = {
   [LUMINARY_MATERIAL_BASE_SUBSTRATE_OPAQUE]      = "Opaque",
   [LUMINARY_MATERIAL_BASE_SUBSTRATE_TRANSLUCENT] = "Translucent",

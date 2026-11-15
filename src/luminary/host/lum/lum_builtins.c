@@ -189,6 +189,9 @@ const LumBuiltinEnumValuePair lum_builtin_enums[] = {
   __BUILTIN_ENUM_PAIR(SKY_MODE_DEFAULT, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(SKY_MODE_HDRI, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(SKY_MODE_CONSTANT_COLOR, 1, LUM_VERSION_CURRENT),
+  // LuminaryParticleType
+  __BUILTIN_ENUM_PAIR(PARTICLE_TYPE_RAIN, 1, LUM_VERSION_CURRENT),
+  __BUILTIN_ENUM_PAIR(PARTICLE_TYPE_SNOW, 1, LUM_VERSION_CURRENT),
   // LuminaryMaterialBaseSubstrate
   __BUILTIN_ENUM_PAIR(MATERIAL_BASE_SUBSTRATE_OPAQUE, 1, LUM_VERSION_CURRENT),
   __BUILTIN_ENUM_PAIR(MATERIAL_BASE_SUBSTRATE_TRANSLUCENT, 1, LUM_VERSION_CURRENT),
@@ -367,7 +370,7 @@ static const LumBuiltinTypeMember _lum_builtin_member_particles[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, active, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, seed, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, count, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, albedo, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, type, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, speed, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, direction_altitude, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, direction_azimuth, 1, LUM_VERSION_CURRENT),
@@ -815,9 +818,7 @@ LuminaryResult lum_builtin_particles_init(LumBuiltinParticles* particles, uint32
 
   particles->active             = false;
   particles->scale              = 10.0f;
-  particles->albedo.r           = 1.0f;
-  particles->albedo.g           = 1.0f;
-  particles->albedo.b           = 1.0f;
+  particles->type               = LUMINARY_PARTICLE_TYPE_RAIN;
   particles->direction_altitude = 1.234f;
   particles->direction_azimuth  = 0.0f;
   particles->speed              = 0.0f;
@@ -1144,7 +1145,7 @@ LuminaryResult lum_builtin_particles_convert(const LumBuiltinParticles* particle
   dst_particles->active             = particles->active;
   dst_particles->seed               = particles->seed;
   dst_particles->count              = particles->count;
-  dst_particles->albedo             = particles->albedo;
+  dst_particles->type               = particles->type;
   dst_particles->speed              = particles->speed;
   dst_particles->direction_altitude = particles->direction_altitude;
   dst_particles->direction_azimuth  = particles->direction_azimuth;
@@ -1422,7 +1423,7 @@ LuminaryResult lum_builtin_particles_serialize(const LuminaryParticles* particle
   dst_particles->active             = particles->active;
   dst_particles->seed               = particles->seed;
   dst_particles->count              = particles->count;
-  dst_particles->albedo             = particles->albedo;
+  dst_particles->type               = particles->type;
   dst_particles->speed              = particles->speed;
   dst_particles->direction_altitude = particles->direction_altitude;
   dst_particles->direction_azimuth  = particles->direction_azimuth;

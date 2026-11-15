@@ -28,6 +28,7 @@ extern const char* const luminary_strings_glow_mode[LUMINARY_GLOW_MODE_COUNT];
 extern const char* const luminary_strings_aperture[LUMINARY_APERTURE_COUNT];
 extern const char* const luminary_strings_jerlov_water_type[LUMINARY_JERLOV_WATER_TYPE_COUNT];
 extern const char* const luminary_strings_sky_mode[LUMINARY_SKY_MODE_COUNT];
+extern const char* const luminary_strings_particle_type[LUMINARY_PARTICLE_TYPE_COUNT];
 extern const char* const luminary_strings_material_base_substrate[LUMINARY_MATERIAL_BASE_SUBSTRATE_COUNT];
 extern const char* const luminary_strings_lens_template[LUMINARY_LENS_TEMPLATE_COUNT];
 extern const char* const luminary_strings_sensor_response_model[LUMINARY_SENSOR_RESPONSE_COUNT];

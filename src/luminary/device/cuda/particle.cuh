@@ -122,7 +122,7 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
     RGBF result;
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO:
-        result = device.particles.albedo;
+        result = splat_color(1.0f);
         break;
       case LUMINARY_SHADING_MODE_DEPTH:
         result = splat_color(__saturatef((1.0f / trace.depth) * 2.0f));
