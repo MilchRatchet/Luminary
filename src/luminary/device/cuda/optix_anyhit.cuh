@@ -26,19 +26,6 @@ extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(geometry_trace)() {
 }
 
 ////////////////////////////////////////////////////////////////////
-// OPTIX_SBT_OFFSET_PARTICLE_TRACE
-////////////////////////////////////////////////////////////////////
-
-extern "C" __global__ void OPTIX_ANYHIT_FUNC_NAME(particle_trace)() {
-  optixSetPayloadTypes(OPTIX_KERNEL_FUNCTION_PAYLOAD_TYPE_ID_PARTICLE_TRACE);
-
-  if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
-    optixIgnoreIntersection();
-    return;
-  }
-}
-
-////////////////////////////////////////////////////////////////////
 // OPTIX_SBT_OFFSET_SHADOW_TRACE
 ////////////////////////////////////////////////////////////////////
 

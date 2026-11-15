@@ -69,15 +69,6 @@ LUMINARY_FUNCTION RGBAF optix_get_albedo_for_shadowing(const TriangleHandle hand
   return albedo;
 }
 
-LUMINARY_FUNCTION bool particle_opacity_cutout(const float2 coord) {
-  const float dx = coord.x - 0.5f;
-  const float dy = coord.y - 0.5f;
-
-  const float r = dx * dx + dy * dy;
-
-  return (r > 0.25f);
-}
-
 LUMINARY_FUNCTION RGBF optix_geometry_shadowing(
   const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const OptixTraceStatus status) {
   OptixKernelFunctionShadowTracePayload payload;

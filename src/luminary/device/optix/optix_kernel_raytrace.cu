@@ -108,12 +108,11 @@ LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, OptixRayt
   payload.instance_id = HIT_TYPE_REJECT;
 
   optixKernelFunctionParticleTrace(
-    device.optix_bvh_particles, pos, scaled_ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, trace_status,
-    payload);
+    device.optix_bvh_particles, pos, scaled_ray, 0.0f, result.depth, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+    trace_status, payload);
 
   if (payload.instance_id != HIT_TYPE_REJECT) {
-    // Hit ID contains the triangle ID but we only store the actual particle / quad ID
-    payload.instance_id = HIT_TYPE_PARTICLE_MIN + (payload.instance_id >> 1);
+    payload.instance_id = HIT_TYPE_PARTICLE_MIN + payload.instance_id;
 
     result.handle = triangle_handle_get(payload.instance_id, 0);
     result.depth  = payload.depth;

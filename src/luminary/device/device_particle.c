@@ -50,7 +50,7 @@ static LuminaryResult _device_particles_instances_create(
         instance.instanceId        = instance_id;
         instance.sbtOffset         = 0;
         instance.visibilityMask    = ((1u << (device->optix_properties.num_bits_instance_visibility_mask)) - 1);
-        instance.flags             = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
+        instance.flags             = OPTIX_INSTANCE_FLAG_NONE;
         instance.traversableHandle = gas_handle;
 
         instance.transform[0]  = 1.0f;
@@ -89,14 +89,10 @@ LuminaryResult device_particles_handle_update(
     if (particles_handle->vertex_buffer)
       __FAILURE_HANDLE(device_free(&particles_handle->vertex_buffer));
 
-    if (particles_handle->quad_buffer)
-      __FAILURE_HANDLE(device_free(&particles_handle->quad_buffer));
-
     particles_handle->allocated_count = 0;
 
     if (count > 0) {
-      __FAILURE_HANDLE(device_malloc(&particles_handle->vertex_buffer, 6 * 4 * sizeof(float) * count));
-      __FAILURE_HANDLE(device_malloc(&particles_handle->quad_buffer, sizeof(Quad) * count));
+      __FAILURE_HANDLE(device_malloc(&particles_handle->vertex_buffer, 4 * sizeof(float) * count));
 
       particles_handle->allocated_count = count;
     }
@@ -111,7 +107,6 @@ LuminaryResult device_particles_handle_update(
     args.size           = shared_particles->size * 0.001f;
     args.size_variation = shared_particles->size_variation;
     args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
-    args.quads          = DEVICE_PTR(particles_handle->quad_buffer);
 
     __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
 
@@ -131,8 +126,8 @@ LuminaryResult device_particles_handle_get_ptrs(DeviceParticlesHandle* particles
   __CHECK_NULL_ARGUMENT(particles_handle);
   __CHECK_NULL_ARGUMENT(ptrs);
 
-  ptrs->quads = DEVICE_CUPTR(particles_handle->quad_buffer);
-  ptrs->bvh   = particles_handle->instance_bvh->traversable;
+  ptrs->spheres = DEVICE_CUPTR(particles_handle->vertex_buffer);
+  ptrs->bvh     = particles_handle->instance_bvh->traversable;
 
   return LUMINARY_SUCCESS;
 }
@@ -146,10 +141,6 @@ LuminaryResult device_particles_handle_destroy(DeviceParticlesHandle** particles
 
   if ((*particles_handle)->vertex_buffer) {
     __FAILURE_HANDLE(device_free(&(*particles_handle)->vertex_buffer));
-  }
-
-  if ((*particles_handle)->quad_buffer) {
-    __FAILURE_HANDLE(device_free(&(*particles_handle)->quad_buffer));
   }
 
   if ((*particles_handle)->optix_instances) {

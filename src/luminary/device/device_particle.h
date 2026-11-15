@@ -7,14 +7,13 @@ struct Device typedef Device;
 struct OptixBVH typedef OptixBVH;
 
 struct DeviceParticlesHandlePtrs {
-  CUdeviceptr quads;
+  CUdeviceptr spheres;
   OptixTraversableHandle bvh;
 } typedef DeviceParticlesHandlePtrs;
 
 struct DeviceParticlesHandle {
   uint32_t allocated_count;
   DEVICE float* vertex_buffer;
-  DEVICE Quad* quad_buffer;
   DEVICE OptixInstance* optix_instances;
   uint32_t num_instances;
   OptixBVH* geometry_bvh;

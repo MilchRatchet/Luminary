@@ -18,6 +18,8 @@ enum OptixKernelType {
 struct OptixKernel {
   bool available;
   OptixModule module;
+  OptixModule triangle_intersection_module;
+  OptixModule sphere_intersection_module;
   OptixProgramGroup groups[OPTIX_KERNEL_NUM_GROUPS];
   OptixPipeline pipeline;
   DEVICE char* records;

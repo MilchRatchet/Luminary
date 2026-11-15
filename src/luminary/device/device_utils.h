@@ -222,13 +222,6 @@ struct Mat3x4 {
   float f34;
 } typedef Mat3x4;
 
-struct Quad {
-  vec3 vertex;
-  vec3 edge1;
-  vec3 edge2;
-  vec3 normal;
-} typedef Quad;
-
 struct TriangleHandle {
   uint32_t instance_id;
   uint32_t tri_id;
@@ -501,7 +494,7 @@ struct DevicePointers {
   const DeviceLightTreeNode* LUM_RESTRICT light_tree_nodes;
   const TriangleHandle* LUM_RESTRICT light_tree_tri_handle_map;
   // DeviceParticlesHandle
-  const Quad* LUM_RESTRICT particle_quads;
+  const float4* LUM_RESTRICT particle_spheres;
   // DeviceSkyStars
   const Star* LUM_RESTRICT stars;
   const uint32_t* LUM_RESTRICT stars_offsets;

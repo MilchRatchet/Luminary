@@ -18,17 +18,18 @@ struct OptixKernelConfig {
   const char* name;
   uint32_t register_count;
   bool allow_gas;
+  bool uses_spheres;
 } typedef OptixKernelConfig;
 
 // TODO: Make register count architecture dependent.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE]      = {.name = "optix_kernel_raytrace", .register_count = 40, .allow_gas = false},
-  [OPTIX_KERNEL_TYPE_SHADOW]        = {.name = "optix_kernel_shadow", .register_count = 40, .allow_gas = true},
-  [OPTIX_KERNEL_TYPE_SHADOW_VOLUME] = {.name = "optix_kernel_shadow_volume", .register_count = 40, .allow_gas = false}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE] = {.name = "optix_kernel_raytrace", .register_count = 40, .allow_gas = false, .uses_spheres = true},
+  [OPTIX_KERNEL_TYPE_SHADOW]   = {.name = "optix_kernel_shadow", .register_count = 40, .allow_gas = true, .uses_spheres = false},
+  [OPTIX_KERNEL_TYPE_SHADOW_VOLUME] =
+    {.name = "optix_kernel_shadow_volume", .register_count = 40, .allow_gas = false, .uses_spheres = false}};
 
 static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
-  "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__shadow_trace", "__anyhit__shadow_sun_trace",
-  "__anyhit__light_bsdf_trace"};
+  "__anyhit__geometry_trace", NULL, "__anyhit__shadow_trace", "__anyhit__shadow_sun_trace", "__anyhit__light_bsdf_trace"};
 
 static const char* optix_closesthit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
   "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__shadow_trace", "__closesthit__shadow_sun_trace",
@@ -158,7 +159,9 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
-  pipeline_compile_options.allowOpacityMicromaps            = true;
+  if (optix_kernel_configs[type].uses_spheres)
+    pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE;
+  pipeline_compile_options.allowOpacityMicromaps = true;
 
   LOCAL char* log;
   __FAILURE_HANDLE(host_malloc_local(&log, OPTIX_LOG_SIZE));
@@ -175,6 +178,16 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   // Group Creation
   ////////////////////////////////////////////////////////////////////
 
+  OptixBuiltinISOptions builtin_triangle_intersection_options;
+  memset(&builtin_triangle_intersection_options, 0, sizeof(OptixBuiltinISOptions));
+  builtin_triangle_intersection_options.builtinISModuleType = OPTIX_PRIMITIVE_TYPE_TRIANGLE;
+  builtin_triangle_intersection_options.usesMotionBlur      = false;
+  builtin_triangle_intersection_options.buildFlags          = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+
+  OPTIX_FAILURE_HANDLE(optixBuiltinISModuleGet(
+    device->optix_ctx, &module_compile_options, &pipeline_compile_options, &builtin_triangle_intersection_options,
+    &(*kernel)->triangle_intersection_module));
+
   OptixProgramGroupOptions group_options[OPTIX_KERNEL_NUM_GROUPS];
   memset(&group_options, 0, OPTIX_KERNEL_NUM_GROUPS * sizeof(OptixProgramGroupOptions));
 
@@ -186,13 +199,32 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   group_desc[0].raygen.entryFunctionName = "__raygen__optix";
 
   group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-
   for (uint32_t function_id = 0; function_id < OPTIX_KERNEL_FUNCTION_COUNT; function_id++) {
-    group_desc[2 + function_id].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-    group_desc[2 + function_id].hitgroup.moduleAH            = (*kernel)->module;
-    group_desc[2 + function_id].hitgroup.entryFunctionNameAH = optix_anyhit_function_names[function_id];
+    group_desc[2 + function_id].kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    if (optix_anyhit_function_names[function_id]) {
+      group_desc[2 + function_id].hitgroup.moduleAH            = (*kernel)->module;
+      group_desc[2 + function_id].hitgroup.entryFunctionNameAH = optix_anyhit_function_names[function_id];
+    }
     group_desc[2 + function_id].hitgroup.moduleCH            = (*kernel)->module;
     group_desc[2 + function_id].hitgroup.entryFunctionNameCH = optix_closesthit_function_names[function_id];
+    group_desc[2 + function_id].hitgroup.moduleCH            = (*kernel)->module;
+    group_desc[2 + function_id].hitgroup.entryFunctionNameCH = optix_closesthit_function_names[function_id];
+    group_desc[2 + function_id].hitgroup.moduleIS            = (*kernel)->triangle_intersection_module;
+    group_desc[2 + function_id].hitgroup.entryFunctionNameIS = NULL;
+  }
+
+  if (optix_kernel_configs[type].uses_spheres) {
+    OptixBuiltinISOptions builtin_is_options;
+    memset(&builtin_is_options, 0, sizeof(OptixBuiltinISOptions));
+    builtin_is_options.builtinISModuleType = OPTIX_PRIMITIVE_TYPE_SPHERE;
+    builtin_is_options.usesMotionBlur      = false;
+    builtin_is_options.buildFlags          = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+
+    OPTIX_FAILURE_HANDLE(optixBuiltinISModuleGet(
+      device->optix_ctx, &module_compile_options, &pipeline_compile_options, &builtin_is_options, &(*kernel)->sphere_intersection_module));
+
+    group_desc[2 + OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE].hitgroup.moduleIS            = (*kernel)->sphere_intersection_module;
+    group_desc[2 + OPTIX_KERNEL_FUNCTION_PARTICLE_TRACE].hitgroup.entryFunctionNameIS = NULL;
   }
 
   OPTIX_FAILURE_HANDLE_LOG(
@@ -284,7 +316,12 @@ LuminaryResult optix_kernel_destroy(OptixKernel** kernel) {
     OPTIX_FAILURE_HANDLE(optixProgramGroupDestroy((*kernel)->groups[group_id]));
   }
 
-  OPTIX_FAILURE_HANDLE(optixModuleDestroy((*kernel)->module))
+  OPTIX_FAILURE_HANDLE(optixModuleDestroy((*kernel)->module));
+  OPTIX_FAILURE_HANDLE(optixModuleDestroy((*kernel)->triangle_intersection_module));
+
+  if ((*kernel)->sphere_intersection_module) {
+    OPTIX_FAILURE_HANDLE(optixModuleDestroy((*kernel)->sphere_intersection_module));
+  }
 
   __FAILURE_HANDLE(host_free(kernel));
 

@@ -541,27 +541,24 @@ LuminaryResult optix_bvh_particles_gas_build(OptixBVH* bvh, Device* device, cons
 
   OptixBuildInput build_input;
   memset(&build_input, 0, sizeof(OptixBuildInput));
-  build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+  build_input.type = OPTIX_BUILD_INPUT_TYPE_SPHERES;
 
-  const uint32_t vertex_count = particles_handle->allocated_count * 6;
+  const uint32_t vertex_count = particles_handle->allocated_count;
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(particles_handle->vertex_buffer);
+  CUdeviceptr device_radius_buffer_ptr = (vertex_count > 0) ? (device_vertex_buffer_ptr + 3 * sizeof(float)) : (CUdeviceptr) 0;
 
-  build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-  build_input.triangleArray.vertexStrideInBytes = 16;
-  build_input.triangleArray.numVertices         = vertex_count;
-  build_input.triangleArray.vertexBuffers       = (vertex_count > 0) ? &device_vertex_buffer_ptr : (CUdeviceptr*) 0;
+  build_input.sphereArray.vertexBuffers       = (vertex_count > 0) ? &device_vertex_buffer_ptr : (CUdeviceptr*) 0;
+  build_input.sphereArray.vertexStrideInBytes = sizeof(float) * 4;
+  build_input.sphereArray.numVertices         = vertex_count;
+  build_input.sphereArray.radiusBuffers       = (vertex_count > 0) ? &device_radius_buffer_ptr : (CUdeviceptr*) 0;
+  build_input.sphereArray.radiusStrideInBytes = sizeof(float) * 4;
+  build_input.sphereArray.singleRadius        = 0;
 
-  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_NONE;
-  build_input.triangleArray.indexStrideInBytes = 0;
-  build_input.triangleArray.numIndexTriplets   = 0;
-  build_input.triangleArray.indexBuffer        = (CUdeviceptr) 0;
+  unsigned int inputFlags = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
 
-  unsigned int inputFlags = 0;
-  inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
-
-  build_input.triangleArray.flags         = &inputFlags;
-  build_input.triangleArray.numSbtRecords = 1;
+  build_input.sphereArray.flags         = &inputFlags;
+  build_input.sphereArray.numSbtRecords = 1;
 
   ////////////////////////////////////////////////////////////////////
   // Building BVH

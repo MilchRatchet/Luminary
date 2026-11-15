@@ -68,7 +68,6 @@ struct KernelArgsParticleGenerate {
   float size;
   float size_variation;
   float4* vertex_buffer;
-  Quad* quads;
 } typedef KernelArgsParticleGenerate;
 
 struct KernelArgsLightComputeIntensity {

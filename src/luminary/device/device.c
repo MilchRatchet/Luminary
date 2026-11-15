@@ -1180,7 +1180,7 @@ LuminaryResult device_update_particles(Device* device, const Particles* particle
     DeviceParticlesHandlePtrs ptrs;
     __FAILURE_HANDLE(device_particles_handle_get_ptrs(device->particles_handle, &ptrs));
 
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_quads, ptrs.quads);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.particle_spheres, ptrs.spheres);
     DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_particles, ptrs.bvh);
   }
 

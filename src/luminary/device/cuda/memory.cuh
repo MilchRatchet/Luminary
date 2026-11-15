@@ -450,21 +450,6 @@ LUMINARY_FUNCTION UV load_triangle_tex_coords(const TriangleHandle handle, const
   return lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }
 
-LUMINARY_FUNCTION Quad load_quad(const Quad* data, const int offset) {
-  const float4* ptr = (float4*) (data + offset);
-  const float4 v1   = __ldg(ptr);
-  const float4 v2   = __ldg(ptr + 1);
-  const float4 v3   = __ldg(ptr + 2);
-
-  Quad quad;
-  quad.vertex = get_vector(v1.x, v1.y, v1.z);
-  quad.edge1  = get_vector(v1.w, v2.x, v2.y);
-  quad.edge2  = get_vector(v2.z, v2.w, v3.x);
-  quad.normal = get_vector(v3.y, v3.z, v3.w);
-
-  return quad;
-}
-
 LUMINARY_FUNCTION DeviceMaterial load_material(const DeviceMaterialCompressed* data, const uint32_t offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
