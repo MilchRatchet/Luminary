@@ -227,8 +227,9 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
   }
 
   if (scattered_ambient_light > 0.0f) {
-    const Spectrum ambient_radiance = sky_get_color_spectral<false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps, path_id);
-    radiance                        = spectrum_add(spectrum_scale(ambient_radiance, scattered_ambient_light), radiance);
+    const Spectrum ambient_radiance =
+      sky_get_color_spectral<false, false>(color_sampling_pos, ambient_ray, FLT_MAX, device.sky.steps, path_id);
+    radiance = spectrum_add(spectrum_scale(ambient_radiance, scattered_ambient_light), radiance);
   }
 
   CloudRenderResult result;

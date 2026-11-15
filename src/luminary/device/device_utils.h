@@ -540,6 +540,7 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_SHADOW_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG,
   DEVICE_CONSTANT_MEMORY_MEMBER_STATE,
@@ -590,6 +591,8 @@ struct DeviceConstantMemory {
   DeviceTextureObject cloud_noise_shape_tex;
   DeviceTextureObject cloud_noise_detail_tex;
   DeviceTextureObject cloud_noise_weather_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_SHADOW_TEX
+  DeviceTextureObject cloud_shadow_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX
   DeviceTextureObject spectral_xy_lut_tex;
   DeviceTextureObject spectral_z_lut_tex;

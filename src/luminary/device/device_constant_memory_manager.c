@@ -33,6 +33,7 @@ static const size_t _device_cuda_const_memory_offsets[DEVICE_CONSTANT_MEMORY_MEM
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, cloud_noise_shape_tex),         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  offsetof(DeviceConstantMemory, cloud_shadow_tex),              // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_SHADOW_TEX
   offsetof(DeviceConstantMemory, spectral_xy_lut_tex),           // DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX
   offsetof(DeviceConstantMemory, config),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
@@ -55,6 +56,7 @@ static const size_t _device_cuda_const_memory_sizes[DEVICE_CONSTANT_MEMORY_MEMBE
   sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   sizeof(DeviceTextureObject) * 4,       // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   sizeof(DeviceTextureObject) * 3,       // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_NOISE_TEX
+  sizeof(DeviceTextureObject),           // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD_SHADOW_TEX
   sizeof(DeviceTextureObject) * 2,       // DEVICE_CONSTANT_MEMORY_MEMBER_SPECTRAL_LUT_TEX
   sizeof(DeviceExecutionConfiguration),  // DEVICE_CONSTANT_MEMORY_MEMBER_CONFIG
   sizeof(DeviceExecutionState)           // DEVICE_CONSTANT_MEMORY_MEMBER_STATE

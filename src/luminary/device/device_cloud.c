@@ -9,6 +9,7 @@
 #define CLOUD_SHAPE_RES 128
 #define CLOUD_DETAIL_RES 32
 #define CLOUD_WEATHER_RES 1024
+#define CLOUD_SHADOW_RES 2048
 
 static LuminaryResult _device_cloud_noise_generate_weather_map(DeviceCloudNoise* cloud_noise, Device* device) {
   __CHECK_NULL_ARGUMENT(cloud_noise);
@@ -45,13 +46,22 @@ LuminaryResult device_cloud_noise_create(DeviceCloudNoise** cloud_noise, Device*
   __FAILURE_HANDLE(texture_create(&weather_tex));
   __FAILURE_HANDLE(texture_fill(weather_tex, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, (void*) 0, TEXTURE_DATA_TYPE_U8, 4));
 
+  Texture* shadow_tex;
+  __FAILURE_HANDLE(texture_create(&shadow_tex));
+  __FAILURE_HANDLE(texture_fill(shadow_tex, CLOUD_SHADOW_RES, CLOUD_SHADOW_RES, 1, (void*) 0, TEXTURE_DATA_TYPE_FP32, 4));
+  shadow_tex->wrap_mode_U = TEXTURE_WRAPPING_MODE_CLAMP;
+  shadow_tex->wrap_mode_V = TEXTURE_WRAPPING_MODE_CLAMP;
+  shadow_tex->filter      = TEXTURE_FILTER_MODE_LINEAR;
+
   __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->shape_tex, shape_tex, device, device->stream_main));
   __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->detail_tex, detail_tex, device, device->stream_main));
   __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->weather_tex, weather_tex, device, device->stream_main));
+  __FAILURE_HANDLE(device_texture_create(&(*cloud_noise)->shadow_tex, shadow_tex, device, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&shape_tex));
   __FAILURE_HANDLE(texture_destroy(&detail_tex));
   __FAILURE_HANDLE(texture_destroy(&weather_tex));
+  __FAILURE_HANDLE(texture_destroy(&shadow_tex));
 
   (*cloud_noise)->initialized = false;
   (*cloud_noise)->seed        = CLOUD_DEFAULT_SEED;
@@ -103,6 +113,23 @@ LuminaryResult device_cloud_noise_generate(DeviceCloudNoise* cloud_noise, const 
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_cloud_shadow_map_generate(DeviceCloudNoise* cloud_noise, Device* device) {
+  __CHECK_NULL_ARGUMENT(cloud_noise);
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
+
+  KernelArgsCloudComputeShadowMap shadow_args;
+  shadow_args.dim = CLOUD_SHADOW_RES;
+  shadow_args.ld  = cloud_noise->shadow_tex->pitch / (sizeof(float) * 4);
+  shadow_args.tex = (float4*) DEVICE_PTR(cloud_noise->shadow_tex->cuda_memory);
+
+  __FAILURE_HANDLE(
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_SHADOW_MAP], &shadow_args, device->stream_main));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_cloud_noise_destroy(DeviceCloudNoise** cloud_noise) {
   __CHECK_NULL_ARGUMENT(cloud_noise);
   __CHECK_NULL_ARGUMENT(*cloud_noise);
@@ -110,6 +137,7 @@ LuminaryResult device_cloud_noise_destroy(DeviceCloudNoise** cloud_noise) {
   __FAILURE_HANDLE(device_texture_destroy(&(*cloud_noise)->shape_tex));
   __FAILURE_HANDLE(device_texture_destroy(&(*cloud_noise)->detail_tex));
   __FAILURE_HANDLE(device_texture_destroy(&(*cloud_noise)->weather_tex));
+  __FAILURE_HANDLE(device_texture_destroy(&(*cloud_noise)->shadow_tex));
 
   __FAILURE_HANDLE(host_free(cloud_noise));
 

@@ -163,6 +163,7 @@ LuminaryResult device_update_sky_stars(Device* device, const SkyStars* sky_stars
 LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
 LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud);
+LuminaryResult device_update_cloud_shadow_map(Device* device);
 LuminaryResult device_update_particles(Device* device, const Particles* particles);
 LuminaryResult device_update_physical_camera(Device* device, const PhysicalCamera* physical_camera);
 LuminaryResult device_update_post(Device* device, const Camera* camera);

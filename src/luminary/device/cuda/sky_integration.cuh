@@ -122,7 +122,7 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
 
       float shadow;
       if constexpr (CLOUD_SHADOWS) {
-        shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : cloud_shadow(pos, ray_scatter);
+        shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : cloud_shadow_fast(pos);
       }
       else {
         shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : 1.0f;
@@ -253,19 +253,19 @@ LUMINARY_FUNCTION Spectrum sky_compute_atmosphere(
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-template <bool CELESTIALS>
+template <bool CELESTIALS, bool CLOUD_SHADOWS>
 LUMINARY_FUNCTION Spectrum
   sky_get_color_spectral(const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
   SkyIntegrationParams params = sky_get_integration_params(origin, ray, limit, steps, path_id);
 
-  return sky_compute_atmosphere<CELESTIALS, false>(transmittance, origin, ray, params, 0, steps);
+  return sky_compute_atmosphere<CELESTIALS, CLOUD_SHADOWS>(transmittance, origin, ray, params, 0, steps);
 }
 
 template <bool CELESTIALS>
 LUMINARY_FUNCTION RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const int steps, const PathID& path_id) {
-  return sky_evaluate_radiance_from_spectrum(sky_get_color_spectral<CELESTIALS>(origin, ray, limit, steps, path_id));
+  return sky_evaluate_radiance_from_spectrum(sky_get_color_spectral<CELESTIALS, true>(origin, ray, limit, steps, path_id));
 }
 
 LUMINARY_FUNCTION Spectrum

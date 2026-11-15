@@ -1165,6 +1165,24 @@ LuminaryResult device_update_cloud_noise(Device* device, const Cloud* cloud) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_cloud_shadow_map(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  DEVICE_ASSERT_AVAILABLE
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_cloud_shadow_map_generate(device->cloud_noise, device));
+
+  DeviceTextureObject cloud_shadow_tex;
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->cloud_noise->shadow_tex, &cloud_shadow_tex));
+  DEVICE_UPDATE_CONSTANT_MEMORY(cloud_shadow_tex, cloud_shadow_tex);
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_update_particles(Device* device, const Particles* particles) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(particles);
