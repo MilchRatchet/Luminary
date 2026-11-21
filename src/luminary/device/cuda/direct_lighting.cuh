@@ -197,12 +197,17 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun
 // Utils
 ////////////////////////////////////////////////////////////////////
 
+LUMINARY_FUNCTION bool direct_lighting_is_rain_hit(const DeviceTaskTrace& trace) {
+  return device.particles.type == LUMINARY_PARTICLE_TYPE_RAIN && PARTICLE_HIT_ID_CHECK(trace.handle.instance_id);
+}
+
 LUMINARY_FUNCTION bool direct_lighting_geometry_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
   bool allow_geometry_lighting = true;
 
   allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
   allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
   allow_geometry_lighting &= trace.handle.instance_id != HIT_TYPE_OCEAN;
+  allow_geometry_lighting &= direct_lighting_is_rain_hit(trace) == false;
 
   return allow_geometry_lighting;
 }
@@ -211,6 +216,7 @@ LUMINARY_FUNCTION bool direct_lighting_sun_is_allowed(const DeviceTask& task, co
   bool allow_sun_lighting = true;
 
   allow_sun_lighting &= device.sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
+  allow_sun_lighting &= direct_lighting_is_rain_hit(trace) == false;
 
   return allow_sun_lighting;
 }
@@ -229,6 +235,7 @@ LUMINARY_FUNCTION bool direct_lighting_ambient_is_allowed(const DeviceTask& task
 
   allow_ambient_lighting &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
   allow_ambient_lighting &= trace.handle.instance_id != HIT_TYPE_OCEAN;
+  allow_ambient_lighting &= direct_lighting_is_rain_hit(trace) == false;
 
   return allow_ambient_lighting;
 }

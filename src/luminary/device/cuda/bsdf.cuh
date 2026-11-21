@@ -323,11 +323,87 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(c
   return info;
 }
 
+LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample_rain(const MaterialContextParticle ctx, float random_choice) {
+  constexpr float water_ior     = 1.333f;
+  constexpr float inv_water_ior = 1.0f / water_ior;
+
+  BSDFSampleInfo<MATERIAL_PARTICLE> info;
+  info.weight = splat_color(1.0f);
+  info.ray    = scale_vector(ctx.V, -1.0f);
+
+  vec3 normal      = ctx.normal;
+  float air_cosine = dot_product(normal, ctx.V);
+  float reflectance;
+  bool total_reflection;
+
+  if (air_cosine >= 0.0f) {
+    const vec3 water_ray = refract_vector(ctx.V, normal, inv_water_ior, total_reflection);
+    reflectance          = bsdf_fresnel(normal, ctx.V, water_ray, water_ior);
+
+    if (random_choice < reflectance || reflectance >= 1.0f) {
+      info.ray = reflect_vector(ctx.V, normal);
+      return info;
+    }
+
+    random_choice = random_saturate((random_choice - reflectance) / (1.0f - reflectance));
+    info.ray      = water_ray;
+    normal        = normalize_vector(sub_vector(normal, scale_vector(water_ray, 2.0f * dot_product(normal, water_ray))));
+  }
+  else {
+    const vec3 inward_normal = scale_vector(normal, -1.0f);
+    const vec3 air_ray       = refract_vector(ctx.V, inward_normal, water_ior, total_reflection);
+
+    if (total_reflection) {
+      info.weight = splat_color(0.0f);
+      return info;
+    }
+
+    air_cosine  = __saturatef(dot_product(normal, air_ray));
+    reflectance = bsdf_fresnel(inward_normal, ctx.V, air_ray, inv_water_ior);
+  }
+
+  if (reflectance >= 1.0f) {
+    info.weight = splat_color(0.0f);
+    return info;
+  }
+
+  const float water_cosine = dot_product(normal, info.ray);
+  vec3 tangent             = sub_vector(info.ray, scale_vector(normal, water_cosine));
+
+  if (random_choice < reflectance) {
+    const float nonzero_choice = fmaxf(random_choice, 0x1p-24f);
+    const uint32_t reflections = (uint32_t) (logf(nonzero_choice) / log1pf(reflectance - 1.0f));
+    const float tangent_length = get_length(tangent);
+
+    if (tangent_length > eps) {
+      const float chord_angle = 2.0f * atan2f(water_cosine, tangent_length);
+      float sine, cosine;
+      sincosf(chord_angle * (float) reflections, &sine, &cosine);
+
+      const vec3 exit_normal = add_vector(scale_vector(normal, cosine), scale_vector(tangent, sine / tangent_length));
+      tangent                = sub_vector(scale_vector(tangent, cosine), scale_vector(normal, sine * tangent_length));
+      normal                 = exit_normal;
+    }
+    else if ((reflections & 1u) != 0) {
+      normal  = scale_vector(normal, -1.0f);
+      tangent = scale_vector(tangent, -1.0f);
+    }
+  }
+
+  info.ray = normalize_vector(add_vector(scale_vector(tangent, water_ior), scale_vector(normal, air_cosine)));
+
+  return info;
+}
+
 template <typename RANDOM_SET>
 LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICLE>(
   const MaterialContextParticle ctx, const PathID& path_id) {
   const float random_choice = random_1D(RANDOM_SET::RESAMPLING, path_id);
-  const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, path_id);
+
+  if (device.particles.type == LUMINARY_PARTICLE_TYPE_RAIN)
+    return bsdf_sample_rain(ctx, random_choice);
+
+  const float2 random_dir = random_2D(RANDOM_SET::DIFFUSE, path_id);
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
   info.ray    = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);

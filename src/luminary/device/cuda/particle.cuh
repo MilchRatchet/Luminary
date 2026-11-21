@@ -70,8 +70,13 @@ LUMINARY_KERNEL void particle_process_tasks() {
     uint16_t new_state = task.state;
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
-    new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
+
+    if (device.particles.type == LUMINARY_PARTICLE_TYPE_RAIN) {
+      new_state |= STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT;
+    }
+    else {
+      new_state &= ~(STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT);
+    }
 
     if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
       RGBF record = record_unpack(throughput.record);
