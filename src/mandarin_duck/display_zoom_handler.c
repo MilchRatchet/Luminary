@@ -86,6 +86,7 @@ void display_zoom_handler_set_display_size(DisplayZoomHandler* zoom, uint32_t wi
   zoom->display_width  = width;
   zoom->display_height = height;
   _display_zoom_handler_recalculate_scale_bounds(zoom);
+  _display_zoom_handler_update_offset(zoom);
 }
 
 void display_zoom_handler_set_image_size(DisplayZoomHandler* zoom, uint32_t width, uint32_t height) {

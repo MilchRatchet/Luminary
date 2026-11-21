@@ -1,19 +1,9 @@
-#include "display.h"
-
-#include <float.h>
-#include <stdio.h>
+#include <limits.h>
 #include <string.h>
-#include <time.h>
 
-// TODO: Let Mandarin Duck have its own embedded files.
-void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
+#include "display_internal.h"
 
-#define DISPLAY_MIN_FRAME_TIME_NS 16666666  // Nanoseconds frametime at 60 FPS
 #define DISPLAY_SCREEN_MARGIN 10
-
-#define DISPLAY_SPLASHSCREEN_WIDTH 640
-#define DISPLAY_SPLASHSCREEN_HEIGHT 180
-#define DISPLAY_SPLASHSCREEN_DATA_OFFSET 0x8A
 
 static uint32_t __num_displays = 0;
 
@@ -24,7 +14,7 @@ static void _display_get_initial_window_size(uint32_t requested_width, uint32_t 
   const SDL_DisplayID primary_display = SDL_GetPrimaryDisplay();
   SDL_Rect usable_bounds;
 
-  if (primary_display == 0 || !SDL_GetDisplayUsableBounds(primary_display, &usable_bounds))
+  if (primary_display == 0 || SDL_GetDisplayUsableBounds(primary_display, &usable_bounds) == false)
     return;
 
   const int32_t available_width  = (usable_bounds.w > 2 * DISPLAY_SCREEN_MARGIN) ? usable_bounds.w - 2 * DISPLAY_SCREEN_MARGIN : 1;
@@ -41,149 +31,60 @@ static void _display_get_initial_window_size(uint32_t requested_width, uint32_t 
     *height = 1;
 }
 
-static void _display_handle_resize(Display* display) {
-  MD_CHECK_NULL_ARGUMENT(display);
-
-  SDL_GetWindowSizeInPixels(display->sdl_window, (int*) &(display->width), (int*) &(display->height));
-
-  int x, y;
-  SDL_GetWindowPosition(display->sdl_window, &x, &y);
-
-  x -= DISPLAY_SCREEN_MARGIN;
-  y -= DISPLAY_SCREEN_MARGIN;
-
-  if (x + display->width > display->screen_width || y + display->height > display->screen_height) {
-    x = display->screen_width - display->width;
-    y = display->screen_height - display->height;
-
-    x += DISPLAY_SCREEN_MARGIN;
-    y += DISPLAY_SCREEN_MARGIN;
-
-    SDL_SetWindowPosition(display->sdl_window, x, y);
+static void _display_refresh_surface(Display* display) {
+  display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
+  if (display->sdl_surface == NULL) {
+    display->buffer = NULL;
+    warn_message("Unable to acquire window surface: %s", SDL_GetError());
+    return;
   }
 
-  display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
-  display->buffer      = display->sdl_surface->pixels;
-  display->pitch       = (uint32_t) display->sdl_surface->pitch;
+  display->width  = (uint32_t) display->sdl_surface->w;
+  display->height = (uint32_t) display->sdl_surface->h;
+  display->buffer = display->sdl_surface->pixels;
+  display->pitch  = (uint32_t) display->sdl_surface->pitch;
 
   display_zoom_handler_set_display_size(display->zoom_handler, display->width, display->height);
 }
 
-static void _display_handle_display_change(Display* display) {
-  MD_CHECK_NULL_ARGUMENT(display);
-
-  int display_count;
-  SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
-
-  if (display_count == 0) {
-    crash_message("No displays available.");
-  }
-
-  SDL_DisplayID curr_display_id = SDL_GetDisplayForWindow(display->sdl_window);
-
-  // If we get an invalid ID, just return and hope that we can just continue.
-  if (curr_display_id == 0) {
-    warn_message("Window is not present in a valid screen.");
-    return;
-  }
-
-  SDL_Rect rect;
-  for (uint32_t display_index = 0; display_index < (uint32_t) display_count; display_index++) {
-    if (displays[display_index] != curr_display_id)
-      continue;
-
-    SDL_GetDisplayUsableBounds(displays[display_index], &rect);
-    break;
-  }
-
-  SDL_free(displays);
-
-  rect.w = rect.w - 2 * DISPLAY_SCREEN_MARGIN;
-  rect.h = rect.h - 2 * DISPLAY_SCREEN_MARGIN;
-
-  display->screen_width  = (uint32_t) rect.w;
-  display->screen_height = (uint32_t) rect.h;
-
-  if (display->width == 0 || display->height == 0)
+static void _display_clamp_window_position(Display* display) {
+  const SDL_Rect bounds = display->screen_bounds;
+  int window_x, window_y, width, height;
+  if (
+    bounds.w <= 0 || bounds.h <= 0 || SDL_GetWindowSize(display->sdl_window, &width, &height) == false
+    || SDL_GetWindowPosition(display->sdl_window, &window_x, &window_y) == false)
     return;
 
-  uint32_t width  = min(display->width, display->screen_width);
-  uint32_t height = min(display->height, display->screen_height);
-
-  if (width != display->width || height != display->height) {
-    SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
-    _display_handle_resize(display);
-  }
+  const int clamped_x = max(bounds.x, min(window_x, bounds.x + bounds.w - width));
+  const int clamped_y = max(bounds.y, min(window_y, bounds.y + bounds.h - height));
+  if (clamped_x != window_x || clamped_y != window_y)
+    SDL_SetWindowPosition(display->sdl_window, clamped_x, clamped_y);
 }
 
-static void _display_blit_to_display_buffer(Display* display, LuminaryImage image) {
-  int32_t scale = (int32_t) display->display_base_scale + display->zoom_handler->scale;
-
-  const int32_t src_offset_x = display->zoom_handler->offset_x;
-  const int32_t src_offset_y = display->zoom_handler->offset_y;
-
-  const LuminaryARGB8* src = (const LuminaryARGB8*) image.buffer;
-
-  if (scale >= 0) {
-    for (uint32_t y = 0; y < display->height; y++) {
-      uint32_t* dst_bg = (uint32_t*) (display->buffer + y * display->pitch);
-      int32_t src_y    = (int32_t) (y >> scale) + src_offset_y;
-      if (src_y < 0 || src_y >= (int32_t) image.height) {
-        for (uint32_t x = 0; x < display->width; x++) {
-          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
-        }
-        continue;
-      }
-
-      const LuminaryARGB8* src_row = src + src_y * image.ld;
-      LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
-
-      uint32_t x = 0;
-      for (; x < display->width; x++) {
-        int32_t src_x = (int32_t) (x >> scale) + src_offset_x;
-        if (src_x < 0 || src_x >= (int32_t) image.width) {
-          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
-        }
-        else {
-          dst_row[x] = src_row[src_x];
-        }
-      }
-
-      for (; x < display->width; x++) {
-        // Background filled natively due to loop breaks or conditions above
-        if ((int32_t) (x >> scale) + src_offset_x >= (int32_t) image.width) {
-          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
-        }
-      }
-    }
+static void _display_handle_display_change(Display* display) {
+  const SDL_DisplayID display_id = SDL_GetDisplayForWindow(display->sdl_window);
+  SDL_Rect bounds;
+  if (display_id == 0 || SDL_GetDisplayUsableBounds(display_id, &bounds) == false) {
+    display->screen_bounds = (SDL_Rect) {0};
+    warn_message("Unable to get usable window display bounds: %s", SDL_GetError());
+    return;
   }
-  else {
-    const uint32_t shift = -scale;
-    for (uint32_t y = 0; y < display->height; y++) {
-      uint32_t* dst_bg = (uint32_t*) (display->buffer + y * display->pitch);
-      int32_t src_y    = (int32_t) (y << shift) + src_offset_y;
-      if (src_y < 0 || src_y >= (int32_t) image.height) {
-        for (uint32_t x = 0; x < display->width; x++) {
-          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
-        }
-        continue;
-      }
 
-      const LuminaryARGB8* src_row = src + src_y * image.ld;
-      LuminaryARGB8* dst_row       = (LuminaryARGB8*) (display->buffer + y * display->pitch);
-
-      uint32_t x = 0;
-      for (; x < display->width; x++) {
-        int32_t src_x = (int32_t) (x << shift) + src_offset_x;
-        if (src_x < 0 || src_x >= (int32_t) image.width) {
-          dst_bg[x] = MD_COLOR_WINDOW_BACKGROUND;
-        }
-        else {
-          dst_row[x] = src_row[src_x];
-        }
-      }
-    }
+  if (bounds.w > 2 * DISPLAY_SCREEN_MARGIN) {
+    bounds.x += DISPLAY_SCREEN_MARGIN;
+    bounds.w -= 2 * DISPLAY_SCREEN_MARGIN;
   }
+  if (bounds.h > 2 * DISPLAY_SCREEN_MARGIN) {
+    bounds.y += DISPLAY_SCREEN_MARGIN;
+    bounds.h -= 2 * DISPLAY_SCREEN_MARGIN;
+  }
+  display->screen_bounds = bounds;
+
+  int width, height;
+  if (SDL_GetWindowSize(display->sdl_window, &width, &height) && (width > bounds.w || height > bounds.h))
+    display_resize(display, (uint32_t) width, (uint32_t) height);
+
+  _display_clamp_window_position(display);
 }
 
 static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const SDL_Point* area, void* data) {
@@ -258,11 +159,9 @@ void display_create(Display** _display, uint32_t requested_window_width, uint32_
 
   SDL_DestroyProperties(sdl_properties);
 
-  if (!display->sdl_window) {
+  if (display->sdl_window == NULL) {
     crash_message("Failed to create SDL_Window.");
   }
-
-  SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
   keyboard_state_create(&display->keyboard_state);
   mouse_state_create(&display->mouse_state);
@@ -276,12 +175,9 @@ void display_create(Display** _display, uint32_t requested_window_width, uint32_
   file_dialog_handler_create(&display->entity_properties_path);
 
   _display_handle_display_change(display);
-  _display_handle_resize(display);
-
-  // We have gathered the screen and window sizes, now pretend that we changed displays again to ensure
-  // that the window is within the bounds and is centered.
-  _display_handle_display_change(display);
-  SDL_SetWindowPosition(display->sdl_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+  _display_refresh_surface(display);
+  if (display->sdl_surface != NULL)
+    SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
   display->selected_cursor = SDL_SYSTEM_CURSOR_DEFAULT;
   for (uint32_t cursor_id = 0; cursor_id < SDL_SYSTEM_CURSOR_COUNT; cursor_id++) {
@@ -292,25 +188,10 @@ void display_create(Display** _display, uint32_t requested_window_width, uint32_
 
   display_set_mouse_visible(display, display->show_ui);
 
-  display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
-  display->image_file_format     = LUMINARY_IMAGE_FILE_FORMAT_JPG;
-
-  uint8_t* splash_screen_data;
-  int64_t splash_screen_size;
-  uint64_t info;
-  ceb_access("SplashScreen.bmp", (void**) &splash_screen_data, &splash_screen_size, &info);
-
-  if (info || splash_screen_size < (DISPLAY_SPLASHSCREEN_WIDTH * DISPLAY_SPLASHSCREEN_HEIGHT * 3 + DISPLAY_SPLASHSCREEN_DATA_OFFSET)) {
-    crash_message("Splash screen is corrupted. Luminary needs to be rebuild. Ceb Error Code: %zu", info);
-  }
-
-  display->splash_screen = (const uint32_t*) (splash_screen_data + DISPLAY_SPLASHSCREEN_DATA_OFFSET);
+  display_render_init(display);
 
   LUM_FAILURE_HANDLE(array_create(&display->status_messages, sizeof(DisplayStatusMessage), 4));
-  display->screenshot_status_message_id = (uint32_t) -1;
-
-  md_thread_pool_create(&display->thread_pool);
-  display->active_promises = NULL;
+  display_screenshot_init(display);
 
   *_display = display;
 }
@@ -323,14 +204,9 @@ void display_set_mouse_visible(Display* display, bool enable) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   display->mouse_visible = enable;
-  SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
-  _display_set_hittest(display, enable && _display_get_mouse_mode_enables_hittest(display->mouse_mode) && !display->active_camera_movement);
-}
-
-void display_set_cursor(Display* display, SDL_SystemCursor cursor) {
-  MD_CHECK_NULL_ARGUMENT(display);
-
-  display->selected_cursor = cursor;
+  SDL_SetWindowRelativeMouseMode(display->sdl_window, enable == false);
+  _display_set_hittest(
+    display, enable && _display_get_mouse_mode_enables_hittest(display->mouse_mode) && display->active_camera_movement == false);
 }
 
 void display_set_mouse_mode(Display* display, DisplayMouseMode mouse_mode) {
@@ -384,18 +260,22 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
         break;
       case SDL_EVENT_WINDOW_SHOWN:
       case SDL_EVENT_WINDOW_HIDDEN:
-      case SDL_EVENT_WINDOW_EXPOSED:
       case SDL_EVENT_WINDOW_MOVED:
         break;
+      case SDL_EVENT_WINDOW_EXPOSED:
+      case SDL_EVENT_WINDOW_RESTORED:
+        if (display->sdl_surface == NULL)
+          _display_refresh_surface(display);
+        break;
       case SDL_EVENT_WINDOW_RESIZED:
-        _display_handle_resize(display);
+        _display_clamp_window_position(display);
+        _display_refresh_surface(display);
         break;
       case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-        _display_handle_resize(display);
+        _display_refresh_surface(display);
         break;
       case SDL_EVENT_WINDOW_MINIMIZED:
       case SDL_EVENT_WINDOW_MAXIMIZED:
-      case SDL_EVENT_WINDOW_RESTORED:
         break;
       case SDL_EVENT_WINDOW_MOUSE_ENTER:
         break;
@@ -443,483 +323,12 @@ void display_query_events(Display* display, DisplayFileDrop** file_drop_array, b
   }
 }
 
-// TODO: Refactor
-static void _display_move_sun(Display* display, LuminaryHost* host, float time_step) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  LuminarySky sky;
-  LUM_FAILURE_HANDLE(luminary_host_get_sky(host, &sky));
-
-  if (display->keyboard_state->keys[SDL_SCANCODE_LEFT].down) {
-    sky.azimuth -= 0.2f * time_step;
-  }
-
-  if (display->keyboard_state->keys[SDL_SCANCODE_RIGHT].down) {
-    sky.azimuth += 0.2f * time_step;
-  }
-
-  if (display->keyboard_state->keys[SDL_SCANCODE_UP].down) {
-    sky.altitude += 0.2f * time_step;
-  }
-
-  if (display->keyboard_state->keys[SDL_SCANCODE_DOWN].down) {
-    sky.altitude -= 0.2f * time_step;
-  }
-
-  LUM_FAILURE_HANDLE(luminary_host_set_sky(host, &sky));
-}
-
-static void _display_set_default_cursor(Display* display) {
-  SDL_SystemCursor cursor;
-
-  bool mouse_hovers_background = false;
-  user_interface_mouse_hovers_background(display->ui, display, &mouse_hovers_background);
-
-  switch (display->mouse_mode) {
-    case DISPLAY_MOUSE_MODE_DEFAULT:
-    default:
-      cursor = SDL_SYSTEM_CURSOR_DEFAULT;
-      break;
-    case DISPLAY_MOUSE_MODE_SELECT:
-    case DISPLAY_MOUSE_MODE_FOCUS:
-      cursor = (mouse_hovers_background) ? SDL_SYSTEM_CURSOR_POINTER : SDL_SYSTEM_CURSOR_DEFAULT;
-      break;
-  }
-
-  display_set_cursor(display, cursor);
-}
-
-static void _display_query_pixel_info(Display* display, LuminaryHost* host, float request_x, float request_y) {
-  MD_CHECK_NULL_ARGUMENT(display);
-
-  const uint32_t screen_x = (uint32_t) fmaxf(request_x, 0.0f);
-  const uint32_t screen_y = (uint32_t) fmaxf(request_y, 0.0f);
-
-  uint32_t image_x, image_y;
-  display_zoom_handler_screen_to_image(display->zoom_handler, screen_x, screen_y, &image_x, &image_y);
-
-  LuminaryRendererSettings settings;
-  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-  if (image_x >= settings.width || image_y >= settings.height) {
-    display->awaiting_pixel_query_result = false;
-
-    switch (display->mouse_mode) {
-      case DISPLAY_MOUSE_MODE_DEFAULT:
-        display->move_pixel_data.pixel_query_is_valid = false;
-        break;
-      case DISPLAY_MOUSE_MODE_SELECT:
-        display->select_pixel_data.pixel_query_is_valid = false;
-        break;
-      case DISPLAY_MOUSE_MODE_FOCUS:
-        display->focus_pixel_data.pixel_query_is_valid = false;
-        break;
-      default:
-        break;
-    }
-
-    return;
-  }
-
-  const uint16_t x = (uint16_t) image_x;
-  const uint16_t y = (uint16_t) image_y;
-
-  LuminaryPixelQueryResult result;
-
-  LUM_FAILURE_HANDLE(luminary_host_get_pixel_info(host, x, y, &result));
-
-  display->reference_x = screen_x;
-  display->reference_y = screen_y;
-
-  display->awaiting_pixel_query_result = !result.pixel_query_is_valid;
-
-  switch (display->mouse_mode) {
-    case DISPLAY_MOUSE_MODE_DEFAULT:
-      display->move_pixel_data = result;
-      break;
-    case DISPLAY_MOUSE_MODE_SELECT:
-      display->select_pixel_data = result;
-      break;
-    case DISPLAY_MOUSE_MODE_FOCUS:
-      display->focus_pixel_data = result;
-      break;
-    default:
-      break;
-  }
-}
-
-static void _display_start_camera_mode(Display* display, const bool left_pressed) {
-  display->active_camera_movement = true;
-  display_set_mouse_visible(display, false);
-
-  camera_handler_set_mode(display->camera_handler, (left_pressed) ? CAMERA_MODE_ORBIT : CAMERA_MODE_ZOOM);
-  camera_handler_set_reference_pos(display->camera_handler, display->move_pixel_data.rel_hit_pos);
-}
-
-static WindowVisibilityMask _display_get_window_visibility_mask(Display* display) {
-  if (display->show_ui) {
-    return (display->active_camera_movement) ? WINDOW_VISIBILITY_MASK_MOVEMENT : WINDOW_VISIBILITY_MASK_ALL;
-  }
-
-  return WINDOW_VISIBILITY_NONE;
-}
-
-static void _display_generate_screenshot_name(
-  const char* output_directory, char* string, LuminaryImage image, LuminaryImageFileFormat format) {
-  time_t rawtime;
-  struct tm timeinfo;
-
-  char time_string[2048];
-
-  time(&rawtime);
-  timeinfo = *localtime(&rawtime);
-  strftime(time_string, 2048, "%Y-%m-%d-%H-%M-%S", &timeinfo);
-
-  const char* dir = (output_directory != (const char*) 0) ? output_directory : ".";
-
-  sprintf(
-    string, "%s/Snap-%s-%05u-%07.1fs.%s", dir, time_string, image.meta_data.sample_count, image.meta_data.time,
-    luminary_strings_image_file_format[format]);
-}
-
-static void _display_generate_screenshot(Display* display, LuminaryHost* host) {
-  if (display->output_promise_handle != LUMINARY_OUTPUT_HANDLE_INVALID)
-    return;
-
-  LuminaryRendererSettings settings;
-  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-  LuminaryOutputRequestProperties properties;
-  properties.sample_count = 0;
-  properties.width        = settings.width;
-  properties.height       = settings.height;
-
-  char status_message[32];
-  sprintf(status_message, "Save %s", luminary_strings_image_file_format[display->image_file_format]);
-  display->screenshot_status_message_id = display_add_status_message(display, "Display", status_message);
-
-  LUM_FAILURE_HANDLE(luminary_host_request_output(host, properties, &display->output_promise_handle));
-}
-
-static void _display_save_scene(Display* display, LuminaryHost* host) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  if (display->queued_save_scene == false)
-    return;
-
-  if (display->scene_file_path->dialog_open)
-    return;
-
-  LuminaryPath* path;
-  file_dialog_handler_try_acquire_path(display->scene_file_path, &path);
-
-  if (path == (LuminaryPath*) 0)
-    return;
-
-  bool is_empty;
-  LUM_FAILURE_HANDLE(luminary_path_get_is_empty(path, &is_empty));
-
-  if (is_empty == false) {
-    LUM_FAILURE_HANDLE(luminary_host_save_as_lumV5(host, path));
-  }
-
-  file_dialog_handler_release_path(display->scene_file_path);
-
-  display->queued_save_scene = false;
-}
-
-static void _display_query_scene_path(Display* display, LuminaryHost* host) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  display->queued_save_scene = true;
-
-  const bool shift_down = display->keyboard_state->keys[SDL_SCANCODE_LSHIFT].down;
-
-  if (shift_down == false) {
-    LuminaryPath* path;
-    file_dialog_handler_try_acquire_path(display->scene_file_path, &path);
-
-    if (path == (LuminaryPath*) 0)
-      return;
-
-    bool is_empty;
-    LUM_FAILURE_HANDLE(luminary_path_get_is_empty(path, &is_empty));
-
-    file_dialog_handler_release_path(display->scene_file_path);
-
-    if (is_empty == false)
-      return;
-  }
-
-  FileDialogHandlerOpenArgs open_args;
-  open_args.sdl_window   = display->sdl_window;
-  open_args.dialog_title = "Select scene file path";
-  open_args.dialog_type  = SDL_FILEDIALOG_SAVEFILE;
-  open_args.filter_type  = FILE_DIALOG_HANDLER_FILTER_TYPE_SCENE;
-
-  file_dialog_handler_open_dialog(display->scene_file_path, &open_args);
-}
-
-static void _display_sync_resolution(Display* display, LuminaryHost* host) {
-  LuminaryRendererSettings settings;
-  LUM_FAILURE_HANDLE(luminary_host_get_settings(host, &settings));
-
-  if (display->zoom_handler->image_width != settings.width || display->zoom_handler->image_height != settings.height) {
-    display_zoom_handler_set_image_size(display->zoom_handler, settings.width, settings.height);
-  }
-
-  if (display->region->image_width != settings.width || display->region->image_height != settings.height) {
-    render_region_handler_set_image_size(display->region, settings.width, settings.height);
-  }
-
-  LuminaryOutputProperties output_properties;
-  LUM_FAILURE_HANDLE(luminary_host_get_output_properties(host, &output_properties));
-
-  if (output_properties.width != settings.width || output_properties.height != settings.height) {
-    output_properties.width  = settings.width;
-    output_properties.height = settings.height;
-
-    LUM_FAILURE_HANDLE(luminary_host_set_output_properties(host, output_properties));
-  }
-}
-
-void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  _display_sync_resolution(display, host);
-
-  display->frametime = time_step;
-
-  if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
-    display->show_ui                = !display->show_ui;
-    display->active_camera_movement = !display->show_ui;
-    display_set_mouse_visible(display, display->show_ui);
-  }
-
-  if (display->keyboard_state->keys[SDL_SCANCODE_F2].phase == KEY_PHASE_PRESSED) {
-    _display_generate_screenshot(display, host);
-  }
-
-  if (display->show_ui && display->keyboard_state->keys[SDL_SCANCODE_S].phase == KEY_PHASE_PRESSED) {
-    const bool ctrl_down = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
-
-    if (ctrl_down) {
-      _display_query_scene_path(display, host);
-    }
-  }
-
-  _display_save_scene(display, host);
-
-  if (display->awaiting_pixel_query_result) {
-    display->awaiting_pixel_query_result = false;
-
-    switch (display->mouse_mode) {
-      case DISPLAY_MOUSE_MODE_DEFAULT:
-      default: {
-        const bool left_down  = display->mouse_state->down;
-        const bool right_down = display->mouse_state->right_down;
-        const bool alt_down   = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
-
-        if ((left_down || right_down) && alt_down) {
-          _display_query_pixel_info(display, host, display->reference_x, display->reference_y);
-
-          if (display->move_pixel_data.pixel_query_is_valid) {
-            _display_start_camera_mode(display, left_down);
-          }
-        }
-      } break;
-      case DISPLAY_MOUSE_MODE_SELECT:
-      case DISPLAY_MOUSE_MODE_FOCUS:
-        _display_query_pixel_info(display, host, display->reference_x, display->reference_y);
-        break;
-    }
-  }
-
-  _display_move_sun(display, host, time_step);
-
-  _display_set_default_cursor(display);
-
-  WindowVisibilityMask visibility_mask = _display_get_window_visibility_mask(display);
-  UserInterfaceStatus ui_status        = user_interface_handle_inputs(display->ui, display, host, visibility_mask);
-
-  if (display->show_ui) {
-    if (ui_status.received_keyboard_action == false) {
-      if (display->keyboard_state->keys[SDL_SCANCODE_1].phase == KEY_PHASE_PRESSED) {
-        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_DEFAULT);
-      }
-
-      if (display->keyboard_state->keys[SDL_SCANCODE_2].phase == KEY_PHASE_PRESSED) {
-        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_SELECT);
-      }
-
-      if (display->keyboard_state->keys[SDL_SCANCODE_3].phase == KEY_PHASE_PRESSED) {
-        display_set_mouse_mode(display, DISPLAY_MOUSE_MODE_FOCUS);
-      }
-    }
-
-    if (
-      (ui_status.received_hover == false) && (ui_status.received_mouse_action == false) && (ui_status.received_keyboard_action == false)) {
-      switch (display->mouse_mode) {
-        case DISPLAY_MOUSE_MODE_DEFAULT:
-        default:
-          if (display->mouse_visible) {
-            const bool left_pressed  = display->mouse_state->phase == MOUSE_PHASE_PRESSED;
-            const bool right_pressed = display->mouse_state->right_phase == MOUSE_PHASE_PRESSED;
-            const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
-            const bool ctrl_down     = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
-
-            if ((left_pressed || right_pressed) && alt_down && (ctrl_down == false)) {
-              _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
-
-              if (display->move_pixel_data.pixel_query_is_valid) {
-                _display_start_camera_mode(display, left_pressed);
-              }
-            }
-          }
-          else if (display->active_camera_movement) {
-            const bool left_pressed  = display->mouse_state->down;
-            const bool right_pressed = display->mouse_state->right_down;
-            const bool alt_down      = display->keyboard_state->keys[SDL_SCANCODE_LALT].down;
-            const bool ctrl_down     = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down;
-
-            const bool cond0 = (display->camera_handler->mode == CAMERA_MODE_ORBIT && !left_pressed);
-            const bool cond1 = (display->camera_handler->mode == CAMERA_MODE_ZOOM && !right_pressed);
-
-            if (cond0 || cond1 || !alt_down || ctrl_down) {
-              display->active_camera_movement = !display->show_ui;
-              display_set_mouse_visible(display, true);
-
-              camera_handler_set_mode(display->camera_handler, CAMERA_MODE_FLY);
-            }
-          }
-          break;
-        case DISPLAY_MOUSE_MODE_SELECT:
-        case DISPLAY_MOUSE_MODE_FOCUS:
-          if (display->mouse_state->phase == MOUSE_PHASE_PRESSED) {
-            _display_query_pixel_info(display, host, display->mouse_state->x, display->mouse_state->y);
-          }
-          break;
-      }
-    }
-
-    if (display->mouse_mode == DISPLAY_MOUSE_MODE_FOCUS && display->focus_pixel_data.pixel_query_is_valid) {
-      if (display->focus_pixel_data.depth != FLT_MAX && display->focus_pixel_data.depth > 0) {
-        LuminaryCamera camera;
-        LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
-
-        camera.lens.object_distance      = fmaxf(display->focus_pixel_data.depth, 0.01f);
-        camera.thin_lens.object_distance = fmaxf(display->focus_pixel_data.depth, 0.01f);
-
-        LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
-
-        // Invalidate the pixel query so that it does not keep overriding the focal length now.
-        display->focus_pixel_data.pixel_query_is_valid = false;
-      }
-    }
-  }
-
-  if (display->active_camera_movement) {
-    camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
-  }
-  else if (ui_status.received_keyboard_action == false) {
-    const bool ctrl_down = display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down || display->keyboard_state->keys[SDL_SCANCODE_RCTRL].down;
-    display_zoom_handler_update(display->zoom_handler, display->mouse_state, ctrl_down);
-    render_region_handle_inputs(display->region, display, host, display->mouse_state, display->keyboard_state);
-  }
-}
-
-struct SaveImageTaskArgs {
-  LuminaryImageSaveArgs save_args;
-  LuminaryHost* host;
-  LuminaryOutputHandle output_handle;
-  Display* display;
-} typedef SaveImageTaskArgs;
-
-static void _save_image_task_continuation(void* args) {
-  SaveImageTaskArgs* task_args = (SaveImageTaskArgs*) args;
-
-  LUM_FAILURE_HANDLE(luminary_host_release_output(task_args->host, task_args->output_handle));
-
-  if (task_args->display->screenshot_status_message_id != (uint32_t) -1) {
-    display_remove_status_message(task_args->display, task_args->display->screenshot_status_message_id);
-    task_args->display->screenshot_status_message_id = (uint32_t) -1;
-  }
-}
-
-static void _save_image_task(void* args, MDPromise* promise) {
-  SaveImageTaskArgs* task_args = (SaveImageTaskArgs*) args;
-
-  LUM_FAILURE_HANDLE(luminary_image_save(&task_args->save_args));
-  LUM_FAILURE_HANDLE(luminary_path_destroy(&task_args->save_args.file_path));
-
-  SDL_LockMutex(promise->mutex);
-  promise->continuation      = _save_image_task_continuation;
-  promise->continuation_args = task_args;
-  SDL_UnlockMutex(promise->mutex);
-}
-
-void display_process_tasks(Display* display) {
-  md_task_list_process(&display->active_promises);
-}
-
-void display_handle_outputs(Display* display, LuminaryHost* host, const char* output_directory) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  if (display->output_promise_handle != LUMINARY_OUTPUT_HANDLE_INVALID) {
-    LuminaryOutputHandle output_handle;
-    luminary_host_try_await_output(host, display->output_promise_handle, &output_handle);
-
-    if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID)
-      return;
-
-    LuminaryImage output_image;
-    LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
-
-    LuminaryPath* image_path;
-    LUM_FAILURE_HANDLE(luminary_path_create(&image_path));
-
-    char string[4096];
-    _display_generate_screenshot_name(output_directory, string, output_image, display->image_file_format);
-
-    LUM_FAILURE_HANDLE(luminary_path_set_from_string(image_path, string));
-
-    SaveImageTaskArgs* task_args;
-    LUM_FAILURE_HANDLE(host_malloc(&task_args, sizeof(SaveImageTaskArgs)));
-
-    task_args->save_args.image        = output_image;
-    task_args->save_args.file_path    = image_path;
-    task_args->save_args.format       = display->image_file_format;
-    task_args->save_args.jpeg_quality = 100;
-    task_args->host                   = host;
-    task_args->output_handle          = output_handle;
-    task_args->display                = display;
-
-    MDPromise* promise = md_thread_pool_enqueue(display->thread_pool, _save_image_task, task_args);
-
-    MDTaskNode* node;
-    LUM_FAILURE_HANDLE(host_malloc(&node, sizeof(MDTaskNode)));
-
-    node->task.promise       = promise;
-    node->task.args          = task_args;
-    node->next               = display->active_promises;
-    display->active_promises = node;
-
-    display->output_promise_handle = LUMINARY_OUTPUT_HANDLE_INVALID;
-  }
-}
-
 void display_handle_maximize(Display* display, bool reinstate_position) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   uint32_t width;
   uint32_t height;
-  uint32_t x;
-  uint32_t y;
+  int x, y;
 
   if (display->is_maximized) {
     width  = display->unmaximize_width;
@@ -929,120 +338,42 @@ void display_handle_maximize(Display* display, bool reinstate_position) {
     y = display->unmaximize_y;
   }
   else {
-    // Store the current size so we can restore it later again.
-    display->unmaximize_width  = display->width;
-    display->unmaximize_height = display->height;
+    const SDL_Rect bounds = display->screen_bounds;
+    int window_width, window_height;
+    if (
+      bounds.w <= 0 || bounds.h <= 0 || SDL_GetWindowSize(display->sdl_window, &window_width, &window_height) == false
+      || SDL_GetWindowPosition(display->sdl_window, &display->unmaximize_x, &display->unmaximize_y) == false)
+      return;
 
-    width  = display->screen_width;
-    height = display->screen_height;
-
-    SDL_GetWindowPosition(display->sdl_window, (int*) &display->unmaximize_x, (int*) &display->unmaximize_y);
-
-    x = SDL_WINDOWPOS_CENTERED;
-    y = SDL_WINDOWPOS_CENTERED;
+    display->unmaximize_width  = (uint32_t) window_width;
+    display->unmaximize_height = (uint32_t) window_height;
+    width                      = (uint32_t) bounds.w;
+    height                     = (uint32_t) bounds.h;
+    x                          = bounds.x;
+    y                          = bounds.y;
   }
 
-  display->is_maximized = !display->is_maximized;
+  display->is_maximized = display->is_maximized == false;
 
   display_resize(display, width, height);
 
   if (reinstate_position)
-    SDL_SetWindowPosition(display->sdl_window, (int) x, (int) y);
-}
-
-static void _display_render_output(Display* display, LuminaryHost* host) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  LuminaryOutputHandle output_handle;
-  LUM_FAILURE_HANDLE(luminary_host_acquire_output(host, &output_handle));
-
-  if (output_handle == LUMINARY_OUTPUT_HANDLE_INVALID) {
-    for (uint32_t y = 0; y < display->height; y++) {
-      uint32_t* dst = (uint32_t*) (display->buffer + y * display->pitch);
-      for (uint32_t x = 0; x < display->width; x++) {
-        dst[x] = MD_COLOR_WINDOW_BACKGROUND;
-      }
-    }
-
-    // Render the splash screen, but only if the display is large enough.
-    if (display->width >= DISPLAY_SPLASHSCREEN_WIDTH && display->height >= DISPLAY_SPLASHSCREEN_HEIGHT) {
-      uint32_t splash_screen_x = (display->width - DISPLAY_SPLASHSCREEN_WIDTH) >> 1;
-      uint32_t splash_screen_y = (display->height - DISPLAY_SPLASHSCREEN_HEIGHT) >> 1;
-
-      for (uint32_t y = 0; y < DISPLAY_SPLASHSCREEN_HEIGHT; y++) {
-        uint32_t* dst = (uint32_t*) (display->buffer + (splash_screen_y + y) * display->pitch);
-        for (uint32_t x = 0; x < DISPLAY_SPLASHSCREEN_WIDTH; x++) {
-          dst[splash_screen_x + x] = display->splash_screen[(DISPLAY_SPLASHSCREEN_HEIGHT - y - 1) * DISPLAY_SPLASHSCREEN_WIDTH + x];
-        }
-      }
-    }
-
-    return;
-  }
-
-  LuminaryImage output_image;
-  LUM_FAILURE_HANDLE(luminary_host_get_image(host, output_handle, &output_image));
-
-  display_zoom_handler_set_image_size(display->zoom_handler, output_image.width, output_image.height);
-
-  display->current_render_meta_data.elapsed_time = output_image.meta_data.time;
-  display->current_render_meta_data.sample_count = output_image.meta_data.sample_count;
-
-  _display_blit_to_display_buffer(display, output_image);
-
-  LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
-}
-
-void display_render(Display* display, LuminaryHost* host) {
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(host);
-
-  _display_render_output(display, host);
-
-  WindowVisibilityMask visibility_mask = _display_get_window_visibility_mask(display);
-  user_interface_render(display->ui, display, visibility_mask);
-}
-
-void display_update(Display* display) {
-  MD_CHECK_NULL_ARGUMENT(display);
-
-  uint64_t ticks_current;
-
-  do {
-    ticks_current = SDL_GetTicksNS();
-  } while (ticks_current - display->ticks_last_frame < DISPLAY_MIN_FRAME_TIME_NS && ticks_current > display->ticks_last_frame);
-
-  display->ticks_last_frame = ticks_current;
-
-  SDL_SetCursor(display->sdl_cursors[display->selected_cursor]);
-
-  SDL_UpdateWindowSurface(display->sdl_window);
-
-  display->frame_id++;
+    SDL_SetWindowPosition(display->sdl_window, x, y);
 }
 
 void display_resize(Display* display, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(display);
 
-  width  = min(display->screen_width, width);
-  height = min(display->screen_height, height);
-
-  // Display width and height will be updated through a resize event
-  SDL_SetWindowSize(display->sdl_window, (int) width, (int) height);
+  const uint32_t max_width  = (display->screen_bounds.w > 0) ? (uint32_t) display->screen_bounds.w : INT_MAX;
+  const uint32_t max_height = (display->screen_bounds.h > 0) ? (uint32_t) display->screen_bounds.h : INT_MAX;
+  SDL_SetWindowSize(display->sdl_window, (int) max(1u, min(max_width, width)), (int) max(1u, min(max_height, height)));
 }
 
 void display_destroy(Display** display) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(*display);
 
-  while ((*display)->active_promises) {
-    md_task_list_process(&(*display)->active_promises);
-  }
-
-  if ((*display)->thread_pool) {
-    md_thread_pool_destroy(&(*display)->thread_pool);
-  }
+  display_screenshot_destroy(*display);
 
   SDL_SetCursor((SDL_Cursor*) 0);
 
