@@ -5,6 +5,8 @@
 
 enum ArgumentCategory { ARGUMENT_CATEGORY_DEFAULT = 0, ARGUMENT_CATEGORY_LUMINARY = 1 } typedef ArgumentCategory;
 
+enum ArgumentMode { ARGUMENT_MODE_SHARED, ARGUMENT_MODE_CLI_ONLY } typedef ArgumentMode;
+
 struct ArgumentParser typedef ArgumentParser;
 
 typedef void (*ArgumentHandlerFunc)(ArgumentParser* parser, LuminaryHost* host, const uint32_t num_arguments, const char** arguments);
@@ -13,6 +15,7 @@ typedef void (*ArgumentHandlerFunc)(ArgumentParser* parser, LuminaryHost* host, 
 
 struct ArgumentDescriptor {
   ArgumentCategory category;
+  ArgumentMode mode;
   const char* long_name;
   const char* short_name;
   const char* description;
@@ -22,14 +25,16 @@ struct ArgumentDescriptor {
 } typedef ArgumentDescriptor;
 
 struct ParsedArgument {
-  ArgumentCategory category;
-  ArgumentHandlerFunc handler_func;
-  uint32_t subargument_count;
+  const ArgumentDescriptor* descriptor;
   char* subarguments[MAX_NUM_SUBARGUMENTS];
 } typedef ParsedArgument;
 
 struct ArgumentParserResults {
   bool dry_run_requested;
+  bool invalid_arguments;
+  bool cli_mode;
+  uint32_t cli_samples;
+  LuminaryImageFileFormat cli_format;
   const char* output_directory;
   uint32_t num_benchmark_outputs;
   const char* benchmark_name;

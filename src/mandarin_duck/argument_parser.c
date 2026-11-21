@@ -14,16 +14,30 @@
 
 #define UNUSED_ARG(X) (void) X
 
-static void _argument_parser_arg_func_benchmark(
-  ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
-  UNUSED_ARG(parser);
+static void _argument_parser_arg_func_cli(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
   UNUSED_ARG(host);
   UNUSED_ARG(num_arguments);
   UNUSED_ARG(arguments);
 
-  if (num_arguments > 1) {
-    parser->results.num_benchmark_outputs = atoll(arguments[0]);
-    parser->results.benchmark_name        = arguments[1];
+  parser->results.cli_mode = true;
+}
+
+static void _argument_parser_arg_func_format(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(host);
+  UNUSED_ARG(num_arguments);
+
+  const char* format = arguments[0];
+  if (strcmp(format, "png") == 0)
+    parser->results.cli_format = LUMINARY_IMAGE_FILE_FORMAT_PNG;
+  else if (strcmp(format, "jpg") == 0 || strcmp(format, "jpeg") == 0)
+    parser->results.cli_format = LUMINARY_IMAGE_FILE_FORMAT_JPG;
+  else if (strcmp(format, "bmp") == 0)
+    parser->results.cli_format = LUMINARY_IMAGE_FILE_FORMAT_BMP;
+  else if (strcmp(format, "tga") == 0)
+    parser->results.cli_format = LUMINARY_IMAGE_FILE_FORMAT_TGA;
+  else {
+    error_message("Unsupported output format '%s'. Expected png, jpg, jpeg, bmp or tga.", format);
+    parser->results.invalid_arguments = true;
   }
 }
 
@@ -37,13 +51,10 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
 
   info_message("OVERVIEW: Mandarin Duck Frontend for Luminary\n\n");
 
-#ifdef _WIN32
-  info_message("USAGE: MandarinDuck.exe [options] file...\n\n");
-#else
-  info_message("USAGE: MandarinDuck [options] file...\n\n");
-#endif
-
-  info_message("OPTIONS:\n");
+  info_message(
+    "USAGE: LuminaryMD [options] file...\n"
+    "       LuminaryMD --cli [options] <scene.lum>\n\n"
+    "OPTIONS:\n");
 
   for (uint32_t argument_id = 0; argument_id < num_available_arguments; argument_id++) {
     const ArgumentDescriptor* argument = parser->descriptors + argument_id;
@@ -53,7 +64,8 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
       info_message(", -%s", argument->short_name);
     }
 
-    info_message("\n\t\t%s\n", argument->description);
+    const char* mode = argument->mode == ARGUMENT_MODE_CLI_ONLY ? " (CLI only)" : "";
+    info_message("\n\t\t%s%s\n", argument->description, mode);
   }
 
   parser->results.dry_run_requested = true;
@@ -67,26 +79,57 @@ static void _argument_parser_arg_func_output(ArgumentParser* parser, LuminaryHos
   }
 }
 
-static uint32_t _argument_parser_parse_dimension(const char* name, const char* value) {
+static uint32_t _argument_parser_parse_positive_uint32(const char* value) {
   char* end;
   const char* character = value;
 
   for (; *character != '\0'; character++) {
-    if (*character < '0' || *character > '9') {
-      crash_message("Invalid window %s: %s. Expected a positive 32-bit integer.", name, value);
+    if (*character < '0' || *character > '9')
       return 0;
-    }
   }
 
   errno                              = 0;
   const unsigned long long dimension = strtoull(value, &end, 10);
 
-  if (errno == ERANGE || end == value || *end != '\0' || dimension == 0 || dimension > UINT32_MAX) {
-    crash_message("Invalid window %s: %s. Expected a positive 32-bit integer.", name, value);
+  if (errno == ERANGE || end == value || *end != '\0' || dimension == 0 || dimension > UINT32_MAX)
     return 0;
-  }
 
   return (uint32_t) dimension;
+}
+
+static void _argument_parser_arg_func_samples(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(host);
+  UNUSED_ARG(num_arguments);
+
+  const uint32_t samples = _argument_parser_parse_positive_uint32(arguments[0]);
+  if (samples == 0) {
+    error_message("Invalid sample count '%s'. Expected a positive 32-bit integer.", arguments[0]);
+    parser->results.invalid_arguments = true;
+    return;
+  }
+
+  parser->results.cli_samples = samples;
+}
+
+static void _argument_parser_arg_func_benchmark(
+  ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
+  UNUSED_ARG(host);
+  UNUSED_ARG(num_arguments);
+
+  const uint32_t num_outputs = _argument_parser_parse_positive_uint32(arguments[0]);
+  if (num_outputs == 0 || num_outputs > 31)
+    crash_message("Invalid benchmark exponent: %s. Expected an integer from 1 to 31.", arguments[0]);
+
+  parser->results.num_benchmark_outputs = num_outputs;
+  parser->results.benchmark_name        = arguments[1];
+}
+
+static uint32_t _argument_parser_parse_dimension(const char* name, const char* value) {
+  const uint32_t dimension = _argument_parser_parse_positive_uint32(value);
+  if (dimension == 0)
+    crash_message("Invalid window %s: %s. Expected a positive 32-bit integer.", name, value);
+
+  return dimension;
 }
 
 static void _argument_parser_arg_func_height(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
@@ -201,6 +244,8 @@ void argument_parser_create(ArgumentParser** parser) {
   LUM_FAILURE_HANDLE(array_create(&(*parser)->parsed_arguments, sizeof(ParsedArgument), 16));
 
   (*parser)->results.device_mask = LUMINARY_HOST_CREATE_INFO_DEVICE_MASK_ALL_DEVICES;
+  (*parser)->results.cli_format  = LUMINARY_IMAGE_FILE_FORMAT_PNG;
+  (*parser)->results.cli_samples = 1;
 
   // Add descriptors sorted by category and alphabetically.
 
@@ -208,16 +253,36 @@ void argument_parser_create(ArgumentParser** parser) {
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "benchmark";
+  descriptor.mode              = ARGUMENT_MODE_CLI_ONLY;
   descriptor.short_name        = "b";
-  descriptor.description       = "Run the benchmark";
+  descriptor.description       = "Save only benchmark checkpoints up to 2^exponent and a timing report: <exponent 1-31> <name>";
   descriptor.subargument_count = 2;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_benchmark;
   descriptor.pre_execute       = false;
 
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 
+  descriptor = (ArgumentDescriptor) {
+    .category     = ARGUMENT_CATEGORY_DEFAULT,
+    .mode         = ARGUMENT_MODE_SHARED,
+    .long_name    = "cli",
+    .description  = "Render without opening a window; save render.<format> unless benchmarking (in --output, if set)",
+    .handler_func = _argument_parser_arg_func_cli,
+    .pre_execute  = true};
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor = (ArgumentDescriptor) {
+    .category          = ARGUMENT_CATEGORY_DEFAULT,
+    .mode              = ARGUMENT_MODE_CLI_ONLY,
+    .long_name         = "format",
+    .description       = "Set image format: png (default), jpg, jpeg, bmp or tga",
+    .subargument_count = 1,
+    .handler_func      = _argument_parser_arg_func_format};
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "help";
+  descriptor.mode              = ARGUMENT_MODE_SHARED;
   descriptor.short_name        = "h";
   descriptor.description       = "Print available commandline arguments";
   descriptor.subargument_count = 0;
@@ -228,8 +293,9 @@ void argument_parser_create(ArgumentParser** parser) {
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "height";
+  descriptor.mode              = ARGUMENT_MODE_SHARED;
   descriptor.short_name        = (char*) 0;
-  descriptor.description       = "Set initial window height in pixels";
+  descriptor.description       = "Set initial window height (render height with --cli) in pixels";
   descriptor.subargument_count = 1;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_height;
   descriptor.pre_execute       = false;
@@ -238,6 +304,7 @@ void argument_parser_create(ArgumentParser** parser) {
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "output";
+  descriptor.mode              = ARGUMENT_MODE_SHARED;
   descriptor.short_name        = "o";
   descriptor.description       = "Set output directory";
   descriptor.subargument_count = 1;
@@ -247,7 +314,19 @@ void argument_parser_create(ArgumentParser** parser) {
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
+  descriptor.long_name         = "samples";
+  descriptor.mode              = ARGUMENT_MODE_CLI_ONLY;
+  descriptor.short_name        = "s";
+  descriptor.description       = "Set render sample count: <count> (default: 1; ignored with --benchmark)";
+  descriptor.subargument_count = 1;
+  descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_samples;
+  descriptor.pre_execute       = false;
+
+  LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
+
+  descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "version";
+  descriptor.mode              = ARGUMENT_MODE_SHARED;
   descriptor.short_name        = "v";
   descriptor.description       = "Print version information";
   descriptor.subargument_count = 0;
@@ -258,8 +337,9 @@ void argument_parser_create(ArgumentParser** parser) {
 
   descriptor.category          = ARGUMENT_CATEGORY_DEFAULT;
   descriptor.long_name         = "width";
+  descriptor.mode              = ARGUMENT_MODE_SHARED;
   descriptor.short_name        = (char*) 0;
-  descriptor.description       = "Set initial window width in pixels";
+  descriptor.description       = "Set initial window width (render width with --cli) in pixels";
   descriptor.subargument_count = 1;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_width;
   descriptor.pre_execute       = false;
@@ -268,6 +348,7 @@ void argument_parser_create(ArgumentParser** parser) {
 
   descriptor.category          = ARGUMENT_CATEGORY_LUMINARY;
   descriptor.long_name         = "device";
+  descriptor.mode              = ARGUMENT_MODE_SHARED;
   descriptor.short_name        = (char*) 0;
   descriptor.description       = "Specify a device that should be enabled for rendering, specify multiple times for multiple devices";
   descriptor.subargument_count = 1;
@@ -280,7 +361,8 @@ void argument_parser_create(ArgumentParser** parser) {
 void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** argv) {
   MD_CHECK_NULL_ARGUMENT(parser);
 
-  uint32_t subargs_left = 0;
+  uint32_t subargs_left    = 0;
+  bool malformed_arguments = false;
   ParseResult subarg_target;
   const char** subargs;
   LUM_FAILURE_HANDLE(array_create(&subargs, sizeof(const char*), 8));
@@ -297,7 +379,10 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
 
     if (result.is_argument) {
       if (subargs_left > 0) {
-        warn_message("Encountered argument but expected sub-argument.");
+        warn_message("Missing value for --%s.", subarg_target.matched_argument->long_name);
+        malformed_arguments = true;
+        if (subarg_target.matched_argument->mode == ARGUMENT_MODE_CLI_ONLY)
+          parser->results.invalid_arguments = true;
         subargs_left = 0;
         LUM_FAILURE_HANDLE(array_clear(subargs));
       }
@@ -305,23 +390,19 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
 
     if (result.is_argument && result.matched_argument == (ArgumentDescriptor*) 0) {
       warn_message("Argument: %s is unknown.", argument);
+      malformed_arguments = true;
       continue;
     }
 
     if (result.is_argument && result.matched_argument->subargument_count == 0) {
       if (result.matched_argument->pre_execute) {
-        result.matched_argument->handler_func(parser, (LuminaryHost*) 0, 0, (const char**) 0);
-
-        // Encountered argument that prevents Mandarin Duck from actually executing.
-        parser->results.dry_run_requested = true;
-        break;
+        result.matched_argument->handler_func(parser, NULL, 0, NULL);
+        if (parser->results.dry_run_requested)
+          break;
+        continue;
       }
 
-      ParsedArgument parsed_argument;
-
-      parsed_argument.category          = result.matched_argument->category;
-      parsed_argument.handler_func      = result.matched_argument->handler_func;
-      parsed_argument.subargument_count = 0;
+      const ParsedArgument parsed_argument = {.descriptor = result.matched_argument};
 
       LUM_FAILURE_HANDLE(array_push(&parser->parsed_arguments, &parsed_argument));
 
@@ -340,11 +421,7 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
       subargs_left--;
 
       if (subargs_left == 0) {
-        ParsedArgument parsed_argument;
-
-        parsed_argument.category          = subarg_target.matched_argument->category;
-        parsed_argument.handler_func      = subarg_target.matched_argument->handler_func;
-        parsed_argument.subargument_count = subarg_target.matched_argument->subargument_count;
+        ParsedArgument parsed_argument = {.descriptor = subarg_target.matched_argument};
 
         memcpy(parsed_argument.subarguments, subargs, subarg_target.matched_argument->subargument_count * sizeof(const char*));
 
@@ -364,6 +441,40 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
   }
 
   LUM_FAILURE_HANDLE(array_destroy(&subargs));
+
+  if (parser->results.dry_run_requested)
+    return;
+
+  if (subargs_left > 0) {
+    warn_message("Missing value for --%s.", subarg_target.matched_argument->long_name);
+    malformed_arguments = true;
+    if (subarg_target.matched_argument->mode == ARGUMENT_MODE_CLI_ONLY)
+      parser->results.invalid_arguments = true;
+  }
+
+  uint32_t num_arguments;
+  LUM_FAILURE_HANDLE(array_get_num_elements(parser->parsed_arguments, &num_arguments));
+  for (uint32_t argument_id = 0; argument_id < num_arguments; argument_id++) {
+    ParsedArgument* argument             = parser->parsed_arguments + argument_id;
+    const ArgumentDescriptor* descriptor = argument->descriptor;
+    if (descriptor->mode == ARGUMENT_MODE_CLI_ONLY && parser->results.cli_mode == false) {
+      error_message("--%s requires --cli.", descriptor->long_name);
+      parser->results.invalid_arguments = true;
+    }
+    else if (descriptor->mode == ARGUMENT_MODE_CLI_ONLY) {
+      descriptor->handler_func(parser, NULL, descriptor->subargument_count, (const char**) argument->subarguments);
+    }
+  }
+
+  if (parser->results.cli_mode) {
+    uint32_t num_inputs;
+    LUM_FAILURE_HANDLE(array_get_num_elements(parser->inputs, &num_inputs));
+    if (num_inputs != 1) {
+      error_message("--cli requires exactly one .lum scene path.");
+      parser->results.invalid_arguments = true;
+    }
+    parser->results.invalid_arguments |= malformed_arguments;
+  }
 }
 
 void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host, ArgumentCategory category) {
@@ -375,7 +486,8 @@ void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host, Argumen
     uint32_t num_inputs;
     LUM_FAILURE_HANDLE(array_get_num_elements(parser->inputs, &num_inputs));
 
-    for (uint32_t input_id = 0; input_id < num_inputs; input_id++) {
+    const uint32_t num_scene_inputs = parser->results.cli_mode ? 1 : num_inputs;
+    for (uint32_t input_id = 0; input_id < num_scene_inputs; input_id++) {
       const char* input = parser->inputs[input_id];
 
       // TODO: Handle obj file inputs
@@ -383,7 +495,8 @@ void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host, Argumen
       LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
       LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, input));
 
-      LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, lum_path));
+      const LuminaryLoadLumFileArgs load_args = {.path = lum_path, .synchronous = parser->results.cli_mode};
+      LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, &load_args));
 
       LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
     }
@@ -393,12 +506,13 @@ void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host, Argumen
   LUM_FAILURE_HANDLE(array_get_num_elements(parser->parsed_arguments, &num_arguments));
 
   for (uint32_t argument_id = 0; argument_id < num_arguments; argument_id++) {
-    const ParsedArgument* argument = parser->parsed_arguments + argument_id;
+    const ParsedArgument* argument       = parser->parsed_arguments + argument_id;
+    const ArgumentDescriptor* descriptor = argument->descriptor;
 
-    if (argument->category != category)
+    if (descriptor->category != category || descriptor->mode == ARGUMENT_MODE_CLI_ONLY)
       continue;
 
-    argument->handler_func(parser, host, argument->subargument_count, (const char**) argument->subarguments);
+    descriptor->handler_func(parser, host, descriptor->subargument_count, (const char**) argument->subarguments);
   }
 }
 

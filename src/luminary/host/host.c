@@ -67,13 +67,10 @@ struct HostLoadLumArgs {
   Path* path;
 } typedef HostLoadLumArgs;
 
-static LuminaryResult _host_load_lum_file(Host* host, HostLoadLumArgs* args) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(args);
-
+static LuminaryResult _host_apply_lum_file(Host* host, Path* path) {
   LumFile* lum_file;
   __FAILURE_HANDLE(lum_file_create(&lum_file));
-  __FAILURE_HANDLE(lum_file_parse(lum_file, args->path));
+  __FAILURE_HANDLE(lum_file_parse(lum_file, path));
 
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock_all(host->scene_caller));
@@ -86,6 +83,15 @@ static LuminaryResult _host_load_lum_file(Host* host, HostLoadLumArgs* args) {
   __FAILURE_HANDLE_CHECK_CRITICAL();
 
   __FAILURE_HANDLE(lum_file_destroy(&lum_file));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _host_load_lum_file(Host* host, HostLoadLumArgs* args) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(_host_apply_lum_file(host, args->path));
 
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));
@@ -673,13 +679,19 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
+LuminaryResult luminary_host_load_lum_file(Host* host, const LuminaryLoadLumFileArgs* args) {
   LUMINARY_HOST_API_ENTRY
 
   __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(args);
+  __CHECK_NULL_ARGUMENT(args->path);
 
-  __FAILURE_HANDLE(_host_queue_load_lum_file(host, path));
+  if (args->synchronous) {
+    __FAILURE_HANDLE(_host_apply_lum_file(host, args->path));
+  }
+  else {
+    __FAILURE_HANDLE(_host_queue_load_lum_file(host, args->path));
+  }
 
   return LUMINARY_SUCCESS;
 }

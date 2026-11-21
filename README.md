@@ -47,13 +47,14 @@ Luminary comes with its own frontend called `Mandarin Duck`. You can run Mandari
 
 ```
 LuminaryMD [File] [Args...]
+LuminaryMD --cli <scene.lum> [Args...]
 ```
 
 where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Args is optionally one or more of:
 
 ```
--b, --benchmark [Log2 of Sample Count, Name of Benchmark Run]
-        render the given scene and output an image at each power of two sample count up to the given target sample count
+-b, --benchmark <exponent> <name>
+  Requires --cli. Save benchmark images at checkpoints through 2^exponent and write a timing report.
 
 --height [Height]
   Set the initial window height in pixels
@@ -63,6 +64,9 @@ where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Arg
 
 -o, --output [Path]
         Specify the output path to which renders are stored
+
+-s, --samples <count>
+  Requires --cli. Set the render sample count to a positive 32-bit integer (default: 1).
 
 -v, --version
         print build information and exit

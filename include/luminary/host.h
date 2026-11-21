@@ -38,7 +38,13 @@ LUMINARY_API LuminaryResult luminary_host_set_device_enable(LuminaryHost* host, 
 LUMINARY_API LuminaryResult luminary_host_start_device(LuminaryHost* host, uint32_t index);
 LUMINARY_API LuminaryResult luminary_host_shutdown_device(LuminaryHost* host, uint32_t index);
 
-LUMINARY_API LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, LuminaryPath* path);
+LUMINARY_API struct LuminaryLoadLumFileArgs {
+  LuminaryPath* path;
+  bool synchronous;
+} typedef LuminaryLoadLumFileArgs;
+
+LUMINARY_API LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, const LuminaryLoadLumFileArgs* args);
+
 LUMINARY_API LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, LuminaryPath* path);
 
 LUMINARY_API LuminaryResult luminary_host_get_current_sample_time(LuminaryHost* host, double* time);

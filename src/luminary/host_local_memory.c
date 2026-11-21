@@ -12,6 +12,7 @@
 #define LOCAL_ALLOCATOR_MAGIC_INITIALIZED (0xCAFEBABE)
 #define LOCAL_ALLOCATOR_MAGIC_NOT_INITIALIZED (0xBAADF00D)
 #define LOCAL_ALLOCATION_MAGIC (0xABCDEF01)
+#define LOCAL_ALLOCATION_MAGIC_FALLBACK (0xABCDEF02)
 #define LOCAL_ALLOCATION_ID_INVALID (0xFFFFFFFF)
 #define LOCAL_ALLOCATION_ALIGNMENT (0x100)
 
@@ -21,6 +22,7 @@ struct LocalMemoryAllocationHeader {
       uint32_t allocation_id;
       uint32_t magic;
       uint32_t allocator_id;
+      size_t fallback_size;
     };
 
     uint8_t padding[LOCAL_ALLOCATION_ALIGNMENT];
@@ -78,6 +80,16 @@ LuminaryResult _host_memory_local_shutdown() {
 LuminaryResult _host_malloc_local(void** ptr, size_t size) {
   __CHECK_NULL_ARGUMENT(ptr);
 
+  if (_thread_local_allocator.magic != LOCAL_ALLOCATOR_MAGIC_INITIALIZED) {
+    LocalMemoryAllocationHeader* header;
+    __FAILURE_HANDLE(host_malloc(&header, size + sizeof(LocalMemoryAllocationHeader)));
+    header->magic         = LOCAL_ALLOCATION_MAGIC_FALLBACK;
+    header->fallback_size = size;
+    *ptr                  = (void*) (header + 1);
+
+    return LUMINARY_SUCCESS;
+  }
+
   uint32_t num_allocations;
   __FAILURE_HANDLE(array_get_num_elements(_thread_local_allocator.allocations, &num_allocations));
 
@@ -130,16 +142,28 @@ LuminaryResult _host_malloc_local(void** ptr, size_t size) {
 
 LuminaryResult _host_realloc_local(void** ptr, size_t size) {
   __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(*ptr);
 
   LocalMemoryAllocationHeader* header = (void*) (((LocalMemoryAllocationHeader*) (*ptr)) - 1);
 
-  if (header->magic != LOCAL_ALLOCATION_MAGIC)
+  if (header->magic != LOCAL_ALLOCATION_MAGIC) {
+    if (header->magic == LOCAL_ALLOCATION_MAGIC_FALLBACK) {
+      if (header->fallback_size < size) {
+        __FAILURE_HANDLE(host_realloc(&header, size + sizeof(LocalMemoryAllocationHeader)));
+        header->fallback_size = size;
+        *ptr                  = (void*) (header + 1);
+      }
+
+      return LUMINARY_SUCCESS;
+    }
+
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given memory is not valid local host memory.");
+  }
 
   if (header->allocation_id == LOCAL_ALLOCATION_ID_INVALID)
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Local memory has been corrupted.");
 
-  if (header->allocator_id != _thread_local_allocator.id)
+  if (_thread_local_allocator.magic != LOCAL_ALLOCATOR_MAGIC_INITIALIZED || header->allocator_id != _thread_local_allocator.id)
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Local memory has been allocated by another local memory allocator.");
 
   // Header will be invalid after the realloc.
@@ -169,16 +193,25 @@ LuminaryResult _host_realloc_local(void** ptr, size_t size) {
 
 LuminaryResult _host_free_local(void** ptr) {
   __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(*ptr);
 
   LocalMemoryAllocationHeader* header = (void*) (((LocalMemoryAllocationHeader*) (*ptr)) - 1);
 
-  if (header->magic != LOCAL_ALLOCATION_MAGIC)
+  if (header->magic != LOCAL_ALLOCATION_MAGIC) {
+    if (header->magic == LOCAL_ALLOCATION_MAGIC_FALLBACK) {
+      __FAILURE_HANDLE(host_free(&header));
+      *ptr = (void*) 0;
+
+      return LUMINARY_SUCCESS;
+    }
+
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given memory is not valid local host memory.");
+  }
 
   if (header->allocation_id == LOCAL_ALLOCATION_ID_INVALID)
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Local memory has been corrupted.");
 
-  if (header->allocator_id != _thread_local_allocator.id)
+  if (_thread_local_allocator.magic != LOCAL_ALLOCATOR_MAGIC_INITIALIZED || header->allocator_id != _thread_local_allocator.id)
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Local memory has been allocated by another local memory allocator.");
 
   LocalMemoryAllocation* allocation = _thread_local_allocator.allocations + header->allocation_id;

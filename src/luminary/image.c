@@ -428,8 +428,8 @@ LuminaryResult luminary_image_save(const LuminaryImageSaveArgs* args) {
 
   __FAILURE_HANDLE(host_free((void**) &buffer));
 
-  if (!stbi_result) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to save image.");
+  if (stbi_result == 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to save image to %s.", file_path_string);
   }
 
   return LUMINARY_SUCCESS;
