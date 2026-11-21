@@ -15,14 +15,23 @@ enum UIRendererWorkSize {
   UI_RENDERER_WORK_SIZE_COUNT
 } typedef UIRendererWorkSize;
 
-static const uint32_t UIRendererWorkSizeStrideLog[UI_RENDERER_WORK_SIZE_COUNT] =
-  {[UI_RENDERER_WORK_SIZE_32BIT] = 0, [UI_RENDERER_WORK_SIZE_128BIT] = 2, [UI_RENDERER_WORK_SIZE_256BIT] = 3};
+static const uint32_t UIRendererWorkSizeStrideLog[UI_RENDERER_WORK_SIZE_COUNT] = {
+  [UI_RENDERER_WORK_SIZE_32BIT]  = 0,
+  [UI_RENDERER_WORK_SIZE_128BIT] = 2,
+  [UI_RENDERER_WORK_SIZE_256BIT] = 3,
+};
 
-static const uint32_t UIRendererWorkSizeStride[UI_RENDERER_WORK_SIZE_COUNT] =
-  {[UI_RENDERER_WORK_SIZE_32BIT] = 1 << 0, [UI_RENDERER_WORK_SIZE_128BIT] = 1 << 2, [UI_RENDERER_WORK_SIZE_256BIT] = 1 << 3};
+static const uint32_t UIRendererWorkSizeStride[UI_RENDERER_WORK_SIZE_COUNT] = {
+  [UI_RENDERER_WORK_SIZE_32BIT]  = 1 << 0,
+  [UI_RENDERER_WORK_SIZE_128BIT] = 1 << 2,
+  [UI_RENDERER_WORK_SIZE_256BIT] = 1 << 3,
+};
 
-static const uint32_t UIRendererWorkSizeStrideBytes[UI_RENDERER_WORK_SIZE_COUNT] =
-  {[UI_RENDERER_WORK_SIZE_32BIT] = 4 << 0, [UI_RENDERER_WORK_SIZE_128BIT] = 4 << 2, [UI_RENDERER_WORK_SIZE_256BIT] = 4 << 3};
+static const uint32_t UIRendererWorkSizeStrideBytes[UI_RENDERER_WORK_SIZE_COUNT] = {
+  [UI_RENDERER_WORK_SIZE_32BIT]  = 4 << 0,
+  [UI_RENDERER_WORK_SIZE_128BIT] = 4 << 2,
+  [UI_RENDERER_WORK_SIZE_256BIT] = 4 << 3,
+};
 
 enum UIRendererBackgroundMode {
   UI_RENDERER_BACKGROUND_MODE_OPAQUE          = 0,
@@ -42,7 +51,6 @@ struct UIRenderer {
 } typedef UIRenderer;
 
 void ui_renderer_create(UIRenderer** renderer);
-void ui_renderer_create_window_background(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_render_rounded_box(
   UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size,

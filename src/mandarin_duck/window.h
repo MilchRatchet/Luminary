@@ -108,7 +108,6 @@ struct Window {
   char separator_context_string[WINDOW_SEPARATOR_CONTEXT_IDENTIFIER_SIZE];
   Element* element_queue;
   uint8_t* background_blur_buffer;
-  uint32_t background_blur_buffer_ld;
   size_t background_blur_buffer_size;
   bool element_has_hover;
   Window* external_subwindow;

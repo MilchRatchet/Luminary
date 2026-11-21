@@ -134,14 +134,6 @@ void ui_renderer_create(UIRenderer** renderer) {
   }
 }
 
-void ui_renderer_create_window_background(UIRenderer* renderer, Display* display, Window* window) {
-  MD_CHECK_NULL_ARGUMENT(renderer);
-  MD_CHECK_NULL_ARGUMENT(display);
-  MD_CHECK_NULL_ARGUMENT(window);
-
-  ui_renderer_stack_blur(renderer, display, window);
-}
-
 void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window) {
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -157,11 +149,13 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
   }
 
   const uint32_t height = (window->y + window->height > display->height) ? display->height - window->y : window->height;
+  UIRendererBlurRows blur;
+  if (ui_renderer_blur_rows_init(&blur, display, window, height) == false)
+    return;
 
   _ui_renderer_render_rounded_box(
-    renderer, window->width, window->height, window->background_blur_buffer, 0, 0, window->background_blur_buffer_ld, display->buffer,
-    window->x, window->y, display->pitch, rounding_size, height, 0, MD_COLOR_WINDOW_BACKGROUND,
-    UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
+    renderer, window->width, window->height, NULL, 0, 0, 0, display->buffer, window->x, window->y, display->pitch, rounding_size, height, 0,
+    MD_COLOR_WINDOW_BACKGROUND, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT, &blur);
 }
 
 void ui_renderer_render_rounded_box(
@@ -185,7 +179,7 @@ void ui_renderer_render_rounded_box(
 
   _ui_renderer_render_rounded_box(
     renderer, width, height, display->buffer, x, y, display->pitch, display->buffer, x, y, display->pitch, rounding_size, height_clip,
-    border_color, background_color, background_mode);
+    border_color, background_color, background_mode, NULL);
 }
 
 void ui_renderer_render_display_corners(UIRenderer* renderer, Display* display) {

@@ -34,7 +34,7 @@ void window_allocate_memory(Window* window) {
   if (!window->background)
     return;
 
-  const size_t required_background_blur_buffer_size = window->width * window->height * sizeof(LuminaryARGB8);
+  const size_t required_background_blur_buffer_size = ui_renderer_blur_buffer_size(window->width, window->height);
 
   if (required_background_blur_buffer_size <= window->background_blur_buffer_size)
     return;
@@ -44,7 +44,6 @@ void window_allocate_memory(Window* window) {
   }
 
   LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffer, required_background_blur_buffer_size));
-  window->background_blur_buffer_ld   = window->width * sizeof(LuminaryARGB8);
   window->background_blur_buffer_size = required_background_blur_buffer_size;
 }
 
@@ -156,13 +155,14 @@ UserInterfaceStatus window_handle_input(Window* window, Display* display, Lumina
   window->context_stack_ptr = 0;
   memset(window->separator_context_string, 0, WINDOW_SEPARATOR_CONTEXT_IDENTIFIER_SIZE);
 
-  window->context_stack[0] = (WindowContext) {.fill          = 0,
-                                              .x             = window->x,
-                                              .y             = window->y,
-                                              .width         = window->width,
-                                              .height        = window->height,
-                                              .padding       = window->padding,
-                                              .is_horizontal = window->is_horizontal};
+  window->context_stack[0] = (WindowContext) {
+    .fill          = 0,
+    .x             = window->x,
+    .y             = window->y,
+    .width         = window->width,
+    .height        = window->height,
+    .padding       = window->padding,
+    .is_horizontal = window->is_horizontal};
 
   window->action_func(window, display, host, mouse_state);
 
@@ -317,7 +317,6 @@ void window_render(Window* window, Display* display) {
   window_allocate_memory(window);
 
   if (window->background) {
-    ui_renderer_create_window_background(display->ui_renderer, display, window);
     ui_renderer_render_window(display->ui_renderer, display, window);
   }
 

@@ -2,6 +2,7 @@
 #define MANDARIN_DUCK_UI_RENDERER_IMPL_H
 
 #include "ui_renderer.h"
+#include "ui_renderer_blur.h"
 #include "ui_renderer_utils.h"
 #include "utils.h"
 
@@ -35,6 +36,7 @@ inline void color256_store_generic(uint8_t* ptr, const Color256 a, const UIRende
 struct UIRendererRoundedBoxArgs {
   uint8_t* dst;
   const uint8_t* src;
+  UIRendererBlurRows* blur;
 
   uint32_t dst_ld;
   uint32_t src_ld;
@@ -172,6 +174,9 @@ inline void _ui_renderer_render_rounded_box_row_kind_1(UIRendererRoundedBoxArgs*
   if (args->row >= args->height_clip)
     return;
 
+  if (args->blur)
+    args->src = ui_renderer_blur_rows_get(args->blur, args->row);
+
   uint32_t col       = 0;
   uint32_t shape_col = 0;
 
@@ -201,6 +206,9 @@ inline void _ui_renderer_render_rounded_box_row_kind_2(UIRendererRoundedBoxArgs*
   const uint32_t end_row = args->row + args->shape_mask_half_size - 1;
 
   for (; args->row < end_row && args->row < args->height_clip; args->row++) {
+    if (args->blur)
+      args->src = ui_renderer_blur_rows_get(args->blur, args->row);
+
     uint32_t col       = 0;
     uint32_t shape_col = 0;
 
@@ -228,6 +236,9 @@ inline void _ui_renderer_render_rounded_box_row_kind_2(UIRendererRoundedBoxArgs*
 
 inline void _ui_renderer_render_rounded_box_row_kind_3(UIRendererRoundedBoxArgs* args, const UIRendererWorkSize work_size) {
   for (; args->row < args->rows - args->shape_mask_half_size && args->row < args->height_clip; args->row++) {
+    if (args->blur)
+      args->src = ui_renderer_blur_rows_get(args->blur, args->row);
+
     uint32_t col = 0;
 
     for (; col < 1; col++) {
@@ -250,7 +261,7 @@ inline void _ui_renderer_render_rounded_box_row_kind_3(UIRendererRoundedBoxArgs*
 static void _ui_renderer_render_rounded_box(
   UIRenderer* renderer, uint32_t width, uint32_t height, const uint8_t* src, uint32_t src_x, uint32_t src_y, uint32_t src_ld, uint8_t* dst,
   uint32_t dst_x, uint32_t dst_y, uint32_t dst_ld, uint32_t rounding_size, uint32_t height_clip, uint32_t border_color,
-  uint32_t background_color, UIRendererBackgroundMode background_mode) {
+  uint32_t background_color, UIRendererBackgroundMode background_mode, UIRendererBlurRows* blur) {
   UIRendererWorkSize work_size = UI_RENDERER_WORK_SIZE_32BIT;
   if ((width & (UIRendererWorkSizeStride[UI_RENDERER_WORK_SIZE_256BIT] - 1)) == 0) {
     work_size = UI_RENDERER_WORK_SIZE_256BIT;
@@ -291,7 +302,8 @@ static void _ui_renderer_render_rounded_box(
 
   UIRendererRoundedBoxArgs args = {
     .dst                  = dst + sizeof(LuminaryARGB8) * dst_x + dst_y * dst_ld,
-    .src                  = src + sizeof(LuminaryARGB8) * src_x + src_y * src_ld,
+    .src                  = blur ? NULL : src + sizeof(LuminaryARGB8) * src_x + src_y * src_ld,
+    .blur                 = blur,
     .dst_ld               = dst_ld,
     .src_ld               = src_ld,
     .cols                 = cols,
