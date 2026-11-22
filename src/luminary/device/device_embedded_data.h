@@ -9,7 +9,6 @@ struct DeviceEmbeddedDataPtrs {
   CUdeviceptr bluenoise_1D;
   CUdeviceptr bluenoise_2D;
   CUdeviceptr bridge_lut;
-  CUdeviceptr spectral_cdf;
   DeviceTextureObject moon_albedo_tex;
   DeviceTextureObject moon_normal_tex;
   DeviceTextureObject spectral_xy_tex;
@@ -20,7 +19,6 @@ struct DeviceEmbeddedData {
   DEVICE uint16_t* bluenoise_1D;
   DEVICE uint32_t* bluenoise_2D;
   DEVICE float* bridge_lut;
-  DEVICE float* spectral_cdf;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
   DeviceTexture* spectral_xy_tex;

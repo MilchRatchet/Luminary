@@ -91,19 +91,6 @@ DEVICE_CTX_FUNC LuminaryResult device_embedded_data_update(DeviceEmbeddedData* d
     *buffers_have_changed = true;
   }
 
-  if (data->spectral_cdf == (DEVICE void*) 0) {
-    void* spectral_cdf_data;
-    int64_t spectral_cdf_length;
-    __FAILURE_HANDLE(device_embedded_load(DEVICE_EMBEDDED_FILE_CIE1931_CDF, &spectral_cdf_data, &spectral_cdf_length));
-
-    __FAILURE_HANDLE(device_malloc(&data->spectral_cdf, spectral_cdf_length));
-
-    __FAILURE_HANDLE(device_staging_manager_register(
-      device->staging_manager, spectral_cdf_data, (DEVICE void*) data->spectral_cdf, 0, spectral_cdf_length));
-
-    *buffers_have_changed = true;
-  }
-
   if (data->spectral_xy_tex == (DeviceTexture*) 0) {
     void* spectral_xy_lut_data;
     int64_t spectral_xy_lut_length;
@@ -160,7 +147,6 @@ DEVICE_CTX_FUNC LuminaryResult device_embedded_data_get_ptrs(DeviceEmbeddedData*
   ptrs->bluenoise_1D = DEVICE_CUPTR(data->bluenoise_1D);
   ptrs->bluenoise_2D = DEVICE_CUPTR(data->bluenoise_2D);
   ptrs->bridge_lut   = DEVICE_CUPTR(data->bridge_lut);
-  ptrs->spectral_cdf = DEVICE_CUPTR(data->spectral_cdf);
 
   __FAILURE_HANDLE(device_struct_texture_object_convert(data->moon_albedo_tex, &ptrs->moon_albedo_tex));
   __FAILURE_HANDLE(device_struct_texture_object_convert(data->moon_normal_tex, &ptrs->moon_normal_tex));
@@ -181,9 +167,6 @@ LuminaryResult device_embedded_data_destroy(DeviceEmbeddedData** data) {
 
   if ((*data)->bridge_lut)
     __FAILURE_HANDLE(device_free(&(*data)->bridge_lut));
-
-  if ((*data)->spectral_cdf)
-    __FAILURE_HANDLE(device_free(&(*data)->spectral_cdf));
 
   if ((*data)->moon_albedo_tex)
     __FAILURE_HANDLE(device_texture_destroy(&(*data)->moon_albedo_tex));

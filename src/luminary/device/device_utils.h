@@ -505,7 +505,6 @@ struct DevicePointers {
   const uint16_t* LUM_RESTRICT bluenoise_1D;
   const uint32_t* LUM_RESTRICT bluenoise_2D;
   const float* LUM_RESTRICT bridge_lut;
-  const float* LUM_RESTRICT spectral_cdf;
   // DeviceAbort
   uint32_t* LUM_RESTRICT abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;

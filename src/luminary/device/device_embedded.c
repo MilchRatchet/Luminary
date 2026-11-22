@@ -13,7 +13,6 @@ static const char* embedded_file_names[DEVICE_EMBEDDED_FILE_COUNT] = {
   [DEVICE_EMBEDDED_FILE_BLUENOISE1D] = "bluenoise_1D.bin",        [DEVICE_EMBEDDED_FILE_BLUENOISE2D] = "bluenoise_2D.bin",
   [DEVICE_EMBEDDED_FILE_BRIDGE_BASE_LUT] = "bridge_lut_base.bin", [DEVICE_EMBEDDED_FILE_BRIDGE_LUT] = "bridge_lut.bin",
   [DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT] = "cie1931_xy_lut.bin",   [DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT] = "cie1931_z_lut.bin",
-  [DEVICE_EMBEDDED_FILE_CIE1931_CDF] = "cie1931_cdf.bin",
 };
 
 ////////////////////////////////////////////////////////////////////
@@ -976,8 +975,6 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
   const uint32_t table_min_wavelength = 360;
   const uint32_t table_max_wavelength = 830;
 
-  // We clamp the wavelengths to reasonable values, outside of that, the importance of a wavelength is not even numerically stable to
-  // include in the CDF.
   // We need to make sure to support 450 and 650 though as OpenPBR mentions these for subsurface scattering.
   const uint32_t clamped_min_wavelength = SPECTRAL_MIN_WAVELENGTH;
   const uint32_t clamped_max_wavelength = SPECTRAL_MAX_WAVELENGTH;
@@ -989,7 +986,7 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
 
   float y_sum = 0.0f;
 
-  // The smallest wavelength receives an importance of 0 to achieve a clean CDF
+  // Preserve the existing XYZ normalization, which excludes the first wavelength.
   for (uint32_t wavelength_id = 0; wavelength_id < table_num_wavelengths; wavelength_id++) {
     if (wavelength_id + table_min_wavelength < clamped_min_wavelength)
       continue;
@@ -1005,16 +1002,11 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
     y_sum += (clamped_index > 0) ? y : 0.0f;
   }
 
-  LOCAL float* cdf;
-  __FAILURE_HANDLE(host_malloc_local(&cdf, clamped_num_wavelengths * sizeof(float)));
-
   LOCAL float* xy_lut;
   __FAILURE_HANDLE(host_malloc_local(&xy_lut, clamped_num_wavelengths * sizeof(float) * 2));
 
   LOCAL float* z_lut;
   __FAILURE_HANDLE(host_malloc_local(&z_lut, clamped_num_wavelengths * sizeof(float)));
-
-  float last_cdf = 0.0f;
 
   for (uint32_t wavelength_id = 0; wavelength_id < table_num_wavelengths; wavelength_id++) {
     if (wavelength_id + table_min_wavelength < clamped_min_wavelength)
@@ -1030,24 +1022,10 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
     const float y = _embedded_cie1931_xyz_lut[wavelength_id * 3 + 1] * S / y_sum;
     const float z = _embedded_cie1931_xyz_lut[wavelength_id * 3 + 2] * S / y_sum;
 
-    const float pdf = (clamped_index > 0) ? y : 0.0f;
-
-    const float cdf_value = last_cdf + pdf;
-
-    last_cdf = cdf_value;
-
-    cdf[clamped_index]            = cdf_value;
     xy_lut[clamped_index * 2 + 0] = x;
     xy_lut[clamped_index * 2 + 1] = y;
     z_lut[clamped_index]          = z;
   }
-
-  FILE* file_cdf = fopen(embedded_file_names[DEVICE_EMBEDDED_FILE_CIE1931_CDF], "wb");
-  if (file_cdf == (FILE*) 0) {
-    __RETURN_ERROR(LUMINARY_ERROR_C_STD, "Could not open file.");
-  }
-  fwrite(cdf, sizeof(float), clamped_num_wavelengths, file_cdf);
-  fclose(file_cdf);
 
   FILE* file_xy = fopen(embedded_file_names[DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT], "wb");
   if (file_xy == (FILE*) 0) {
@@ -1063,7 +1041,6 @@ static LuminaryResult _embedded_generate_cie1931_xyz_lut() {
   fwrite(z_lut, sizeof(float), clamped_num_wavelengths, file_z);
   fclose(file_z);
 
-  __FAILURE_HANDLE(host_free_local(&cdf));
   __FAILURE_HANDLE(host_free_local(&xy_lut));
   __FAILURE_HANDLE(host_free_local(&z_lut));
 
@@ -1142,7 +1119,7 @@ LuminaryResult device_embedded_load(const DeviceEmbeddedFile file, void** data, 
 #ifdef EMBEDDED_GENERATE
   if (file == DEVICE_EMBEDDED_FILE_BRIDGE_LUT)
     __FAILURE_HANDLE(_embedded_generate_bridge_lut_optimized());
-  if (file == DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT || file == DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT || file == DEVICE_EMBEDDED_FILE_CIE1931_CDF)
+  if (file == DEVICE_EMBEDDED_FILE_CIE1931_XY_LUT || file == DEVICE_EMBEDDED_FILE_CIE1931_Z_LUT)
     __FAILURE_HANDLE(_embedded_generate_cie1931_xyz_lut());
 #endif /* EMBEDDED_GENERATE */
 

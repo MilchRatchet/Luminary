@@ -632,7 +632,6 @@ LuminaryResult device_load_embedded_data(Device* device) {
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_1D, ptrs.bluenoise_1D);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_2D, ptrs.bluenoise_2D);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bridge_lut, ptrs.bridge_lut);
-    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.spectral_cdf, ptrs.spectral_cdf);
 
     DEVICE_UPDATE_CONSTANT_MEMORY(moon_albedo_tex, ptrs.moon_albedo_tex);
     DEVICE_UPDATE_CONSTANT_MEMORY(moon_normal_tex, ptrs.moon_normal_tex);
