@@ -252,7 +252,6 @@ LUMINARY_FUNCTION bool light_triangle_sample_finalize_bridges(
 LUMINARY_FUNCTION RGBF light_get_color(TriangleLight& triangle) {
   RGBF color = splat_color(0.0f);
 
-  // TODO: Implement a light weight DeviceLightMaterial type
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
   if (mat.luminance_tex != TEXTURE_NONE) {

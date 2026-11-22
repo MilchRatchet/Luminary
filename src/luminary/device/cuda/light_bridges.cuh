@@ -246,14 +246,12 @@ LUMINARY_FUNCTION RGBF bridges_sample_bridge(
 
   end_vertex = current_vertex;
 
-  const RGBF scattering = ctx.descriptor.scattering;
-  const RGBF absorption = ctx.descriptor.absorption;
+  const RGBF log_scattering = ctx.descriptor.log_scattering;
+  const RGBF transmittance  = volume_get_transmittance(ctx.descriptor);
 
-  // TODO: Scattering is a material constant, so logf(scattering) should be precomputed.
   RGBF path_weight = get_color(
-    expf(vertex_count * logf(fmaxf(scattering.r, eps)) - sum_dist * (scattering.r + absorption.r)),
-    expf(vertex_count * logf(fmaxf(scattering.g, eps)) - sum_dist * (scattering.g + absorption.g)),
-    expf(vertex_count * logf(fmaxf(scattering.b, eps)) - sum_dist * (scattering.b + absorption.b)));
+    expf(vertex_count * log_scattering.r - sum_dist * transmittance.r), expf(vertex_count * log_scattering.g - sum_dist * transmittance.g),
+    expf(vertex_count * log_scattering.b - sum_dist * transmittance.b));
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 

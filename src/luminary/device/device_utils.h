@@ -231,6 +231,7 @@ struct VolumeDescriptor {
   VolumeType type;
   RGBF absorption;
   RGBF scattering;
+  RGBF log_scattering;
   float max_absorption;
   float max_scattering;
   float dist;

@@ -89,7 +89,6 @@ LUM_STATIC_SIZE_ASSERT(DeviceCameraAux, 0x1Cu);
 
 struct DeviceOcean {
   uint32_t active : 1;
-  uint32_t water_type : 4;
   uint32_t caustics_active : 1;
   uint32_t caustics_ris_sample_count : 7;
   uint32_t multiscattering : 1;
@@ -100,8 +99,12 @@ struct DeviceOcean {
   float frequency;
   float refractive_index;
   float caustics_domain_scale;
+  float molecular_weight;
+  RGBF absorption;
+  RGBF scattering;
+  RGBF log_scattering;
 } typedef DeviceOcean;
-LUM_STATIC_SIZE_ASSERT(DeviceOcean, 0x18u);
+LUM_STATIC_SIZE_ASSERT(DeviceOcean, 0x40u);
 
 struct DeviceSky {
   uint32_t ozone_absorption : 1;
@@ -169,12 +172,13 @@ LUM_STATIC_SIZE_ASSERT(DeviceCloud, 0x90u);
 struct DeviceFog {
   uint32_t active : 1;
 
-  float density;
+  float scattering;
+  float log_scattering;
   float droplet_diameter;
   float height;
   float dist;
 } typedef DeviceFog;
-LUM_STATIC_SIZE_ASSERT(DeviceFog, 0x14u);
+LUM_STATIC_SIZE_ASSERT(DeviceFog, 0x18u);
 
 struct DeviceParticles {
   uint32_t active : 1;

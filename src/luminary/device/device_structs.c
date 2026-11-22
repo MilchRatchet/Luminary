@@ -1,5 +1,6 @@
 #include "device_structs.h"
 
+#include <float.h>
 #include <math.h>
 
 #include "device_mesh.h"
@@ -80,6 +81,27 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
 
   return LUMINARY_SUCCESS;
 }
+
+// Coefficients from Droske et al., Path Tracing in Production: The Path of Water, SIGGRAPH 2023 Courses.
+struct OceanJerlovCoefficients {
+  RGBF scattering;
+  RGBF absorption;
+  float molecular_weight;
+} typedef OceanJerlovCoefficients;
+
+static const OceanJerlovCoefficients ocean_jerlov_coefficients[] = {
+  [LUMINARY_JERLOV_WATER_TYPE_I]   = {{0.001f, 0.002f, 0.004f}, {0.309f, 0.053f, 0.009f}, 0.93f},
+  [LUMINARY_JERLOV_WATER_TYPE_IA]  = {{0.002f, 0.004f, 0.007f}, {0.309f, 0.054f, 0.014f}, 0.44f},
+  [LUMINARY_JERLOV_WATER_TYPE_IB]  = {{0.045f, 0.054f, 0.07f}, {0.309f, 0.054f, 0.015f}, 0.06f},
+  [LUMINARY_JERLOV_WATER_TYPE_II]  = {{0.27f, 0.365f, 0.516f}, {0.31f, 0.054f, 0.016f}, 0.007f},
+  [LUMINARY_JERLOV_WATER_TYPE_III] = {{0.737f, 0.998f, 1.413f}, {0.31f, 0.056f, 0.031f}, 0.003f},
+  [LUMINARY_JERLOV_WATER_TYPE_1C]  = {{0.274f, 0.372f, 0.526f}, {0.316f, 0.067f, 0.105f}, 0.005f},
+  [LUMINARY_JERLOV_WATER_TYPE_3C]  = {{0.904f, 1.071f, 1.532f}, {0.508f, 0.052f, 0.161f}, 0.003f},
+  [LUMINARY_JERLOV_WATER_TYPE_5C]  = {{3.589f, 1.382f, 1.857f}, {4.638f, 0.222f, 0.216f}, 0.001f},
+  [LUMINARY_JERLOV_WATER_TYPE_7C]  = {{1.772f, 2.394f, 3.376f}, {0.351f, 0.188f, 0.574f}, 0.0f},
+  [LUMINARY_JERLOV_WATER_TYPE_9C]  = {{2.347f, 3.18f, 4.496f}, {0.398f, 0.349f, 0.995f}, 0.0f},
+};
+
 LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* device_ocean) {
   __CHECK_NULL_ARGUMENT(ocean);
   __CHECK_NULL_ARGUMENT(device_ocean);
@@ -88,7 +110,6 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Ocean caustics RIS sample count exceeds the device limit of 128.");
 
   device_ocean->active                      = ocean->active;
-  device_ocean->water_type                  = ocean->water_type;
   device_ocean->caustics_active             = ocean->caustics_active;
   device_ocean->caustics_ris_sample_count   = max(ocean->caustics_ris_sample_count, 1) - 1;
   device_ocean->multiscattering             = ocean->multiscattering;
@@ -99,6 +120,19 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
   device_ocean->frequency             = ocean->frequency;
   device_ocean->refractive_index      = ocean->refractive_index;
   device_ocean->caustics_domain_scale = ocean->caustics_domain_scale;
+
+  const uint32_t water_type                  = ocean->water_type;
+  const OceanJerlovCoefficients coefficients = (water_type < sizeof(ocean_jerlov_coefficients) / sizeof(ocean_jerlov_coefficients[0]))
+                                                 ? ocean_jerlov_coefficients[water_type]
+                                                 : (OceanJerlovCoefficients) {0};
+  const RGBF scattering                      = coefficients.scattering;
+
+  device_ocean->absorption       = coefficients.absorption;
+  device_ocean->molecular_weight = coefficients.molecular_weight;
+  device_ocean->scattering       = scattering;
+  device_ocean->log_scattering.r = logf(fmaxf(scattering.r, FLT_EPSILON));
+  device_ocean->log_scattering.g = logf(fmaxf(scattering.g, FLT_EPSILON));
+  device_ocean->log_scattering.b = logf(fmaxf(scattering.b, FLT_EPSILON));
 
   return LUMINARY_SUCCESS;
 }
@@ -226,7 +260,8 @@ LuminaryResult device_struct_fog_convert(const Fog* fog, DeviceFog* device_fog) 
 
   device_fog->active = fog->active;
 
-  device_fog->density          = fog->density;
+  device_fog->scattering       = 0.001f * fog->density;
+  device_fog->log_scattering   = logf(fmaxf(device_fog->scattering, FLT_EPSILON));
   device_fog->droplet_diameter = fog->droplet_diameter;
   device_fog->height           = fog->height;
   device_fog->dist             = fog->dist;

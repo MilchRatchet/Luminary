@@ -5,8 +5,6 @@
 #include "ocean_utils.cuh"
 #include "utils.cuh"
 
-#define FOG_DENSITY (0.001f * device.fog.density)
-
 LUMINARY_FUNCTION RGBF volume_get_transmittance(const VolumeDescriptor volume) {
   return add_color(volume.absorption, volume.scattering);
 }
@@ -14,15 +12,16 @@ LUMINARY_FUNCTION RGBF volume_get_transmittance(const VolumeDescriptor volume) {
 LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_fog() {
   VolumeDescriptor volume;
 
-  volume.type       = VOLUME_TYPE_FOG;
-  volume.absorption = get_color(0.0f, 0.0f, 0.0f);
-  volume.scattering = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
-  volume.dist       = device.fog.dist;
-  volume.max_height = device.fog.height;
-  volume.min_height = (device.ocean.active) ? device.ocean.height : -65535.0f;
+  volume.type           = VOLUME_TYPE_FOG;
+  volume.absorption     = splat_color(0.0f);
+  volume.scattering     = splat_color(device.fog.scattering);
+  volume.log_scattering = splat_color(device.fog.log_scattering);
+  volume.dist           = device.fog.dist;
+  volume.max_height     = device.fog.height;
+  volume.min_height     = (device.ocean.active) ? device.ocean.height : -65535.0f;
 
   volume.max_absorption = 0.0f;
-  volume.max_scattering = FOG_DENSITY;
+  volume.max_scattering = device.fog.scattering;
 
   return volume;
 }
@@ -30,12 +29,13 @@ LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_fog() {
 LUMINARY_FUNCTION VolumeDescriptor volume_get_descriptor_preset_ocean() {
   VolumeDescriptor volume;
 
-  volume.type       = VOLUME_TYPE_OCEAN;
-  volume.absorption = ocean_jerlov_absorption_coefficient((JerlovWaterType) device.ocean.water_type);
-  volume.scattering = ocean_jerlov_scattering_coefficient((JerlovWaterType) device.ocean.water_type);
-  volume.dist       = 10000.0f;
-  volume.max_height = 65535.0f;
-  volume.min_height = -65535.0f;
+  volume.type           = VOLUME_TYPE_OCEAN;
+  volume.absorption     = device.ocean.absorption;
+  volume.scattering     = device.ocean.scattering;
+  volume.log_scattering = device.ocean.log_scattering;
+  volume.dist           = 10000.0f;
+  volume.max_height     = 65535.0f;
+  volume.min_height     = -65535.0f;
 
   volume.max_absorption = color_importance(volume.absorption);
   volume.max_scattering = color_importance(volume.scattering);
