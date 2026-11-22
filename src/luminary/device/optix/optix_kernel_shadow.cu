@@ -15,8 +15,8 @@ static_assert(
 extern "C" __global__ void __raygen__optix() {
   HANDLE_DEVICE_ABORT();
 
-  const uint32_t task_count = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] + device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE]
-                              + device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN];
+  const uint32_t task_count  = device.ptrs.task_counts[TASK_ADDRESS_OFFSET_GEOMETRY] + device.ptrs.task_counts[TASK_ADDRESS_OFFSET_PARTICLE]
+                               + device.ptrs.task_counts[TASK_ADDRESS_OFFSET_OCEAN];
   const uint32_t task_offset = device.ptrs.task_offsets[TASK_ADDRESS_OFFSET_GEOMETRY];
   const uint32_t task_id     = TASK_ID;
 
@@ -39,11 +39,11 @@ extern "C" __global__ void __raygen__optix() {
   // Shadow Geometry
   ////////////////////////////////////////////////////////////////////
 
-  // TODO: Dont load if not allowed
   {
-    const DeviceTaskDirectLightGeo direct_light_task = task_direct_light_geo_load(direct_light_task_base_address);
+    const bool is_allowed                            = direct_lighting_geometry_is_allowed(task, trace);
+    const DeviceTaskDirectLightGeo direct_light_task = is_allowed ? task_direct_light_geo_load(direct_light_task_base_address)
+                                                                  : DeviceTaskDirectLightGeo{LIGHT_ID_INVALID, {}, task.ray, 0.0f};
 
-    const bool is_allowed          = direct_lighting_geometry_is_allowed(task, trace);
     const RGBF direct_light_result = direct_lighting_geometry_evaluate_task(task, trace, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
@@ -54,9 +54,10 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   {
-    const DeviceTaskDirectLightBSDF direct_light_task = task_direct_light_bsdf_load(direct_light_task_base_address);
+    const bool is_allowed = direct_lighting_bsdf_is_allowed(task, trace);
+    const DeviceTaskDirectLightBSDF direct_light_task =
+      is_allowed ? task_direct_light_bsdf_load(direct_light_task_base_address) : DeviceTaskDirectLightBSDF{{}, task.ray, 0.0f, 0.0f};
 
-    const bool is_allowed          = direct_lighting_bsdf_is_allowed(task, trace);
     const RGBF direct_light_result = direct_lighting_bsdf_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
@@ -67,9 +68,10 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   {
-    const DeviceTaskDirectLightSun direct_light_task = task_direct_light_sun_load(direct_light_task_base_address);
+    const bool is_allowed = direct_lighting_sun_is_allowed(task, trace);
+    const DeviceTaskDirectLightSun direct_light_task =
+      is_allowed ? task_direct_light_sun_load(direct_light_task_base_address) : DeviceTaskDirectLightSun{};
 
-    const bool is_allowed          = direct_lighting_sun_is_allowed(task, trace);
     const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
@@ -80,9 +82,10 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   {
-    const DeviceTaskDirectLightAmbient direct_light_task = task_direct_light_ambient_load(direct_light_task_base_address);
+    const bool is_allowed = direct_lighting_ambient_is_allowed(task, trace);
+    const DeviceTaskDirectLightAmbient direct_light_task =
+      is_allowed ? task_direct_light_ambient_load(direct_light_task_base_address) : DeviceTaskDirectLightAmbient{};
 
-    const bool is_allowed          = direct_lighting_ambient_is_allowed(task, trace);
     const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
