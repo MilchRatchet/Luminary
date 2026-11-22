@@ -322,7 +322,7 @@ LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task
   MaterialContextVolume ctx;
   ctx.descriptor  = volume;
   ctx.position    = task.origin;
-  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.V           = neg_vector(task.ray);
   ctx.state       = task.state;
   ctx.volume_type = volume.type;
   ctx.path        = volume_compute_path(volume, task.origin, task.ray, max_dist);

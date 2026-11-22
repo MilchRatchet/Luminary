@@ -37,7 +37,7 @@ LUMINARY_FUNCTION MaterialContextParticle
   ctx.particle_id = instance_id;
   ctx.position    = task.origin;
   ctx.normal      = normal;
-  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.V           = neg_vector(task.ray);
   ctx.state       = task.state;
   ctx.volume_type = (VolumeType) volume_id;
 

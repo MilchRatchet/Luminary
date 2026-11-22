@@ -15,10 +15,9 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
   bool normal_map_is_compressed, vec3& face_normal, bool& is_inside) {
   is_inside = dot_product(face_normal, ray) > 0.0f;
 
-  // TODO: Why do I not have a neg_vector function?
   // Convention is for the face normal to look towards the origin
   if (is_inside)
-    face_normal = scale_vector(face_normal, -1.0f);
+    face_normal = neg_vector(face_normal);
 
   vec3 normal = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
 
@@ -49,7 +48,7 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
     normal = quaternion_apply(quaternion_inverse(q), map_normal);
   }
 
-  return normal_adaptation_apply(scale_vector(ray, -1.0f), normal, face_normal);
+  return normal_adaptation_apply(neg_vector(ray), normal, face_normal);
 }
 
 LUMINARY_FUNCTION MaterialContextGeometry
@@ -207,7 +206,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
   ctx.normal      = transform_apply_normal(trans, normal);
   ctx.face_normal = normal_pack(transform_apply_normal(trans, face_normal));
   ctx.position    = position;
-  ctx.V           = scale_vector(task.ray, -1.0f);
+  ctx.V           = neg_vector(task.ray);
   ctx.state       = task.state;
   ctx.volume_type = VolumeType(volume_id);
 

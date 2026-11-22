@@ -479,8 +479,8 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
     const bool fast_path = caustics_is_fast_path(task.state);
 
     // Ocean normal points up, we come from below, so flip it
-    const vec3 ocean_normal = (fast_path) ? get_vector(0.0f, -1.0f, 0.0f) : scale_vector(ocean_get_normal(ocean_pos), -1.0f);
-    const vec3 ocean_V      = scale_vector(ray, -1.0f);
+    const vec3 ocean_normal = (fast_path) ? get_vector(0.0f, -1.0f, 0.0f) : neg_vector(ocean_get_normal(ocean_pos));
+    const vec3 ocean_V      = neg_vector(ray);
 
     bool total_reflection;
     const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);
@@ -548,8 +548,8 @@ LUMINARY_FUNCTION RGBF direct_lighting_ambient_evaluate_task(
     const vec3 ocean_pos = add_vector(task.origin, scale_vector(ray, limit));
 
     // Ocean normal points up, we come from below, so flip it
-    const vec3 ocean_normal = scale_vector(ocean_get_normal(ocean_pos), -1.0f);
-    const vec3 ocean_V      = scale_vector(ray, -1.0f);
+    const vec3 ocean_normal = neg_vector(ocean_get_normal(ocean_pos));
+    const vec3 ocean_V      = neg_vector(ray);
 
     bool total_reflection;
     const vec3 refraction = refract_vector(ocean_V, ocean_normal, device.ocean.refractive_index, total_reflection);

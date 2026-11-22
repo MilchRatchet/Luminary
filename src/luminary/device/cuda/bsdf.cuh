@@ -24,7 +24,7 @@ LUMINARY_FUNCTION BSDFRayContext bsdf_evaluate_analyze(const MaterialParams& par
   context.NdotH = dot_product(normal, H);
 
   if (context.NdotH < 0.0f) {
-    H             = scale_vector(H, -1.0f);
+    H             = neg_vector(H);
     context.NdotH = -context.NdotH;
   }
 
@@ -147,7 +147,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
       const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx.params);
 
       BSDFSampleInfo<MATERIAL_GEOMETRY> info;
-      info.ray                 = scale_vector(mat_ctx.V, -1.0f);
+      info.ray                 = neg_vector(mat_ctx.V);
       info.weight              = (mat_ctx.params.flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) ? albedo : get_color(1.0f, 1.0f, 1.0f);
       info.is_microfacet_based = false;
       info.is_transparent_pass = true;
@@ -312,7 +312,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_VOLUME> bsdf_sample<MATERIAL_VOLUME>(c
   const float random_choice = random_1D(RANDOM_SET::RESAMPLING, path_id);
   const float2 random_dir   = random_2D(RANDOM_SET::DIFFUSE, path_id);
 
-  const vec3 I = scale_vector(ctx.V, -1.0f);
+  const vec3 I = neg_vector(ctx.V);
 
   BSDFSampleInfo<MATERIAL_VOLUME> info;
 
@@ -329,7 +329,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample_rain(const Mater
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
   info.weight = splat_color(1.0f);
-  info.ray    = scale_vector(ctx.V, -1.0f);
+  info.ray    = neg_vector(ctx.V);
 
   vec3 normal      = ctx.normal;
   float air_cosine = dot_product(normal, ctx.V);
@@ -350,7 +350,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample_rain(const Mater
     normal        = normalize_vector(sub_vector(normal, scale_vector(water_ray, 2.0f * dot_product(normal, water_ray))));
   }
   else {
-    const vec3 inward_normal = scale_vector(normal, -1.0f);
+    const vec3 inward_normal = neg_vector(normal);
     const vec3 air_ray       = refract_vector(ctx.V, inward_normal, water_ior, total_reflection);
 
     if (total_reflection) {
@@ -385,8 +385,8 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample_rain(const Mater
       normal                 = exit_normal;
     }
     else if ((reflections & 1u) != 0) {
-      normal  = scale_vector(normal, -1.0f);
-      tangent = scale_vector(tangent, -1.0f);
+      normal  = neg_vector(normal);
+      tangent = neg_vector(tangent);
     }
   }
 
@@ -406,7 +406,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_PARTICLE> bsdf_sample<MATERIAL_PARTICL
   const float2 random_dir = random_2D(RANDOM_SET::DIFFUSE, path_id);
 
   BSDFSampleInfo<MATERIAL_PARTICLE> info;
-  info.ray    = jendersie_eon_phase_sample(scale_vector(ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_choice);
+  info.ray    = jendersie_eon_phase_sample(neg_vector(ctx.V), device.particles.phase_diameter, random_dir, random_choice);
   info.weight = splat_color(1.0f);
 
   return info;
@@ -495,7 +495,7 @@ LUMINARY_FUNCTION vec3
   const float2 random_dir   = random_2D(MaterialContextVolume::RANDOM_DL_SUN::BSDF, path_id);
   const float random_method = random_1D(MaterialContextVolume::RANDOM_DL_SUN::BSDF_METHOD, path_id);
 
-  const vec3 I = scale_vector(mat_ctx.V, -1.0f);
+  const vec3 I = neg_vector(mat_ctx.V);
 
   const vec3 scatter_ray = (mat_ctx.descriptor.type != VOLUME_TYPE_OCEAN)
                              ? jendersie_eon_phase_sample(I, device.fog.droplet_diameter, random_dir, random_method)
@@ -516,7 +516,7 @@ LUMINARY_FUNCTION vec3 bsdf_sample_for_sun<MATERIAL_PARTICLE>(
   is_refraction = false;
   is_valid      = true;
 
-  return jendersie_eon_phase_sample(scale_vector(mat_ctx.V, -1.0f), device.particles.phase_diameter, random_dir, random_method);
+  return jendersie_eon_phase_sample(neg_vector(mat_ctx.V), device.particles.phase_diameter, random_dir, random_method);
 }
 
 template <MaterialType TYPE>

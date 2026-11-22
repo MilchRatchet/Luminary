@@ -266,7 +266,7 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
 
   if (inside_water)
-    normal = scale_vector(normal, -1.0f);
+    normal = neg_vector(normal);
 
   uint32_t flags = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
 
@@ -290,7 +290,7 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
   ctx.normal       = normal;
   ctx.face_normal  = normal_pack(normal);
   ctx.position     = task.origin;
-  ctx.V            = scale_vector(task.ray, -1.0f);
+  ctx.V            = neg_vector(task.ray);
   ctx.state        = task.state;
   ctx.volume_type  = VolumeType(volume_id);
   ctx.params.flags = flags;

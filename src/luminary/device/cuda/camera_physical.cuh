@@ -136,7 +136,7 @@ LUMINARY_FUNCTION bool camera_simulation_intersect_medium_cylinder(
 
     const vec3 cylindrical_normal = normalize_vector(get_vector(-origin.x, -origin.y, 0.0f));
     const float ior               = medium_ior * (1.0f / IOR_AIR);
-    const vec3 V                  = scale_vector(ray, -1.0f);
+    const vec3 V                  = neg_vector(ray);
 
     bool total_reflection;
     const vec3 refraction = refract_vector(V, cylindrical_normal, ior, total_reflection);
@@ -331,10 +331,10 @@ LUMINARY_FUNCTION int32_t
   interface_curving_away ^= state.is_forward == false;
 
   if (interface_curving_away == false && interface.radius != FLT_MAX) {
-    normal = scale_vector(normal, -1.0f);
+    normal = neg_vector(normal);
   }
 
-  const vec3 V = scale_vector(state.ray, -1.0f);
+  const vec3 V = neg_vector(state.ray);
 
   const float ior = state.ior / medium_ior;
 

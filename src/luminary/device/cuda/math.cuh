@@ -890,7 +890,7 @@ LUMINARY_FUNCTION void direction_to_angles(const vec3 dir, float& azimuth, float
 LUMINARY_FUNCTION vec3 refract_vector(const vec3 V, const vec3 normal, const float index_ratio, bool& total_reflection) {
   if (index_ratio < eps) {
     total_reflection = false;
-    return scale_vector(V, -1.0f);
+    return neg_vector(V);
   }
 
   const float dot = fabsf(dot_product(normal, V));
@@ -1550,7 +1550,7 @@ LUMINARY_FUNCTION vec3 normal_adaptation_apply(const vec3 V, vec3 shading_normal
 
   // Make sure that shading and geometry normal are on the same side
   if (dot_product(shading_normal, geometry_normal) < 0.0f) {
-    shading_normal = scale_vector(shading_normal, -1.0f);
+    shading_normal = neg_vector(shading_normal);
   }
 
   if (dot_product(V, shading_normal) < 0.0f) {

@@ -24,7 +24,7 @@ LUMINARY_FUNCTION vec3 caustics_solve_for_normal(const MaterialContext<TYPE> ctx
   if (is_underwater) {
     bool total_reflection;
     ray = refract_vector(L, get_vector(0.0f, 1.0f, 0.0f), 1.0f / device.ocean.refractive_index, total_reflection);
-    ray = scale_vector(ray, -1.0f);
+    ray = neg_vector(ray);
   }
   else {
     ray = get_vector(L.x, -L.y, L.z);
