@@ -5,6 +5,7 @@
 #include "camera_thin_lens.cuh"
 #include "camera_utils.cuh"
 #include "math.cuh"
+#include "random.cuh"
 #include "spectral.cuh"
 #include "utils.cuh"
 
@@ -37,6 +38,11 @@ LUMINARY_FUNCTION CameraSampleResult camera_sample(const PathID& path_id) {
   result.origin = add_vector(result.origin, device.camera.pos);
 
   result.ray = quaternion_apply(device.camera.rotation, result.ray);
+
+  constexpr float shutter_ramp_fraction = 0.1f;
+  const float shutter_sample            = random_1D_consistent(RANDOM_TARGET_CAMERA_TIME, path_id);
+  const float shutter_weight            = __saturatef(fminf(shutter_sample, 1.0f - shutter_sample) / shutter_ramp_fraction);
+  result.weight                         = scale_color(result.weight, shutter_weight);
 
   return result;
 }
