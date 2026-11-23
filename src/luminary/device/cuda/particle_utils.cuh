@@ -11,14 +11,18 @@ LUMINARY_FUNCTION bool particle_is_hit(const TriangleHandle handle) {
   return PARTICLE_HIT_ID_CHECK(handle.instance_id);
 }
 
+LUMINARY_FUNCTION vec3 particle_world_to_tile(const vec3 position, const PathID& path_id) {
+  const float time         = random_1D_consistent(RANDOM_TARGET_CAMERA_TIME, path_id) * device.camera.exposure_time;
+  const vec3 motion_offset = scale_vector(device.particles.velocity, time);
+
+  return scale_vector(sub_vector(position, motion_offset), device.particles.inv_tile_size);
+}
+
 LUMINARY_FUNCTION MaterialContextParticle
   particle_get_context(const DeviceTask task, const DeviceTaskMediumStack& medium, const uint32_t instance_id) {
   const float4 sphere = __ldg(device.ptrs.particle_spheres + (instance_id & HIT_TYPE_PARTICLE_MASK));
 
-  const float time         = random_1D_consistent(RANDOM_TARGET_CAMERA_TIME, task.path_id);
-  const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
-  const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
-  const vec3 hit_tile      = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.particles.scale);
+  const vec3 hit_tile = particle_world_to_tile(task.origin, task.path_id);
 
   vec3 delta;
   delta.x = hit_tile.x - sphere.x;

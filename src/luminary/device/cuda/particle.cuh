@@ -170,9 +170,9 @@ LUMINARY_KERNEL void particle_generate(const KernelArgsParticleGenerate args) {
     const float z = white_noise_offset(args.seed + id * 4 + 2);
 
     const float random_size = 2.0f * white_noise_offset(args.seed + id * 4 + 3) - 1.0f;
-    const float s           = args.size * (1.0f + random_size * args.size_variation);
+    const float radius      = fmaxf(args.radius + random_size * args.radius_variation, 0.0f);
 
-    __stcs(args.vertex_buffer + id, make_float4(x, y, z, s));
+    __stcs(args.vertex_buffer + id, make_float4(x, y, z, radius));
 
     id += blockDim.x * gridDim.x;
   }

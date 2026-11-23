@@ -326,13 +326,13 @@ struct LumBuiltinParticles {
   uint32_t seed;
   uint32_t count;
   LuminaryParticleType type;
-  float speed;
-  float direction_altitude;
-  float direction_azimuth;
+  float fall_speed;
+  float wind_speed;
+  float wind_direction;
   float phase_diameter;
-  float scale;
-  float size;
-  float size_variation;
+  float tile_size;
+  float diameter;
+  float diameter_variation;
 } typedef LumBuiltinParticles;
 
 struct LumBuiltinMesh {

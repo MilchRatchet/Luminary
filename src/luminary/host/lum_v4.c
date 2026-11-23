@@ -626,7 +626,20 @@ static LuminaryResult parse_ocean_settings(Ocean* ocean, char* line) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult parse_particle_settings(Particles* particle, char* line) {
+struct LegacyParticleSettings {
+  bool active;
+  uint32_t seed;
+  uint32_t count;
+  float speed;
+  float direction_altitude;
+  float direction_azimuth;
+  float phase_diameter;
+  float scale;
+  float size;
+  float size_variation;
+} typedef LegacyParticleSettings;
+
+static LuminaryResult parse_particle_settings(LegacyParticleSettings* particle, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
   uint32_t bool_uint = 0;
@@ -680,10 +693,30 @@ static LuminaryResult parse_particle_settings(Particles* particle, char* line) {
   return LUMINARY_SUCCESS;
 }
 
+static void convert_particle_settings(const LegacyParticleSettings* source, float shutter_speed, Particles* particles) {
+  const float speed            = source->speed * shutter_speed;
+  const float horizontal_speed = -speed * cosf(source->direction_altitude);
+
+  particles->active             = source->active;
+  particles->seed               = source->seed;
+  particles->count              = source->count;
+  particles->type               = LUMINARY_PARTICLE_TYPE_RAIN;
+  particles->fall_speed         = speed * sinf(source->direction_altitude);
+  particles->wind_speed         = fabsf(horizontal_speed);
+  particles->wind_direction     = source->direction_azimuth + ((horizontal_speed < 0.0f) ? 3.14159265358979323846f : 0.0f);
+  particles->phase_diameter     = source->phase_diameter;
+  particles->tile_size          = source->scale;
+  particles->diameter           = 2.0f * source->size * source->scale;
+  particles->diameter_variation = particles->diameter * source->size_variation;
+}
+
 LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
   char* line;
 
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
+
+  LegacyParticleSettings particles = {
+    .count = 8192, .direction_altitude = 1.234f, .phase_diameter = 50.0f, .scale = 10.0f, .size = 1.0f, .size_variation = 0.1f};
 
   LegacyLumFileSettings legacy_settings = {
     .legacy_smoothness         = false,
@@ -718,7 +751,7 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
       __FAILURE_HANDLE(parse_ocean_settings(&content->ocean, line + 5 + 1));
     }
     else if (line[0] == 'P') {
-      __FAILURE_HANDLE(parse_particle_settings(&content->particles, line + 8 + 1));
+      __FAILURE_HANDLE(parse_particle_settings(&particles, line + 8 + 1));
     }
     else if (line[0] == 'T') {
       // Legacy toy settings
@@ -736,6 +769,8 @@ LuminaryResult lum_file_parse_v4(FILE* file, LumFileContent* content) {
 
   if (ferror(file) != 0)
     error_message("LumV4 FILE stream set error condition. Scene may have not been fully parsed.");
+
+  convert_particle_settings(&particles, content->camera.shutter_speed, &content->particles);
 
   if (legacy_settings.force_no_bloom) {
     content->camera.glow_mode     = LUMINARY_GLOW_MODE_NONE;

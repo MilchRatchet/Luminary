@@ -71,8 +71,8 @@ struct KernelArgsSkyComputeMultiscatteringLUT {
 struct KernelArgsParticleGenerate {
   uint32_t count;
   uint32_t seed;
-  float size;
-  float size_variation;
+  float radius;
+  float radius_variation;
   float4* vertex_buffer;
 } typedef KernelArgsParticleGenerate;
 

@@ -7,16 +7,16 @@ LuminaryResult particles_get_default(Particles* particles) {
   __CHECK_NULL_ARGUMENT(particles);
 
   particles->active             = false;
-  particles->scale              = 10.0f;
-  particles->type               = LUMINARY_PARTICLE_TYPE_RAIN;
-  particles->direction_altitude = 1.234f;
-  particles->direction_azimuth  = 0.0f;
-  particles->speed              = 0.0f;
+  particles->tile_size          = 10.0f;
+  particles->type               = LUMINARY_PARTICLE_TYPE_SNOW;
+  particles->fall_speed         = 1.8f;
+  particles->wind_speed         = 10.0f;
+  particles->wind_direction     = 0.0f;
   particles->phase_diameter     = 50.0f;
   particles->seed               = 0;
   particles->count              = 8192;
-  particles->size               = 1.0f;
-  particles->size_variation     = 0.1f;
+  particles->diameter           = 10.0f;
+  particles->diameter_variation = 8.0f;
 
   return LUMINARY_SUCCESS;
 }
@@ -37,16 +37,16 @@ LuminaryResult particles_check_for_dirty(const Particles* input, const Particles
   __PARTICLES_CHECK_DIRTY(active);
 
   if (input->active) {
-    __PARTICLES_CHECK_DIRTY(scale);
+    __PARTICLES_CHECK_DIRTY(tile_size);
     __PARTICLES_CHECK_DIRTY(type);
-    __PARTICLES_CHECK_DIRTY(direction_altitude);
-    __PARTICLES_CHECK_DIRTY(direction_azimuth);
-    __PARTICLES_CHECK_DIRTY(speed);
+    __PARTICLES_CHECK_DIRTY(fall_speed);
+    __PARTICLES_CHECK_DIRTY(wind_speed);
+    __PARTICLES_CHECK_DIRTY(wind_direction);
     __PARTICLES_CHECK_DIRTY(phase_diameter);
     __PARTICLES_CHECK_DIRTY(seed);
     __PARTICLES_CHECK_DIRTY(count);
-    __PARTICLES_CHECK_DIRTY(size);
-    __PARTICLES_CHECK_DIRTY(size_variation);
+    __PARTICLES_CHECK_DIRTY(diameter);
+    __PARTICLES_CHECK_DIRTY(diameter_variation);
   }
 
   return LUMINARY_SUCCESS;

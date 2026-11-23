@@ -277,13 +277,11 @@ LuminaryResult device_struct_particles_convert(const Particles* particles, Devic
   device_particles->type   = particles->type;
   device_particles->count  = particles->count;
 
-  device_particles->speed              = particles->speed;
-  device_particles->direction_altitude = particles->direction_altitude;
-  device_particles->direction_azimuth  = particles->direction_azimuth;
-  device_particles->phase_diameter     = particles->phase_diameter;
-  device_particles->scale              = particles->scale;
-  device_particles->size               = particles->size;
-  device_particles->size_variation     = particles->size_variation;
+  device_particles->velocity.x     = particles->wind_speed * cosf(particles->wind_direction);
+  device_particles->velocity.y     = -particles->fall_speed;
+  device_particles->velocity.z     = particles->wind_speed * sinf(particles->wind_direction);
+  device_particles->phase_diameter = particles->phase_diameter;
+  device_particles->inv_tile_size  = 1.0f / fmaxf(particles->tile_size, FLT_EPSILON);
 
   return LUMINARY_SUCCESS;
 }

@@ -1,5 +1,8 @@
 #include "device_particle.h"
 
+#include <float.h>
+#include <math.h>
+
 #include "device.h"
 #include "internal_error.h"
 #include "kernel_args.h"
@@ -101,12 +104,14 @@ LuminaryResult device_particles_handle_update(
   }
 
   if (shared_particles->active && particles_handle->allocated_count > 0) {
+    const float radius_to_tile = 0.0005f / fmaxf(shared_particles->tile_size, FLT_EPSILON);
+
     KernelArgsParticleGenerate args;
-    args.count          = particles_handle->allocated_count;
-    args.seed           = shared_particles->seed;
-    args.size           = shared_particles->size * 0.001f;
-    args.size_variation = shared_particles->size_variation;
-    args.vertex_buffer  = DEVICE_PTR(particles_handle->vertex_buffer);
+    args.count            = particles_handle->allocated_count;
+    args.seed             = shared_particles->seed;
+    args.radius           = shared_particles->diameter * radius_to_tile;
+    args.radius_variation = shared_particles->diameter_variation * radius_to_tile;
+    args.vertex_buffer    = DEVICE_PTR(particles_handle->vertex_buffer);
 
     __FAILURE_HANDLE(kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_PARTICLE_GENERATE], &args, device->stream_main));
 

@@ -1135,19 +1135,20 @@ static void _window_entity_properties_particles_action(
     update_data |=
       _window_entity_properties_add_slider(data, "Count", &particles.count, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 32767.0f, 1.0f);
     update_data |= _window_entity_properties_add_slider(data, "Seed", &particles.seed, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Fall Speed (m/s)", &particles.fall_speed, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Wind Speed (m/s)", &particles.wind_speed, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Wind Direction (rad)", &particles.wind_direction, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Phase Diameter (um)", &particles.phase_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+    update_data |= _window_entity_properties_add_slider(
+      data, "Tile Size (m)", &particles.tile_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, FLT_EPSILON, FLT_MAX, 1.0f);
     update_data |=
-      _window_entity_properties_add_slider(data, "Speed", &particles.speed, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      _window_entity_properties_add_slider(data, "Diameter (mm)", &particles.diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
     update_data |= _window_entity_properties_add_slider(
-      data, "Direction Altitude", &particles.direction_altitude, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Direction Azimuth", &particles.direction_azimuth, ELEMENT_SLIDER_DATA_TYPE_FLOAT, -FLT_MAX, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Phase Diameter", &particles.phase_diameter, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |=
-      _window_entity_properties_add_slider(data, "Scale", &particles.scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(data, "Size", &particles.size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
-    update_data |= _window_entity_properties_add_slider(
-      data, "Size Variation", &particles.size_variation, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+      data, "Diameter Variation (mm)", &particles.diameter_variation, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
 
     if (update_data) {
       particles.type = (LuminaryParticleType) particle_type;

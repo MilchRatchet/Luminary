@@ -6,6 +6,7 @@
 #include "memory.cuh"
 #include "ocean_utils.cuh"
 #include "optix_include.cuh"
+#include "particle_utils.cuh"
 #include "utils.cuh"
 
 // Kernels must be named __[SEMANTIC]__..., for example, __raygen__...
@@ -91,12 +92,8 @@ LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, OptixRayt
     trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
-  const float time         = random_1D_consistent(RANDOM_TARGET_CAMERA_TIME, task.path_id);
-  const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
-  const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
-
-  const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.particles.scale);
-  vec3 pos              = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.particles.scale);
+  const vec3 scaled_ray = scale_vector(task.ray, device.particles.inv_tile_size);
+  vec3 pos              = particle_world_to_tile(task.origin, task.path_id);
 
   // Map our current point into the particle tiling coordinate system
   pos.x = pos.x - floorf(pos.x);

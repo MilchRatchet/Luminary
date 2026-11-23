@@ -3,6 +3,8 @@
 - Never build the project.
 - Never run tests.
 - Do not invoke scripts or tools that build the project or run tests.
+- Never introduce new LumV5 versions on your own.
+- Never modify the README file.
 
 # Style guide
 

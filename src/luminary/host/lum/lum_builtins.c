@@ -5,6 +5,7 @@
 
 #include "internal_error.h"
 #include "lum_tokenizer.h"
+#include "particles.h"
 
 const char* lum_builtin_types_strings[LUM_BUILTIN_TYPE_COUNT] = {
   [LUM_BUILTIN_TYPE_VOID]             = "void",
@@ -371,13 +372,13 @@ static const LumBuiltinTypeMember _lum_builtin_member_particles[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, seed, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, count, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, type, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, speed, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, direction_altitude, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, direction_azimuth, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, fall_speed, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, wind_speed, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, wind_direction, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinParticles, phase_diameter, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, scale, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, size, 1, LUM_VERSION_CURRENT),
-  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, size_variation, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, tile_size, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, diameter, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinParticles, diameter_variation, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_material[] = {
@@ -816,19 +817,9 @@ LuminaryResult lum_builtin_particles_init(LumBuiltinParticles* particles, uint32
   if (version < 1)
     return LUMINARY_SUCCESS;
 
-  particles->active             = false;
-  particles->scale              = 10.0f;
-  particles->type               = LUMINARY_PARTICLE_TYPE_RAIN;
-  particles->direction_altitude = 1.234f;
-  particles->direction_azimuth  = 0.0f;
-  particles->speed              = 0.0f;
-  particles->phase_diameter     = 50.0f;
-  particles->seed               = 0;
-  particles->count              = 8192;
-  particles->size               = 1.0f;
-  particles->size_variation     = 0.1f;
-
-  return LUMINARY_SUCCESS;
+  LuminaryParticles defaults;
+  __FAILURE_HANDLE(particles_get_default(&defaults));
+  return lum_builtin_particles_serialize(&defaults, particles);
 }
 
 LuminaryResult lum_builtin_material_init(LumBuiltinMaterial* material, uint32_t version) {
@@ -1146,13 +1137,13 @@ LuminaryResult lum_builtin_particles_convert(const LumBuiltinParticles* particle
   dst_particles->seed               = particles->seed;
   dst_particles->count              = particles->count;
   dst_particles->type               = particles->type;
-  dst_particles->speed              = particles->speed;
-  dst_particles->direction_altitude = particles->direction_altitude;
-  dst_particles->direction_azimuth  = particles->direction_azimuth;
+  dst_particles->fall_speed         = particles->fall_speed;
+  dst_particles->wind_speed         = particles->wind_speed;
+  dst_particles->wind_direction     = particles->wind_direction;
   dst_particles->phase_diameter     = particles->phase_diameter;
-  dst_particles->scale              = particles->scale;
-  dst_particles->size               = particles->size;
-  dst_particles->size_variation     = particles->size_variation;
+  dst_particles->tile_size          = particles->tile_size;
+  dst_particles->diameter           = particles->diameter;
+  dst_particles->diameter_variation = particles->diameter_variation;
 
   return LUMINARY_SUCCESS;
 }
@@ -1424,13 +1415,13 @@ LuminaryResult lum_builtin_particles_serialize(const LuminaryParticles* particle
   dst_particles->seed               = particles->seed;
   dst_particles->count              = particles->count;
   dst_particles->type               = particles->type;
-  dst_particles->speed              = particles->speed;
-  dst_particles->direction_altitude = particles->direction_altitude;
-  dst_particles->direction_azimuth  = particles->direction_azimuth;
+  dst_particles->fall_speed         = particles->fall_speed;
+  dst_particles->wind_speed         = particles->wind_speed;
+  dst_particles->wind_direction     = particles->wind_direction;
   dst_particles->phase_diameter     = particles->phase_diameter;
-  dst_particles->scale              = particles->scale;
-  dst_particles->size               = particles->size;
-  dst_particles->size_variation     = particles->size_variation;
+  dst_particles->tile_size          = particles->tile_size;
+  dst_particles->diameter           = particles->diameter;
+  dst_particles->diameter_variation = particles->diameter_variation;
 
   return LUMINARY_SUCCESS;
 }

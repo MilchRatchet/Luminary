@@ -185,15 +185,11 @@ struct DeviceParticles {
   uint32_t type : 1;
   uint32_t count : 30;
 
-  float speed;
-  float direction_altitude;
-  float direction_azimuth;
+  vec3 velocity;
   float phase_diameter;
-  float scale;
-  float size;
-  float size_variation;
+  float inv_tile_size;
 } typedef DeviceParticles;
-LUM_STATIC_SIZE_ASSERT(DeviceParticles, 0x20u);
+LUM_STATIC_SIZE_ASSERT(DeviceParticles, 0x18u);
 
 union DeviceSceneEntityCover {
   DeviceRendererSettings settings;

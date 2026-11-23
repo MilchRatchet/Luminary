@@ -373,13 +373,13 @@ LUMINARY_API struct LuminaryParticles {
   uint32_t seed;
   uint32_t count;
   LuminaryParticleType type;
-  float speed;
-  float direction_altitude;
-  float direction_azimuth;
-  float phase_diameter;
-  float scale;
-  float size;
-  float size_variation;
+  float fall_speed;          // [m/s], positive downward
+  float wind_speed;          // [m/s], horizontal
+  float wind_direction;      // [radians], from +X toward +Z
+  float phase_diameter;      // [um]
+  float tile_size;           // [m], side length of the repeated particle tile
+  float diameter;            // [mm]
+  float diameter_variation;  // [mm], maximum deviation from diameter
 } typedef LuminaryParticles;
 
 ////////////////////////////////////////////////////////////////////

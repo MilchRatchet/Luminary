@@ -17,7 +17,7 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->aperture_shape               = LUMINARY_APERTURE_BLADED;
   camera->aperture_blade_count         = 7;
   camera->exposure                     = 0.0f;
-  camera->shutter_speed                = 200.0f;
+  camera->shutter_speed                = 800.0f;
   camera->glow_mode                    = LUMINARY_GLOW_MODE_MONOCHROMATIC;
   camera->glow_strength                = 0.05f;
   camera->glow_color                   = (LuminaryRGBF) {1.0f, 0.3f, 0.05f};
@@ -50,7 +50,7 @@ LuminaryResult camera_get_default(Camera* camera) {
     .diagonal_size                    = 43.3f,
     .aspect_ratio                     = 16.0f / 9.0f,
     .use_aspect_ratio_from_resolution = true,
-    .iso                              = 200.0f,
+    .iso                              = 800.0f,
     .film_grain_strength              = 0.0f,
     .film_grain_size                  = 10.0f,
     .film_grain_amplitude             = 1.0f,
@@ -96,14 +96,7 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, ui
   __CAMERA_CHECK_DIRTY(rotation.z, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __CAMERA_CHECK_DIRTY(lens_template, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT | SCENE_DIRTY_FLAG_CAMERA_TEMPLATE);
   __CAMERA_CHECK_DIRTY(aperture_shape, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-
-  // TODO: This condition will be whether motion blur is enabled or not.
-  if (false) {
-    __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
-  }
-  else {
-    __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_OUTPUT);
-  }
+  __CAMERA_CHECK_DIRTY(shutter_speed, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   if (input->aperture_shape != LUMINARY_APERTURE_ROUND) {
     __CAMERA_CHECK_DIRTY(aperture_blade_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
