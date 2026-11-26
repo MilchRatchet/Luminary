@@ -8,8 +8,8 @@
 // Utils
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION bool light_allow_geo_direct_lighting(const DeviceTask task) {
-  return ((task.state & STATE_FLAG_VOLUME_SCATTERED) == 0);
+LUMINARY_FUNCTION bool light_allow_geo_direct_lighting(const uint32_t flags) {
+  return ((flags & STATE_FLAG_VOLUME_SCATTERED) == 0);
 }
 
 ////////////////////////////////////////////////////////////////////

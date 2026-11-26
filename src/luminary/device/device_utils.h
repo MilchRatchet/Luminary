@@ -34,7 +34,7 @@
 #define ADAPTIVE_SAMPLING_STAGE_INVALID 0xFF
 #define ADAPTIVE_SAMPLING_MAX_SAMPLING_RATE 256
 
-#define PATH_ID_SENSOR_BITS 14
+#define PATH_ID_SENSOR_BITS 16
 #define PATH_ID_SAMPLE_BITS 20
 #define MAX_NUM_GLOBAL_SAMPLES (1u << PATH_ID_SAMPLE_BITS)
 
@@ -184,16 +184,22 @@ struct float4 {
 // Misc data types
 ////////////////////////////////////////////////////////////////////
 
+struct UnalignedUint2 {
+  uint32_t x;
+  uint32_t y;
+} typedef UnalignedUint2;
+
 typedef uint16_t BFloat16;
 typedef uint16_t UnsignedBFloat16;
-typedef uint2 PackedRecord;
-typedef uint2 PackedRayDirection;
-typedef uint2 PackedPosition;
+typedef UnalignedUint2 PackedRecord;
+typedef UnalignedUint2 PackedRayDirection;
+typedef UnalignedUint2 PackedPosition;
 typedef uint32_t PackedNormal;
 typedef uint32_t PackedUV;
-typedef ushort3 PathID;
+typedef UnalignedUint2 PathID;
+typedef uint32_t TaskFlags;
 
-#define PACKED_RECORD_BLACK ((PackedRecord) make_uint2(0, 0))
+#define PACKED_RECORD_BLACK (PackedRecord{0, 0})
 
 struct Mat3x3 {
   float f11;
@@ -349,7 +355,6 @@ enum TaskStateBufferIndex {
 } typedef TaskStateBufferIndex;
 
 struct DeviceTask {
-  uint16_t state;
   PathID path_id;
   vec3 origin;
   vec3 ray;
@@ -366,7 +371,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskTrace, 0x10);
 struct DeviceTaskThroughput {
   PackedRecord record;
   uint32_t results_index;
-  uint32_t padding;
+  TaskFlags flags;
 } typedef DeviceTaskThroughput;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskThroughput, 0x10);
 

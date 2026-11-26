@@ -21,6 +21,7 @@ extern "C" __global__ void __raygen__optix() {
 
   const uint32_t task_base_address   = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
   DeviceTask task                    = task_load(task_base_address);
+  const uint32_t flags               = task_flags_load(task_base_address);
   DeviceTaskTrace trace              = task_trace_load(task_base_address);
   const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
@@ -31,7 +32,7 @@ extern "C" __global__ void __raygen__optix() {
   const VolumeType volume_type  = (VolumeType) medium_stack_volume_peek(medium, false);
   const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-  MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
+  MaterialContextVolume ctx = volume_get_context(task, flags, volume, trace.depth);
 
   const uint32_t direct_light_task_base_address =
     task_get_base_address<DeviceTaskDirectLight>(task_id, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
@@ -68,7 +69,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightSun direct_light_task = task_direct_light_sun_load(direct_light_task_base_address);
 
     const bool is_allowed          = direct_lighting_sun_is_allowed(ctx);
-    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
+    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, flags, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
   }

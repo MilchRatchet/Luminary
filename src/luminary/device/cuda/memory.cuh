@@ -224,6 +224,10 @@ LUMINARY_FUNCTION DeviceTaskMediumStack task_medium_load(const uint32_t base_add
   return load_task_state<DeviceTaskMediumStack, float4>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, medium));
 }
 
+LUMINARY_FUNCTION TaskFlags task_flags_load(const uint32_t base_address) {
+  return load_task_state<TaskFlags, uint32_t>(device.ptrs.task_states, base_address, offsetof(DeviceTaskState, throughput.flags));
+}
+
 LUMINARY_FUNCTION DeviceTaskResult task_result_load(const uint32_t base_address) {
   return load_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0);
 }

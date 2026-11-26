@@ -25,11 +25,12 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     DeviceTask task                       = task_load(task_base_address);
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const TaskFlags flags                 = throughput.flags;
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const MaterialContextGeometry ctx = ocean_get_context(task, medium);
+    const MaterialContextGeometry ctx = ocean_get_context(task, flags, medium);
 
     // We need to store the face normal so the DL shadowing kernel knows how to offset the origin.
     task_trace_facenormal_store(task_base_address, ctx.face_normal);
@@ -41,7 +42,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     // Direct Lighting BSDF
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_bsdf_is_allowed(task, trace)) {
+    if (direct_lighting_bsdf_is_allowed(flags, trace)) {
       const DeviceTaskDirectLightBSDF direct_light_bsdf_task = direct_lighting_bsdf_create_task(ctx, task.path_id, 0.0f);
 
       task_direct_light_bsdf_store(task_direct_lighting_base_address, direct_light_bsdf_task);
@@ -65,16 +66,15 @@ LUMINARY_KERNEL void ocean_process_tasks() {
 
     const vec3 bounce_pos = ocean_shift_vector(ctx, bounce_info.is_transparent_pass);
 
-    uint16_t new_state = task.state;
+    uint32_t new_state = flags;
 
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
 
-    if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
+    if (russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       RGBF record = record_unpack(throughput.record);
       record      = mul_color(record, bounce_info.weight);
 
       DeviceTask bounce_task;
-      bounce_task.state   = new_state;
       bounce_task.origin  = bounce_pos;
       bounce_task.ray     = bounce_info.ray;
       bounce_task.path_id = task.path_id;
@@ -94,6 +94,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
       DeviceTaskThroughput bounce_throughput;
       bounce_throughput.record        = record_pack(record);
       bounce_throughput.results_index = throughput.results_index;
+      bounce_throughput.flags         = new_state;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
       task_medium_store(dst_task_base_address, medium);

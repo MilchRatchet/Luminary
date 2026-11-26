@@ -25,6 +25,7 @@ extern "C" __global__ void __raygen__optix() {
 
   const uint32_t task_base_address   = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
   DeviceTask task                    = task_load(task_base_address);
+  const uint32_t flags               = task_flags_load(task_base_address);
   const DeviceTaskTrace trace        = task_trace_load(task_base_address);
   const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
@@ -40,7 +41,7 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   {
-    const bool is_allowed                            = direct_lighting_geometry_is_allowed(task, trace);
+    const bool is_allowed                            = direct_lighting_geometry_is_allowed(flags, trace);
     const DeviceTaskDirectLightGeo direct_light_task = is_allowed ? task_direct_light_geo_load(direct_light_task_base_address)
                                                                   : DeviceTaskDirectLightGeo{LIGHT_ID_INVALID, {}, task.ray, 0.0f};
 
@@ -54,7 +55,7 @@ extern "C" __global__ void __raygen__optix() {
   ////////////////////////////////////////////////////////////////////
 
   {
-    const bool is_allowed = direct_lighting_bsdf_is_allowed(task, trace);
+    const bool is_allowed = direct_lighting_bsdf_is_allowed(flags, trace);
     const DeviceTaskDirectLightBSDF direct_light_task =
       is_allowed ? task_direct_light_bsdf_load(direct_light_task_base_address) : DeviceTaskDirectLightBSDF{{}, task.ray, 0.0f, 0.0f};
 
@@ -72,7 +73,7 @@ extern "C" __global__ void __raygen__optix() {
     const DeviceTaskDirectLightSun direct_light_task =
       is_allowed ? task_direct_light_sun_load(direct_light_task_base_address) : DeviceTaskDirectLightSun{};
 
-    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
+    const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, flags, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, direct_light_result);
   }

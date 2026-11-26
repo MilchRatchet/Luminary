@@ -134,22 +134,19 @@ extern "C" static __constant__ DeviceConstantMemory device;
 // PathID
 //===========================================================================================
 
-#define PATH_ID_EXTRA_BITS (16 - PATH_ID_SENSOR_BITS)
 #define PATH_ID_SENSOR_MASK ((1u << PATH_ID_SENSOR_BITS) - 1)
 #define PATH_ID_SAMPLE_MASK ((1u << PATH_ID_SAMPLE_BITS) - 1)
-#define PATH_ID_EXTRA_MASK ((1u << PATH_ID_EXTRA_BITS) - 1)
 
 LUMINARY_FUNCTION PathID path_id_get(const uint32_t x, const uint32_t y, const uint32_t sample_id) {
   PathID path_id;
-  path_id.x = (x & PATH_ID_SENSOR_MASK) | (((sample_id >> (16 + PATH_ID_EXTRA_BITS * 0)) & PATH_ID_EXTRA_MASK) << PATH_ID_SENSOR_BITS);
-  path_id.y = (y & PATH_ID_SENSOR_MASK) | (((sample_id >> (16 + PATH_ID_EXTRA_BITS * 1)) & PATH_ID_EXTRA_MASK) << PATH_ID_SENSOR_BITS);
-  path_id.z = sample_id & PATH_ID_SAMPLE_MASK;
+  path_id.x = x | (y << PATH_ID_SENSOR_BITS);
+  path_id.y = sample_id & PATH_ID_SAMPLE_MASK;
 
   return path_id;
 }
 
 LUMINARY_FUNCTION ushort2 path_id_get_pixel(const PathID& path_id) {
-  return make_ushort2(path_id.x & PATH_ID_SENSOR_MASK, path_id.y & PATH_ID_SENSOR_MASK);
+  return make_ushort2(path_id.x & PATH_ID_SENSOR_MASK, path_id.x >> PATH_ID_SENSOR_BITS);
 }
 
 LUMINARY_FUNCTION uint32_t path_id_get_pixel_index(const PathID& path_id) {
@@ -162,14 +159,7 @@ LUMINARY_FUNCTION uint32_t path_id_get_pixel_index(const PathID& path_id) {
 }
 
 LUMINARY_FUNCTION uint32_t path_id_get_sample_id(const PathID& path_id) {
-  const uint32_t x = path_id.x;
-  const uint32_t y = path_id.y;
-
-  uint32_t sample_id = path_id.z;
-  sample_id |= (x >> PATH_ID_SENSOR_BITS) << (16 + PATH_ID_EXTRA_BITS * 0);
-  sample_id |= (y >> PATH_ID_SENSOR_BITS) << (16 + PATH_ID_EXTRA_BITS * 1);
-
-  return sample_id;
+  return path_id.y & PATH_ID_SAMPLE_MASK;
 }
 
 //===========================================================================================

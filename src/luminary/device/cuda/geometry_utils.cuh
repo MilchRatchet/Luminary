@@ -51,8 +51,8 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
   return normal_adaptation_apply(neg_vector(ray), normal, face_normal);
 }
 
-LUMINARY_FUNCTION MaterialContextGeometry
-  geometry_get_context(const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium, RGBF& emission) {
+LUMINARY_FUNCTION MaterialContextGeometry geometry_get_context(
+  const DeviceTask& task, const TaskFlags flags, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium, RGBF& emission) {
   const uint32_t mesh_id      = mesh_id_load(trace.handle.instance_id);
   const DeviceTransform trans = load_transform(trace.handle.instance_id);
 
@@ -121,7 +121,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
 
   const bool emissive_side    = (is_inside == false) || (mat.flags & DEVICE_MATERIAL_FLAG_BIDIRECTIONAL_EMISSION);
   const bool has_emission     = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && emissive_side;
-  const bool include_emission = has_emission && ((task.state & STATE_FLAG_CAMERA_DIRECTION) != 0);
+  const bool include_emission = has_emission && ((flags & STATE_FLAG_CAMERA_DIRECTION) != 0);
 
   emission = get_color(0.0f, 0.0f, 0.0f);
   if (include_emission) {
@@ -158,28 +158,28 @@ LUMINARY_FUNCTION MaterialContextGeometry
   roughness = fmaxf(roughness, BSDF_ROUGHNESS_CLAMP);
 
   // We clamp the roughness to avoid caustics which would never clean up.
-  if ((task.state & STATE_FLAG_DELTA_PATH) == 0) {
+  if ((flags & STATE_FLAG_DELTA_PATH) == 0) {
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
-  MaterialFlags flags = (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
+  MaterialFlags mat_flags = (mat.flags & DEVICE_MATERIAL_BASE_SUBSTRATE_MASK);
 
   if (mat.metallic_tex != TEXTURE_NONE) {
     // TODO: Stochastic filtering of metallic texture.
   }
   else if (mat.flags & DEVICE_MATERIAL_FLAG_METALLIC) {
-    flags |= MATERIAL_FLAG_METALLIC;
+    mat_flags |= MATERIAL_FLAG_METALLIC;
   }
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
-    flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
+    mat_flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
   }
 
   if (is_inside) {
-    flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+    mat_flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const bool refraction_is_inside = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) != 0;
+  const bool refraction_is_inside = (mat_flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE) != 0;
 
   const float other_ior    = medium_stack_ior_peek(medium, refraction_is_inside);
   const uint16_t volume_id = medium_stack_volume_peek(medium, false);
@@ -188,29 +188,28 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const float ior_out = (refraction_is_inside) ? other_ior : mat.refraction_index;
 
   // If we have a translucent substrate and the IOR change is within some small threshold, treat the material as fully transparent.
-  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(flags) && (fabsf(1.0f - ior_in / ior_out) < 1e-4f)) {
+  if (MATERIAL_IS_SUBSTRATE_TRANSLUCENT(mat_flags) && (fabsf(1.0f - ior_in / ior_out) < 1e-4f)) {
     // Fudge the albedo to be a blend between the transparent color and the refraction color.
-    if ((flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) == 0) {
+    if ((mat_flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) == 0) {
       albedo.r = lerp(1.0f, albedo.r, albedo.a);
       albedo.g = lerp(1.0f, albedo.g, albedo.a);
       albedo.b = lerp(1.0f, albedo.b, albedo.a);
     }
 
     albedo.a = 0.0f;
-    flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
+    mat_flags |= MATERIAL_FLAG_COLORED_TRANSPARENCY;
   }
 
   MaterialContextGeometry ctx;
-  ctx.instance_id = trace.handle.instance_id;
-  ctx.tri_id      = trace.handle.tri_id;
-  ctx.normal      = transform_apply_normal(trans, normal);
-  ctx.face_normal = normal_pack(transform_apply_normal(trans, face_normal));
-  ctx.position    = position;
-  ctx.V           = neg_vector(task.ray);
-  ctx.state       = task.state;
-  ctx.volume_type = VolumeType(volume_id);
-
-  ctx.params.flags = flags;
+  ctx.instance_id  = trace.handle.instance_id;
+  ctx.tri_id       = trace.handle.tri_id;
+  ctx.normal       = transform_apply_normal(trans, normal);
+  ctx.face_normal  = normal_pack(transform_apply_normal(trans, face_normal));
+  ctx.position     = position;
+  ctx.V            = neg_vector(task.ray);
+  ctx.state        = flags;
+  ctx.volume_type  = VolumeType(volume_id);
+  ctx.params.flags = mat_flags;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, opaque_color(albedo));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, albedo.a);

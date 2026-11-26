@@ -280,15 +280,14 @@ LUMINARY_KERNEL void sky_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    const DeviceTask task            = task_load(task_base_address);
-
-    if ((device.sky.mode != LUMINARY_SKY_MODE_DEFAULT) && ((task.state & STATE_FLAG_ALLOW_AMBIENT) == 0))
-      continue;
-
+    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    const DeviceTask task                 = task_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    RGBF sky = sky_color_main(task.origin, task.ray, task.state, task.path_id);
+    if ((device.sky.mode != LUMINARY_SKY_MODE_DEFAULT) && ((throughput.flags & STATE_FLAG_ALLOW_AMBIENT) == 0))
+      continue;
+
+    RGBF sky = sky_color_main(task.origin, task.ray, throughput.flags, task.path_id);
     sky      = mul_color(sky, record_unpack(throughput.record));
 
     write_beauty_buffer(sky, throughput.results_index);

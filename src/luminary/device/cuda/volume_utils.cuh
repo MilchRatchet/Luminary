@@ -318,12 +318,13 @@ LUMINARY_FUNCTION RGBF volume_integrate_transmittance(const VolumeType volume_ty
   return transmittance;
 }
 
-LUMINARY_FUNCTION MaterialContextVolume volume_get_context(const DeviceTask task, const VolumeDescriptor volume, const float max_dist) {
+LUMINARY_FUNCTION MaterialContextVolume
+  volume_get_context(const DeviceTask task, const uint32_t flags, const VolumeDescriptor volume, const float max_dist) {
   MaterialContextVolume ctx;
   ctx.descriptor  = volume;
   ctx.position    = task.origin;
   ctx.V           = neg_vector(task.ray);
-  ctx.state       = task.state;
+  ctx.state       = flags;
   ctx.volume_type = volume.type;
   ctx.path        = volume_compute_path(volume, task.origin, task.ray, max_dist);
   ctx.path_end    = ctx.path.start + ctx.path.length;

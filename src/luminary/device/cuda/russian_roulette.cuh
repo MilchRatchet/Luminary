@@ -7,7 +7,7 @@
 
 #define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
 
-LUMINARY_FUNCTION bool russian_roulette_apply(const PathID path_id, const uint8_t state, RGBF& record) {
+LUMINARY_FUNCTION bool russian_roulette_apply(const PathID path_id, const uint32_t state, RGBF& record) {
   const float value = color_importance(record);
 
   if (value <= 0.0f)

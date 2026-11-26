@@ -48,7 +48,7 @@ LUMINARY_KERNEL void volume_process_inscattering() {
 
     const DeviceTaskTrace trace = task_trace_load(task_base_address);
 
-    MaterialContextVolume ctx = volume_get_context(task, volume, trace.depth);
+    MaterialContextVolume ctx = volume_get_context(task, task_flags_load(task_base_address), volume, trace.depth);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
@@ -132,13 +132,14 @@ LUMINARY_KERNEL void volume_process_events() {
       volume          = volume_get_descriptor_preset(volume.type);
       VolumePath path = volume_compute_path(volume, task.origin, task.ray, depth, true);
 
-      bool sky_fast_path = true;
+      const TaskFlags flags = throughput.flags;
+      bool sky_fast_path    = true;
       sky_fast_path &= handle.instance_id == HIT_TYPE_SKY;
       sky_fast_path &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
-      sky_fast_path &= (task.state & STATE_FLAG_ALLOW_AMBIENT) != 0;
+      sky_fast_path &= (flags & STATE_FLAG_ALLOW_AMBIENT) != 0;
 
       if (sky_fast_path) {
-        RGBF sky_color = sky_color_no_compute(task.origin, task.ray, task.state);
+        RGBF sky_color = sky_color_no_compute(task.origin, task.ray, flags);
         sky_color      = mul_color(sky_color, record);
         sky_color      = mul_color(sky_color, volume_integrate_transmittance_precomputed(volume, path.length));
 
@@ -151,12 +152,12 @@ LUMINARY_KERNEL void volume_process_events() {
 
       // Geometry hits can cause bright highlights that are still visible through thick dense volume,
       // we bound the intersection probability to bound the variance in this case.
-      if (((task.state & STATE_FLAG_DELTA_PATH) != 0) && (particle_is_hit(handle) == false)) {
+      if (((flags & STATE_FLAG_DELTA_PATH) != 0) && (particle_is_hit(handle) == false)) {
         volume_intersection_probability = 0.5f;
       }
 
       // Turn off multiscattering for ocean volume
-      if (volume.type == VOLUME_TYPE_OCEAN && device.ocean.multiscattering == false && (task.state & STATE_FLAG_DELTA_PATH) == 0) {
+      if (volume.type == VOLUME_TYPE_OCEAN && device.ocean.multiscattering == false && (flags & STATE_FLAG_DELTA_PATH) == 0) {
         volume_intersection_probability = 0.0f;
       }
 
@@ -240,22 +241,23 @@ LUMINARY_KERNEL void volume_process_tasks() {
   for (int i = 0; i < task_count; i++) {
     HANDLE_DEVICE_ABORT();
 
-    const uint32_t task_base_address      = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
-    DeviceTask task                       = task_load(task_base_address);
-    const DeviceTaskTrace trace           = task_trace_load(task_base_address);
-    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
-    const DeviceTaskMediumStack medium    = task_medium_load(task_base_address);
+    const uint32_t task_base_address   = task_get_base_address(task_offset + i, TASK_STATE_BUFFER_INDEX_POSTSORT);
+    DeviceTask task                    = task_load(task_base_address);
+    const DeviceTaskTrace trace        = task_trace_load(task_base_address);
+    DeviceTaskThroughput throughput    = task_throughput_load(task_base_address);
+    const TaskFlags flags              = throughput.flags;
+    const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const VolumeType volume_type  = (VolumeType) medium_stack_volume_peek(medium, false);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    MaterialContextVolume ctx = volume_get_context(task, volume, 0.0f);
+    MaterialContextVolume ctx = volume_get_context(task, flags, volume, 0.0f);
 
     const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_GI>(ctx, task.path_id);
 
-    uint16_t new_state = task.state;
+    uint32_t new_state = flags;
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
@@ -266,12 +268,12 @@ LUMINARY_KERNEL void volume_process_tasks() {
     const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
     DeviceTask bounce_task;
-    bounce_task.state   = new_state;
     bounce_task.origin  = ctx.position;
     bounce_task.ray     = bounce_info.ray;
     bounce_task.path_id = task.path_id;
 
     task_store(dst_task_base_address, bounce_task);
+    throughput.flags = new_state;
     task_throughput_store(dst_task_base_address, throughput);
     task_medium_store(dst_task_base_address, medium);
   }

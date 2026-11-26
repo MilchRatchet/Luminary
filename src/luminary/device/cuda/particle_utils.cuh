@@ -19,7 +19,7 @@ LUMINARY_FUNCTION vec3 particle_world_to_tile(const vec3 position, const PathID&
 }
 
 LUMINARY_FUNCTION MaterialContextParticle
-  particle_get_context(const DeviceTask task, const DeviceTaskMediumStack& medium, const uint32_t instance_id) {
+  particle_get_context(const DeviceTask task, const uint32_t flags, const DeviceTaskMediumStack& medium, const uint32_t instance_id) {
   const float4 sphere = __ldg(device.ptrs.particle_spheres + (instance_id & HIT_TYPE_PARTICLE_MASK));
 
   const vec3 hit_tile = particle_world_to_tile(task.origin, task.path_id);
@@ -42,7 +42,7 @@ LUMINARY_FUNCTION MaterialContextParticle
   ctx.position    = task.origin;
   ctx.normal      = normal;
   ctx.V           = neg_vector(task.ray);
-  ctx.state       = task.state;
+  ctx.state       = flags;
   ctx.volume_type = (VolumeType) volume_id;
 
   return ctx;

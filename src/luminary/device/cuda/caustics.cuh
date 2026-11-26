@@ -47,7 +47,7 @@ LUMINARY_FUNCTION vec3 caustics_transform(const vec3 V, const vec3 normal, const
   }
 }
 
-LUMINARY_FUNCTION bool caustics_is_fast_path(const uint16_t state) {
+LUMINARY_FUNCTION bool caustics_is_fast_path(const uint32_t state) {
   bool fast_path = false;
   fast_path |= (device.ocean.amplitude == 0.0f);  // Fast path is assuming amplitude == 0, so if that is actually true we can just do it.
   fast_path |= (device.ocean.caustics_active == false);  // Caustics not active still means we want the shift in direction.

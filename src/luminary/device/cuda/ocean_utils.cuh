@@ -260,7 +260,7 @@ LUMINARY_FUNCTION float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, DeviceTaskMediumStack& medium) {
+LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask task, const TaskFlags flags, DeviceTaskMediumStack& medium) {
   vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
@@ -268,20 +268,20 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
   if (inside_water)
     normal = neg_vector(normal);
 
-  uint32_t flags = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
+  MaterialFlags mat_flags = MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT;
 
   if (inside_water) {
-    flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
+    mat_flags |= MATERIAL_FLAG_REFRACTION_IS_INSIDE;
   }
 
-  const bool refraction_is_inside = (flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
+  const bool refraction_is_inside = (mat_flags & MATERIAL_FLAG_REFRACTION_IS_INSIDE);
 
   const float other_ior    = medium_stack_ior_peek(medium, refraction_is_inside);
   const uint16_t volume_id = medium_stack_volume_peek(medium, false);
 
   const float ior_ratio = (refraction_is_inside) ? device.ocean.refractive_index / other_ior : other_ior / device.ocean.refractive_index;
 
-  const float roughness = ((task.state & STATE_FLAG_DELTA_PATH) != 0) ? BSDF_ROUGHNESS_CLAMP * 2.0f : 0.25f;
+  const float roughness = ((flags & STATE_FLAG_DELTA_PATH) != 0) ? BSDF_ROUGHNESS_CLAMP * 2.0f : 0.25f;
 
   MaterialContextGeometry ctx;
 
@@ -291,9 +291,9 @@ LUMINARY_FUNCTION MaterialContextGeometry ocean_get_context(const DeviceTask tas
   ctx.face_normal  = normal_pack(normal);
   ctx.position     = task.origin;
   ctx.V            = neg_vector(task.ray);
-  ctx.state        = task.state;
+  ctx.state        = flags;
   ctx.volume_type  = VolumeType(volume_id);
-  ctx.params.flags = flags;
+  ctx.params.flags = mat_flags;
 
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, 1.0f);

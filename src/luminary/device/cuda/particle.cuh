@@ -21,11 +21,12 @@ LUMINARY_KERNEL void particle_process_tasks() {
     DeviceTask task                       = task_load(task_base_address);
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+    const TaskFlags flags                 = throughput.flags;
     const DeviceTaskMediumStack medium    = task_medium_load(task_base_address);
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const MaterialContextParticle ctx = particle_get_context(task, medium, trace.handle.instance_id);
+    const MaterialContextParticle ctx = particle_get_context(task, flags, medium, trace.handle.instance_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
@@ -34,7 +35,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     const uint32_t task_direct_lighting_base_address =
       task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
-    if (direct_lighting_geometry_is_allowed(task, trace)) {
+    if (direct_lighting_geometry_is_allowed(flags, trace)) {
       float light_tree_root_sum;
       const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.path_id, light_tree_root_sum);
 
@@ -67,7 +68,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
       task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
     }
 
-    uint16_t new_state = task.state;
+    uint32_t new_state = flags;
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
 
@@ -78,14 +79,13 @@ LUMINARY_KERNEL void particle_process_tasks() {
       new_state &= ~(STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT);
     }
 
-    if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
+    if (russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       RGBF record = record_unpack(throughput.record);
       record      = mul_color(record, bounce_info.weight);
 
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
       DeviceTask bounce_task;
-      bounce_task.state   = new_state;
       bounce_task.origin  = ctx.position;
       bounce_task.ray     = bounce_info.ray;
       bounce_task.path_id = task.path_id;
@@ -95,6 +95,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
       DeviceTaskThroughput bounce_throughput;
       bounce_throughput.record        = record_pack(record);
       bounce_throughput.results_index = throughput.results_index;
+      bounce_throughput.flags         = new_state;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
 
@@ -133,7 +134,7 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
         result = splat_color(__saturatef((1.0f / trace.depth) * 2.0f));
         break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const MaterialContextParticle data = particle_get_context(task, medium, trace.handle.instance_id);
+        const MaterialContextParticle data = particle_get_context(task, throughput.flags, medium, trace.handle.instance_id);
 
         const vec3 normal = data.normal;
 

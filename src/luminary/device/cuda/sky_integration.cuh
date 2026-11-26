@@ -286,7 +286,7 @@ LUMINARY_FUNCTION RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray,
   return inscattering;
 }
 
-LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint8_t state) {
+LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint32_t state) {
   RGBF sky;
   switch (device.sky.mode) {
     default:
@@ -319,7 +319,7 @@ LUMINARY_FUNCTION RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, c
   return sky;
 }
 
-LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t state, const PathID& path_id) {
+LUMINARY_FUNCTION RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint32_t state, const PathID& path_id) {
   RGBF sky;
   switch (device.sky.mode) {
     default:

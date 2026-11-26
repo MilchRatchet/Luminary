@@ -201,11 +201,11 @@ LUMINARY_FUNCTION bool direct_lighting_is_rain_hit(const DeviceTaskTrace& trace)
   return device.particles.type == LUMINARY_PARTICLE_TYPE_RAIN && PARTICLE_HIT_ID_CHECK(trace.handle.instance_id);
 }
 
-LUMINARY_FUNCTION bool direct_lighting_geometry_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
+LUMINARY_FUNCTION bool direct_lighting_geometry_is_allowed(const uint32_t flags, const DeviceTaskTrace& trace) {
   bool allow_geometry_lighting = true;
 
   allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
-  allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
+  allow_geometry_lighting &= (flags & STATE_FLAG_VOLUME_SCATTERED) == 0;
   allow_geometry_lighting &= trace.handle.instance_id != HIT_TYPE_OCEAN;
   allow_geometry_lighting &= direct_lighting_is_rain_hit(trace) == false;
 
@@ -261,11 +261,11 @@ LUMINARY_FUNCTION bool direct_lighting_bridges_is_allowed(const MaterialContextV
   return allow_geometry_lighting;
 }
 
-LUMINARY_FUNCTION bool direct_lighting_bsdf_is_allowed(const DeviceTask& task, const DeviceTaskTrace& trace) {
+LUMINARY_FUNCTION bool direct_lighting_bsdf_is_allowed(const uint32_t flags, const DeviceTaskTrace& trace) {
   bool allow_geometry_lighting = true;
 
   allow_geometry_lighting &= LIGHTS_ARE_PRESENT == true;
-  allow_geometry_lighting &= (task.state & STATE_FLAG_VOLUME_SCATTERED) == 0;
+  allow_geometry_lighting &= (flags & STATE_FLAG_VOLUME_SCATTERED) == 0;
   allow_geometry_lighting &= particle_is_hit(trace.handle) == false;
 
   return allow_geometry_lighting;
@@ -436,7 +436,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_geometry_evaluate_task(
 }
 
 LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
-  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium,
+  const DeviceTask& task, const uint32_t flags, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium,
   const DeviceTaskDirectLightSun& direct_light_task, const bool is_allowed) {
   const vec3 ray = ray_unpack(direct_light_task.ray);
 
@@ -476,7 +476,7 @@ LUMINARY_FUNCTION RGBF direct_lighting_sun_evaluate_task(
     // Volume and particle rendering always use the geometry logic here, this means we get low variance sampling as we use the caustics fast
     // path, but then apply Fresnel here. This means we are essentially taking the integral over a very small subspace. It looks nice and is
     // fast.
-    const bool fast_path = caustics_is_fast_path(task.state);
+    const bool fast_path = caustics_is_fast_path(flags);
 
     // Ocean normal points up, we come from below, so flip it
     const vec3 ocean_normal = (fast_path) ? get_vector(0.0f, -1.0f, 0.0f) : neg_vector(ocean_get_normal(ocean_pos));

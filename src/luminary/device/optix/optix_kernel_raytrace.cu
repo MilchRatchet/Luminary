@@ -84,12 +84,18 @@ LUMINARY_FUNCTION void optix_raytrace_geometry(const DeviceTask task, OptixRaytr
   }
 }
 
-LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, OptixRaytraceResult& result) {
+LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, const uint32_t task_base_address, OptixRaytraceResult& result) {
   OptixTraceStatus trace_status = OPTIX_TRACE_STATUS_EXECUTE;
 
-  // Particles can not be hit by non delta path due to their negligible contribution
-  if ((task.state & STATE_FLAG_DELTA_PATH) == 0 || !device.particles.active) {
+  if (device.particles.active == false)
     trace_status = OPTIX_TRACE_STATUS_ABORT;
+
+  if (trace_status == OPTIX_TRACE_STATUS_EXECUTE && device.state.depth > 0) {
+    TaskFlags flags = task_flags_load(task_base_address);
+
+    // Particles can not be hit by non delta path due to their negligible contribution
+    if ((flags & STATE_FLAG_DELTA_PATH) == 0)
+      trace_status = OPTIX_TRACE_STATUS_ABORT;
   }
 
   const vec3 scaled_ray = scale_vector(task.ray, device.particles.inv_tile_size);
@@ -146,7 +152,7 @@ extern "C" __global__ void __raygen__optix() {
   result.depth  = FLT_MAX;
 
   optix_raytrace_geometry(task, result);
-  optix_raytrace_particles(task, result);
+  optix_raytrace_particles(task, task_flags_load(task_base_address), result);
   optix_raytrace_ocean(task, result);
 
   // If we didn't hit anything, the result handle could be the ignore handle,

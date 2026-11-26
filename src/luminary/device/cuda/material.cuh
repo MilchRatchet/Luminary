@@ -79,7 +79,7 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
   vec3 V;
   vec3 normal;
   PackedNormal face_normal;
-  uint16_t state;
+  uint32_t state;
   VolumeType volume_type;
   MaterialParams params;
 };
@@ -96,7 +96,7 @@ struct MaterialContext<MATERIAL_VOLUME> {
   VolumeDescriptor descriptor;
   vec3 position;
   vec3 V;
-  uint16_t state;
+  uint32_t state;
   VolumeType volume_type;
   VolumePath path;
   float path_end;
@@ -115,7 +115,7 @@ struct MaterialContext<MATERIAL_PARTICLE> {
   vec3 position;
   vec3 V;
   vec3 normal;
-  uint16_t state;
+  uint32_t state;
   VolumeType volume_type;
 };
 
