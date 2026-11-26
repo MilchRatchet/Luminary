@@ -353,9 +353,7 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
     ushort2 pixel;
     pixel.y = (uint16_t) (offset / device.settings.width);
     pixel.x = (uint16_t) (offset - pixel.y * device.settings.width);
-    printf(
-      "[%s:%u] Path at (%u, %u) at depth %u on frame %u ran into a NaN or INF: (%f %f %f)\n", func, line, pixel.x, pixel.y,
-      (uint32_t) device.state.depth, (uint32_t) device.state.sample_id, color.r, color.g, color.b);
+    printf("[%s:%u] Non-finite color at (%u, %u): (%f %f %f)\n", func, line, pixel.x, pixel.y, color.r, color.g, color.b);
 
     sanitized_color = UTILS_DEBUG_NAN_COLOR;
   }

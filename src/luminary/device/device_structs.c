@@ -14,7 +14,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   __CHECK_NULL_ARGUMENT(settings);
   __CHECK_NULL_ARGUMENT(device_settings);
 
-  device_settings->max_ray_depth                 = settings->max_ray_depth;
+  device_settings->max_ray_depth                 = min(settings->max_ray_depth, PATH_ID_DEPTH_MASK);
   device_settings->shading_mode                  = settings->shading_mode;
   device_settings->bridge_max_num_vertices       = settings->bridge_max_num_vertices;
   device_settings->supersampling                 = settings->supersampling;

@@ -273,10 +273,7 @@ LUMINARY_FUNCTION float2 cloud_get_toplayer_intersection(const vec3 origin, cons
 // Density function
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION float cloud_base_density_low(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
-  mip_bias += device.cloud.mipmap_bias;
-  mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
-
+LUMINARY_FUNCTION float cloud_base_density_low(const vec3 pos, const float height, const CloudWeather weather, const float mip_bias) {
   vec3 shape_pos = pos;
   shape_pos.x    = shape_pos.x + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_cos * 0.33f;
   shape_pos.z    = shape_pos.z + device.cloud.low.wind_speed * height * device.cloud.low.wind_angle_sin * 0.33f;
@@ -300,10 +297,7 @@ LUMINARY_FUNCTION float cloud_base_density_low(const vec3 pos, const float heigh
   return density;
 }
 
-LUMINARY_FUNCTION float cloud_base_density_mid(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
-  mip_bias += device.cloud.mipmap_bias;
-  mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
-
+LUMINARY_FUNCTION float cloud_base_density_mid(const vec3 pos, const float height, const CloudWeather weather, const float mip_bias) {
   vec3 shape_pos = pos;
   shape_pos      = scale_vector(shape_pos, 0.2f * device.cloud.noise_shape_scale);
 
@@ -319,10 +313,7 @@ LUMINARY_FUNCTION float cloud_base_density_mid(const vec3 pos, const float heigh
   return remap01(density_gradient * (d0 * (1.0f - interp) + d1 * interp), 0.05f, 1.0f);
 }
 
-LUMINARY_FUNCTION float cloud_base_density_top(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
-  mip_bias += device.cloud.mipmap_bias;
-  mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
-
+LUMINARY_FUNCTION float cloud_base_density_top(const vec3 pos, const float height, const CloudWeather weather, const float mip_bias) {
   vec3 shape_pos = pos;
   shape_pos      = scale_vector(shape_pos, 0.2f * device.cloud.noise_shape_scale);
 
@@ -347,11 +338,9 @@ LUMINARY_FUNCTION float cloud_base_density_top(const vec3 pos, const float heigh
   return remap01(density_gradient * (d1 + d2) * 0.25f, 0.05f, 1.0f);
 }
 
-LUMINARY_FUNCTION float cloud_erode_density(const vec3 pos, float density, const float height, const CloudWeather weather, float mip_bias) {
+LUMINARY_FUNCTION float cloud_erode_density(
+  const vec3 pos, float density, const float height, const CloudWeather weather, const float mip_bias) {
   if (density > 0.0f) {
-    mip_bias += device.cloud.mipmap_bias;
-    mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
-
     vec3 detail_pos = pos;
     detail_pos      = scale_vector(detail_pos, 2.0f * device.cloud.noise_detail_scale);
 
@@ -368,10 +357,11 @@ LUMINARY_FUNCTION float cloud_erode_density(const vec3 pos, float density, const
 }
 
 template <CloudLayerType LAYER_TYPE>
-LUMINARY_FUNCTION float cloud_density(vec3 pos, const float height, const CloudWeather weather, const float mip_bias) {
+LUMINARY_FUNCTION float cloud_density(vec3 pos, const float height, const CloudWeather weather) {
   pos.x += device.cloud.offset_x;
   pos.z += device.cloud.offset_z;
 
+  const float mip_bias = device.cloud.mipmap_bias;
   float density;
 
   switch (LAYER_TYPE) {

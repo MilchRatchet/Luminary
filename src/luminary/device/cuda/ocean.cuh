@@ -78,6 +78,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
       bounce_task.origin  = bounce_pos;
       bounce_task.ray     = bounce_info.ray;
       bounce_task.path_id = task.path_id;
+      path_id_increment_depth(bounce_task.path_id);
 
       // Apply medium transition.
       if (bounce_info.is_transparent_pass) {

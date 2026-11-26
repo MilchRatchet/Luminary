@@ -472,7 +472,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
       adaptive_sampler_allocate_sample(device_manager->adaptive_sampler, &main_device->renderer->sample_allocation, num_initial_samples));
 
     DeviceRendererQueueArgs render_args;
-    render_args.max_depth                         = scene->settings.max_ray_depth;
+    render_args.max_depth                         = min(scene->settings.max_ray_depth, PATH_ID_DEPTH_MASK);
     render_args.enable_adaptive_sampling          = scene->settings.adaptive_sampling_settings.enable;
     render_args.render_clouds                     = scene->cloud.active && scene->sky.mode == LUMINARY_SKY_MODE_DEFAULT;
     render_args.render_inscattering               = scene->sky.aerial_perspective && scene->sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;

@@ -271,6 +271,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     bounce_task.origin  = ctx.position;
     bounce_task.ray     = bounce_info.ray;
     bounce_task.path_id = task.path_id;
+    path_id_increment_depth(bounce_task.path_id);
 
     task_store(dst_task_base_address, bounce_task);
     throughput.flags = new_state;

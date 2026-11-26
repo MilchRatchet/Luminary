@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_FUNCTION void optix_write_out_gbuffer_meta(const DeviceTask task, OptixRaytraceResult result) {
-  if (device.state.undersampling == 0 || device.state.depth != 0)
+  if (device.state.undersampling == 0 || path_id_get_depth(task.path_id) != 0)
     return;
 
   const uint32_t shift = device.settings.supersampling + 1;
@@ -90,7 +90,7 @@ LUMINARY_FUNCTION void optix_raytrace_particles(const DeviceTask task, const uin
   if (device.particles.active == false)
     trace_status = OPTIX_TRACE_STATUS_ABORT;
 
-  if (trace_status == OPTIX_TRACE_STATUS_EXECUTE && device.state.depth > 0) {
+  if (trace_status == OPTIX_TRACE_STATUS_EXECUTE && path_id_get_depth(task.path_id) > 0) {
     TaskFlags flags = task_flags_load(task_base_address);
 
     // Particles can not be hit by non delta path due to their negligible contribution

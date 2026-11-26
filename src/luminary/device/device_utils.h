@@ -36,6 +36,12 @@
 
 #define PATH_ID_SENSOR_BITS 16
 #define PATH_ID_SAMPLE_BITS 20
+#define PATH_ID_DEPTH_BITS 6
+#define PATH_ID_SPLIT_BITS 6
+#define PATH_ID_SENSOR_MASK ((1u << PATH_ID_SENSOR_BITS) - 1u)
+#define PATH_ID_SAMPLE_MASK ((1u << PATH_ID_SAMPLE_BITS) - 1u)
+#define PATH_ID_DEPTH_MASK ((1u << PATH_ID_DEPTH_BITS) - 1u)
+#define PATH_ID_SPLIT_MASK ((1u << PATH_ID_SPLIT_BITS) - 1u)
 #define MAX_NUM_GLOBAL_SAMPLES (1u << PATH_ID_SAMPLE_BITS)
 
 #define STARS_GRID_LD 64
@@ -517,7 +523,6 @@ struct DevicePointers {
 
 struct DeviceExecutionState {
   uint32_t tile_id;
-  uint8_t depth;
   uint8_t undersampling;
   DeviceSampleAllocation sample_allocation;
   uint32_t adaptive_sampling_accumulated_stages[ADAPTIVE_SAMPLER_NUM_STAGES + 1];

@@ -383,7 +383,6 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
     __FAILURE_HANDLE(_device_renderer_queue_sample_start(renderer, device, event_id));
   }
 
-  __FAILURE_HANDLE(device_update_depth_const_mem(device, renderer->depth));
   if (starts_tile) {
     __FAILURE_HANDLE(device_update_tile_id_const_mem(device, renderer->tile_id));
     const CUDAKernelType create_tasks =

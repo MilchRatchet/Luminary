@@ -73,7 +73,7 @@ LUMINARY_FUNCTION float cloud_extinction(const vec3 origin, const vec3 ray) {
     const CloudWeather weather = cloud_weather<LAYER_TYPE>(pos, height);
 
     if (cloud_significant_point<LAYER_TYPE>(height, weather)) {
-      optical_depth -= cloud_density<LAYER_TYPE>(pos, height, weather, 0.0f) * step_size;
+      optical_depth -= cloud_density<LAYER_TYPE>(pos, height, weather) * step_size;
     }
   }
 
@@ -166,7 +166,7 @@ LUMINARY_FUNCTION CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float 
       continue;
     }
 
-    const float density = cloud_density<LAYER_TYPE>(pos, height, weather, 0.0f);
+    const float density = cloud_density<LAYER_TYPE>(pos, height, weather);
 
     if (density == 0.0f) {
       reach += step_size;

@@ -94,7 +94,7 @@ LUMINARY_FUNCTION float cloud_shadow_layer_transmittance(const vec3 origin, cons
     const CloudWeather weather = cloud_weather<LAYER_TYPE>(pos, height);
 
     if (cloud_significant_point<LAYER_TYPE>(height, weather)) {
-      optical_depth -= cloud_density<LAYER_TYPE>(pos, height, weather, 1.0f) * step_size * CLOUD_EXTINCTION_DENSITY;
+      optical_depth -= cloud_density<LAYER_TYPE>(pos, height, weather) * step_size * CLOUD_EXTINCTION_DENSITY;
       if (optical_depth < -64.0f) {
         return 0.0f;
       }

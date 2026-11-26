@@ -89,7 +89,6 @@ enum ShadingTaskIndex {
 #define VOLUME_HIT_ID_CHECK(X) (((X) >= HIT_TYPE_VOLUME_BASE) && ((X) <= HIT_TYPE_VOLUME_MAX))
 #define VOLUME_ID_TO_HIT_ID(X) (HIT_TYPE_VOLUME_BASE | (X))
 #define PARTICLE_HIT_ID_CHECK(X) (((X) <= HIT_TYPE_PARTICLE_MAX) && ((X) >= HIT_TYPE_PARTICLE_MIN))
-#define IS_PRIMARY_RAY (device.state.depth == 0)
 
 //
 // Usage documentation:
@@ -134,15 +133,26 @@ extern "C" static __constant__ DeviceConstantMemory device;
 // PathID
 //===========================================================================================
 
-#define PATH_ID_SENSOR_MASK ((1u << PATH_ID_SENSOR_BITS) - 1)
-#define PATH_ID_SAMPLE_MASK ((1u << PATH_ID_SAMPLE_BITS) - 1)
-
 LUMINARY_FUNCTION PathID path_id_get(const uint32_t x, const uint32_t y, const uint32_t sample_id) {
   PathID path_id;
   path_id.x = x | (y << PATH_ID_SENSOR_BITS);
   path_id.y = sample_id & PATH_ID_SAMPLE_MASK;
 
   return path_id;
+}
+
+LUMINARY_FUNCTION uint32_t path_id_get_depth(const PathID& path_id) {
+  return (path_id.y >> PATH_ID_SAMPLE_BITS) & PATH_ID_DEPTH_MASK;
+}
+
+LUMINARY_FUNCTION void path_id_increment_depth(PathID& path_id) {
+  if (path_id_get_depth(path_id) < PATH_ID_DEPTH_MASK)
+    path_id.y += 1u << PATH_ID_SAMPLE_BITS;
+}
+
+LUMINARY_FUNCTION void path_id_set_split_id(PathID& path_id, const uint32_t split_id) {
+  path_id.y &= ~(PATH_ID_SPLIT_MASK << (PATH_ID_SAMPLE_BITS + PATH_ID_DEPTH_BITS));
+  path_id.y |= split_id << (PATH_ID_SAMPLE_BITS + PATH_ID_DEPTH_BITS);
 }
 
 LUMINARY_FUNCTION ushort2 path_id_get_pixel(const PathID& path_id) {

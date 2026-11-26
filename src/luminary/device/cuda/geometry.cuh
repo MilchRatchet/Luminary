@@ -145,6 +145,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       bounce_task.origin  = apply_safe_offset(ctx.position, ctx.face_normal, bounce_info.ray);
       bounce_task.ray     = bounce_info.ray;
       bounce_task.path_id = task.path_id;
+      path_id_increment_depth(bounce_task.path_id);
 
       task_store(dst_task_base_address, bounce_task);
 
