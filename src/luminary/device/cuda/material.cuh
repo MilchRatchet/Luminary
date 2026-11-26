@@ -44,7 +44,6 @@ enum MaterialParamType {
 #define MATERIAL_PARAM_TYPE_PACKED_NORMAL_SIZE 32
 
 enum MaterialGeometryParam : uint32_t {
-  MATERIAL_GEOMETRY_PARAM_ALLOCATE(EMISSION, MATERIAL_PARAM_TYPE_COLOR, MATERIAL_PARAM_TYPE_COLOR_SIZE)          //
   MATERIAL_GEOMETRY_PARAM_ALLOCATE(ALBEDO, MATERIAL_PARAM_TYPE_NORM_COLOR, MATERIAL_PARAM_TYPE_NORM_COLOR_SIZE)  //
   MATERIAL_GEOMETRY_PARAM_ALLOCATE(OPACITY, MATERIAL_PARAM_TYPE_NORM_FLOAT, 8)                                   //
   MATERIAL_GEOMETRY_PARAM_ALLOCATE(ROUGHNESS, MATERIAL_PARAM_TYPE_NORM_FLOAT, 10)                                //
@@ -359,7 +358,6 @@ LUMINARY_FUNCTION void material_params_get_set_default(MaterialParams& params) {
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(params, splat_color(1.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(params, 1.0f);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(params, 0.5f);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(params, splat_color(0.0f));
   material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(params, 1.0f);
 }
 

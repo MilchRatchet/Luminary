@@ -27,7 +27,21 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
+    RGBF emission;
+    const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium, emission);
+
+    ////////////////////////////////////////////////////////////////////
+    // Emission
+    ////////////////////////////////////////////////////////////////////
+
+    if (color_any(emission)) {
+      const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
+      RGBF record             = record_unpack(throughput.record);
+      const RGBF result_color = mul_color(emission, record);
+
+      write_beauty_buffer(result_color, throughput.results_index);
+    }
 
     // We need to store the face normal so the DL shadowing kernel knows how to offset the origin.
     task_trace_facenormal_store(task_base_address, ctx.face_normal);
@@ -105,20 +119,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       is_delta_distribution = true;
 
     ////////////////////////////////////////////////////////////////////
-    // Emission and record
+    // Queue next iteration
     ////////////////////////////////////////////////////////////////////
-
-    const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
-
-    RGBF record = record_unpack(throughput.record);
-
-    const RGBF emission = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
-
-    if (color_any(emission)) {
-      const RGBF result_color = mul_color(emission, record);
-
-      write_beauty_buffer(result_color, throughput.results_index);
-    }
 
     uint16_t new_state = task.state;
 
@@ -131,9 +133,12 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     }
 
     if (russian_roulette_apply(task.path_id, task.state, bounce_info.weight)) {
+      const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
+
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
 
-      record = mul_color(record, bounce_info.weight);
+      RGBF record = record_unpack(throughput.record);
+      record      = mul_color(record, bounce_info.weight);
 
       DeviceTask bounce_task;
       bounce_task.state   = new_state;
@@ -194,9 +199,9 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
     RGBF result;
     switch (device.settings.shading_mode) {
       case LUMINARY_SHADING_MODE_ALBEDO: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
+        RGBF emission;
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium, emission);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
-        const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
         result = add_color(albedo, emission);
       } break;
@@ -204,7 +209,8 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         result = splat_color(__saturatef((1.0f / trace.depth) * 2.0f));
       } break;
       case LUMINARY_SHADING_MODE_NORMAL: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
+        RGBF emission;
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium, emission);
 
         const vec3 normal = ctx.normal;
 
@@ -224,9 +230,9 @@ LUMINARY_KERNEL void geometry_process_tasks_debug() {
         result = get_color(cr, cg, cb);
       } break;
       case LUMINARY_SHADING_MODE_LIGHTS: {
-        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium);
+        RGBF emission;
+        const MaterialContextGeometry ctx = geometry_get_context(task, trace, medium, emission);
         const RGBF albedo                 = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params);
-        const RGBF emission               = material_get_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params);
 
         result = add_color(scale_color(albedo, 0.025f), emission);
       } break;

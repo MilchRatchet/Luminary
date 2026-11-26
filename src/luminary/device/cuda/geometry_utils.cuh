@@ -52,7 +52,7 @@ LUMINARY_FUNCTION vec3 geometry_compute_normal(
 }
 
 LUMINARY_FUNCTION MaterialContextGeometry
-  geometry_get_context(const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium) {
+  geometry_get_context(const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskMediumStack& medium, RGBF& emission) {
   const uint32_t mesh_id      = mesh_id_load(trace.handle.instance_id);
   const DeviceTransform trans = load_transform(trace.handle.instance_id);
 
@@ -123,7 +123,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
   const bool has_emission     = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && emissive_side;
   const bool include_emission = has_emission && ((task.state & STATE_FLAG_CAMERA_DIRECTION) != 0);
 
-  RGBF emission = get_color(0.0f, 0.0f, 0.0f);
+  emission = get_color(0.0f, 0.0f, 0.0f);
   if (include_emission) {
     emission = mat.emission;
 
@@ -215,7 +215,6 @@ LUMINARY_FUNCTION MaterialContextGeometry
   material_set_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(ctx.params, opaque_color(albedo));
   material_set_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params, albedo.a);
   material_set_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params, roughness);
-  material_set_color<MATERIAL_GEOMETRY_PARAM_EMISSION>(ctx.params, emission);
   material_set_float<MATERIAL_GEOMETRY_PARAM_IOR>(ctx.params, ior_in / ior_out);
 
   return ctx;
