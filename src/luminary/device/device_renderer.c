@@ -29,13 +29,6 @@ struct DeviceRendererReply {
 
 static LuminaryResult _device_renderer_thread_main(void* args);
 
-struct DeviceRendererWork {
-  uint32_t event_id;
-  uint32_t launch_id;
-  bool allow_gbuffer_meta_query;
-  DeviceRenderCallbackData* shared_callback_data;
-} typedef DeviceRendererWork;
-
 LuminaryResult device_renderer_create(DeviceRenderer** renderer, Device* device, uint64_t host_id) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
@@ -48,10 +41,6 @@ LuminaryResult device_renderer_create(DeviceRenderer** renderer, Device* device,
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*renderer)->renderer_ready, CU_EVENT_DISABLE_TIMING));
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*renderer)->abort_flag_uploaded, CU_EVENT_DISABLE_TIMING));
   CUDA_FAILURE_HANDLE(cuEventCreate(&(*renderer)->abort_complete, CU_EVENT_DISABLE_TIMING));
-
-  __FAILURE_HANDLE(array_create(&(*renderer)->prepass_queue, sizeof(DeviceRendererQueueAction), 16));
-  __FAILURE_HANDLE(array_create(&(*renderer)->queue, sizeof(DeviceRendererQueueAction), 16));
-  __FAILURE_HANDLE(array_create(&(*renderer)->postpass_queue, sizeof(DeviceRendererQueueAction), 16));
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_start[event_id], 0));
@@ -89,193 +78,6 @@ LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceR
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_build_main_kernel_queue(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
-  __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(args);
-
-  DeviceRendererQueueAction action;
-
-  for (uint32_t depth = 0; depth <= args->max_depth; depth++) {
-    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-    action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (args->render_volumes) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_INSCATTERING;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-      action.optix_type = OPTIX_KERNEL_TYPE_SHADOW_VOLUME;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (args->render_clouds) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    if (args->render_inscattering) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_TASKS_SORT;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (args->render_particles) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    if (args->render_ocean) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-    action.optix_type = OPTIX_KERNEL_TYPE_SHADOW;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (args->render_volumes && depth != args->max_depth) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    if (args->render_procedural_sky) {
-      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-      action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-
-    if (depth + 1 <= args->max_depth) {
-      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
-      action.mem_update = (DeviceRendererQueueActionMemUpdate) {.depth = depth + 1};
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_renderer_build_debug_kernel_queue(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
-  __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(args);
-
-  DeviceRendererQueueAction action;
-
-  action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
-  action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  if (args->render_inscattering) {
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-  }
-
-  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_TASKS_SORT;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  if (args->render_ocean) {
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS_DEBUG;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-  }
-
-  if (args->render_particles) {
-    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-    action.cuda_type = CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG;
-    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-  }
-
-  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
-  action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_renderer_build_kernel_queue(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args) {
-  __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(args);
-
-  __FAILURE_HANDLE(array_set_num_elements(&renderer->prepass_queue, 0));
-  __FAILURE_HANDLE(array_set_num_elements(&renderer->queue, 0));
-  __FAILURE_HANDLE(array_set_num_elements(&renderer->postpass_queue, 0));
-
-  DeviceRendererQueueAction action;
-
-  ////////////////////////////////////////////////////////////////////
-  // Prepass Queue
-  ////////////////////////////////////////////////////////////////////
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE;
-  __FAILURE_HANDLE(array_push(&renderer->prepass_queue, &action));
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
-  __FAILURE_HANDLE(array_push(&renderer->prepass_queue, &action));
-
-  ////////////////////////////////////////////////////////////////////
-  // Main Queue
-  ////////////////////////////////////////////////////////////////////
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_TILE;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  switch (args->shading_mode) {
-    case LUMINARY_SHADING_MODE_DEFAULT:
-    default:
-      __FAILURE_HANDLE(_device_renderer_build_main_kernel_queue(renderer, args));
-      break;
-    case LUMINARY_SHADING_MODE_ALBEDO:
-    case LUMINARY_SHADING_MODE_DEPTH:
-    case LUMINARY_SHADING_MODE_NORMAL:
-    case LUMINARY_SHADING_MODE_IDENTIFICATION:
-    case LUMINARY_SHADING_MODE_LIGHTS:
-      __FAILURE_HANDLE(_device_renderer_build_debug_kernel_queue(renderer, args));
-      break;
-  }
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_TILE;
-  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-  ////////////////////////////////////////////////////////////////////
-  // Postpass Queue
-  ////////////////////////////////////////////////////////////////////
-
-  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
-  __FAILURE_HANDLE(array_push(&renderer->postpass_queue, &action));
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_renderer_register_callback(
   DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(renderer);
@@ -297,15 +99,13 @@ static LuminaryResult _device_renderer_init_new_render(DeviceRenderer* renderer,
   memset(renderer->executed_aggregate_sample_counts, 0, sizeof(renderer->executed_aggregate_sample_counts));
 
   renderer->tile_id = 0;
+  renderer->depth   = 0;
+  renderer->args    = *args;
   renderer->render_id++;
-  renderer->enable_adaptive_sampling          = args->enable_adaptive_sampling;
-  renderer->adaptive_sampling_update_interval = args->adaptive_sampling_update_interval;
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     renderer->total_render_time[event_id] = 0.0f;
   }
-
-  __FAILURE_HANDLE(_device_renderer_build_kernel_queue(renderer, args));
 
   renderer->status_flags = DEVICE_RENDERER_STATUS_FLAG_READY;
 
@@ -386,7 +186,8 @@ static LuminaryResult _device_renderer_queue_optix_kernel(
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRenderer* renderer, Device* device, DeviceRendererWork* work) {
+static LuminaryResult _device_renderer_queue_adaptive_sampling_update(
+  DeviceRenderer* renderer, Device* device, DeviceRenderCallbackData* callback_data) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
 
@@ -394,7 +195,7 @@ static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRend
   if (device->is_main_device == false)
     return LUMINARY_SUCCESS;
 
-  if (renderer->enable_adaptive_sampling == false)
+  if (renderer->args.enable_adaptive_sampling == false)
     return LUMINARY_SUCCESS;
 
   const uint32_t stage_id = renderer->sample_allocation.stage_id;
@@ -404,124 +205,106 @@ static LuminaryResult _device_renderer_queue_adaptive_sampling_update(DeviceRend
     return LUMINARY_SUCCESS;
 
   const uint32_t samples_this_stage = renderer->executed_aggregate_sample_counts[stage_id];
-  const uint32_t samples_to_update  = renderer->adaptive_sampling_update_interval << stage_id;
+  const uint32_t samples_to_update  = renderer->args.adaptive_sampling_update_interval << stage_id;
 
   if (samples_this_stage < samples_to_update)
     return LUMINARY_SUCCESS;
 
-  work->shared_callback_data->adaptive_sampling_build_stage_id = renderer->sample_allocation.stage_id + 1;
+  callback_data->adaptive_sampling_build_stage_id = stage_id + 1;
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_handle_queue_action(
-  DeviceRenderer* renderer, Device* device, DeviceRendererWork* work, const DeviceRendererQueueAction* action) {
-  __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(device);
+static bool _device_renderer_is_first_sample(const DeviceRenderer* renderer) {
+  for (uint32_t stage_id = 0; stage_id <= ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
+    if (renderer->executed_aggregate_sample_counts[stage_id] != 0)
+      return false;
+  }
 
-  switch (action->type) {
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL:
-      __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, action->cuda_type, &work->launch_id));
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL:
-      __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, action->optix_type, &work->launch_id));
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
-      __FAILURE_HANDLE(device_update_dynamic_const_mem(device, renderer->sample_allocation, renderer->executed_aggregate_sample_counts));
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
-      __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
+  return true;
+}
 
-      const bool allow_gbuffer_meta_query = work->allow_gbuffer_meta_query && (action->mem_update.depth > 0);
-      if (allow_gbuffer_meta_query && (device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY)) {
-        __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-      }
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION:
-      CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, renderer->stream));
-      CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
-      CUDA_FAILURE_HANDLE(
-        cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, work->shared_callback_data));
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE: {
-      CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[work->event_id], renderer->stream));
+static LuminaryResult _device_renderer_queue_sample_start(DeviceRenderer* renderer, Device* device, uint32_t event_id) {
+  CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], renderer->stream));
 
-      bool is_first_sample = true;
-      for (uint32_t stage_id = 0; stage_id <= ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
-        is_first_sample &= renderer->executed_aggregate_sample_counts[stage_id] == 0;
-      }
+  if (renderer->sample_allocation.stage_id > 0 && _device_renderer_is_first_sample(renderer)) {
+    const size_t moment_buffer_size = sizeof(float) * device->work_buffers->allocated_internal_pixel_count;
+    for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
+      __FAILURE_HANDLE(device_memset(device->work_buffers->frame_first_moment[channel_id], 0, 0, moment_buffer_size, renderer->stream));
+    }
 
-      if (is_first_sample && renderer->sample_allocation.stage_id > 0) {
-        const size_t moment_buffer_size = sizeof(float) * device->work_buffers->allocated_internal_pixel_count;
-        for (uint32_t channel_id = 0; channel_id < FRAME_CHANNEL_COUNT; channel_id++) {
-          __FAILURE_HANDLE(device_memset(device->work_buffers->frame_first_moment[channel_id], 0, 0, moment_buffer_size, renderer->stream));
-        }
+    __FAILURE_HANDLE(device_memset(device->work_buffers->frame_second_moment_luminance, 0, 0, moment_buffer_size, renderer->stream));
+  }
 
-        __FAILURE_HANDLE(device_memset(device->work_buffers->frame_second_moment_luminance, 0, 0, moment_buffer_size, renderer->stream));
-      }
-    } break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-      CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[work->event_id], renderer->stream));
-      CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[work->event_id], CU_EVENT_WAIT_DEFAULT));
-      CUDA_FAILURE_HANDLE(
-        cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_finished_func, work->shared_callback_data));
+  return device_update_dynamic_const_mem(device, renderer->sample_allocation, renderer->executed_aggregate_sample_counts);
+}
 
-      renderer->event_id++;
+static LuminaryResult _device_renderer_queue_main_pass(DeviceRenderer* renderer, Device* device, uint32_t* launch_id) {
+  const DeviceRendererQueueArgs* args = &renderer->args;
 
-      if (work->allow_gbuffer_meta_query && device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY) {
-        __FAILURE_HANDLE(device_query_gbuffer_meta(device));
-      }
+  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_RAYTRACE, launch_id));
 
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_TILE:
-      __FAILURE_HANDLE(device_update_depth_const_mem(device, 0));
-      __FAILURE_HANDLE(device_update_tile_id_const_mem(device, renderer->tile_id));
+  if (args->render_volumes) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_INSCATTERING, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_SHADOW_VOLUME, launch_id));
+  }
 
-      if (renderer->sample_allocation.stage_id > 0) {
-        __FAILURE_HANDLE(
-          _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING, &work->launch_id));
-      }
-      else {
-        __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_CREATE, &work->launch_id));
-      }
-      break;
-    case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_TILE:
-      bool is_first_sample = true;
-      for (uint32_t stage_id = 0; stage_id <= ADAPTIVE_SAMPLER_NUM_STAGES; stage_id++) {
-        is_first_sample &= renderer->executed_aggregate_sample_counts[stage_id] == 0;
-      }
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS, launch_id));
 
-      if (is_first_sample && renderer->sample_allocation.stage_id == 0) {
-        __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(
-          renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE, &work->launch_id));
-      }
-      else {
-        __FAILURE_HANDLE(
-          _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS, &work->launch_id));
-      }
-      break;
+  if (args->render_clouds) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS, launch_id));
+  }
+
+  if (args->render_inscattering) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS, launch_id));
+  }
+
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS, launch_id));
+
+  if (args->render_particles) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS, launch_id));
+  }
+
+  if (args->render_ocean) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS, launch_id));
+  }
+
+  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_SHADOW, launch_id));
+
+  if (args->render_volumes && renderer->depth != args->max_depth) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS, launch_id));
+  }
+
+  if (args->render_procedural_sky) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS, launch_id));
   }
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_execute_queue(
-  DeviceRenderer* renderer, Device* device, DeviceRendererWork* work, const ARRAY DeviceRendererQueueAction* queue) {
-  __CHECK_NULL_ARGUMENT(renderer);
-  __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(work);
-  __CHECK_NULL_ARGUMENT(queue);
+static LuminaryResult _device_renderer_queue_debug_pass(DeviceRenderer* renderer, Device* device, uint32_t* launch_id) {
+  const DeviceRendererQueueArgs* args = &renderer->args;
 
-  uint32_t num_actions;
-  __FAILURE_HANDLE(array_get_num_elements(queue, &num_actions));
+  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_RAYTRACE, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS, launch_id));
 
-  for (uint32_t action_id = 0; action_id < num_actions; action_id++) {
-    const DeviceRendererQueueAction* action = queue + action_id;
-
-    __FAILURE_HANDLE(_device_renderer_handle_queue_action(renderer, device, work, action));
+  if (args->render_inscattering) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS, launch_id));
   }
 
-  return LUMINARY_SUCCESS;
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG, launch_id));
+
+  if (args->render_ocean) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS_DEBUG, launch_id));
+  }
+
+  if (args->render_particles) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG, launch_id));
+  }
+
+  return _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG, launch_id);
 }
 
 static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device* device) {
@@ -563,16 +346,22 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   if (renderer->tile_id >= tile_count)
     return LUMINARY_SUCCESS;
 
-  if (renderer->tile_id == 0)
+  const bool starts_tile   = renderer->depth == 0;
+  const bool starts_sample = starts_tile && renderer->tile_id == 0;
+
+  if (starts_sample)
     renderer->callback_id++;
 
   DeviceRenderCallbackData* shared_callback_data = renderer->callback_data + (renderer->callback_id & DEVICE_RENDERER_TIMING_EVENTS_MASK);
 
-  if (renderer->tile_id == 0) {
+  if (starts_sample) {
     shared_callback_data->common                           = renderer->common_callback_data;
     shared_callback_data->render_id                        = renderer->render_id;
     shared_callback_data->render_event_id                  = renderer->event_id;
     shared_callback_data->adaptive_sampling_build_stage_id = ADAPTIVE_SAMPLING_STAGE_INVALID;
+#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
+    renderer->kernel_times[event_id].num_kernel_launches = 0;
+#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
   }
 
   const DeviceConstantMemory* constant_memory;
@@ -585,25 +374,69 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   // Setup work
   ////////////////////////////////////////////////////////////////////
 
-  DeviceRendererWork work;
-  work.event_id                 = event_id;
-  work.launch_id                = 0;
-  work.allow_gbuffer_meta_query = allow_gbuffer_meta_query;
-  work.shared_callback_data     = shared_callback_data;
+  uint32_t launch_id = starts_tile ? 0 : renderer->tile_launch_id;
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->manager_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(renderer->stream, renderer->manager_ready, CU_EVENT_WAIT_DEFAULT));
 
-  if (renderer->tile_id == 0) {
-    __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->prepass_queue));
+  if (starts_sample) {
+    __FAILURE_HANDLE(_device_renderer_queue_sample_start(renderer, device, event_id));
   }
 
-  __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->queue));
-  renderer->tile_id++;
+  __FAILURE_HANDLE(device_update_depth_const_mem(device, renderer->depth));
+  if (starts_tile) {
+    __FAILURE_HANDLE(device_update_tile_id_const_mem(device, renderer->tile_id));
+    const CUDAKernelType create_tasks =
+      renderer->sample_allocation.stage_id > 0 ? CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING : CUDA_KERNEL_TYPE_TASKS_CREATE;
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, create_tasks, &launch_id));
+  }
+  else if (allow_gbuffer_meta_query && device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY) {
+    __FAILURE_HANDLE(device_query_gbuffer_meta(device));
+  }
+
+  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, renderer->stream));
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
+  CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, shared_callback_data));
+
+  bool last_depth;
+  switch (renderer->args.shading_mode) {
+    case LUMINARY_SHADING_MODE_ALBEDO:
+    case LUMINARY_SHADING_MODE_DEPTH:
+    case LUMINARY_SHADING_MODE_NORMAL:
+    case LUMINARY_SHADING_MODE_IDENTIFICATION:
+    case LUMINARY_SHADING_MODE_LIGHTS:
+      __FAILURE_HANDLE(_device_renderer_queue_debug_pass(renderer, device, &launch_id));
+      last_depth = true;
+      break;
+    default:
+      __FAILURE_HANDLE(_device_renderer_queue_main_pass(renderer, device, &launch_id));
+      last_depth = renderer->depth == renderer->args.max_depth;
+      break;
+  }
+
+  if (last_depth) {
+    const CUDAKernelType collect_results = (renderer->sample_allocation.stage_id == 0 && _device_renderer_is_first_sample(renderer))
+                                             ? CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE
+                                             : CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS;
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, collect_results, &launch_id));
+    renderer->depth = 0;
+    renderer->tile_id++;
+  }
+  else {
+    renderer->depth++;
+    renderer->tile_launch_id = launch_id;
+  }
 
   if (renderer->tile_id == tile_count) {
-    __FAILURE_HANDLE(_device_renderer_queue_adaptive_sampling_update(renderer, device, &work));
-    __FAILURE_HANDLE(_device_renderer_execute_queue(renderer, device, &work, renderer->postpass_queue));
+    __FAILURE_HANDLE(_device_renderer_queue_adaptive_sampling_update(renderer, device, shared_callback_data));
+    CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], renderer->stream));
+    CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[event_id], CU_EVENT_WAIT_DEFAULT));
+    CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_finished_func, shared_callback_data));
+    renderer->event_id++;
+
+    if (allow_gbuffer_meta_query && device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY) {
+      __FAILURE_HANDLE(device_query_gbuffer_meta(device));
+    }
 
     renderer->status_flags &= ~DEVICE_RENDERER_STATUS_FLAG_IN_PROGRESS;
     renderer->status_flags |= DEVICE_RENDERER_STATUS_FLAG_FINISHED;
@@ -614,7 +447,8 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   ////////////////////////////////////////////////////////////////////
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  renderer->kernel_times[event_id].num_kernel_launches = min(work.launch_id, DEVICE_RENDERER_MAX_TIMED_KERNELS);
+  renderer->kernel_times[event_id].num_kernel_launches =
+    max(renderer->kernel_times[event_id].num_kernel_launches, min(launch_id, DEVICE_RENDERER_MAX_TIMED_KERNELS));
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->renderer_ready, renderer->stream));
@@ -1009,10 +843,6 @@ LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
   CUDA_FAILURE_HANDLE(cuEventDestroy((*renderer)->renderer_ready));
   CUDA_FAILURE_HANDLE(cuEventDestroy((*renderer)->abort_flag_uploaded));
   CUDA_FAILURE_HANDLE(cuEventDestroy((*renderer)->abort_complete));
-
-  __FAILURE_HANDLE(array_destroy(&(*renderer)->prepass_queue));
-  __FAILURE_HANDLE(array_destroy(&(*renderer)->queue));
-  __FAILURE_HANDLE(array_destroy(&(*renderer)->postpass_queue));
 
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventDestroy((*renderer)->time_start[event_id]));

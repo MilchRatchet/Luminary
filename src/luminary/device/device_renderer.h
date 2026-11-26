@@ -12,36 +12,19 @@
 struct Device typedef Device;
 struct AdaptiveSampler typedef AdaptiveSampler;
 
-enum DeviceRendererQueueActionType {
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_CONTINUATION,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_SAMPLE,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_START_OF_TILE,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_TILE
-} typedef DeviceRendererQueueActionType;
-
-struct DeviceRendererQueueActionMemUpdate {
-  union {
-    // DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH
-    struct {
-      uint32_t depth;
-    };
-  };
-
-} typedef DeviceRendererQueueActionMemUpdate;
-
-struct DeviceRendererQueueAction {
-  DeviceRendererQueueActionType type;
-  union {
-    CUDAKernelType cuda_type;
-    OptixKernelType optix_type;
-    DeviceRendererQueueActionMemUpdate mem_update;
-  };
-} typedef DeviceRendererQueueAction;
+struct DeviceRendererQueueArgs {
+  uint32_t max_depth;
+  bool enable_adaptive_sampling;
+  bool render_particles;
+  bool render_volumes;
+  bool render_clouds;
+  bool render_ocean;
+  bool render_inscattering;
+  bool render_lights;
+  bool render_procedural_sky;
+  uint32_t adaptive_sampling_update_interval;
+  ShadingMode shading_mode;
+} typedef DeviceRendererQueueArgs;
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
 
@@ -89,10 +72,10 @@ struct DeviceRenderer {
   DeviceSampleAllocation sample_allocation;
   uint32_t executed_aggregate_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   DeviceRendererStatusFlags status_flags;
+  DeviceRendererQueueArgs args;
   uint32_t tile_id;
-  ARRAY DeviceRendererQueueAction* prepass_queue;
-  ARRAY DeviceRendererQueueAction* queue;
-  ARRAY DeviceRendererQueueAction* postpass_queue;
+  uint32_t depth;
+  uint32_t tile_launch_id;
   CUhostFn registered_callback_continue_func;
   CUhostFn registered_callback_finished_func;
   DeviceCommonCallbackData common_callback_data;
@@ -107,27 +90,10 @@ struct DeviceRenderer {
   float last_time;
   bool shutdown;
 
-  bool enable_adaptive_sampling;
-  uint32_t adaptive_sampling_update_interval;
-
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
   DeviceRendererPerKernelTimings kernel_times[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 } typedef DeviceRenderer;
-
-struct DeviceRendererQueueArgs {
-  uint32_t max_depth;
-  bool enable_adaptive_sampling;
-  bool render_particles;
-  bool render_volumes;
-  bool render_clouds;
-  bool render_ocean;
-  bool render_inscattering;
-  bool render_lights;
-  bool render_procedural_sky;
-  uint32_t adaptive_sampling_update_interval;
-  ShadingMode shading_mode;
-} typedef DeviceRendererQueueArgs;
 
 DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer, Device* device, uint64_t host_id);
 LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceRenderCallbackData* data, bool* is_valid);
