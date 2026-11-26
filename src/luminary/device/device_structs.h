@@ -20,8 +20,9 @@ struct DeviceRendererSettings {
   uint16_t window_width;
   uint16_t window_height;
   float russian_roulette_threshold;
+  float geometry_emission_scale;
 } typedef DeviceRendererSettings;
-LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x14u);
+LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x18u);
 
 struct DeviceCameraMedium {
   float design_ior;

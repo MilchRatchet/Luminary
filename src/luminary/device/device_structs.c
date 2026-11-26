@@ -37,6 +37,7 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   }
 
   device_settings->russian_roulette_threshold = settings->russian_roulette_threshold;
+  device_settings->geometry_emission_scale    = settings->geometry_emission_scale;
 
   return LUMINARY_SUCCESS;
 }

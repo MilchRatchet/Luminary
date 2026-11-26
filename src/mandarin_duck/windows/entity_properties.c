@@ -419,6 +419,8 @@ static void _window_entity_properties_renderer_settings_action(
 
   update_data |= _window_entity_properties_add_slider(
     data, "Russian Roulette Threshold", &settings.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    data, "Emission Scale", &settings.geometry_emission_scale, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 0.1f);
 
   element_separator(
     window, mouse_state, (ElementSeparatorArgs) {.text = "Adaptive Sampling", .size = (ElementSize) {.rel_width = 1.0f, .height = 32}});

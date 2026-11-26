@@ -131,7 +131,7 @@ LUMINARY_FUNCTION LightSampleResult<TYPE> light_list_resample(
   const float sampling_weight = ris_reservoir_get_sampling_weight(reservoir);
 
   if (result.light_id != LIGHT_ID_INVALID)
-    result.light_color = scale_color(result.light_color, sampling_weight);
+    result.light_color = scale_color(result.light_color, sampling_weight * device.settings.geometry_emission_scale);
 
   if constexpr (TYPE == MATERIAL_GEOMETRY)
     result.light_tree_root_sum = light_tree_work.root_sum;

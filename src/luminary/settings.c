@@ -18,6 +18,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->region_width               = 1.0f;
   settings->region_height              = 1.0f;
   settings->russian_roulette_threshold = 1.0f;
+  settings->geometry_emission_scale    = 1.0f;
 
   settings->adaptive_sampling_settings = (LuminaryAdaptiveSamplingSettings) {
     .enable            = true,
@@ -73,6 +74,7 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
   __SETTINGS_CHECK_DIRTY(region_height, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   __SETTINGS_CHECK_DIRTY(russian_roulette_threshold, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  __SETTINGS_CHECK_DIRTY(geometry_emission_scale, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
 
   return LUMINARY_SUCCESS;
 }

@@ -135,7 +135,7 @@ LUMINARY_FUNCTION MaterialContextGeometry
       emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
     }
 
-    emission = scale_color(emission, albedo.a * mat.emission_scale);
+    emission = scale_color(emission, albedo.a * mat.emission_scale * device.settings.geometry_emission_scale);
   }
 
   float roughness = mat.roughness;

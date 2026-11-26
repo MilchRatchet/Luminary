@@ -177,6 +177,7 @@ struct LumBuiltinSettings {
   float region_width;
   float region_height;
   float russian_roulette_threshold;
+  float geometry_emission_scale;
 } typedef LumBuiltinSettings;
 
 struct LumBuiltinCameraThinLens {

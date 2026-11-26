@@ -263,6 +263,7 @@ static const LumBuiltinTypeMember _lum_builtin_member_settings[] = {
   _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_width, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinSettings, region_height, 1, LUM_VERSION_CURRENT),
   _LUM_BUILTIN_MEMBER(LumBuiltinSettings, russian_roulette_threshold, 1, LUM_VERSION_CURRENT),
+  _LUM_BUILTIN_MEMBER(LumBuiltinSettings, geometry_emission_scale, 1, LUM_VERSION_CURRENT),
 };
 
 static const LumBuiltinTypeMember _lum_builtin_member_camera[] = {
@@ -550,6 +551,7 @@ LuminaryResult lum_builtin_settings_init(LumBuiltinSettings* settings, uint32_t 
   settings->region_height           = 1.0f;
 
   settings->russian_roulette_threshold = 1.0f;
+  settings->geometry_emission_scale    = 1.0f;
 
   settings->adaptive_sampling_settings = (LumBuiltinAdaptiveSampling) {
     .enable            = true,
@@ -902,6 +904,7 @@ LuminaryResult lum_builtin_settings_convert(const LumBuiltinSettings* settings, 
   dst_settings->region_height           = settings->region_height;
 
   dst_settings->russian_roulette_threshold = settings->russian_roulette_threshold;
+  dst_settings->geometry_emission_scale    = settings->geometry_emission_scale;
 
   dst_settings->adaptive_sampling_settings.enable            = settings->adaptive_sampling_settings.enable;
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;
@@ -1211,6 +1214,7 @@ LuminaryResult lum_builtin_settings_serialize(const LuminaryRendererSettings* se
   dst_settings->region_height           = settings->region_height;
 
   dst_settings->russian_roulette_threshold = settings->russian_roulette_threshold;
+  dst_settings->geometry_emission_scale    = settings->geometry_emission_scale;
 
   dst_settings->adaptive_sampling_settings.enable            = settings->adaptive_sampling_settings.enable;
   dst_settings->adaptive_sampling_settings.max_sampling_rate = settings->adaptive_sampling_settings.max_sampling_rate;

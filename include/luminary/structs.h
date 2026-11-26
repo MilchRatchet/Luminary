@@ -76,6 +76,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   float region_width;
   float region_height;
   float russian_roulette_threshold;
+  float geometry_emission_scale;
 } typedef LuminaryRendererSettings;
 
 LUMINARY_API struct LuminaryDeviceInfo {
