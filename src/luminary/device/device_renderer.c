@@ -311,6 +311,15 @@ static LuminaryResult _device_renderer_queue_debug_pass(DeviceRenderer* renderer
   return _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG, launch_id);
 }
 
+static LuminaryResult _device_renderer_queue_continue_callback(
+  DeviceRenderer* renderer, Device* device, DeviceRenderCallbackData* callback_data) {
+  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, renderer->stream));
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
+  CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, callback_data));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device* device) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
@@ -370,17 +379,33 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   // Setup work
   ////////////////////////////////////////////////////////////////////
 
+  bool debug_pass;
+  switch (renderer->args.shading_mode) {
+    case LUMINARY_SHADING_MODE_ALBEDO:
+    case LUMINARY_SHADING_MODE_DEPTH:
+    case LUMINARY_SHADING_MODE_NORMAL:
+    case LUMINARY_SHADING_MODE_IDENTIFICATION:
+    case LUMINARY_SHADING_MODE_LIGHTS:
+      debug_pass = true;
+      break;
+    default:
+      debug_pass = false;
+      break;
+  }
+
   const uint32_t pass_id      = renderer->pass_id;
+  const bool single_pass      = debug_pass || renderer->args.max_depth == 0;
   const bool starts_pass_pair = (pass_id & 1u) == 0;
-  if (starts_pass_pair == false && pass_id > 1 && *renderer->work_pending == 0) {
+  const bool check_pending    = single_pass ? pass_id > 0 : (starts_pass_pair == false && pass_id > 1);
+  if (check_pending && *renderer->work_pending == 0) {
     __FAILURE_HANDLE(_device_renderer_queue_adaptive_sampling_update(renderer, device, shared_callback_data));
 
     if (allow_gbuffer_meta_query && device->gbuffer_meta_state == GBUFFER_META_STATE_NOT_READY) {
       __FAILURE_HANDLE(device_query_gbuffer_meta(device));
     }
 
-    CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], renderer->stream));
-    CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, renderer->time_end[event_id], CU_EVENT_WAIT_DEFAULT));
+    CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, renderer->stream));
+    CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
     CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_finished_func, shared_callback_data));
     CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, shared_callback_data));
 
@@ -391,7 +416,9 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
     return LUMINARY_SUCCESS;
   }
 
-  uint32_t launch_id = starts_pass_pair ? 0 : 1;
+  const bool creates_tasks    = single_pass || starts_pass_pair;
+  const bool collects_results = single_pass || starts_pass_pair == false;
+  uint32_t launch_id          = creates_tasks ? 0 : 1;
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->manager_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(renderer->stream, renderer->manager_ready, CU_EVENT_WAIT_DEFAULT));
@@ -400,38 +427,38 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
     __FAILURE_HANDLE(_device_renderer_queue_sample_start(renderer, device, event_id));
   }
 
-  if (starts_pass_pair) {
+  if (creates_tasks) {
     const CUDAKernelType create_tasks =
       renderer->sample_allocation.stage_id > 0 ? CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING : CUDA_KERNEL_TYPE_TASKS_CREATE;
     __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, create_tasks, &launch_id));
   }
 
-  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, renderer->stream));
-  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
-  CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_continue_func, shared_callback_data));
-
-  switch (renderer->args.shading_mode) {
-    case LUMINARY_SHADING_MODE_ALBEDO:
-    case LUMINARY_SHADING_MODE_DEPTH:
-    case LUMINARY_SHADING_MODE_NORMAL:
-    case LUMINARY_SHADING_MODE_IDENTIFICATION:
-    case LUMINARY_SHADING_MODE_LIGHTS:
-      __FAILURE_HANDLE(_device_renderer_queue_debug_pass(renderer, device, &launch_id));
-      break;
-    default:
-      __FAILURE_HANDLE(_device_renderer_queue_main_pass(renderer, device, &launch_id));
-      break;
+  if (single_pass == false) {
+    __FAILURE_HANDLE(_device_renderer_queue_continue_callback(renderer, device, shared_callback_data));
   }
 
-  if (starts_pass_pair == false) {
+  if (debug_pass) {
+    __FAILURE_HANDLE(_device_renderer_queue_debug_pass(renderer, device, &launch_id));
+  }
+  else {
+    __FAILURE_HANDLE(_device_renderer_queue_main_pass(renderer, device, &launch_id));
+  }
+
+  if (collects_results) {
     const CUDAKernelType collect_results = (renderer->sample_allocation.stage_id == 0 && _device_renderer_is_first_sample(renderer))
                                              ? CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE
                                              : CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS;
     __FAILURE_HANDLE(device_memset(device->work_buffers->task_work_pending, 0, 0, sizeof(uint32_t), renderer->stream));
     __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, collect_results, &launch_id));
+    CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], renderer->stream));
     __FAILURE_HANDLE(
       device_download(renderer->work_pending, device->work_buffers->task_work_pending, 0, sizeof(uint32_t), renderer->stream));
   }
+
+  if (single_pass) {
+    __FAILURE_HANDLE(_device_renderer_queue_continue_callback(renderer, device, shared_callback_data));
+  }
+
   renderer->pass_id++;
 
   ////////////////////////////////////////////////////////////////////
