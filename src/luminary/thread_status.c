@@ -1,4 +1,5 @@
 #include "internal_error.h"
+#include "internal_walltime.h"
 #include "utils.h"
 
 // TODO: Use timespec_get and timespec_getres instead.
@@ -106,7 +107,9 @@ LuminaryResult thread_status_get_time(ThreadStatus* thread_status, double* time)
 LuminaryResult thread_status_stop(ThreadStatus* thread_status) {
   __CHECK_NULL_ARGUMENT(thread_status);
 
-  thread_status->time = (thread_status->time_point != 0) ? _thread_status_get_time_diff(thread_status->time_point, _thread_status_get_time()) : 0.0f;
+  const uint64_t current_time = _thread_status_get_time();
+
+  thread_status->time = (thread_status->time_point != 0) ? _thread_status_get_time_diff(thread_status->time_point, current_time) : 0.0f;
 
   thread_status->time_point = 0;
   thread_status->string     = (const char*) 0;
@@ -129,4 +132,8 @@ LuminaryResult _thread_status_get_timestamp(uint64_t* time) {
   *time = _thread_status_get_time();
 
   return LUMINARY_SUCCESS;
+}
+
+double _thread_status_get_elapsed_time(uint64_t start) {
+  return (start != 0) ? _thread_status_get_time_diff(start, _thread_status_get_time()) : 0.0;
 }

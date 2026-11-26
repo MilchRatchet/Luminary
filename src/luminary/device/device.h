@@ -86,7 +86,7 @@ struct Device {
   bool exit_requested;
   bool optix_callback_error;
   bool is_main_device;
-  bool state_abort;
+  _Atomic bool state_abort;
   CUdevice cuda_device;
   CUcontext cuda_ctx;
   CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
@@ -132,7 +132,7 @@ struct DeviceRegisterCallbackFuncs {
 void _device_init(void);
 void _device_shutdown(void);
 
-LuminaryResult device_create(Device** device, uint32_t index);
+LuminaryResult device_create(Device** device, uint32_t index, uint64_t host_id);
 LuminaryResult device_register_as_main(Device* device);
 LuminaryResult device_unregister_as_main(Device* device);
 LuminaryResult device_set_enable(Device* device, bool enable);
@@ -186,7 +186,6 @@ LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackDat
 LuminaryResult device_free_result_sharing_entries(Device* device, DeviceResultInterface* interface);
 LuminaryResult device_handle_result_sharing(Device* device, DeviceResultInterface* interface);
 LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32_t* recommended_count);
-LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
 LuminaryResult device_query_gbuffer_meta(Device* device);
 LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, GBufferMetaData* data);

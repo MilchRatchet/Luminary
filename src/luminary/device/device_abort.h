@@ -13,6 +13,7 @@ struct DeviceAbortDeviceBufferPtrs {
 struct DeviceAbort {
   STAGING uint32_t* staging_buffer;
   DEVICE uint32_t* device_buffer;
+  CUevent flag_cleared;
 } typedef DeviceAbort;
 
 DEVICE_CTX_FUNC LuminaryResult device_abort_create(DeviceAbort** abort);

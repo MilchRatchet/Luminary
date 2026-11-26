@@ -1,6 +1,7 @@
 #include "device.h"
 
 #include <optix_function_table_definition.h>
+#include <stdatomic.h>
 
 #include "camera.h"
 #include "cloud.h"
@@ -15,10 +16,6 @@
 #include "sky.h"
 
 static _Atomic uint64_t _device_init_reference_count = 0;
-
-#ifdef CUDA_STALL_VALIDATION
-ThreadStatus* __cuda_stall_validation_macro_walltime;
-#endif
 
 #define DEVICE_ASSERT_AVAILABLE                    \
   {                                                \
@@ -56,10 +53,6 @@ void _device_init(void) {
   info_message("Initialized OptiX %s", LUMINARY_OPTIX_VERSION);
 
   _device_memory_init();
-
-#ifdef CUDA_STALL_VALIDATION
-  thread_status_create(&__cuda_stall_validation_macro_walltime);
-#endif
 }
 
 void _device_shutdown(void) {
@@ -67,10 +60,6 @@ void _device_shutdown(void) {
 
   if (previous_reference_count > 1)
     return;
-
-#ifdef CUDA_STALL_VALIDATION
-  thread_status_destroy(&__cuda_stall_validation_macro_walltime);
-#endif
 
   _device_memory_shutdown();
 }
@@ -417,12 +406,13 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 // External API implementation
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult device_create(Device** _device, uint32_t index) {
+LuminaryResult device_create(Device** _device, uint32_t index, uint64_t host_id) {
   __CHECK_NULL_ARGUMENT(_device);
 
   Device* device;
   __FAILURE_HANDLE(host_malloc(&device, sizeof(Device)));
   memset(device, 0, sizeof(Device));
+  device->state_abort = false;
 
   device->index                = index;
   device->optix_callback_error = false;
@@ -493,7 +483,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_embedded_data_create(&device->embedded_data));
   __FAILURE_HANDLE(device_work_buffers_create(&device->work_buffers));
-  __FAILURE_HANDLE(device_renderer_create(&device->renderer));
+  __FAILURE_HANDLE(device_renderer_create(&device->renderer, device, host_id));
   __FAILURE_HANDLE(device_output_create(&device->output));
   __FAILURE_HANDLE(device_post_create(&device->post));
   __FAILURE_HANDLE(device_abort_create(&device->abort));
@@ -739,34 +729,33 @@ LuminaryResult device_update_dynamic_const_mem(
   // have completed. If the abort flag would use a memset, then that one would stall until all kernels have completed. Hence
   // it is mandatory that the renderer NEVER queues any host to device memcpys.
 
-  CUDA_FAILURE_HANDLE(
-    cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), 0, 1, device->stream_main));
+  const CUstream stream = device->renderer->stream;
+  CUDA_FAILURE_HANDLE(cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), 0, 1, stream));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.undersampling), device->undersampling_state, 1,
-    device->stream_main));
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.undersampling), device->undersampling_state, 1, stream));
 
   const CUdeviceptr stage_sample_offsets_ptr =
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.stage_sample_offsets);
   for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
     const CUdeviceptr dst = stage_sample_offsets_ptr + sizeof(uint32_t) * stage_id;
-    CUDA_FAILURE_HANDLE(cuMemsetD32Async(dst, sample_allocation.stage_sample_offsets[stage_id], 1, device->stream_main));
+    CUDA_FAILURE_HANDLE(cuMemsetD32Async(dst, sample_allocation.stage_sample_offsets[stage_id], 1, stream));
   }
 
   CUDA_FAILURE_HANDLE(cuMemsetD32Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.upper_bound_tasks_per_sample),
-    sample_allocation.upper_bound_tasks_per_sample, 1, device->stream_main));
+    sample_allocation.upper_bound_tasks_per_sample, 1, stream));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.stage_id), sample_allocation.stage_id, 1,
-    device->stream_main));
+    stream));
   CUDA_FAILURE_HANDLE(cuMemsetD8Async(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_allocation.num_samples), sample_allocation.num_samples,
-    1, device->stream_main));
+    1, stream));
 
   const CUdeviceptr num_stage_executions_ptr =
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.adaptive_sampling_accumulated_stages);
   for (uint32_t stage_id = 0; stage_id < ADAPTIVE_SAMPLER_NUM_STAGES + 1; stage_id++) {
     const CUdeviceptr dst = num_stage_executions_ptr + sizeof(uint32_t) * stage_id;
-    CUDA_FAILURE_HANDLE(cuMemsetD32Async(dst, num_stage_executions[stage_id], 1, device->stream_main));
+    CUDA_FAILURE_HANDLE(cuMemsetD32Async(dst, num_stage_executions[stage_id], 1, stream));
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -784,8 +773,8 @@ LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id)
   device->constant_memory->data.state.tile_id                                                                 = tile_id;
   device->constant_memory->staging_buffers[device->constant_memory->current_staging_buffer_id]->state.tile_id = tile_id;
 
-  CUDA_FAILURE_HANDLE(
-    cuMemsetD32Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.tile_id), tile_id, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.tile_id), tile_id, 1, device->renderer->stream));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -803,7 +792,7 @@ LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth) {
   device->constant_memory->staging_buffers[device->constant_memory->current_staging_buffer_id]->state.depth = depth;
 
   CUDA_FAILURE_HANDLE(
-    cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), depth, 1, device->stream_main));
+    cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), depth, 1, device->renderer->stream));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1442,12 +1431,10 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
   device->gbuffer_meta_state = GBUFFER_META_STATE_NOT_READY;
 
   __FAILURE_HANDLE(device_constant_memory_manager_ensure_synced(device->constant_memory, device, device->stream_main));
-  __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer, args));
-  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
-  return LUMINARY_SUCCESS;
+  return device_renderer_start(device->renderer, args);
 }
 
 LuminaryResult device_validate_render_callback(Device* device, DeviceRenderCallbackData* callback_data, bool* is_valid) {
@@ -1548,13 +1535,7 @@ LuminaryResult device_continue_render(Device* device) {
 
   DEVICE_ASSERT_AVAILABLE
 
-  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
-  __FAILURE_HANDLE(device_renderer_continue(device->renderer, device));
-
-  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
-
-  return LUMINARY_SUCCESS;
+  return device_renderer_continue(device->renderer);
 }
 
 LuminaryResult device_update_render_time(Device* device, DeviceRenderCallbackData* callback_data) {
@@ -1626,25 +1607,6 @@ LuminaryResult device_get_recommended_sample_queue_counts(Device* device, uint32
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_set_abort(Device* device) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  DEVICE_ASSERT_AVAILABLE
-
-  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
-  __FAILURE_HANDLE(device_abort_set(device->abort, device, true));
-
-  device->state_abort = true;
-
-  // Make sure that we don't overwrite data while a output is in flight.
-  __FAILURE_HANDLE(device_output_wait_for_completion(device->output, device->stream_main));
-
-  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_unset_abort(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -1682,9 +1644,9 @@ LuminaryResult device_query_gbuffer_meta(Device* device) {
   const uint16_t height = constant_memory->settings.height >> (constant_memory->settings.supersampling + 1);
 
   __FAILURE_HANDLE(device_download(
-    device->gbuffer_meta_dst, device->work_buffers->gbuffer_meta, 0, sizeof(GBufferMetaData) * width * height, device->stream_main));
+    device->gbuffer_meta_dst, device->work_buffers->gbuffer_meta, 0, sizeof(GBufferMetaData) * width * height, device->renderer->stream));
 
-  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_gbuffer_meta, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_gbuffer_meta, device->renderer->stream));
   device->gbuffer_meta_state = GBUFFER_META_STATE_QUEUED;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1739,6 +1701,8 @@ LuminaryResult device_get_gbuffer_meta(Device* device, uint16_t x, uint16_t y, G
 LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(*device);
+
+  __FAILURE_HANDLE(device_renderer_shutdown((*device)->renderer));
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent((*device)->cuda_ctx));
   CUDA_FAILURE_HANDLE(cuCtxSynchronize());

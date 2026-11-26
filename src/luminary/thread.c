@@ -36,7 +36,7 @@ LuminaryResult thread_create(Thread** _thread) {
   return LUMINARY_SUCCESS;
 }
 
-int _thread_main(struct ThreadMainArgs* args) {
+static int _thread_main(struct ThreadMainArgs* args) {
   args->self->result = _host_memory_local_init();
   if (args->self->result != LUMINARY_SUCCESS)
     return 1;

@@ -299,7 +299,7 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   const uint32_t max_current_resident_tasks_per_thread = min(tasks_per_thread, pixels_per_thread);
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
-    kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
+    kernel->pipeline, device->renderer->stream, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
     MAX_THREADS_PER_BLOCK, device->properties.optimal_block_count, max_current_resident_tasks_per_thread));
 
   return LUMINARY_SUCCESS;

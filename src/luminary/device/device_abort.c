@@ -8,8 +8,11 @@ LuminaryResult device_abort_create(DeviceAbort** abort) {
 
   __FAILURE_HANDLE(host_malloc(abort, sizeof(DeviceAbort)));
 
-  __FAILURE_HANDLE(device_malloc_staging(&(*abort)->staging_buffer, sizeof(uint32_t), DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
+  __FAILURE_HANDLE(device_malloc_staging(&(*abort)->staging_buffer, 2 * sizeof(uint32_t), DEVICE_MEMORY_STAGING_FLAG_PCIE_TRANSFER_ONLY));
+  (*abort)->staging_buffer[0] = 0;
+  (*abort)->staging_buffer[1] = UINT32_MAX;
   __FAILURE_HANDLE(device_malloc(&(*abort)->device_buffer, sizeof(uint32_t)));
+  CUDA_FAILURE_HANDLE(cuEventCreate(&(*abort)->flag_cleared, CU_EVENT_DISABLE_TIMING));
 
   return LUMINARY_SUCCESS;
 }
@@ -17,24 +20,15 @@ LuminaryResult device_abort_create(DeviceAbort** abort) {
 LuminaryResult device_abort_set(DeviceAbort* abort, Device* device, bool set_abort) {
   __CHECK_NULL_ARGUMENT(abort);
 
-  if (set_abort == false) {
-    // We have to wait for the upload to finish, otherwise it is in theory possible that the unset abort upload happens before the set abort
-    // upload.
-    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_abort));
-
-    // Only main device needs to actually have finished aborting.
-    if (device->is_main_device)
-      CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
-  }
-
-  *(abort->staging_buffer) = (set_abort) ? 0xFFFFFFFF : 0;
-  CUstream stream          = (set_abort) ? device->stream_abort : device->stream_main;
-
-  __FAILURE_HANDLE(device_upload(abort->device_buffer, abort->staging_buffer, 0, sizeof(uint32_t), stream));
-
-  // This is a trick to make the CUDA driver submit the commandbuffer containing the upload immediately.
-  if (set_abort == false)
+  if (set_abort) {
+    CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_abort, abort->flag_cleared, CU_EVENT_WAIT_DEFAULT));
+    __FAILURE_HANDLE(device_upload(abort->device_buffer, abort->staging_buffer + 1, 0, sizeof(uint32_t), device->stream_abort));
     cuStreamQuery(device->stream_abort);
+  }
+  else {
+    __FAILURE_HANDLE(device_upload(abort->device_buffer, abort->staging_buffer, 0, sizeof(uint32_t), device->stream_main));
+    CUDA_FAILURE_HANDLE(cuEventRecord(abort->flag_cleared, device->stream_main));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -51,6 +45,7 @@ LuminaryResult device_abort_get_ptrs(DeviceAbort* abort, DeviceAbortDeviceBuffer
 LuminaryResult device_abort_destroy(DeviceAbort** abort) {
   __CHECK_NULL_ARGUMENT(abort);
 
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*abort)->flag_cleared));
   __FAILURE_HANDLE(device_free(&(*abort)->device_buffer));
   __FAILURE_HANDLE(device_free_staging(&(*abort)->staging_buffer));
 

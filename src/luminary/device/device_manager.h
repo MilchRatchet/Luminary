@@ -20,7 +20,7 @@ struct DeviceManagerCreateInfo {
 
 struct DeviceManager {
   Host* host;
-  bool is_shutdown;
+  _Atomic bool is_shutdown;
   Scene* scene_device;
   ARRAY Device** devices;
   uint32_t main_device_index;

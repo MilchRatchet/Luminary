@@ -5,7 +5,7 @@
 #include "device_utils.h"
 #include "kernel.h"
 #include "optix_kernel.h"
-#include "spinlock.h"
+#include "thread.h"
 
 // #define DEVICE_RENDERER_DO_PER_KERNEL_TIMING
 
@@ -76,6 +76,16 @@ enum DeviceRendererStatusFlag {
 } typedef DeviceRendererStatusFlag;
 
 struct DeviceRenderer {
+  Device* device;
+  Thread* thread;
+  Queue* commands;
+  Queue* replies;
+  uint64_t host_id;
+  CUstream stream;
+  CUevent manager_ready;
+  CUevent renderer_ready;
+  CUevent abort_flag_uploaded;
+  CUevent abort_complete;
   DeviceSampleAllocation sample_allocation;
   uint32_t executed_aggregate_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   DeviceRendererStatusFlags status_flags;
@@ -88,6 +98,7 @@ struct DeviceRenderer {
   DeviceCommonCallbackData common_callback_data;
   uint64_t render_id;
   DeviceRenderCallbackData callback_data[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
+  uint32_t callback_id;
   uint32_t event_id;
   uint32_t timing_event_id;
   CUevent time_start[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
@@ -118,12 +129,14 @@ struct DeviceRendererQueueArgs {
   ShadingMode shading_mode;
 } typedef DeviceRendererQueueArgs;
 
-DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer, Device* device, uint64_t host_id);
 LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceRenderCallbackData* data, bool* is_valid);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(
   DeviceRenderer* renderer, CUhostFn callback_continue_func, CUhostFn callback_finished_func, DeviceCommonCallbackData callback_data);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_continue(DeviceRenderer* renderer, Device* device);
+LuminaryResult device_renderer_start(DeviceRenderer* renderer, const DeviceRendererQueueArgs* args);
+LuminaryResult device_renderer_continue(DeviceRenderer* renderer);
+LuminaryResult device_renderer_request_abort(DeviceRenderer* renderer);
+LuminaryResult device_renderer_wait_for_abort_submission(DeviceRenderer* renderer);
 LuminaryResult device_renderer_finish_iteration(DeviceRenderer* renderer, bool is_undersampling);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint32_t target_event_id);
 LuminaryResult device_renderer_allocate_sample(DeviceRenderer* renderer, AdaptiveSampler* sampler);

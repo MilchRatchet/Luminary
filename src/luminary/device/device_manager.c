@@ -294,13 +294,12 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(DeviceMana
   __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(scene, &flags));
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
-    // We will override rendering related data, we need to do this synchronously so the stale
-    // render kernels don't read crap and crash.
-    // We unset the abort later just before we start rendering again to hide latency coming from the abort procedure.
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-      Device* device = device_manager->devices[device_id];
+      __FAILURE_HANDLE_CRITICAL(device_renderer_request_abort(device_manager->devices[device_id]->renderer));
+    }
 
-      __FAILURE_HANDLE_CRITICAL(device_set_abort(device));
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      __FAILURE_HANDLE_CRITICAL(device_renderer_wait_for_abort_submission(device_manager->devices[device_id]->renderer));
     }
   }
 
@@ -819,7 +818,7 @@ static LuminaryResult _device_manager_init(DeviceManager* device_manager, Device
       continue;
 
     Device* device;
-    __FAILURE_HANDLE(device_create(&device, device_id));
+    __FAILURE_HANDLE(device_create(&device, device_id, device_manager->host->id));
 
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
@@ -864,7 +863,8 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(host_malloc(&device_manager, sizeof(DeviceManager)));
   memset(device_manager, 0, sizeof(DeviceManager));
 
-  device_manager->host = host;
+  device_manager->host        = host;
+  device_manager->is_shutdown = false;
 
   ////////////////////////////////////////////////////////////////////
   // Create exposed members
@@ -933,10 +933,11 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
 
   // TODO: This must be guarded with a mutex for when the device manager is shutting down.
 
-  bool cannot_execute           = device_manager->is_shutdown;
-  bool device_thread_is_running = device_manager->is_shutdown == false;
+  const bool is_shutdown        = device_manager->is_shutdown;
+  bool cannot_execute           = is_shutdown;
+  bool device_thread_is_running = is_shutdown == false;
 
-  if (device_manager->is_shutdown == false) {
+  if (is_shutdown == false) {
     __FAILURE_HANDLE(queue_worker_is_running(device_manager->queue_worker_main, &device_thread_is_running));
 
     cannot_execute |= (device_thread_is_running == false) && (entry->queuer_cannot_execute == true);
@@ -976,8 +977,11 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_manager_shutdown(DeviceManager* device_manager) {
+static LuminaryResult _device_manager_shutdown_renderers(DeviceManager* device_manager, void* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
+  LUM_UNUSED(args);
+
+  device_manager->is_shutdown = true;
 
   uint32_t num_devices;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
@@ -988,12 +992,20 @@ LuminaryResult device_manager_shutdown(DeviceManager* device_manager) {
     __FAILURE_HANDLE(device_renderer_shutdown(device->renderer));
   }
 
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_shutdown(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
   bool device_thread_is_running;
   __FAILURE_HANDLE(queue_worker_is_running(device_manager->queue_worker_main, &device_thread_is_running));
 
-  if (!device_thread_is_running)
+  if (device_thread_is_running == false)
     return LUMINARY_SUCCESS;
 
+  QueueEntry entry = {.name = "Shutdown device renderers", .function = (QueueEntryFunction) _device_manager_shutdown_renderers};
+  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
   __FAILURE_HANDLE(queue_set_is_blocking(device_manager->work_queue, false));
   __FAILURE_HANDLE(queue_worker_shutdown(device_manager->queue_worker_main));
 
@@ -1170,16 +1182,10 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(*device_manager);
 
-  (*device_manager)->is_shutdown = true;
+  __FAILURE_HANDLE(device_manager_shutdown(*device_manager));
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
-
-  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_set_abort((*device_manager)->devices[device_id]));
-  }
-
-  __FAILURE_HANDLE(device_manager_shutdown(*device_manager));
 
   __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
