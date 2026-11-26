@@ -46,17 +46,6 @@ LuminaryResult device_renderer_create(DeviceRenderer** renderer, Device* device,
   for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_start[event_id], 0));
     __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_end[event_id], 0));
-
-#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-    for (uint32_t timer_id = 0; timer_id < DEVICE_RENDERER_MAX_TIMED_KERNELS; timer_id++) {
-      memset(&(*renderer)->kernel_times[event_id].kernels[timer_id], 0, sizeof(DeviceRendererKernelTimer));
-
-      for (uint32_t tile_id = 0; tile_id < DEVICE_RENDERER_MAX_TIMED_TILES; tile_id++) {
-        __FAILURE_HANDLE(cuEventCreate(&(*renderer)->kernel_times[event_id].kernels[timer_id].time_start[tile_id], 0));
-        __FAILURE_HANDLE(cuEventCreate(&(*renderer)->kernel_times[event_id].kernels[timer_id].time_end[tile_id], 0));
-      }
-    }
-#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
   }
 
   (*renderer)->device  = device;
@@ -112,77 +101,80 @@ static LuminaryResult _device_renderer_init_new_render(DeviceRenderer* renderer,
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_queue_cuda_kernel(
-  DeviceRenderer* renderer, Device* device, CUDAKernelType type, uint32_t* launch_id) {
+#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
+static LuminaryResult _device_renderer_collect_kernel_timing(DeviceRendererKernelTimer* timer, uint32_t slot_id) {
+  DeviceRendererKernelTimingSlot* slot = timer->slots + slot_id;
+  if (slot->pending) {
+    float elapsed_ms;
+    CUDA_FAILURE_HANDLE(cuEventElapsedTime(&elapsed_ms, slot->start, slot->end));
+    timer->total_ms += elapsed_ms;
+    slot->pending = false;
+  }
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_renderer_start_kernel_timing(
+  DeviceRenderer* renderer, uint32_t kernel_id, const char* name, DeviceRendererKernelTimingSlot** slot) {
+  const uint32_t event_id          = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
+  DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + kernel_id;
+  const uint32_t slot_id           = renderer->pass_id % DEVICE_RENDERER_KERNEL_TIMING_SLOTS;
+  *slot                            = timer->slots + slot_id;
+  timer->name                      = name;
+
+  __FAILURE_HANDLE(_device_renderer_collect_kernel_timing(timer, slot_id));
+  if ((*slot)->start == 0) {
+    CUDA_FAILURE_HANDLE(cuEventCreate(&(*slot)->start, 0));
+    CUDA_FAILURE_HANDLE(cuEventCreate(&(*slot)->end, 0));
+  }
+  CUDA_FAILURE_HANDLE(cuEventRecord((*slot)->start, renderer->stream));
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_renderer_end_kernel_timing(DeviceRenderer* renderer, DeviceRendererKernelTimingSlot* slot) {
+  CUDA_FAILURE_HANDLE(cuEventRecord(slot->end, renderer->stream));
+  slot->pending = true;
+  return LUMINARY_SUCCESS;
+}
+#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
+
+static LuminaryResult _device_renderer_queue_cuda_kernel(DeviceRenderer* renderer, Device* device, CUDAKernelType type) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(launch_id);
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
-
-  if (*launch_id < DEVICE_RENDERER_MAX_TIMED_KERNELS && renderer->pass_id < DEVICE_RENDERER_MAX_TIMED_TILES) {
-    DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + *launch_id;
-
-    __FAILURE_HANDLE(kernel_get_name(device->cuda_kernels[type], &timer->name));
-
-    if (timer->num_queued_tile_executions < DEVICE_RENDERER_MAX_TIMED_TILES) {
-      CUDA_FAILURE_HANDLE(cuEventRecord(timer->time_start[timer->num_queued_tile_executions], renderer->stream));
-    }
-  }
+  const char* name;
+  DeviceRendererKernelTimingSlot* slot;
+  __FAILURE_HANDLE(kernel_get_name(device->cuda_kernels[type], &name));
+  __FAILURE_HANDLE(_device_renderer_start_kernel_timing(renderer, type, name, &slot));
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
   __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[type], renderer->stream));
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  if (*launch_id < DEVICE_RENDERER_MAX_TIMED_KERNELS && renderer->pass_id < DEVICE_RENDERER_MAX_TIMED_TILES) {
-    DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + *launch_id;
-
-    if (timer->num_queued_tile_executions < DEVICE_RENDERER_MAX_TIMED_TILES) {
-      CUDA_FAILURE_HANDLE(cuEventRecord(timer->time_end[timer->num_queued_tile_executions++], renderer->stream));
-    }
-  }
+  __FAILURE_HANDLE(_device_renderer_end_kernel_timing(renderer, slot));
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
-
-  *launch_id = *launch_id + 1;
-
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_queue_optix_kernel(
-  DeviceRenderer* renderer, Device* device, OptixKernelType type, uint32_t* launch_id) {
+static LuminaryResult _device_renderer_queue_optix_kernel(DeviceRenderer* renderer, Device* device, OptixKernelType type) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(launch_id);
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
-
-  if (*launch_id < DEVICE_RENDERER_MAX_TIMED_KERNELS && renderer->pass_id < DEVICE_RENDERER_MAX_TIMED_TILES) {
-    DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + *launch_id;
-
-    timer->name = "Optix Kernel";
-
-    if (timer->num_queued_tile_executions < DEVICE_RENDERER_MAX_TIMED_TILES) {
-      CUDA_FAILURE_HANDLE(cuEventRecord(timer->time_start[timer->num_queued_tile_executions], renderer->stream));
-    }
-  }
+  static const char* const names[OPTIX_KERNEL_TYPE_COUNT] = {
+    [OPTIX_KERNEL_TYPE_RAYTRACE]      = "OptiX raytrace",
+    [OPTIX_KERNEL_TYPE_SHADOW]        = "OptiX shadow",
+    [OPTIX_KERNEL_TYPE_SHADOW_VOLUME] = "OptiX volume shadow",
+  };
+  DeviceRendererKernelTimingSlot* slot;
+  __FAILURE_HANDLE(_device_renderer_start_kernel_timing(renderer, CUDA_KERNEL_TYPE_COUNT + type, names[type], &slot));
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
   __FAILURE_HANDLE(optix_kernel_execute(device->optix_kernels[type], device));
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  if (*launch_id < DEVICE_RENDERER_MAX_TIMED_KERNELS && renderer->pass_id < DEVICE_RENDERER_MAX_TIMED_TILES) {
-    DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + *launch_id;
-
-    if (timer->num_queued_tile_executions < DEVICE_RENDERER_MAX_TIMED_TILES) {
-      CUDA_FAILURE_HANDLE(cuEventRecord(timer->time_end[timer->num_queued_tile_executions++], renderer->stream));
-    }
-  }
+  __FAILURE_HANDLE(_device_renderer_end_kernel_timing(renderer, slot));
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
-
-  *launch_id = *launch_id + 1;
-
   return LUMINARY_SUCCESS;
 }
 
@@ -243,72 +235,72 @@ static LuminaryResult _device_renderer_queue_sample_start(DeviceRenderer* render
   return device_update_dynamic_const_mem(device, renderer->sample_allocation, renderer->executed_aggregate_sample_counts);
 }
 
-static LuminaryResult _device_renderer_queue_main_pass(DeviceRenderer* renderer, Device* device, uint32_t* launch_id) {
+static LuminaryResult _device_renderer_queue_main_pass(DeviceRenderer* renderer, Device* device) {
   const DeviceRendererQueueArgs* args = &renderer->args;
 
-  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_RAYTRACE, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_RAYTRACE));
 
   if (args->render_volumes) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_INSCATTERING, launch_id));
-    __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_SHADOW_VOLUME, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_INSCATTERING));
+    __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_SHADOW_VOLUME));
   }
 
-  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS));
 
   if (args->render_clouds) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS));
   }
 
   if (args->render_inscattering) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS));
   }
 
-  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT, launch_id));
-  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS));
 
   if (args->render_particles) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS));
   }
 
   if (args->render_ocean) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS));
   }
 
-  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_SHADOW, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_SHADOW));
 
   if (args->render_volumes && args->max_depth != 0) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_TASKS));
   }
 
   if (args->render_procedural_sky) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS));
   }
 
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_renderer_queue_debug_pass(DeviceRenderer* renderer, Device* device, uint32_t* launch_id) {
+static LuminaryResult _device_renderer_queue_debug_pass(DeviceRenderer* renderer, Device* device) {
   const DeviceRendererQueueArgs* args = &renderer->args;
 
-  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_RAYTRACE, launch_id));
-  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_optix_kernel(renderer, device, OPTIX_KERNEL_TYPE_RAYTRACE));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS));
 
   if (args->render_inscattering) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS));
   }
 
-  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT, launch_id));
-  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG, launch_id));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT));
+  __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG));
 
   if (args->render_ocean) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS_DEBUG, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_OCEAN_PROCESS_TASKS_DEBUG));
   }
 
   if (args->render_particles) {
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG, launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG));
   }
 
-  return _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG, launch_id);
+  return _device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG);
 }
 
 static LuminaryResult _device_renderer_queue_continue_callback(
@@ -365,7 +357,14 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
     shared_callback_data->render_event_id                  = renderer->event_id;
     shared_callback_data->adaptive_sampling_build_stage_id = ADAPTIVE_SAMPLING_STAGE_INVALID;
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-    renderer->kernel_times[event_id].num_kernel_launches = 0;
+    for (uint32_t kernel_id = 0; kernel_id < DEVICE_RENDERER_TIMED_KERNEL_TYPES; kernel_id++) {
+      DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + kernel_id;
+      timer->name                      = (const char*) 0;
+      timer->total_ms                  = 0.0;
+      for (uint32_t slot_id = 0; slot_id < DEVICE_RENDERER_KERNEL_TIMING_SLOTS; slot_id++) {
+        timer->slots[slot_id].pending = false;
+      }
+    }
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
   }
 
@@ -418,7 +417,6 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
 
   const bool creates_tasks    = single_pass || starts_pass_pair;
   const bool collects_results = single_pass || starts_pass_pair == false;
-  uint32_t launch_id          = creates_tasks ? 0 : 1;
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->manager_ready, device->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(renderer->stream, renderer->manager_ready, CU_EVENT_WAIT_DEFAULT));
@@ -430,7 +428,7 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   if (creates_tasks) {
     const CUDAKernelType create_tasks =
       renderer->sample_allocation.stage_id > 0 ? CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING : CUDA_KERNEL_TYPE_TASKS_CREATE;
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, create_tasks, &launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, create_tasks));
   }
 
   if (single_pass == false) {
@@ -438,10 +436,10 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   }
 
   if (debug_pass) {
-    __FAILURE_HANDLE(_device_renderer_queue_debug_pass(renderer, device, &launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_debug_pass(renderer, device));
   }
   else {
-    __FAILURE_HANDLE(_device_renderer_queue_main_pass(renderer, device, &launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_main_pass(renderer, device));
   }
 
   if (collects_results) {
@@ -449,7 +447,7 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
                                              ? CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS_FIRST_SAMPLE
                                              : CUDA_KERNEL_TYPE_ACCUMULATION_COLLECT_RESULTS;
     __FAILURE_HANDLE(device_memset(device->work_buffers->task_work_pending, 0, 0, sizeof(uint32_t), renderer->stream));
-    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, collect_results, &launch_id));
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, collect_results));
     CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], renderer->stream));
     __FAILURE_HANDLE(
       device_download(renderer->work_pending, device->work_buffers->task_work_pending, 0, sizeof(uint32_t), renderer->stream));
@@ -464,11 +462,6 @@ static LuminaryResult _device_renderer_continue(DeviceRenderer* renderer, Device
   ////////////////////////////////////////////////////////////////////
   // Exit
   ////////////////////////////////////////////////////////////////////
-
-#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  renderer->kernel_times[event_id].num_kernel_launches =
-    max(renderer->kernel_times[event_id].num_kernel_launches, min(launch_id, DEVICE_RENDERER_MAX_TIMED_KERNELS));
-#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->renderer_ready, renderer->stream));
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_main, renderer->renderer_ready, CU_EVENT_WAIT_DEFAULT));
@@ -508,36 +501,24 @@ LuminaryResult device_renderer_update_render_time(DeviceRenderer* renderer, uint
     CUDA_FAILURE_HANDLE(cuEventElapsedTime(&event_time, renderer->time_start[event_id], renderer->time_end[event_id]));
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-    const uint32_t num_kernel_launches = renderer->kernel_times[event_id].num_kernel_launches;
-
     info_message("[EventIdx: %05u] ------- Kernel Times -------", event_id);
 
-    float total_render_time = 0.0f;
+    double total_render_time = 0.0;
 
-    for (uint32_t launch_id = 0; launch_id < num_kernel_launches; launch_id++) {
-      float total_kernel_time = 0.0f;
+    for (uint32_t kernel_id = 0; kernel_id < DEVICE_RENDERER_TIMED_KERNEL_TYPES; kernel_id++) {
+      DeviceRendererKernelTimer* timer = renderer->kernel_times[event_id].kernels + kernel_id;
+      if (timer->name == (const char*) 0)
+        continue;
 
-      const uint32_t num_tiles = renderer->kernel_times[event_id].kernels[launch_id].num_queued_tile_executions;
-
-      for (uint32_t tile_id = 0; tile_id < num_tiles; tile_id++) {
-        float kernel_time;
-        CUDA_FAILURE_HANDLE(cuEventElapsedTime(
-          &kernel_time, renderer->kernel_times[event_id].kernels[launch_id].time_start[tile_id],
-          renderer->kernel_times[event_id].kernels[launch_id].time_end[tile_id]));
-
-        total_kernel_time += kernel_time;
+      for (uint32_t slot_id = 0; slot_id < DEVICE_RENDERER_KERNEL_TIMING_SLOTS; slot_id++) {
+        __FAILURE_HANDLE(_device_renderer_collect_kernel_timing(timer, slot_id));
       }
 
-      renderer->kernel_times[event_id].kernels[launch_id].num_queued_tile_executions = 0;
-
-      info_message(
-        "[LaunchIdx: %03u] %32s | %07.2fms (%05.2f%%)", launch_id, renderer->kernel_times[event_id].kernels[launch_id].name,
-        total_kernel_time, 100.0f * total_kernel_time / event_time);
-
-      total_render_time += total_kernel_time;
+      info_message("%32s | %07.2fms (%05.2f%%)", timer->name, timer->total_ms, 100.0 * timer->total_ms / event_time);
+      total_render_time += timer->total_ms;
     }
 
-    info_message("Total Time spent in Kernels: %07.2fms (%05.2f%%)", total_render_time, 100.0f * total_render_time / event_time);
+    info_message("Total Time spent in Kernels: %07.2fms (%05.2f%%)", total_render_time, 100.0 * total_render_time / event_time);
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
     // Convert from milliseconds to seconds.
@@ -691,15 +672,6 @@ static LuminaryResult _device_renderer_abort(DeviceRenderer* renderer, bool shut
     __FAILURE_HANDLE(device_output_wait_for_completion(device->output, device->stream_main));
     CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_callbacks));
   }
-
-#ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-  if ((renderer->status_flags & DEVICE_RENDERER_STATUS_FLAG_IN_PROGRESS) != 0) {
-    const uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
-    for (uint32_t launch_id = 0; launch_id < renderer->kernel_times[event_id].num_kernel_launches; launch_id++) {
-      renderer->kernel_times[event_id].kernels[launch_id].num_queued_tile_executions = 0;
-    }
-  }
-#endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
 
   renderer->status_flags = DEVICE_RENDERER_STATUS_FLAG_NONE;
 
@@ -869,10 +841,14 @@ LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
     __FAILURE_HANDLE(cuEventDestroy((*renderer)->time_end[event_id]));
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
-    for (uint32_t timer_id = 0; timer_id < DEVICE_RENDERER_MAX_TIMED_KERNELS; timer_id++) {
-      for (uint32_t tile_id = 0; tile_id < DEVICE_RENDERER_MAX_TIMED_TILES; tile_id++) {
-        __FAILURE_HANDLE(cuEventDestroy((*renderer)->kernel_times[event_id].kernels[timer_id].time_start[tile_id]));
-        __FAILURE_HANDLE(cuEventDestroy((*renderer)->kernel_times[event_id].kernels[timer_id].time_end[tile_id]));
+    for (uint32_t kernel_id = 0; kernel_id < DEVICE_RENDERER_TIMED_KERNEL_TYPES; kernel_id++) {
+      DeviceRendererKernelTimer* timer = (*renderer)->kernel_times[event_id].kernels + kernel_id;
+      for (uint32_t slot_id = 0; slot_id < DEVICE_RENDERER_KERNEL_TIMING_SLOTS; slot_id++) {
+        DeviceRendererKernelTimingSlot* slot = timer->slots + slot_id;
+        if (slot->start != 0) {
+          CUDA_FAILURE_HANDLE(cuEventDestroy(slot->start));
+          CUDA_FAILURE_HANDLE(cuEventDestroy(slot->end));
+        }
       }
     }
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */

@@ -28,19 +28,23 @@ struct DeviceRendererQueueArgs {
 
 #ifdef DEVICE_RENDERER_DO_PER_KERNEL_TIMING
 
-#define DEVICE_RENDERER_MAX_TIMED_KERNELS 256
-#define DEVICE_RENDERER_MAX_TIMED_TILES 128
+#define DEVICE_RENDERER_TIMED_KERNEL_TYPES (CUDA_KERNEL_TYPE_COUNT + OPTIX_KERNEL_TYPE_COUNT)
+#define DEVICE_RENDERER_KERNEL_TIMING_SLOTS 2
+
+struct DeviceRendererKernelTimingSlot {
+  CUevent start;
+  CUevent end;
+  bool pending;
+} typedef DeviceRendererKernelTimingSlot;
 
 struct DeviceRendererKernelTimer {
   const char* name;
-  CUevent time_start[DEVICE_RENDERER_MAX_TIMED_TILES];
-  CUevent time_end[DEVICE_RENDERER_MAX_TIMED_TILES];
-  uint32_t num_queued_tile_executions;
+  DeviceRendererKernelTimingSlot slots[DEVICE_RENDERER_KERNEL_TIMING_SLOTS];
+  double total_ms;
 } typedef DeviceRendererKernelTimer;
 
 struct DeviceRendererPerKernelTimings {
-  DeviceRendererKernelTimer kernels[DEVICE_RENDERER_MAX_TIMED_KERNELS];
-  uint32_t num_kernel_launches;
+  DeviceRendererKernelTimer kernels[DEVICE_RENDERER_TIMED_KERNEL_TYPES];
 } typedef DeviceRendererPerKernelTimings;
 
 #endif /* DEVICE_RENDERER_DO_PER_KERNEL_TIMING */
