@@ -248,6 +248,9 @@ LUMINARY_KERNEL void volume_process_tasks() {
     const TaskFlags flags              = throughput.flags;
     const DeviceTaskMediumStack medium = task_medium_load(task_base_address);
 
+    if (path_id_get_depth(task.path_id) >= device.state.max_depth)
+      continue;
+
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const VolumeType volume_type  = (VolumeType) medium_stack_volume_peek(medium, false);
@@ -277,6 +280,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     throughput.flags = new_state;
     task_throughput_store(dst_task_base_address, throughput);
     task_medium_store(dst_task_base_address, medium);
+    device.ptrs.task_result_live[throughput.results_index] = 1;
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;

@@ -45,8 +45,11 @@
 LUMINARY_KERNEL void tasks_create() {
   HANDLE_DEVICE_ABORT();
 
-  uint32_t task_count   = 0;
-  uint32_t result_count = 0;
+  DeviceTaskQueue queue = device.ptrs.task_queues[THREAD_ID];
+  if (queue.next_task == UINT32_MAX)
+    return;
+
+  uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
 
   const uint32_t undersampling_stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
   const uint32_t undersampling_iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
@@ -61,16 +64,18 @@ LUMINARY_KERNEL void tasks_create() {
   const uint32_t window_offset_x = (device.settings.window_x >> undersampling_stage) << undersampling_stage;
   const uint32_t window_offset_y = (device.settings.window_y >> undersampling_stage) << undersampling_stage;
 
-  const uint32_t num_threads    = NUM_THREADS;
-  const uint32_t tasks_per_tile = device.config.num_tasks_per_thread * num_threads;
-  const uint32_t start_pixel    = THREAD_ID + device.state.tile_id * tasks_per_tile;
-  const uint32_t end_pixel      = min(amount, start_pixel + tasks_per_tile);
+  const uint32_t num_threads = NUM_THREADS;
+  const uint32_t capacity    = device.config.num_tasks_per_thread;
+  const uint32_t task_end    = amount > THREAD_ID ? amount - THREAD_ID : 0;
+  uint32_t free_results      = (UINT32_MAX >> (32 - capacity)) & ~queue.occupied_results;
 
-  for (uint32_t pixel_id = start_pixel; pixel_id < end_pixel; pixel_id += num_threads) {
+  for (; queue.next_task < task_end && task_count < capacity && free_results != 0;
+       queue.next_task += min(num_threads, task_end - queue.next_task)) {
     HANDLE_DEVICE_ABORT();
 
-    uint16_t y = (uint16_t) (pixel_id / undersampling_width);
-    uint16_t x = (uint16_t) (pixel_id - y * undersampling_width);
+    const uint32_t pixel_id = queue.next_task + THREAD_ID;
+    uint16_t y              = (uint16_t) (pixel_id / undersampling_width);
+    uint16_t x              = (uint16_t) (pixel_id - y * undersampling_width);
 
     if (undersampling_scale > 1) {
       x *= undersampling_scale;
@@ -113,8 +118,11 @@ LUMINARY_KERNEL void tasks_create() {
     if (sample_id != 0 && ray_is_valid == false)
       continue;
 
-    const uint32_t thread_result_id         = result_count++;
+    const uint32_t thread_result_id         = __ffs(free_results) - 1;
     const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(thread_result_id, TASK_STATE_BUFFER_INDEX_RESULT);
+    free_results &= free_results - 1;
+    queue.occupied_results |= 1u << thread_result_id;
+    device.ptrs.task_result_live[task_result_base_address] = 0;
 
     ////////////////////////////////////////////////////////////////////
     // Task Result
@@ -188,30 +196,38 @@ LUMINARY_KERNEL void tasks_create() {
     task_medium_store(task_base_address, medium);
   }
 
-  device.ptrs.trace_counts[THREAD_ID]   = task_count;
-  device.ptrs.results_counts[THREAD_ID] = result_count;
+  if (queue.next_task == task_end)
+    queue.next_task = UINT32_MAX;
+
+  device.ptrs.trace_counts[THREAD_ID] = task_count;
+  device.ptrs.task_queues[THREAD_ID]  = queue;
 }
 
 LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
   HANDLE_DEVICE_ABORT();
 
-  uint32_t task_count   = 0;
-  uint32_t result_count = 0;
+  DeviceTaskQueue queue = device.ptrs.task_queues[THREAD_ID];
+  if (queue.next_task == UINT32_MAX)
+    return;
+
+  uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
 
   const uint32_t adaptive_sampling_width =
     (device.settings.window_width + (1u << ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG) - 1) >> ADAPTIVE_SAMPLING_BLOCK_SIZE_LOG;
 
   const uint32_t num_threads       = NUM_THREADS;
-  const uint32_t tasks_per_tile    = device.config.num_tasks_per_thread * num_threads;
+  const uint32_t capacity          = device.config.num_tasks_per_thread;
+  const uint32_t tasks_per_tile    = capacity * num_threads;
   const uint32_t tasks_per_subtile = (tasks_per_tile + WARP_SIZE - 1) >> WARP_SIZE_LOG;
+  const uint32_t amount            = device.state.sample_allocation.upper_bound_tasks_per_sample;
+  const uint32_t task_end          = amount > THREAD_ID ? amount - THREAD_ID : 0;
+  uint32_t free_results            = (UINT32_MAX >> (32 - capacity)) & ~queue.occupied_results;
 
-  const uint32_t task_id_offset = tasks_per_tile * device.state.tile_id;
-  const uint32_t task_id_start  = task_id_offset + THREAD_ID;
-  const uint32_t task_id_end    = min(task_id_offset + tasks_per_tile, device.state.sample_allocation.upper_bound_tasks_per_sample);
-
-  for (uint32_t task_id = task_id_start; task_id < task_id_end; task_id += num_threads) {
+  for (; queue.next_task < task_end && task_count < capacity && free_results != 0;
+       queue.next_task += min(num_threads, task_end - queue.next_task)) {
     HANDLE_DEVICE_ABORT();
 
+    const uint32_t task_id = queue.next_task + THREAD_ID;
     ////////////////////////////////////////////////////////////////////
     // Adaptive Sampling Block
     ////////////////////////////////////////////////////////////////////
@@ -275,8 +291,11 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
     if (sample_id != 0 && ray_is_valid == false)
       continue;
 
-    const uint32_t thread_result_id         = result_count++;
+    const uint32_t thread_result_id         = __ffs(free_results) - 1;
     const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(thread_result_id, TASK_STATE_BUFFER_INDEX_RESULT);
+    free_results &= free_results - 1;
+    queue.occupied_results |= 1u << thread_result_id;
+    device.ptrs.task_result_live[task_result_base_address] = 0;
 
     ////////////////////////////////////////////////////////////////////
     // Task Result
@@ -350,8 +369,11 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
     task_medium_store(task_base_address, medium);
   }
 
-  device.ptrs.trace_counts[THREAD_ID]   = task_count;
-  device.ptrs.results_counts[THREAD_ID] = result_count;
+  if (queue.next_task == task_end)
+    queue.next_task = UINT32_MAX;
+
+  device.ptrs.trace_counts[THREAD_ID] = task_count;
+  device.ptrs.task_queues[THREAD_ID]  = queue;
 }
 
 LUMINARY_KERNEL void sky_process_inscattering_events() {
@@ -447,6 +469,7 @@ LUMINARY_KERNEL void tasks_sort() {
 
       state = task_state_load(src_task_base_address);
       index = shading_task_index_from_instance_id(state.trace_result.handle.instance_id);
+      device.ptrs.task_result_live[state.throughput.results_index] = 0;
     }
 
     uint32_t dst_task_base_address;

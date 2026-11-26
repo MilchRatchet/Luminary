@@ -79,7 +79,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
       new_state &= ~(STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT);
     }
 
-    if (russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
+    if (path_id_get_depth(task.path_id) < device.state.max_depth && russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       RGBF record = record_unpack(throughput.record);
       record      = mul_color(record, bounce_info.weight);
 
@@ -94,9 +94,10 @@ LUMINARY_KERNEL void particle_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record        = record_pack(record);
-      bounce_throughput.results_index = throughput.results_index;
-      bounce_throughput.flags         = new_state;
+      bounce_throughput.record                               = record_pack(record);
+      bounce_throughput.results_index                        = throughput.results_index;
+      device.ptrs.task_result_live[throughput.results_index] = 1;
+      bounce_throughput.flags                                = new_state;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
 

@@ -145,7 +145,6 @@ LuminaryResult device_get_current_pixels_per_thread(Device* device, uint32_t* pi
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
 LuminaryResult device_update_dynamic_const_mem(
   Device* device, DeviceSampleAllocation sample_allocation, uint32_t num_stage_executions[ADAPTIVE_SAMPLER_NUM_STAGES + 1]);
-LuminaryResult device_update_tile_id_const_mem(Device* device, uint32_t tile_id);
 LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_add_mesh(Device* device, const Mesh* mesh);
 LuminaryResult device_update_instances(Device* device, const MeshInstanceManager* instance_manager);

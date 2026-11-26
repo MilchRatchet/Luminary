@@ -87,7 +87,8 @@ LuminaryResult device_work_buffers_update(DeviceWorkBuffers* buffers, const Devi
   }
 
   if (info->thread_count != buffers->allocated_thread_count) {
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->results_counts, sizeof(uint16_t) * info->thread_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_queues, sizeof(DeviceTaskQueue) * info->thread_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_work_pending, sizeof(uint32_t)));
     __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->trace_counts, sizeof(uint16_t) * info->thread_count));
     __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_counts, sizeof(uint16_t) * 5 * info->thread_count));
     __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_offsets, sizeof(uint16_t) * 5 * info->thread_count));
@@ -101,6 +102,7 @@ LuminaryResult device_work_buffers_update(DeviceWorkBuffers* buffers, const Devi
     __FAILURE_HANDLE(_BUFFER_ALLOC(
       buffers->task_direct_light, sizeof(DeviceTaskDirectLight) * info->task_count * TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT));
     __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_results, sizeof(DeviceTaskResult) * info->task_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_result_live, sizeof(uint8_t) * info->task_count));
 
     buffers->allocated_task_count = info->task_count;
     *buffers_have_changed         = true;
@@ -123,7 +125,9 @@ LuminaryResult device_work_buffers_get_ptrs(DeviceWorkBuffers* buffers, DeviceWo
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_states));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_direct_light));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_results));
-  __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, results_counts));
+  __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_queues));
+  __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_result_live));
+  __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_work_pending));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, trace_counts));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_counts));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_offsets));
@@ -147,7 +151,9 @@ LuminaryResult device_work_buffers_destroy(DeviceWorkBuffers** buffers) {
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_states));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_direct_light));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_results));
-  __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->results_counts));
+  __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_queues));
+  __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_result_live));
+  __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_work_pending));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->trace_counts));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_counts));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_offsets));

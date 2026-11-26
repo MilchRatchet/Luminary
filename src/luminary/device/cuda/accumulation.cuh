@@ -46,60 +46,65 @@ LUMINARY_FUNCTION bool accumulation_reduce_sample(RGBF value, const uint32_t ind
   return is_first_thread;
 }
 
-LUMINARY_KERNEL void accumulation_collect_results() {
+template <bool FIRST_SAMPLE>
+LUMINARY_FUNCTION void accumulation_collect_finished_paths() {
   HANDLE_DEVICE_ABORT();
 
-  const int results_count = device.ptrs.results_counts[THREAD_ID];
+  DeviceTaskQueue queue      = device.ptrs.task_queues[THREAD_ID];
+  uint32_t surviving_results = 0;
 
-  LUMINARY_ASSUME(results_count <= MAXIMUM_TASKS_PER_THREAD);
-
-  for (int result_id = 0; result_id < results_count; result_id++) {
+  for (uint32_t remaining = queue.occupied_results; remaining != 0; remaining &= remaining - 1) {
+    const uint32_t result_id                = __ffs(remaining) - 1;
     const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(result_id, TASK_STATE_BUFFER_INDEX_RESULT);
+
+    if (device.ptrs.task_result_live[task_result_base_address]) {
+      surviving_results |= 1u << result_id;
+      continue;
+    }
 
     const DeviceTaskResult result = task_result_load(task_result_base_address);
 
-    RGBF first_moment;
-    float second_moment_luminance;
-    const bool is_first_thread = accumulation_reduce_sample(result.color, result.index, first_moment, second_moment_luminance);
+    if constexpr (FIRST_SAMPLE) {
+      float luminance   = color_luminance(result.color);
+      RGBF first_moment = result.color;
+      if (is_non_finite(luminance)) {
+        first_moment = UTILS_DEBUG_NAN_COLOR;
+        luminance    = 0.0f;
+      }
 
-    if (is_first_thread) {
-      // TODO: Ensure this compiles to "red" instructions
-      atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);
-      atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);
-      atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + result.index, first_moment.b);
+      const float second_moment_luminance = luminance * luminance;
 
-      atomicAdd(device.ptrs.frame_second_moment_luminance + result.index, second_moment_luminance);
+      __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);
+      __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);
+      __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + result.index, first_moment.b);
+      __stcs(device.ptrs.frame_second_moment_luminance + result.index, second_moment_luminance);
+    }
+    else {
+      RGBF first_moment;
+      float second_moment_luminance;
+      const bool is_first_thread = accumulation_reduce_sample(result.color, result.index, first_moment, second_moment_luminance);
+
+      if (is_first_thread) {
+        atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);
+        atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);
+        atomicAdd(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + result.index, first_moment.b);
+        atomicAdd(device.ptrs.frame_second_moment_luminance + result.index, second_moment_luminance);
+      }
     }
   }
+
+  device.ptrs.task_queues[THREAD_ID].occupied_results = surviving_results;
+  const bool work_pending                             = __syncthreads_or(surviving_results != 0 || queue.next_task != UINT32_MAX);
+  if (threadIdx.x == 0 && work_pending)
+    atomicOr(device.ptrs.task_work_pending, 1u);
+}
+
+LUMINARY_KERNEL void accumulation_collect_results() {
+  accumulation_collect_finished_paths<false>();
 }
 
 LUMINARY_KERNEL void accumulation_collect_results_first_sample() {
-  HANDLE_DEVICE_ABORT();
-
-  const int results_count = device.ptrs.results_counts[THREAD_ID];
-
-  LUMINARY_ASSUME(results_count <= MAXIMUM_TASKS_PER_THREAD);
-
-  for (int result_id = 0; result_id < results_count; result_id++) {
-    const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(result_id, TASK_STATE_BUFFER_INDEX_RESULT);
-
-    const DeviceTaskResult result = task_result_load(task_result_base_address);
-
-    float luminance   = color_luminance(result.color);
-    RGBF first_moment = result.color;
-    if (is_non_finite(luminance)) {
-      first_moment = UTILS_DEBUG_NAN_COLOR;
-      luminance    = 0.0f;
-    }
-
-    const float second_moment_luminance = luminance * luminance;
-
-    __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_RED] + result.index, first_moment.r);
-    __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_GREEN] + result.index, first_moment.g);
-    __stcs(device.ptrs.frame_first_moment[FRAME_CHANNEL_BLUE] + result.index, first_moment.b);
-
-    __stcs(device.ptrs.frame_second_moment_luminance + result.index, second_moment_luminance);
-  }
+  accumulation_collect_finished_paths<true>();
 }
 
 LUMINARY_KERNEL void accumulation_generate_result() {

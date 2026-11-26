@@ -73,9 +73,8 @@ struct DeviceRenderer {
   uint32_t executed_aggregate_sample_counts[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   DeviceRendererStatusFlags status_flags;
   DeviceRendererQueueArgs args;
-  uint32_t tile_id;
-  uint32_t depth;
-  uint32_t tile_launch_id;
+  uint32_t pass_id;
+  uint32_t* work_pending;
   CUhostFn registered_callback_continue_func;
   CUhostFn registered_callback_finished_func;
   DeviceCommonCallbackData common_callback_data;

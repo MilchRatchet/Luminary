@@ -18,7 +18,9 @@ struct DeviceWorkBuffersPtrs {
   CUdeviceptr task_states;
   CUdeviceptr task_direct_light;
   CUdeviceptr task_results;
-  CUdeviceptr results_counts;
+  CUdeviceptr task_queues;
+  CUdeviceptr task_result_live;
+  CUdeviceptr task_work_pending;
   CUdeviceptr trace_counts;
   CUdeviceptr task_counts;
   CUdeviceptr task_offsets;
@@ -34,7 +36,9 @@ struct DeviceWorkBuffers {
   DEVICE DeviceTaskState* task_states;
   DEVICE DeviceTaskDirectLight* task_direct_light;
   DEVICE DeviceTaskResult* task_results;
-  DEVICE uint16_t* results_counts;
+  DEVICE DeviceTaskQueue* task_queues;
+  DEVICE uint8_t* task_result_live;
+  DEVICE uint32_t* task_work_pending;
   DEVICE uint16_t* trace_counts;
   DEVICE uint16_t* task_counts;
   DEVICE uint16_t* task_offsets;

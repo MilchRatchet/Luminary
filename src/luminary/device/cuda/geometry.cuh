@@ -133,7 +133,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
     }
 
-    if (russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
+    if (path_id_get_depth(task.path_id) < device.state.max_depth && russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
       const uint32_t dst_task_base_address = task_get_base_address(trace_count++, TASK_STATE_BUFFER_INDEX_PRESORT);
@@ -155,6 +155,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       bounce_throughput.flags         = new_state;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
+      device.ptrs.task_result_live[throughput.results_index] = 1;
 
       // Apply medium transition.
       if (bounce_info.is_transparent_pass && is_pass_through == false) {

@@ -403,6 +403,12 @@ struct DeviceTaskResult {
 } typedef DeviceTaskResult;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskResult, 0x10);
 
+struct DeviceTaskQueue {
+  uint32_t next_task;
+  uint32_t occupied_results;
+} typedef DeviceTaskQueue;
+static_assert(MAXIMUM_TASKS_PER_THREAD <= 32, "The task queue needs one result bit per task slot.");
+
 ////////////////////////////////////////////////////////////////////
 // Task Direct Lighting
 ////////////////////////////////////////////////////////////////////
@@ -479,7 +485,9 @@ struct DevicePointers {
   DeviceTaskState* LUM_RESTRICT task_states;
   DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
   DeviceTaskResult* LUM_RESTRICT task_results;
-  uint16_t* LUM_RESTRICT results_counts;
+  DeviceTaskQueue* LUM_RESTRICT task_queues;
+  uint8_t* LUM_RESTRICT task_result_live;
+  uint32_t* LUM_RESTRICT task_work_pending;
   uint16_t* LUM_RESTRICT trace_counts;
   uint16_t* LUM_RESTRICT task_counts;
   uint16_t* LUM_RESTRICT task_offsets;
@@ -522,8 +530,8 @@ struct DevicePointers {
 } typedef DevicePointers;
 
 struct DeviceExecutionState {
-  uint32_t tile_id;
   uint8_t undersampling;
+  uint8_t max_depth;
   DeviceSampleAllocation sample_allocation;
   uint32_t adaptive_sampling_accumulated_stages[ADAPTIVE_SAMPLER_NUM_STAGES + 1];
   DeviceExecutionFlags flags;
