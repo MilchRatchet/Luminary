@@ -90,16 +90,6 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
 
     ////////////////////////////////////////////////////////////////////
-    // Direct Lighting Ambient
-    ////////////////////////////////////////////////////////////////////
-
-    if (split_replay == false && direct_lighting_ambient_is_allowed(task, trace)) {
-      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
-
-      task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
-    }
-
-    ////////////////////////////////////////////////////////////////////
     // Update delta path state
     ////////////////////////////////////////////////////////////////////
 
@@ -130,10 +120,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     if (is_delta_distribution == false)
       new_state &= ~STATE_FLAG_DELTA_PATH;
 
-    if (is_pass_through == false) {
+    if (is_pass_through == false)
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-      new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
-    }
 
     if (path_id_get_depth(task.path_id) < device.state.max_depth && russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);

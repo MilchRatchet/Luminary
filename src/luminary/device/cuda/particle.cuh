@@ -59,25 +59,15 @@ LUMINARY_KERNEL void particle_process_tasks() {
 
     BSDFSampleInfo<MATERIAL_PARTICLE> bounce_info = bsdf_sample<MaterialContextParticle::RANDOM_GI>(ctx, task.path_id);
 
-    ////////////////////////////////////////////////////////////////////
-    // Direct Lighting Ambient
-    ////////////////////////////////////////////////////////////////////
-
-    if (split_replay == false && direct_lighting_ambient_is_allowed(task, trace)) {
-      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
-
-      task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
-    }
-
     uint32_t new_state = flags;
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
 
     if (device.particles.type == LUMINARY_PARTICLE_TYPE_RAIN) {
-      new_state |= STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT;
+      new_state |= STATE_FLAG_CAMERA_DIRECTION;
     }
     else {
-      new_state &= ~(STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT);
+      new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     }
 
     if (path_id_get_depth(task.path_id) < device.state.max_depth && russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {

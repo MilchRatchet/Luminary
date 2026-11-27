@@ -104,14 +104,11 @@ enum ShadingTaskIndex {
 //                              This flag is used to limit ocean volumes to single scattering for performance reasons.
 //                              This flag is used to limit DL after volume scattering for convergence reasons.
 //
-// STATE_FLAG_ALLOW_AMBIENT: This flag is set for rays that are allowed to include sky contribution
-//
 
 enum StateFlag {
   STATE_FLAG_DELTA_PATH       = 0b00000001u,
   STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
-  STATE_FLAG_VOLUME_SCATTERED = 0b00000100u,
-  STATE_FLAG_ALLOW_AMBIENT    = 0b00001000u
+  STATE_FLAG_VOLUME_SCATTERED = 0b00000100u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {

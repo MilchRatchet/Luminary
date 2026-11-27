@@ -64,7 +64,7 @@ LUMINARY_KERNEL void volume_process_inscattering() {
     }
 
     ////////////////////////////////////////////////////////////////////
-    // Initial vertex sampling for Sun and Ambient
+    // Initial vertex sampling for Sun
     ////////////////////////////////////////////////////////////////////
 
     volume_sample_sky_dl_initial_vertex_dist(ctx, task.path_id);
@@ -77,22 +77,6 @@ LUMINARY_KERNEL void volume_process_inscattering() {
       const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
 
       task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
-    }
-
-    ////////////////////////////////////////////////////////////////////
-    // Bounce Ray Sampling
-    ////////////////////////////////////////////////////////////////////
-
-    const BSDFSampleInfo<MATERIAL_VOLUME> bounce_info = bsdf_sample<MaterialContextVolume::RANDOM_DL_AMBIENT>(ctx, task.path_id);
-
-    ////////////////////////////////////////////////////////////////////
-    // Direct Lighting Ambient
-    ////////////////////////////////////////////////////////////////////
-
-    if (direct_lighting_ambient_is_allowed(ctx)) {
-      const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
-
-      task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
     }
   }
 }
@@ -136,7 +120,6 @@ LUMINARY_KERNEL void volume_process_events() {
       bool sky_fast_path    = true;
       sky_fast_path &= handle.instance_id == HIT_TYPE_SKY;
       sky_fast_path &= device.sky.mode != LUMINARY_SKY_MODE_DEFAULT;
-      sky_fast_path &= (flags & STATE_FLAG_ALLOW_AMBIENT) != 0;
 
       if (sky_fast_path) {
         RGBF sky_color = sky_color_no_compute(task.origin, task.ray, flags);
@@ -264,7 +247,6 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
-    new_state &= ~STATE_FLAG_ALLOW_AMBIENT;
 
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
 

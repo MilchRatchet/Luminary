@@ -66,10 +66,9 @@ struct MaterialContext {};
 
 template <>
 struct MaterialContext<MATERIAL_GEOMETRY> {
-  using RANDOM_GI         = RandomSet::BSDF<0>;
-  using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<0>;
-  using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<0>;
-  using RANDOM_DL_AMBIENT = RandomSet::BSDF<1>;
+  using RANDOM_GI     = RandomSet::BSDF<0>;
+  using RANDOM_DL_SUN = RandomSet::LIGHT_SUN<0>;
+  using RANDOM_DL_GEO = RandomSet::LIGHT_GEO<0>;
 
   constexpr static bool FORCE_FAST_OCEAN_CAUSTICS = false;
 
@@ -86,10 +85,9 @@ struct MaterialContext<MATERIAL_GEOMETRY> {
 
 template <>
 struct MaterialContext<MATERIAL_VOLUME> {
-  using RANDOM_GI         = RandomSet::BSDF<0>;
-  using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<1>;
-  using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<1>;
-  using RANDOM_DL_AMBIENT = RandomSet::BSDF<2>;
+  using RANDOM_GI     = RandomSet::BSDF<0>;
+  using RANDOM_DL_SUN = RandomSet::LIGHT_SUN<1>;
+  using RANDOM_DL_GEO = RandomSet::LIGHT_GEO<1>;
 
   constexpr static bool FORCE_FAST_OCEAN_CAUSTICS = true;
 
@@ -104,10 +102,9 @@ struct MaterialContext<MATERIAL_VOLUME> {
 
 template <>
 struct MaterialContext<MATERIAL_PARTICLE> {
-  using RANDOM_GI         = RandomSet::BSDF<0>;
-  using RANDOM_DL_SUN     = RandomSet::LIGHT_SUN<0>;
-  using RANDOM_DL_GEO     = RandomSet::LIGHT_GEO<0>;
-  using RANDOM_DL_AMBIENT = RandomSet::BSDF<1>;
+  using RANDOM_GI     = RandomSet::BSDF<0>;
+  using RANDOM_DL_SUN = RandomSet::LIGHT_SUN<0>;
+  using RANDOM_DL_GEO = RandomSet::LIGHT_GEO<0>;
 
   constexpr static bool FORCE_FAST_OCEAN_CAUSTICS = true;
 

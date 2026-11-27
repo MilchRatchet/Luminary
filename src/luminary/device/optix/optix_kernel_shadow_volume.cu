@@ -53,7 +53,7 @@ extern "C" __global__ void __raygen__optix() {
   }
 
   ////////////////////////////////////////////////////////////////////
-  // Initial vertex sampling for Sun and Ambient
+  // Initial vertex sampling for Sun
   ////////////////////////////////////////////////////////////////////
 
   RGBF initial_vertex_weight;
@@ -70,19 +70,6 @@ extern "C" __global__ void __raygen__optix() {
 
     const bool is_allowed          = direct_lighting_sun_is_allowed(ctx);
     const RGBF direct_light_result = direct_lighting_sun_evaluate_task(task, flags, trace, medium, direct_light_task, is_allowed);
-
-    accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Shadow Ambient
-  ////////////////////////////////////////////////////////////////////
-
-  {
-    const DeviceTaskDirectLightAmbient direct_light_task = task_direct_light_ambient_load(direct_light_task_base_address);
-
-    const bool is_allowed          = direct_lighting_ambient_is_allowed(ctx);
-    const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
 
     accumulated_light = add_color(accumulated_light, mul_color(direct_light_result, initial_vertex_weight));
   }

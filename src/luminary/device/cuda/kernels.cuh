@@ -170,7 +170,7 @@ LUMINARY_KERNEL void tasks_create() {
 
     throughput.record        = record_pack(camera_result.weight);
     throughput.results_index = task_result_base_address;
-    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT;
+    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
 
     task_throughput_store(task_base_address, throughput);
 
@@ -343,7 +343,7 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
 
     throughput.record        = record_pack(camera_result.weight);
     throughput.results_index = task_result_base_address;
-    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_ALLOW_AMBIENT;
+    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
 
     task_throughput_store(task_base_address, throughput);
 

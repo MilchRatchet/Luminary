@@ -434,12 +434,6 @@ struct DeviceTaskDirectLightSun {
 } typedef DeviceTaskDirectLightSun;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightSun, 0x10);
 
-struct DeviceTaskDirectLightAmbient {
-  PackedRecord light_color;
-  PackedRayDirection ray;
-} typedef DeviceTaskDirectLightAmbient;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLightAmbient, 0x10);
-
 struct DeviceTaskDirectLightBSDF {
   RGBF weight;
   vec3 ray;
@@ -470,10 +464,8 @@ struct DeviceTaskDirectLight {
     };
   };
   DeviceTaskDirectLightSun sun;
-  // TODO: Do this only for underwater in the future, the rest does not need it.
-  DeviceTaskDirectLightAmbient ambient;
 } typedef DeviceTaskDirectLight;
-LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x60);
+LUM_STATIC_SIZE_ASSERT(DeviceTaskDirectLight, 0x50);
 
 ////////////////////////////////////////////////////////////////////
 // Globals

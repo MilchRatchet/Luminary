@@ -82,20 +82,6 @@ extern "C" __global__ void __raygen__optix() {
   }
 
   ////////////////////////////////////////////////////////////////////
-  // Shadow Ambient
-  ////////////////////////////////////////////////////////////////////
-
-  {
-    const bool is_allowed = direct_lighting_ambient_is_allowed(task, trace);
-    const DeviceTaskDirectLightAmbient direct_light_task =
-      is_allowed ? task_direct_light_ambient_load(direct_light_task_base_address) : DeviceTaskDirectLightAmbient{};
-
-    const RGBF direct_light_result = direct_lighting_ambient_evaluate_task(task, trace, medium, direct_light_task, is_allowed);
-
-    accumulated_light = add_color(accumulated_light, direct_light_result);
-  }
-
-  ////////////////////////////////////////////////////////////////////
   // Store Result
   ////////////////////////////////////////////////////////////////////
 

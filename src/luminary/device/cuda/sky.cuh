@@ -284,9 +284,6 @@ LUMINARY_KERNEL void sky_process_tasks() {
     const DeviceTask task                 = task_load(task_base_address);
     const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
 
-    if ((device.sky.mode != LUMINARY_SKY_MODE_DEFAULT) && ((throughput.flags & STATE_FLAG_ALLOW_AMBIENT) == 0))
-      continue;
-
     RGBF sky = sky_color_main(task.origin, task.ray, throughput.flags, task.path_id);
     sky      = mul_color(sky, record_unpack(throughput.record));
 

@@ -304,11 +304,6 @@ LUMINARY_FUNCTION DeviceTaskDirectLightSun task_direct_light_sun_load(const uint
     device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, sun));
 }
 
-LUMINARY_FUNCTION DeviceTaskDirectLightAmbient task_direct_light_ambient_load(const uint32_t base_address) {
-  return load_task_state<DeviceTaskDirectLightAmbient, float4>(
-    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, ambient));
-}
-
 LUMINARY_FUNCTION DeviceTaskDirectLightBridges task_direct_light_bridges_load(const uint32_t base_address) {
   return load_task_state<DeviceTaskDirectLightBridges, float4>(
     device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, bridges));
@@ -327,11 +322,6 @@ LUMINARY_FUNCTION void task_direct_light_geo_store(const uint32_t base_address, 
 LUMINARY_FUNCTION void task_direct_light_sun_store(const uint32_t base_address, const DeviceTaskDirectLightSun data) {
   store_task_state<DeviceTaskDirectLightSun, float4>(
     device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, sun), data);
-}
-
-LUMINARY_FUNCTION void task_direct_light_ambient_store(const uint32_t base_address, const DeviceTaskDirectLightAmbient data) {
-  store_task_state<DeviceTaskDirectLightAmbient, float4>(
-    device.ptrs.task_direct_light, base_address, offsetof(DeviceTaskDirectLight, ambient), data);
 }
 
 LUMINARY_FUNCTION void task_direct_light_bridges_store(const uint32_t base_address, const DeviceTaskDirectLightBridges data) {
