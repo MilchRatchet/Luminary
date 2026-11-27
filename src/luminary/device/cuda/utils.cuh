@@ -176,6 +176,14 @@ LUMINARY_FUNCTION uint32_t path_id_get_split_id(const PathID& path_id) {
   return path_id.y >> PATH_ID_SAMPLE_BITS + PATH_ID_DEPTH_BITS;
 }
 
+LUMINARY_FUNCTION bool path_id_is_split_replay(const PathID& path_id) {
+  return path_id_get_depth(path_id) == 0 && path_id_get_split_id(path_id) != 0;
+}
+
+LUMINARY_FUNCTION float path_id_get_bounce_scale(const PathID& path_id) {
+  return path_id_get_depth(path_id) == 0 ? 1.0f / (device.settings.first_hit_split_count_minus_one + 1) : 1.0f;
+}
+
 //===========================================================================================
 // Functions
 //===========================================================================================

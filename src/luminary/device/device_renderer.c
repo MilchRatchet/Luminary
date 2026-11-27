@@ -255,6 +255,10 @@ static LuminaryResult _device_renderer_queue_main_pass(DeviceRenderer* renderer,
     __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS));
   }
 
+  if (device->work_buffers->split_tasks != 0) {
+    __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_EXPAND_SPLITS));
+  }
+
   __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_TASKS_SORT));
   __FAILURE_HANDLE(_device_renderer_queue_cuda_kernel(renderer, device, CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS));
 

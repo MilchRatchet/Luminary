@@ -28,7 +28,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const TaskFlags flags = throughput.flags;
+    const TaskFlags flags   = throughput.flags;
+    const bool split_replay = path_id_is_split_replay(task.path_id);
 
     RGBF emission;
     const MaterialContextGeometry ctx = geometry_get_context(task, flags, trace, medium, emission);
@@ -37,7 +38,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Emission
     ////////////////////////////////////////////////////////////////////
 
-    if (color_any(emission)) {
+    if (split_replay == false && color_any(emission)) {
       RGBF record             = record_unpack(throughput.record);
       const RGBF result_color = mul_color(emission, record);
 
@@ -45,7 +46,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     }
 
     // We need to store the face normal so the DL shadowing kernel knows how to offset the origin.
-    task_trace_facenormal_store(task_base_address, ctx.face_normal);
+    if (split_replay == false)
+      task_trace_facenormal_store(task_base_address, ctx.face_normal);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
@@ -55,7 +57,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
     float light_tree_root_sum = 0.0f;
-    if (direct_lighting_geometry_is_allowed(flags, trace)) {
+    if (split_replay == false && direct_lighting_geometry_is_allowed(flags, trace)) {
       const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.path_id, light_tree_root_sum);
 
       task_direct_light_geo_store(task_direct_lighting_base_address, direct_light_geo_task);
@@ -65,7 +67,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting BSDF
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_bsdf_is_allowed(flags, trace)) {
+    if (split_replay == false && direct_lighting_bsdf_is_allowed(flags, trace)) {
       const DeviceTaskDirectLightBSDF direct_light_bsdf_task = direct_lighting_bsdf_create_task(ctx, task.path_id, light_tree_root_sum);
 
       task_direct_light_bsdf_store(task_direct_lighting_base_address, direct_light_bsdf_task);
@@ -75,7 +77,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting Sun
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_sun_is_allowed(task, trace)) {
+    if (split_replay == false && direct_lighting_sun_is_allowed(task, trace)) {
       const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
 
       task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
@@ -91,7 +93,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Direct Lighting Ambient
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_ambient_is_allowed(task, trace)) {
+    if (split_replay == false && direct_lighting_ambient_is_allowed(task, trace)) {
       const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
 
       task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
@@ -150,12 +152,12 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record        = record_pack(record);
+      bounce_throughput.record        = record_pack(scale_color(record, path_id_get_bounce_scale(task.path_id)));
       bounce_throughput.results_index = throughput.results_index;
       bounce_throughput.flags         = new_state;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
-      device.ptrs.task_result_live[throughput.results_index] = 1;
+      task_result_set_live(throughput.results_index, 1);
 
       // Apply medium transition.
       if (bounce_info.is_transparent_pass && is_pass_through == false) {

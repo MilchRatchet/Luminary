@@ -12,10 +12,12 @@ struct DeviceWorkBuffersAllocInfo {
   uint32_t thread_count;
   uint32_t task_count;
   uint32_t max_concurrent_blocks;
+  bool enable_splitting;
 } typedef DeviceWorkBuffersAllocInfo;
 
 struct DeviceWorkBuffersPtrs {
   CUdeviceptr task_states;
+  CUdeviceptr split_tasks;
   CUdeviceptr task_direct_light;
   CUdeviceptr task_results;
   CUdeviceptr task_queues;
@@ -34,10 +36,11 @@ struct DeviceWorkBuffersPtrs {
 
 struct DeviceWorkBuffers {
   DEVICE DeviceTaskState* task_states;
+  DEVICE DeviceSplitTask* split_tasks;
   DEVICE DeviceTaskDirectLight* task_direct_light;
   DEVICE DeviceTaskResult* task_results;
   DEVICE DeviceTaskQueue* task_queues;
-  DEVICE uint8_t* task_result_live;
+  DEVICE uint32_t* task_result_live;
   DEVICE uint32_t* task_work_pending;
   DEVICE uint16_t* trace_counts;
   DEVICE uint16_t* task_counts;

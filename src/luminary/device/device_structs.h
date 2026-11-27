@@ -11,7 +11,7 @@ struct DeviceRendererSettings {
   uint32_t bridge_max_num_vertices : 4;
   uint32_t supersampling : 2;
   uint32_t adaptive_sampling_output_mode : 2;
-  // 11 bits spare
+  uint32_t first_hit_split_count_minus_one : 6;
 
   uint16_t width;
   uint16_t height;

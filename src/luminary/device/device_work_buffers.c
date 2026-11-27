@@ -97,12 +97,21 @@ LuminaryResult device_work_buffers_update(DeviceWorkBuffers* buffers, const Devi
     *buffers_have_changed           = true;
   }
 
+  if (info->enable_splitting && (buffers->split_tasks == 0 || info->task_count != buffers->allocated_task_count)) {
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->split_tasks, sizeof(DeviceSplitTask) * info->task_count));
+    *buffers_have_changed = true;
+  }
+  else if (info->enable_splitting == false && buffers->split_tasks != 0) {
+    __FAILURE_HANDLE(_BUFFER_FREE(buffers->split_tasks));
+    *buffers_have_changed = true;
+  }
+
   if (info->task_count != buffers->allocated_task_count) {
     __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_states, sizeof(DeviceTaskState) * info->task_count * TASK_STATE_BUFFER_INDEX_COUNT));
     __FAILURE_HANDLE(_BUFFER_ALLOC(
       buffers->task_direct_light, sizeof(DeviceTaskDirectLight) * info->task_count * TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT_COUNT));
     __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_results, sizeof(DeviceTaskResult) * info->task_count));
-    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_result_live, sizeof(uint8_t) * info->task_count));
+    __FAILURE_HANDLE(_BUFFER_ALLOC(buffers->task_result_live, sizeof(uint32_t) * info->task_count));
 
     buffers->allocated_task_count = info->task_count;
     *buffers_have_changed         = true;
@@ -123,6 +132,7 @@ LuminaryResult device_work_buffers_get_ptrs(DeviceWorkBuffers* buffers, DeviceWo
   __CHECK_NULL_ARGUMENT(ptrs);
 
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_states));
+  __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, split_tasks));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_direct_light));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_results));
   __FAILURE_HANDLE(_BUFFER_GET_PTR(buffers, ptrs, task_queues));
@@ -149,6 +159,7 @@ LuminaryResult device_work_buffers_destroy(DeviceWorkBuffers** buffers) {
   __CHECK_NULL_ARGUMENT(*buffers);
 
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_states));
+  __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->split_tasks));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_direct_light));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_results));
   __FAILURE_HANDLE(_BUFFER_FREE((*buffers)->task_queues));

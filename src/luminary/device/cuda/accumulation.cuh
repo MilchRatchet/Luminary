@@ -57,7 +57,7 @@ LUMINARY_FUNCTION void accumulation_collect_finished_paths() {
     const uint32_t result_id                = __ffs(remaining) - 1;
     const uint32_t task_result_base_address = task_get_base_address<DeviceTaskResult>(result_id, TASK_STATE_BUFFER_INDEX_RESULT);
 
-    if (device.ptrs.task_result_live[task_result_base_address]) {
+    if ((queue.pending_splits & (1u << result_id)) != 0 || device.ptrs.task_result_live[task_result_base_address]) {
       surviving_results |= 1u << result_id;
       continue;
     }

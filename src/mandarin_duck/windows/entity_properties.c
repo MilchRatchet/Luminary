@@ -411,6 +411,8 @@ static void _window_entity_properties_renderer_settings_action(
   update_data |=
     _window_entity_properties_add_slider(data, "Max Depth", &settings.max_ray_depth, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 63.0f, 1.0f);
   update_data |= _window_entity_properties_add_slider(
+    data, "First Hit Splits", &settings.first_hit_split_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 64.0f, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
     data, "Bridges Max Num Vertices", &settings.bridge_max_num_vertices, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, 15.0f, 1.0f);
   update_data |=
     _window_entity_properties_add_slider(data, "Undersampling", &settings.undersampling, ELEMENT_SLIDER_DATA_TYPE_UINT, 0.0f, 6.0f, 1.0f);

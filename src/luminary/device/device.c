@@ -363,6 +363,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   alloc_info.thread_count          = thread_count;
   alloc_info.task_count            = total_task_count;
   alloc_info.max_concurrent_blocks = device->properties.optimal_block_count;
+  alloc_info.enable_splitting      = constant_memory->settings.first_hit_split_count_minus_one != 0;
 
   bool buffers_have_changed;
   __FAILURE_HANDLE(device_work_buffers_update(device->work_buffers, &alloc_info, &buffers_have_changed));
@@ -375,6 +376,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_direct_light, ptrs.task_direct_light);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_results, ptrs.task_results);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_queues, ptrs.task_queues);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.split_tasks, ptrs.split_tasks);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_result_live, ptrs.task_result_live);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_work_pending, ptrs.task_work_pending);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.trace_counts, ptrs.trace_counts);

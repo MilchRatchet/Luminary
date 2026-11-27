@@ -23,8 +23,11 @@ extern "C" __global__ void __raygen__optix() {
   if (task_id >= task_count)
     return;
 
-  const uint32_t task_base_address   = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
-  DeviceTask task                    = task_load(task_base_address);
+  const uint32_t task_base_address = task_get_base_address(task_offset + task_id, TASK_STATE_BUFFER_INDEX_POSTSORT);
+  DeviceTask task                  = task_load(task_base_address);
+  if (path_id_is_split_replay(task.path_id))
+    return;
+
   const uint32_t flags               = task_flags_load(task_base_address);
   const DeviceTaskTrace trace        = task_trace_load(task_base_address);
   const DeviceTaskMediumStack medium = task_medium_load(task_base_address);

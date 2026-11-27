@@ -19,6 +19,10 @@ LuminaryResult device_struct_settings_convert(const RendererSettings* settings, 
   device_settings->bridge_max_num_vertices       = settings->bridge_max_num_vertices;
   device_settings->supersampling                 = settings->supersampling;
   device_settings->adaptive_sampling_output_mode = settings->adaptive_sampling_settings.output_mode;
+  device_settings->first_hit_split_count_minus_one =
+    (settings->shading_mode == LUMINARY_SHADING_MODE_DEFAULT && device_settings->max_ray_depth > 0 && settings->first_hit_split_count > 1)
+      ? min(settings->first_hit_split_count - 1, PATH_ID_SPLIT_MASK)
+      : 0;
 
   device_settings->width  = settings->width << settings->supersampling;
   device_settings->height = settings->height << settings->supersampling;

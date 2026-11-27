@@ -398,6 +398,11 @@ struct DeviceTaskState {
 } typedef DeviceTaskState;
 LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x50);
 
+struct DeviceSplitTask {
+  DeviceTaskState hit;
+  uint32_t next_split_id;
+} typedef DeviceSplitTask;
+
 struct DeviceTaskResult {
   RGBF color;
   uint32_t index;
@@ -407,6 +412,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskResult, 0x10);
 struct DeviceTaskQueue {
   uint32_t next_task;
   uint32_t occupied_results;
+  uint32_t pending_splits;
 } typedef DeviceTaskQueue;
 static_assert(MAXIMUM_TASKS_PER_THREAD <= 32, "The task queue needs one result bit per task slot.");
 
@@ -484,10 +490,11 @@ enum FrameChannel {
 struct DevicePointers {
   // DeviceWorkBuffers
   DeviceTaskState* LUM_RESTRICT task_states;
+  DeviceSplitTask* LUM_RESTRICT split_tasks;
   DeviceTaskDirectLight* LUM_RESTRICT task_direct_light;
   DeviceTaskResult* LUM_RESTRICT task_results;
   DeviceTaskQueue* LUM_RESTRICT task_queues;
-  uint8_t* LUM_RESTRICT task_result_live;
+  uint32_t* LUM_RESTRICT task_result_live;
   uint32_t* LUM_RESTRICT task_work_pending;
   uint16_t* LUM_RESTRICT trace_counts;
   uint16_t* LUM_RESTRICT task_counts;

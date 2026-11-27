@@ -12,6 +12,7 @@ struct CUDAKernelConfig {
 static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_TASKS_CREATE]                   = {.name = "tasks_create", .param_size = 0},
   [CUDA_KERNEL_TYPE_TASKS_CREATE_ADAPTIVE_SAMPLING] = {.name = "tasks_create_adaptive_sampling", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TASKS_EXPAND_SPLITS]            = {.name = "tasks_expand_splits", .param_size = 0},
   [CUDA_KERNEL_TYPE_TASKS_SORT]                     = {.name = "tasks_sort", .param_size = 0},
   [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS]         = {.name = "geometry_process_tasks", .param_size = 0},
   [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG]   = {.name = "geometry_process_tasks_debug", .param_size = 0},

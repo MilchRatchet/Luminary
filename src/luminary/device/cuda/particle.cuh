@@ -27,6 +27,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const MaterialContextParticle ctx = particle_get_context(task, flags, medium, trace.handle.instance_id);
+    const bool split_replay           = path_id_is_split_replay(task.path_id);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry
@@ -35,7 +36,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     const uint32_t task_direct_lighting_base_address =
       task_get_base_address<DeviceTaskDirectLight>(task_offset + i, TASK_STATE_BUFFER_INDEX_DIRECT_LIGHT);
 
-    if (direct_lighting_geometry_is_allowed(flags, trace)) {
+    if (split_replay == false && direct_lighting_geometry_is_allowed(flags, trace)) {
       float light_tree_root_sum;
       const DeviceTaskDirectLightGeo direct_light_geo_task = direct_lighting_geometry_create_task(ctx, task.path_id, light_tree_root_sum);
 
@@ -46,7 +47,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     // Direct Lighting Sun
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_sun_is_allowed(task, trace)) {
+    if (split_replay == false && direct_lighting_sun_is_allowed(task, trace)) {
       const DeviceTaskDirectLightSun direct_light_sun_task = direct_lighting_sun_create_task(ctx, medium, task.path_id);
 
       task_direct_light_sun_store(task_direct_lighting_base_address, direct_light_sun_task);
@@ -62,7 +63,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     // Direct Lighting Ambient
     ////////////////////////////////////////////////////////////////////
 
-    if (direct_lighting_ambient_is_allowed(task, trace)) {
+    if (split_replay == false && direct_lighting_ambient_is_allowed(task, trace)) {
       const DeviceTaskDirectLightAmbient direct_light_ambient_task = direct_lighting_ambient_create_task(ctx, bounce_info, task.path_id);
 
       task_direct_light_ambient_store(task_direct_lighting_base_address, direct_light_ambient_task);
@@ -94,10 +95,10 @@ LUMINARY_KERNEL void particle_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record                               = record_pack(record);
-      bounce_throughput.results_index                        = throughput.results_index;
-      device.ptrs.task_result_live[throughput.results_index] = 1;
-      bounce_throughput.flags                                = new_state;
+      bounce_throughput.record        = record_pack(scale_color(record, path_id_get_bounce_scale(task.path_id)));
+      bounce_throughput.results_index = throughput.results_index;
+      task_result_set_live(throughput.results_index, 1);
+      bounce_throughput.flags = new_state;
 
       task_throughput_store(dst_task_base_address, bounce_throughput);
 

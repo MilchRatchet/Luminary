@@ -46,7 +46,7 @@ LUMINARY_KERNEL void tasks_create() {
   HANDLE_DEVICE_ABORT();
 
   DeviceTaskQueue queue = device.ptrs.task_queues[THREAD_ID];
-  if (queue.next_task == UINT32_MAX)
+  if (queue.next_task == UINT32_MAX || queue.pending_splits != 0)
     return;
 
   uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
@@ -207,7 +207,7 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
   HANDLE_DEVICE_ABORT();
 
   DeviceTaskQueue queue = device.ptrs.task_queues[THREAD_ID];
-  if (queue.next_task == UINT32_MAX)
+  if (queue.next_task == UINT32_MAX || queue.pending_splits != 0)
     return;
 
   uint32_t task_count = device.ptrs.trace_counts[THREAD_ID];
@@ -410,6 +410,56 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
   }
 }
 
+LUMINARY_KERNEL void tasks_expand_splits() {
+  HANDLE_DEVICE_ABORT();
+
+  const uint32_t split_count = device.settings.first_hit_split_count_minus_one + 1;
+  const uint32_t capacity    = device.config.num_tasks_per_thread;
+  uint32_t task_count        = device.ptrs.trace_counts[THREAD_ID];
+  uint32_t pending_splits    = device.ptrs.task_queues[THREAD_ID].pending_splits;
+
+  for (uint32_t task_id = 0; task_id < task_count; task_id++) {
+    const uint32_t address = task_get_base_address(task_id, TASK_STATE_BUFFER_INDEX_PRESORT);
+    const DeviceTask task  = task_load(address);
+    if (path_id_get_depth(task.path_id) != 0)
+      continue;
+
+    const DeviceTaskTrace trace = task_trace_load(address);
+    const ShadingTaskIndex type = shading_task_index_from_instance_id(trace.handle.instance_id);
+    if (type == SHADING_TASK_INDEX_INVALID || type == SHADING_TASK_INDEX_SKY)
+      continue;
+
+    const DeviceTaskThroughput throughput = task_throughput_load(address);
+    const uint32_t result_index           = throughput.results_index;
+    const uint32_t result_slot            = result_index / NUM_THREADS;
+    device.ptrs.split_tasks[result_index] = {{task, trace, throughput, task_medium_load(address)}, 1};
+    pending_splits |= 1u << result_slot;
+  }
+
+  for (uint32_t remaining = pending_splits; remaining != 0 && task_count < capacity; remaining &= remaining - 1) {
+    const uint32_t result_slot  = __ffs(remaining) - 1;
+    const uint32_t result_index = task_get_base_address<DeviceTaskResult>(result_slot, TASK_STATE_BUFFER_INDEX_RESULT);
+    DeviceSplitTask split       = device.ptrs.split_tasks[result_index];
+    const ShadingTaskIndex type = shading_task_index_from_instance_id(split.hit.trace_result.handle.instance_id);
+    const uint32_t branch_count = min(capacity - task_count, split_count - split.next_split_id);
+    const uint32_t branch_end   = split.next_split_id + branch_count;
+
+    for (; split.next_split_id < branch_end; split.next_split_id++) {
+      path_id_set_split_id(split.hit.task.path_id, split.next_split_id);
+      task_state_store(task_get_base_address(task_count++, TASK_STATE_BUFFER_INDEX_PRESORT), split.hit);
+    }
+
+    device.ptrs.task_counts[TASK_ADDRESS_OFFSET_IMPL(type)] += branch_count;
+    if (branch_end == split_count)
+      pending_splits &= ~(1u << result_slot);
+    else
+      device.ptrs.split_tasks[result_index].next_split_id = branch_end;
+  }
+
+  device.ptrs.task_queues[THREAD_ID].pending_splits = pending_splits;
+  device.ptrs.trace_counts[THREAD_ID]               = task_count;
+}
+
 LUMINARY_KERNEL void tasks_sort() {
   HANDLE_DEVICE_ABORT();
 
@@ -469,7 +519,7 @@ LUMINARY_KERNEL void tasks_sort() {
 
       state = task_state_load(src_task_base_address);
       index = shading_task_index_from_instance_id(state.trace_result.handle.instance_id);
-      device.ptrs.task_result_live[state.throughput.results_index] = 0;
+      task_result_set_live(state.throughput.results_index, 0);
     }
 
     uint32_t dst_task_base_address;

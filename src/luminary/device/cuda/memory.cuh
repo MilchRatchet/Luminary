@@ -284,6 +284,14 @@ LUMINARY_FUNCTION void task_result_store(const uint32_t base_address, const Devi
   store_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0, data);
 }
 
+LUMINARY_FUNCTION void task_result_set_live(const uint32_t results_index, const uint32_t live) {
+  uint32_t* address = device.ptrs.task_result_live + results_index;
+  if (device.settings.first_hit_split_count_minus_one != 0)
+    atomicExch(address, live);
+  else
+    *address = live;
+}
+
 // DeviceTaskDirectLight
 
 LUMINARY_FUNCTION DeviceTaskDirectLightGeo task_direct_light_geo_load(const uint32_t base_address) {
@@ -383,6 +391,14 @@ LUMINARY_FUNCTION void store_RGBF_impl(RGBF* buffer, const uint32_t offset, cons
 LUMINARY_FUNCTION void write_beauty_buffer(const RGBF beauty, const uint32_t results_index) {
   if (color_any(beauty) == false)
     return;
+
+  if (device.settings.first_hit_split_count_minus_one != 0) {
+    RGBF& color = device.ptrs.task_results[results_index].color;
+    atomicAdd(&color.r, beauty.r);
+    atomicAdd(&color.g, beauty.g);
+    atomicAdd(&color.b, beauty.b);
+    return;
+  }
 
   DeviceTaskResult result = task_result_load(results_index);
 

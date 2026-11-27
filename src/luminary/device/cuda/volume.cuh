@@ -277,10 +277,14 @@ LUMINARY_KERNEL void volume_process_tasks() {
     path_id_increment_depth(bounce_task.path_id);
 
     task_store(dst_task_base_address, bounce_task);
-    throughput.flags = new_state;
-    task_throughput_store(dst_task_base_address, throughput);
+    DeviceTaskThroughput bounce_throughput = throughput;
+    bounce_throughput.flags                = new_state;
+    const float bounce_scale               = path_id_get_bounce_scale(task.path_id);
+    if (bounce_scale < 1.0f)
+      bounce_throughput.record = record_pack(scale_color(record_unpack(throughput.record), bounce_scale));
+    task_throughput_store(dst_task_base_address, bounce_throughput);
     task_medium_store(dst_task_base_address, medium);
-    device.ptrs.task_result_live[throughput.results_index] = 1;
+    task_result_set_live(throughput.results_index, 1);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;

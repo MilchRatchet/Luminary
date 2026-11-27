@@ -19,6 +19,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->region_height              = 1.0f;
   settings->russian_roulette_threshold = 1.0f;
   settings->geometry_emission_scale    = 1.0f;
+  settings->first_hit_split_count      = 1;
 
   settings->adaptive_sampling_settings = (LuminaryAdaptiveSamplingSettings) {
     .enable            = true,
@@ -53,6 +54,13 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
   __SETTINGS_CHECK_DIRTY(supersampling, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(bridge_max_num_vertices, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(undersampling, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+  const bool splitting_enabled =
+    input->first_hit_split_count > 1 && input->max_ray_depth > 0 && input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT;
+  const bool splitting_was_enabled =
+    old->first_hit_split_count > 1 && old->max_ray_depth > 0 && old->shading_mode == LUMINARY_SHADING_MODE_DEFAULT;
+  if (splitting_enabled != splitting_was_enabled)
+    *dirty_flags |= SCENE_DIRTY_FLAG_BUFFERS;
+
   __SETTINGS_CHECK_DIRTY(shading_mode, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   __SETTINGS_CHECK_DIRTY(
     adaptive_sampling_settings.enable, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_BUFFERS | SCENE_DIRTY_FLAG_OUTPUT);
@@ -66,6 +74,7 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* input, const Ren
 
   if (input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
     __SETTINGS_CHECK_DIRTY(max_ray_depth, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
+    __SETTINGS_CHECK_DIRTY(first_hit_split_count, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
   }
 
   __SETTINGS_CHECK_DIRTY(region_x, SCENE_DIRTY_FLAG_INTEGRATION | SCENE_DIRTY_FLAG_OUTPUT);
