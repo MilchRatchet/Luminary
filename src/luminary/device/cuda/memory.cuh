@@ -284,6 +284,17 @@ LUMINARY_FUNCTION void task_result_store(const uint32_t base_address, const Devi
   store_task_state<DeviceTaskResult, float4>(device.ptrs.task_results, base_address, 0, data);
 }
 
+LUMINARY_FUNCTION void task_split_enqueue(
+  const DeviceTask& task, const DeviceTaskTrace& trace, const DeviceTaskThroughput& throughput, const DeviceTaskMediumStack& medium,
+  const uint32_t split_count) {
+  const uint32_t result_index = throughput.results_index;
+  const uint32_t result_slot  = result_index / NUM_THREADS;
+  const uint32_t owner_thread = result_index - result_slot * NUM_THREADS;
+
+  device.ptrs.split_tasks[result_index] = {{task, trace, throughput, medium}, (split_count << PATH_ID_SPLIT_BITS) | 1u};
+  atomicOr(&device.ptrs.task_queues[owner_thread].pending_splits, 1u << result_slot);
+}
+
 LUMINARY_FUNCTION void task_result_set_live(const uint32_t results_index, const uint32_t live) {
   uint32_t* address = device.ptrs.task_result_live + results_index;
   if (device.settings.first_hit_split_count_minus_one != 0)

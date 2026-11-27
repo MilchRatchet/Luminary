@@ -400,7 +400,7 @@ LUM_STATIC_SIZE_ASSERT(DeviceTaskState, 0x50);
 
 struct DeviceSplitTask {
   DeviceTaskState hit;
-  uint32_t next_split_id;
+  uint32_t split_progress;
 } typedef DeviceSplitTask;
 
 struct DeviceTaskResult {

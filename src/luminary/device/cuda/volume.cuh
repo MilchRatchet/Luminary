@@ -234,6 +234,12 @@ LUMINARY_KERNEL void volume_process_tasks() {
     if (path_id_get_depth(task.path_id) >= device.state.max_depth)
       continue;
 
+    if (
+      device.settings.first_hit_split_count_minus_one != 0 && path_id_get_depth(task.path_id) == 0
+      && path_id_get_split_id(task.path_id) == 0) {
+      task_split_enqueue(task, trace, throughput, medium, device.settings.first_hit_split_count_minus_one + 1);
+    }
+
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const VolumeType volume_type  = (VolumeType) medium_stack_volume_peek(medium, false);

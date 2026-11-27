@@ -85,7 +85,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record        = record_pack(scale_color(record, path_id_get_bounce_scale(task.path_id)));
+      bounce_throughput.record        = record_pack(record);
       bounce_throughput.results_index = throughput.results_index;
       task_result_set_live(throughput.results_index, 1);
       bounce_throughput.flags = new_state;

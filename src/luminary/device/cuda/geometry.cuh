@@ -26,10 +26,16 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
+    const bool split_replay = path_id_is_split_replay(task.path_id);
+    if (
+      device.settings.first_hit_split_count_minus_one != 0 && device.state.max_depth != 0 && path_id_get_depth(task.path_id) == 0
+      && split_replay == false) {
+      task_split_enqueue(task, trace, throughput, medium, device.settings.first_hit_split_count_minus_one + 1);
+    }
+
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
-    const TaskFlags flags   = throughput.flags;
-    const bool split_replay = path_id_is_split_replay(task.path_id);
+    const TaskFlags flags = throughput.flags;
 
     RGBF emission;
     const MaterialContextGeometry ctx = geometry_get_context(task, flags, trace, medium, emission);

@@ -28,10 +28,15 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     const TaskFlags flags                 = throughput.flags;
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
+    const bool split_replay    = path_id_is_split_replay(task.path_id);
+    const bool split_first_hit = device.settings.first_hit_split_count_minus_one != 0 && path_id_get_depth(task.path_id) == 0;
+    if (split_first_hit && device.state.max_depth != 0 && split_replay == false) {
+      task_split_enqueue(task, trace, throughput, medium, 2);
+    }
+
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const MaterialContextGeometry ctx = ocean_get_context(task, flags, medium);
-    const bool split_replay           = path_id_is_split_replay(task.path_id);
 
     // We need to store the face normal so the DL shadowing kernel knows how to offset the origin.
     if (split_replay == false)
@@ -95,7 +100,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record        = record_pack(scale_color(record, path_id_get_bounce_scale(task.path_id)));
+      bounce_throughput.record        = record_pack(split_first_hit ? scale_color(record, 0.5f) : record);
       bounce_throughput.results_index = throughput.results_index;
       task_result_set_live(throughput.results_index, 1);
       bounce_throughput.flags = new_state;
