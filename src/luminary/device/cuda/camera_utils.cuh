@@ -19,7 +19,7 @@ struct CameraSampleResult {
 LUMINARY_FUNCTION float2 camera_get_jitter(const PathID& path_id) {
   const uint32_t sample_id = path_id_get_sample_id(path_id);
 
-  return random_2D_base_float(RANDOM_TARGET_CAMERA_JITTER, make_ushort2(0, 0), sample_id, 0);
+  return random_2D_base_float(RANDOM_TARGET_CAMERA_JITTER, make_ushort2(0, 0), sample_id, 0, 0);
 }
 
 template <bool IS_THIN_LENS>

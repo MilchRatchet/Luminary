@@ -320,8 +320,9 @@ LUMINARY_FUNCTION uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32
 // Warning: The lowest bit is always 0 for these random numbers.
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_FUNCTION uint2 random_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  uint32_t dimension_index = target + depth * RANDOM_TARGET_COUNT;
+LUMINARY_FUNCTION uint2
+  random_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth, const uint32_t split_id) {
+  uint32_t dimension_index = target + depth * RANDOM_TARGET_COUNT + split_id * (MAX_DEPTH + 1) * RANDOM_TARGET_COUNT;
 
   uint2 quasi = random_sobol(sequence_id, dimension_index);
 
@@ -334,40 +335,42 @@ LUMINARY_FUNCTION uint2 random_2D_base(const uint32_t target, const ushort2 pixe
   return quasi;
 }
 
-LUMINARY_FUNCTION float2
-  random_2D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  const uint2 quasi = random_2D_base(target, pixel, sequence_id, depth);
+LUMINARY_FUNCTION float2 random_2D_base_float(
+  const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth, const uint32_t split_id) {
+  const uint2 quasi = random_2D_base(target, pixel, sequence_id, depth, split_id);
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
 
-LUMINARY_FUNCTION uint32_t random_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  return random_2D_base(target, pixel, sequence_id, depth).x;
+LUMINARY_FUNCTION uint32_t
+  random_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth, const uint32_t split_id) {
+  return random_2D_base(target, pixel, sequence_id, depth, split_id).x;
 }
 
-LUMINARY_FUNCTION float random_1D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
-  return random_uint32_t_to_float(random_1D_base(target, pixel, sequence_id, depth));
+LUMINARY_FUNCTION float random_1D_base_float(
+  const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth, const uint32_t split_id) {
+  return random_uint32_t_to_float(random_1D_base(target, pixel, sequence_id, depth, split_id));
 }
 
 LUMINARY_FUNCTION float random_1D(const uint32_t target, const PathID& path_id) {
   const ushort2 pixel      = path_id_get_pixel(path_id);
   const uint32_t sample_id = path_id_get_sample_id(path_id);
 
-  return random_1D_base_float(target, pixel, sample_id, path_id_get_depth(path_id));
+  return random_1D_base_float(target, pixel, sample_id, path_id_get_depth(path_id), path_id_get_split_id(path_id));
 }
 
 LUMINARY_FUNCTION float random_1D_consistent(const uint32_t target, const PathID& path_id) {
   const ushort2 pixel      = path_id_get_pixel(path_id);
   const uint32_t sample_id = path_id_get_sample_id(path_id);
 
-  return random_1D_base_float(target, pixel, sample_id, 0);
+  return random_1D_base_float(target, pixel, sample_id, 0, 0);
 }
 
 LUMINARY_FUNCTION float2 random_2D(const uint32_t target, const PathID& path_id) {
   const ushort2 pixel      = path_id_get_pixel(path_id);
   const uint32_t sample_id = path_id_get_sample_id(path_id);
 
-  return random_2D_base_float(target, pixel, sample_id, path_id_get_depth(path_id));
+  return random_2D_base_float(target, pixel, sample_id, path_id_get_depth(path_id), path_id_get_split_id(path_id));
 }
 
 LUMINARY_FUNCTION float random_dither_mask(const uint32_t x, const uint32_t y) {

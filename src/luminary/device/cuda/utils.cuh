@@ -172,6 +172,10 @@ LUMINARY_FUNCTION uint32_t path_id_get_sample_id(const PathID& path_id) {
   return path_id.y & PATH_ID_SAMPLE_MASK;
 }
 
+LUMINARY_FUNCTION uint32_t path_id_get_split_id(const PathID& path_id) {
+  return path_id.y >> PATH_ID_SAMPLE_BITS + PATH_ID_DEPTH_BITS;
+}
+
 //===========================================================================================
 // Functions
 //===========================================================================================
