@@ -135,9 +135,11 @@ LUMINARY_FUNCTION BSDFRayContext
 template <MaterialType TYPE, typename RANDOM_SET>
 LUMINARY_FUNCTION BSDFSampleInfo<TYPE> bsdf_sample(const MaterialContext<TYPE> mat_ctx, const PathID& path_id);
 
+enum class BSDFSamplingMode { RESAMPLE, REFLECTION_ONLY, REFRACTION_ONLY };
+
 template <typename RANDOM_SET>
 LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(
-  const MaterialContextGeometry mat_ctx, const PathID& path_id) {
+  const MaterialContextGeometry mat_ctx, const PathID& path_id, const BSDFSamplingMode mode) {
   const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx.params);
 
   if (opacity < 1.0f) {
@@ -173,16 +175,17 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   const bool include_diffuse =
     (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE) && ((mat_ctx.params.flags & MATERIAL_FLAG_METALLIC) == 0);
   const bool include_refraction = (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
+  const bool refraction_only    = mode == BSDFSamplingMode::REFRACTION_ONLY && include_refraction;
 
   float sum_weights  = 0.0f;
   RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 
-  float resampling_random = random_1D(RANDOM_SET::RESAMPLING, path_id);
+  float resampling_random = (mode == BSDFSamplingMode::RESAMPLE) ? random_1D(RANDOM_SET::RESAMPLING, path_id) : 0.0f;
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx.params);
 
   // Microfacet based sample
-  if (true) {
+  if (refraction_only == false) {
     const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
     const vec3 microfacet    = bsdf_microfacet_sample(V_local, roughness, path_id, RANDOM_SET::REFLECTION);
@@ -197,6 +200,13 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
     const float sum_pdf    = pdf + diffuse_pdf + refraction_pdf;
     const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
+
+    if (mode == BSDFSamplingMode::REFLECTION_ONLY) {
+      info.ray                 = normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), ray));
+      info.weight              = scale_color(eval, mis_weight);
+      info.is_microfacet_based = true;
+      return info;
+    }
 
     const float weight = color_importance(eval) * mis_weight;
 
@@ -270,6 +280,14 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
       const float sum_pdf = pdf + reflection_pdf + diffuse_pdf;
       mis_weight          = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
+    }
+
+    if (refraction_only) {
+      info.ray                 = normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), ray));
+      info.weight              = scale_color(eval, mis_weight);
+      info.is_transparent_pass = total_reflection == false;
+      info.is_microfacet_based = true;
+      return info;
     }
 
     const float weight = color_importance(eval) * mis_weight;

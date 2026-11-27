@@ -93,7 +93,8 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
+    BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info =
+      bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id, BSDFSamplingMode::RESAMPLE);
 
     ////////////////////////////////////////////////////////////////////
     // Update delta path state

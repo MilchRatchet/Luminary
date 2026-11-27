@@ -28,9 +28,10 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     const TaskFlags flags                 = throughput.flags;
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
-    const bool split_replay    = path_id_is_split_replay(task.path_id);
-    const bool split_first_hit = device.settings.first_hit_split_count_minus_one != 0 && path_id_get_depth(task.path_id) == 0;
-    if (split_first_hit && device.state.max_depth != 0 && split_replay == false) {
+    const bool split_replay = path_id_is_split_replay(task.path_id);
+    const bool split_first_hit =
+      device.settings.first_hit_split_count_minus_one != 0 && device.state.max_depth != 0 && path_id_get_depth(task.path_id) == 0;
+    if (split_first_hit && split_replay == false) {
       task_split_enqueue(task, trace, throughput, medium, 2);
     }
 
@@ -69,7 +70,9 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     // Bounce Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id);
+    const BSDFSamplingMode sampling_mode =
+      split_first_hit ? (split_replay ? BSDFSamplingMode::REFRACTION_ONLY : BSDFSamplingMode::REFLECTION_ONLY) : BSDFSamplingMode::RESAMPLE;
+    BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id, sampling_mode);
 
     const vec3 bounce_pos = ocean_shift_vector(ctx, bounce_info.is_transparent_pass);
 
@@ -100,7 +103,7 @@ LUMINARY_KERNEL void ocean_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record        = record_pack(split_first_hit ? scale_color(record, 0.5f) : record);
+      bounce_throughput.record        = record_pack(record);
       bounce_throughput.results_index = throughput.results_index;
       task_result_set_live(throughput.results_index, 1);
       bounce_throughput.flags = new_state;
