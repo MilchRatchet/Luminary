@@ -79,6 +79,8 @@ struct DeviceRenderer {
   DeviceRendererQueueArgs args;
   uint32_t pass_id;
   uint32_t* work_pending;
+  uint32_t* resident_task_count;
+  bool work_pending_valid;
   CUhostFn registered_callback_continue_func;
   CUhostFn registered_callback_finished_func;
   DeviceCommonCallbackData common_callback_data;

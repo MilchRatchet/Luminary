@@ -379,6 +379,7 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.split_tasks, ptrs.split_tasks);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_result_live, ptrs.task_result_live);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_work_pending, ptrs.task_work_pending);
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.resident_task_count, ptrs.resident_task_count);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.trace_counts, ptrs.trace_counts);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_counts, ptrs.task_counts);
     DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.task_offsets, ptrs.task_offsets);

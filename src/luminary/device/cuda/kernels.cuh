@@ -467,6 +467,11 @@ LUMINARY_KERNEL void tasks_sort() {
   }
 
   const uint32_t thread_id_in_warp = THREAD_ID & WARP_SIZE_MASK;
+  if (thread_id_in_warp == 0) {
+    const uint32_t warp_task_count = warp_offsets[SHADING_TASK_INDEX_TOTAL - 1] + warp_counts[SHADING_TASK_INDEX_TOTAL - 1];
+    if (warp_task_count > 0)
+      atomicAdd(device.ptrs.resident_task_count, warp_task_count);
+  }
   uint32_t thread_shift            = WARP_SIZE - 1 - thread_id_in_warp;
 
   uint32_t read_thread_counts[SHADING_TASK_INDEX_TOTAL];

@@ -488,6 +488,7 @@ struct DevicePointers {
   DeviceTaskQueue* LUM_RESTRICT task_queues;
   uint32_t* LUM_RESTRICT task_result_live;
   uint32_t* LUM_RESTRICT task_work_pending;
+  uint32_t* LUM_RESTRICT resident_task_count;
   uint16_t* LUM_RESTRICT trace_counts;
   uint16_t* LUM_RESTRICT task_counts;
   uint16_t* LUM_RESTRICT task_offsets;

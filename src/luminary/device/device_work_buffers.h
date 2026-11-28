@@ -23,6 +23,7 @@ struct DeviceWorkBuffersPtrs {
   CUdeviceptr task_queues;
   CUdeviceptr task_result_live;
   CUdeviceptr task_work_pending;
+  CUdeviceptr resident_task_count;
   CUdeviceptr trace_counts;
   CUdeviceptr task_counts;
   CUdeviceptr task_offsets;
@@ -42,6 +43,7 @@ struct DeviceWorkBuffers {
   DEVICE DeviceTaskQueue* task_queues;
   DEVICE uint32_t* task_result_live;
   DEVICE uint32_t* task_work_pending;
+  DEVICE uint32_t* resident_task_count;
   DEVICE uint16_t* trace_counts;
   DEVICE uint16_t* task_counts;
   DEVICE uint16_t* task_offsets;
