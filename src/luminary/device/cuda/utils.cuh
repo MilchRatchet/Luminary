@@ -104,11 +104,14 @@ enum ShadingTaskIndex {
 //                              This flag is used to limit ocean volumes to single scattering for performance reasons.
 //                              This flag is used to limit DL after volume scattering for convergence reasons.
 //
+// STATE_FLAG_SPLIT_ALLOWED: This flag is set while the path has not yet split and may still split at a vertex.
+//
 
 enum StateFlag {
   STATE_FLAG_DELTA_PATH       = 0b00000001u,
   STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
-  STATE_FLAG_VOLUME_SCATTERED = 0b00000100u
+  STATE_FLAG_VOLUME_SCATTERED = 0b00000100u,
+  STATE_FLAG_SPLIT_ALLOWED    = 0b00001000u
 } typedef StateFlag;
 
 struct OptixRaytraceResult {
@@ -173,12 +176,12 @@ LUMINARY_FUNCTION uint32_t path_id_get_split_id(const PathID& path_id) {
   return path_id.y >> PATH_ID_SAMPLE_BITS + PATH_ID_DEPTH_BITS;
 }
 
-LUMINARY_FUNCTION bool path_id_is_split_replay(const PathID& path_id) {
-  return path_id_get_depth(path_id) == 0 && path_id_get_split_id(path_id) != 0;
+LUMINARY_FUNCTION bool path_id_is_split_replay(const PathID& path_id, const TaskFlags flags) {
+  return ((flags & STATE_FLAG_SPLIT_ALLOWED) != 0) && (path_id_get_split_id(path_id) != 0);
 }
 
-LUMINARY_FUNCTION float path_id_get_bounce_scale(const PathID& path_id) {
-  return path_id_get_depth(path_id) == 0 ? 1.0f / (device.settings.first_hit_split_count_minus_one + 1) : 1.0f;
+LUMINARY_FUNCTION float path_id_get_bounce_scale(const TaskFlags flags) {
+  return (flags & STATE_FLAG_SPLIT_ALLOWED) != 0 ? 1.0f / (device.settings.first_hit_split_count_minus_one + 1) : 1.0f;
 }
 
 //===========================================================================================

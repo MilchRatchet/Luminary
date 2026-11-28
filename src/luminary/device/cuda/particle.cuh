@@ -27,7 +27,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
     task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const MaterialContextParticle ctx = particle_get_context(task, flags, medium, trace.handle.instance_id);
-    const bool split_replay           = path_id_is_split_replay(task.path_id);
+    const bool split_replay           = path_id_is_split_replay(task.path_id, flags);
 
     ////////////////////////////////////////////////////////////////////
     // Direct Lighting Geometry

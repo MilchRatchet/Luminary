@@ -234,9 +234,8 @@ LUMINARY_KERNEL void volume_process_tasks() {
     if (path_id_get_depth(task.path_id) >= device.state.max_depth)
       continue;
 
-    if (
-      device.settings.first_hit_split_count_minus_one != 0 && path_id_get_depth(task.path_id) == 0
-      && path_id_get_split_id(task.path_id) == 0) {
+    const bool split_allowed = device.settings.first_hit_split_count_minus_one != 0 && (flags & STATE_FLAG_SPLIT_ALLOWED) != 0;
+    if (split_allowed && path_id_get_split_id(task.path_id) == 0) {
       task_split_enqueue(task, trace, throughput, medium, device.settings.first_hit_split_count_minus_one + 1);
     }
 
@@ -253,6 +252,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     new_state &= ~STATE_FLAG_DELTA_PATH;
     new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~STATE_FLAG_SPLIT_ALLOWED;
 
     new_state |= STATE_FLAG_VOLUME_SCATTERED;
 
@@ -267,7 +267,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
     task_store(dst_task_base_address, bounce_task);
     DeviceTaskThroughput bounce_throughput = throughput;
     bounce_throughput.flags                = new_state;
-    const float bounce_scale               = path_id_get_bounce_scale(task.path_id);
+    const float bounce_scale               = path_id_get_bounce_scale(flags);
     if (bounce_scale < 1.0f)
       bounce_throughput.record = record_pack(scale_color(record_unpack(throughput.record), bounce_scale));
     task_throughput_store(dst_task_base_address, bounce_throughput);

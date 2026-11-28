@@ -28,10 +28,11 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     const TaskFlags flags                 = throughput.flags;
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
-    const bool split_replay = path_id_is_split_replay(task.path_id);
-    const bool split_first_hit =
-      device.settings.first_hit_split_count_minus_one != 0 && device.state.max_depth != 0 && path_id_get_depth(task.path_id) == 0;
-    if (split_first_hit && split_replay == false) {
+    const bool split_replay = path_id_is_split_replay(task.path_id, flags);
+    const bool split_allowed =
+      device.settings.first_hit_split_count_minus_one != 0 && (flags & STATE_FLAG_SPLIT_ALLOWED) != 0
+      && path_id_get_depth(task.path_id) < device.state.max_depth;
+    if (split_allowed && split_replay == false) {
       task_split_enqueue(task, trace, throughput, medium, 2);
     }
 
@@ -71,14 +72,14 @@ LUMINARY_KERNEL void ocean_process_tasks() {
     ////////////////////////////////////////////////////////////////////
 
     const BSDFSamplingMode sampling_mode =
-      split_first_hit ? (split_replay ? BSDFSamplingMode::REFRACTION_ONLY : BSDFSamplingMode::REFLECTION_ONLY) : BSDFSamplingMode::RESAMPLE;
+      split_allowed ? (split_replay ? BSDFSamplingMode::REFRACTION_ONLY : BSDFSamplingMode::REFLECTION_ONLY) : BSDFSamplingMode::RESAMPLE;
     BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info = bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id, sampling_mode);
 
     const vec3 bounce_pos = ocean_shift_vector(ctx, bounce_info.is_transparent_pass);
 
     uint32_t new_state = flags;
 
-    new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    new_state &= ~(STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_SPLIT_ALLOWED);
 
     if (path_id_get_depth(task.path_id) < device.state.max_depth && russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       RGBF record = record_unpack(throughput.record);

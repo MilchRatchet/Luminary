@@ -170,7 +170,8 @@ LUMINARY_KERNEL void tasks_create() {
 
     throughput.record        = record_pack(camera_result.weight);
     throughput.results_index = task_result_base_address;
-    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
+    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION
+                       | ((device.settings.first_hit_split_count_minus_one != 0) ? STATE_FLAG_SPLIT_ALLOWED : 0u);
 
     task_throughput_store(task_base_address, throughput);
 
@@ -343,7 +344,8 @@ LUMINARY_KERNEL void tasks_create_adaptive_sampling() {
 
     throughput.record        = record_pack(camera_result.weight);
     throughput.results_index = task_result_base_address;
-    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
+    throughput.flags         = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION
+                       | ((device.settings.first_hit_split_count_minus_one != 0) ? STATE_FLAG_SPLIT_ALLOWED : 0u);
 
     task_throughput_store(task_base_address, throughput);
 

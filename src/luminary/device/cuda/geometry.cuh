@@ -26,14 +26,14 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     const DeviceTaskTrace trace           = task_trace_load(task_base_address);
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
-    const bool split_replay = path_id_is_split_replay(task.path_id);
-    const bool split_first_hit =
-      device.settings.first_hit_split_count_minus_one != 0 && device.state.max_depth != 0 && path_id_get_depth(task.path_id) == 0;
+    const TaskFlags flags   = throughput.flags;
+    const bool split_replay = path_id_is_split_replay(task.path_id, flags);
+    const bool split_allowed =
+      device.settings.first_hit_split_count_minus_one != 0 && (flags & STATE_FLAG_SPLIT_ALLOWED) != 0
+      && path_id_get_depth(task.path_id) < device.state.max_depth;
 
     const vec3 ray_origin = task.origin;
     task.origin           = add_vector(task.origin, scale_vector(task.ray, trace.depth));
-
-    const TaskFlags flags = throughput.flags;
 
     RGBF emission;
     const MaterialContextGeometry ctx = geometry_get_context(task, flags, trace, medium, emission);
@@ -42,8 +42,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     BSDFSamplingMode sampling_mode = BSDFSamplingMode::RESAMPLE;
     float bounce_scale             = 1.0f;
+    bool did_split                 = false;
 
-    if (split_first_hit) {
+    if (split_allowed) {
       const float opacity       = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params);
       const bool is_smooth      = roughness <= BSDF_ROUGHNESS_CLAMP;
       const bool has_surface    = opacity > 0.0f;
@@ -63,7 +64,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
         has_rest ? ((requested_splits > fixed_count) ? (requested_splits - fixed_count) : 1u) : 0u;
       const uint32_t total_splits = fixed_count + rest_count;
 
-      if (split_replay == false && total_splits > 1u) {
+      did_split = total_splits > 1u;
+
+      if (split_replay == false && did_split) {
         DeviceTask split_task = task;
         split_task.origin     = ray_origin;
         task_split_enqueue(split_task, trace, throughput, medium, total_splits);
@@ -182,6 +185,9 @@ LUMINARY_KERNEL void geometry_process_tasks() {
 
     if (is_pass_through == false)
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+
+    if (did_split)
+      new_state &= ~STATE_FLAG_SPLIT_ALLOWED;
 
     if (path_id_get_depth(task.path_id) < device.state.max_depth && russian_roulette_apply(task.path_id, flags, bounce_info.weight)) {
       const DeviceTaskThroughput throughput = task_throughput_load(task_base_address);
