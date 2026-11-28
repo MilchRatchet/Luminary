@@ -27,18 +27,73 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     DeviceTaskMediumStack medium          = task_medium_load(task_base_address);
 
     const bool split_replay = path_id_is_split_replay(task.path_id);
-    if (
-      device.settings.first_hit_split_count_minus_one != 0 && device.state.max_depth != 0 && path_id_get_depth(task.path_id) == 0
-      && split_replay == false) {
-      task_split_enqueue(task, trace, throughput, medium, device.settings.first_hit_split_count_minus_one + 1);
-    }
+    const bool split_first_hit =
+      device.settings.first_hit_split_count_minus_one != 0 && device.state.max_depth != 0 && path_id_get_depth(task.path_id) == 0;
 
-    task.origin = add_vector(task.origin, scale_vector(task.ray, trace.depth));
+    const vec3 ray_origin = task.origin;
+    task.origin           = add_vector(task.origin, scale_vector(task.ray, trace.depth));
 
     const TaskFlags flags = throughput.flags;
 
     RGBF emission;
     const MaterialContextGeometry ctx = geometry_get_context(task, flags, trace, medium, emission);
+
+    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params);
+
+    BSDFSamplingMode sampling_mode = BSDFSamplingMode::RESAMPLE;
+    float bounce_scale             = 1.0f;
+
+    if (split_first_hit) {
+      const float opacity       = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(ctx.params);
+      const bool is_smooth      = roughness <= BSDF_ROUGHNESS_CLAMP;
+      const bool has_surface    = opacity > 0.0f;
+      const bool is_translucent = MATERIAL_IS_SUBSTRATE_TRANSLUCENT(ctx.params.flags);
+      const bool is_metallic    = (ctx.params.flags & MATERIAL_FLAG_METALLIC) != 0;
+      const bool has_diffuse    = (is_translucent == false) && (is_metallic == false);
+
+      const bool split_transparent       = opacity < 1.0f;
+      const bool split_smooth_reflection = has_surface && is_smooth;
+      const bool split_smooth_refraction = has_surface && is_smooth && is_translucent;
+      const bool has_rest                = has_surface && ((is_smooth == false) || has_diffuse);
+
+      const uint32_t fixed_count =
+        (uint32_t) split_transparent + (uint32_t) split_smooth_reflection + (uint32_t) split_smooth_refraction;
+      const uint32_t requested_splits = device.settings.first_hit_split_count_minus_one + 1u;
+      const uint32_t rest_count =
+        has_rest ? ((requested_splits > fixed_count) ? (requested_splits - fixed_count) : 1u) : 0u;
+      const uint32_t total_splits = fixed_count + rest_count;
+
+      if (split_replay == false && total_splits > 1u) {
+        DeviceTask split_task = task;
+        split_task.origin     = ray_origin;
+        task_split_enqueue(split_task, trace, throughput, medium, total_splits);
+      }
+
+      const uint32_t split_id = path_id_get_split_id(task.path_id);
+      uint32_t slot           = 0;
+
+      if (split_transparent && split_id == slot++) {
+        sampling_mode = BSDFSamplingMode::TRANSPARENT_ONLY;
+      }
+      else if (split_smooth_reflection && split_id == slot++) {
+        sampling_mode = BSDFSamplingMode::REFLECTION_ONLY;
+      }
+      else if (split_smooth_refraction && split_id == slot++) {
+        sampling_mode = BSDFSamplingMode::REFRACTION_ONLY;
+      }
+      else {
+        if (is_smooth) {
+          sampling_mode = BSDFSamplingMode::DIFFUSE_ONLY;
+        }
+        else if (is_metallic) {
+          sampling_mode = BSDFSamplingMode::REFLECTION_ONLY;
+        }
+        else {
+          sampling_mode = BSDFSamplingMode::RESAMPLE_SURFACE;
+        }
+        bounce_scale = 1.0f / (float) rest_count;
+      }
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Emission
@@ -94,13 +149,11 @@ LUMINARY_KERNEL void geometry_process_tasks() {
     ////////////////////////////////////////////////////////////////////
 
     BSDFSampleInfo<MATERIAL_GEOMETRY> bounce_info =
-      bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id, BSDFSamplingMode::RESAMPLE);
+      bsdf_sample<MaterialContextGeometry::RANDOM_GI>(ctx, task.path_id, sampling_mode);
 
     ////////////////////////////////////////////////////////////////////
     // Update delta path state
     ////////////////////////////////////////////////////////////////////
-
-    const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(ctx.params);
 
     bool is_delta_distribution;
     if (bounce_info.is_transparent_pass) {
@@ -147,7 +200,7 @@ LUMINARY_KERNEL void geometry_process_tasks() {
       task_store(dst_task_base_address, bounce_task);
 
       DeviceTaskThroughput bounce_throughput;
-      bounce_throughput.record        = record_pack(scale_color(record, path_id_get_bounce_scale(task.path_id)));
+      bounce_throughput.record        = record_pack(scale_color(record, bounce_scale));
       bounce_throughput.results_index = throughput.results_index;
       bounce_throughput.flags         = new_state;
 

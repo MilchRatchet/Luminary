@@ -135,14 +135,27 @@ LUMINARY_FUNCTION BSDFRayContext
 template <MaterialType TYPE, typename RANDOM_SET>
 LUMINARY_FUNCTION BSDFSampleInfo<TYPE> bsdf_sample(const MaterialContext<TYPE> mat_ctx, const PathID& path_id);
 
-enum class BSDFSamplingMode { RESAMPLE, REFLECTION_ONLY, REFRACTION_ONLY };
+enum class BSDFSamplingMode { RESAMPLE, RESAMPLE_SURFACE, TRANSPARENT_ONLY, REFLECTION_ONLY, DIFFUSE_ONLY, REFRACTION_ONLY };
 
 template <typename RANDOM_SET>
 LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETRY>(
   const MaterialContextGeometry mat_ctx, const PathID& path_id, const BSDFSamplingMode mode) {
   const float opacity = material_get_float<MATERIAL_GEOMETRY_PARAM_OPACITY>(mat_ctx.params);
 
-  if (opacity < 1.0f) {
+  if (mode == BSDFSamplingMode::TRANSPARENT_ONLY) {
+    const RGBF albedo = material_get_color<MATERIAL_GEOMETRY_PARAM_ALBEDO>(mat_ctx.params);
+
+    BSDFSampleInfo<MATERIAL_GEOMETRY> info;
+    info.ray = neg_vector(mat_ctx.V);
+    info.weight =
+      scale_color((mat_ctx.params.flags & MATERIAL_FLAG_COLORED_TRANSPARENCY) ? albedo : get_color(1.0f, 1.0f, 1.0f), 1.0f - opacity);
+    info.is_microfacet_based = false;
+    info.is_transparent_pass = true;
+
+    return info;
+  }
+
+  if (mode == BSDFSamplingMode::RESAMPLE && opacity < 1.0f) {
     const float transparency_random = random_1D(RANDOM_SET::OPACITY, path_id);
 
     if (transparency_random >= opacity) {
@@ -175,17 +188,19 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   const bool include_diffuse =
     (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_OPAQUE) && ((mat_ctx.params.flags & MATERIAL_FLAG_METALLIC) == 0);
   const bool include_refraction = (base_substrate == MATERIAL_FLAG_BASE_SUBSTRATE_TRANSLUCENT);
+  const bool diffuse_only       = mode == BSDFSamplingMode::DIFFUSE_ONLY && include_diffuse;
   const bool refraction_only    = mode == BSDFSamplingMode::REFRACTION_ONLY && include_refraction;
+  const bool is_resample        = (mode == BSDFSamplingMode::RESAMPLE) || (mode == BSDFSamplingMode::RESAMPLE_SURFACE);
 
   float sum_weights  = 0.0f;
   RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 
-  float resampling_random = (mode == BSDFSamplingMode::RESAMPLE) ? random_1D(RANDOM_SET::RESAMPLING, path_id) : 0.0f;
+  float resampling_random = is_resample ? random_1D(RANDOM_SET::RESAMPLING, path_id) : 0.0f;
 
   const float ior = material_get_float<MATERIAL_GEOMETRY_PARAM_IOR>(mat_ctx.params);
 
   // Microfacet based sample
-  if (refraction_only == false) {
+  if (refraction_only == false && diffuse_only == false) {
     const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
     const vec3 microfacet    = bsdf_microfacet_sample(V_local, roughness, path_id, RANDOM_SET::REFLECTION);
@@ -220,7 +235,7 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
   }
 
   // Diffuse based sample
-  if (include_diffuse) {
+  if (include_diffuse && refraction_only == false) {
     const float roughness = material_get_float<MATERIAL_GEOMETRY_PARAM_ROUGHNESS>(mat_ctx.params);
 
     const vec3 ray             = bsdf_diffuse_sample(random_2D(RANDOM_SET::DIFFUSE, path_id));
@@ -235,6 +250,13 @@ LUMINARY_FUNCTION BSDFSampleInfo<MATERIAL_GEOMETRY> bsdf_sample<MATERIAL_GEOMETR
 
     const float sum_pdf    = pdf + microfacet_pdf + refraction_pdf;
     const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
+
+    if (diffuse_only) {
+      info.ray                 = normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), ray));
+      info.weight              = scale_color(eval, mis_weight);
+      info.is_microfacet_based = false;
+      return info;
+    }
 
     const float weight = color_importance(eval) * mis_weight;
 
