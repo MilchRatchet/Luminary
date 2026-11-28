@@ -152,7 +152,7 @@ extern "C" __global__ void __raygen__optix() {
   result.depth  = FLT_MAX;
 
   optix_raytrace_geometry(task, result);
-  optix_raytrace_particles(task, task_flags_load(task_base_address), result);
+  optix_raytrace_particles(task, task_base_address, result);
   optix_raytrace_ocean(task, result);
 
   // If we didn't hit anything, the result handle could be the ignore handle,
